@@ -1,0 +1,25 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\git\\cs-fhir-server-harness\\src\\FhirServerHarness\\wwwroot\\css\\site.css",
+      "PackagePath": "staticwebassets\\css\\site.css"
+    },
+    {
+      "Id": "obj\\Debug\\net7.0\\staticwebassets\\msbuild.FhirServerHarness.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net7.0\\staticwebassets\\msbuild.build.FhirServerHarness.props",
+      "PackagePath": "build\\FhirServerHarness.props"
+    },
+    {
+      "Id": "obj\\Debug\\net7.0\\staticwebassets\\msbuild.buildMultiTargeting.FhirServerHarness.props",
+      "PackagePath": "buildMultiTargeting\\FhirServerHarness.props"
+    },
+    {
+      "Id": "obj\\Debug\\net7.0\\staticwebassets\\msbuild.buildTransitive.FhirServerHarness.props",
+      "PackagePath": "buildTransitive\\FhirServerHarness.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

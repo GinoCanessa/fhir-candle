@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net7.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Folder Include="Extensions\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Hl7.Fhir.R4B" Version="4.3.0" />
+	</ItemGroup>
+
+	<!--<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
+		<ItemGroup>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4.Core'"><Aliases>coreR4</Aliases></ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4B.Core'"><Aliases>coreR4B</Aliases></ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R5.Core'"><Aliases>coreR5</Aliases></ReferencePath>
+		</ItemGroup>
+	</Target>-->
+
+</Project>

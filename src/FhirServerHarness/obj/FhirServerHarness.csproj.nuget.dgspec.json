@@ -48,6 +48,10 @@
             "Hl7.Fhir.R4B": {
               "target": "Package",
               "version": "[4.3.0, )"
+            },
+            "Hl7.FhirPath": {
+              "target": "Package",
+              "version": "[4.3.0, )"
             }
           },
           "imports": [

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "bsEeKClAZ1FJpdmJte5Uiht+7hUhqRgUOHW1znFYkw/wxHd3/1kJrmA689Yl2qkZxT79NnU0ntxLGDalpjRyAQ==",
+  "dgSpecHash": "CMWNETvWITPjU3lbUJIGZSDwdhRVEnVQLQlZD5CmMZLqo5QhPgizz08oEp/vnwOrOXm0apgjoxqpVCxGP1VUlA==",
   "success": true,
   "projectFilePath": "C:\\git\\cs-fhir-server-harness\\src\\FhirServerHarness\\FhirServerHarness.csproj",
   "expectedPackageFiles": [

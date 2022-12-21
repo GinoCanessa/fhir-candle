@@ -7,6 +7,7 @@ using FhirServerHarness.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
+using Hl7.FhirPath;
 using Microsoft.AspNetCore.Http;
 using System.Net;
 
@@ -17,6 +18,9 @@ public class FhirStore : IFhirStore
 {
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
+
+    private static readonly FhirPathCompiler _compiler = new();
+
 
     private FhirJsonParser _jsonParser = new(new ParserSettings()
     {

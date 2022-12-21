@@ -105,6 +105,13 @@ public interface IFhirStore : IDisposable
         out string serializedResource,
         out string serializedOutcome);
 
+    /// <summary>Type search.</summary>
+    /// <param name="resourceType">     Type of the resource.</param>
+    /// <param name="queryString">      The query string.</param>
+    /// <param name="destFormat">       Destination format.</param>
+    /// <param name="serializedBundle"> [out] The serialized bundle.</param>
+    /// <param name="serializedOutcome">[out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode TypeSearch(
         string resourceType,
         string queryString,

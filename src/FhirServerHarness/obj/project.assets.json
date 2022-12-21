@@ -3476,7 +3476,8 @@
   },
   "projectFileDependencyGroups": {
     "net7.0": [
-      "Hl7.Fhir.R4B >= 4.3.0"
+      "Hl7.Fhir.R4B >= 4.3.0",
+      "Hl7.FhirPath >= 4.3.0"
     ]
   },
   "packageFolders": {
@@ -3525,6 +3526,10 @@
         "targetAlias": "net7.0",
         "dependencies": {
           "Hl7.Fhir.R4B": {
+            "target": "Package",
+            "version": "[4.3.0, )"
+          },
+          "Hl7.FhirPath": {
             "target": "Package",
             "version": "[4.3.0, )"
           }

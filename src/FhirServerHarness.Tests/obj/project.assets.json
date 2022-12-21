@@ -1916,7 +1916,8 @@
         "type": "project",
         "framework": ".NETCoreApp,Version=v7.0",
         "dependencies": {
-          "Hl7.Fhir.R4B": "4.3.0"
+          "Hl7.Fhir.R4B": "4.3.0",
+          "Hl7.FhirPath": "4.3.0"
         },
         "compile": {
           "bin/placeholder/FhirServerHarness.dll": {}

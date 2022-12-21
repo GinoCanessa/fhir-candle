@@ -295,24 +295,61 @@ public class ParsedSearchParameter
         "_total"
     });
 
-    private static readonly ImmutableHashSet<string> _allResourceParameters = ImmutableHashSet.Create(new string[]
+    /// <summary>(Immutable) Options for controlling all resource.</summary>
+    private static readonly Dictionary<string, string> _allResourceParameters = new()
     {
-        "_content",
-        "_id",
-        "_in",
-        "_language",
-        "_lastUpdated",
+        /// <summary>Searching all textual content of a resource.</summary>
+        {"_content", "" },
 
-    });
+        /// <summary>Specify an arbitrary query via filter syntax.</summary>
+        { "_filter", "" },
+
+        /// <summary>Searching based on the logical identifier of resources (Resource.id).</summary>
+        { "_id", "Resource.id" },
+
+        /// <summary>Match resources against active membership in collection resources.</summary>
+        { "_in", "" },
+
+        /// <summary>Match resources based on the language of the resource used (Resource.language).</summary>
+        { "_language", "Resource.language" },
+
+        /// <summary>Match resources based on when the most recent change has been made (Resource.meta.lastUpdated).</summary>
+        { "_lastUpdated", "Resource.meta.lastUpdated" },
+
+        /// <summary>Test resources against references in a List resource.</summary>
+        { "_list", "" },
+
+        /// <summary>Match resources based on values in the Resource.meta.profile element.</summary>
+        { "_profile", "Resource.meta.profile" },
+
+        /// <summary>Execute a pre-defined and named query operation.</summary>
+        { "_query", "" },
+
+        /// <summary>Match resources based on security labels in the Resource.meta.security.</summary>
+        { "_security", "Resource.meta.security" },
+
+        /// <summary>Match resources based on tag information in the Resource.meta.tag element.</summary>
+        { "_tag", "Resource.meta.tag" },
+
+        /// <summary>Perform searches against the narrative content of a resource.</summary>
+        { "_text", "" },
+
+        /// <summary>Allow filtering of types in searches that are performed across multiple resource types (e.g., searches across the server root).</summary>
+        { "_type", "" },
+    };
 
     /// <summary>Gets or sets the name.</summary>
-    public string Name { get; set; }
+    public required string Name { get; set; }
+
+    /// <summary>Gets or sets the type of the parameter.</summary>
+    public required SearchParameterTypeCodes ParamType { get; set; }
 
     /// <summary>Gets or sets the modifier.</summary>
-    public string? Modifier { get; set; }
+    public string? Modifier { get; set; } = null;
 
     /// <summary>Gets or sets the prefix.</summary>
-    public string? Prefix { get; set; }
+    public string? Prefix { get; set; } = null;
 
-    
+    /// <summary>Gets or sets the fhirPath query.</summary>
+    public required string Expression { get; set; }
 }

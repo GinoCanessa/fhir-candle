@@ -34,7 +34,7 @@ public class FhirStoreTestsR4B : IDisposable
     {
         _testOutputHelper = testOutputHelper;
 
-        _fhirStore = new FhirStore();
+        _fhirStore = new VersionedFhirStore();
         _fhirStore.Init(_config);
     }
 
@@ -49,7 +49,7 @@ public class FhirStoreTestsR4B : IDisposable
     
     [Theory]
     [FileData("data/r4b/patient-example.json")]
-    public void StoreExamplePatient(string json)
+    public void CreateAndReadExamplePatient(string json)
     {
         //_testOutputHelper.WriteLine(json);
 
@@ -59,16 +59,19 @@ public class FhirStoreTestsR4B : IDisposable
             "application/fhir+json",
             "application/fhir+json",
             string.Empty,
+            true,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
-            out string lastModified);
+            out string lastModified,
+            out string location);
 
         scCreate.Should().Be(HttpStatusCode.Created);
         serializedResource.Should().NotBeNullOrEmpty();
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Be("Patient/example");
 
         HttpStatusCode scRead = _fhirStore.InstanceRead(
             "Patient",
@@ -87,12 +90,12 @@ public class FhirStoreTestsR4B : IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().StartWith("Patient/");
     }
 
     [Theory]
     [DirectoryContentsData("data/r4b", "patient-*.json")]
-    public void LoadAndSearch(params string[] jsons)
+    public void CreateAllPatients(params string[] jsons)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
@@ -104,16 +107,125 @@ public class FhirStoreTestsR4B : IDisposable
                 "application/fhir+json",
                 "application/fhir+json",
                 string.Empty,
+                true,
                 out string serializedResource,
                 out string serializedOutcome,
                 out string eTag,
-                out string lastModified);
+                out string lastModified,
+                out string location);
 
             scCreate.Should().Be(HttpStatusCode.Created);
             serializedResource.Should().NotBeNullOrEmpty();
             serializedOutcome.Should().NotBeNullOrEmpty();
             eTag.Should().Be("W/\"1\"");
             lastModified.Should().NotBeNullOrEmpty();
+            location.Should().StartWith("Patient/");
+        }
+    }
+
+    [Theory]
+    [FileData("data/r4b/patient-example.json")]
+    public void CreateExamplePatientSearchById(string json)
+    {
+        //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
+
+        HttpStatusCode scCreate = _fhirStore.InstanceCreate(
+            "Patient",
+            json,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        scCreate.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().StartWith("Patient/");
+
+        _fhirStore.TypeSearch("Patient", "_id=example", "application/fhir+json", out string bundle, out string outcome);
+        bundle.Should().NotBeNullOrEmpty();
+        bundle.Length.Should().BeGreaterThan(json.Length / 2);      // account for formatting change (pretty -> not)
+
+        _testOutputHelper.WriteLine(bundle);
+    }
+
+
+    [Theory]
+    [DirectoryContentsData("data/r4b", "patient-*.json")]
+    public void CreateAllPatientsSearchExampleById(params string[] jsons)
+    {
+        //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
+
+        foreach (var json in jsons)
+        {
+            HttpStatusCode scCreate = _fhirStore.InstanceCreate(
+                "Patient",
+                json,
+                "application/fhir+json",
+                "application/fhir+json",
+                string.Empty,
+                true,
+                out string serializedResource,
+                out string serializedOutcome,
+                out string eTag,
+                out string lastModified,
+                out string location);
+
+            scCreate.Should().Be(HttpStatusCode.Created);
+            serializedResource.Should().NotBeNullOrEmpty();
+            serializedOutcome.Should().NotBeNullOrEmpty();
+            eTag.Should().Be("W/\"1\"");
+            lastModified.Should().NotBeNullOrEmpty();
+            location.Should().StartWith("Patient/");
+        }
+
+        _fhirStore.TypeSearch("Patient", "_id=example", "application/fhir+json", out string bundle, out string outcome);
+        bundle.Should().NotBeNullOrEmpty();
+        bundle.Length.Should().BeGreaterThan(55);       // empty bundle length
+
+        //_testOutputHelper.WriteLine(bundle);
+    }
+
+
+    [Theory]
+    [DirectoryContentsData("data/r4b", "patient-*.json")]
+    public void CreateAllPatientsSearchExampleByIdLooped(params string[] jsons)
+    {
+        //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
+
+        foreach (var json in jsons)
+        {
+            HttpStatusCode scCreate = _fhirStore.InstanceCreate(
+                "Patient",
+                json,
+                "application/fhir+json",
+                "application/fhir+json",
+                string.Empty,
+                true,
+                out string serializedResource,
+                out string serializedOutcome,
+                out string eTag,
+                out string lastModified,
+                out string location);
+
+            scCreate.Should().Be(HttpStatusCode.Created);
+            serializedResource.Should().NotBeNullOrEmpty();
+            serializedOutcome.Should().NotBeNullOrEmpty();
+            eTag.Should().Be("W/\"1\"");
+            location.Should().StartWith("Patient/");
+        }
+
+        for (int i = 0; i < 100; i++)
+        {
+            _fhirStore.TypeSearch("Patient", "_id=example", "application/fhir+json", out string bundle, out string outcome);
+            bundle.Should().NotBeNullOrEmpty();
         }
     }
 }

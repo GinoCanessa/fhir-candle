@@ -4,6 +4,8 @@
 // </copyright>
 
 using FhirServerHarness.Models;
+using FhirServerHarness.Search;
+using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
@@ -14,13 +16,12 @@ using System.Net;
 namespace FhirServerHarness.Storage;
 
 /// <summary>A FHIR store.</summary>
-public class FhirStore : IFhirStore
+public class VersionedFhirStore : IFhirStore
 {
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
 
     private static readonly FhirPathCompiler _compiler = new();
-
 
     private FhirJsonParser _jsonParser = new(new ParserSettings()
     {
@@ -52,8 +53,19 @@ public class FhirStore : IFhirStore
     /// <summary>The store.</summary>
     private Dictionary<string, IResourceStore> _store = new();
 
+    /// <summary>The search tester.</summary>
+    private SearchTester _searchTester;
+
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources => _store.Keys.ToArray<string>();
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VersionedFhirStore"/> class.
+    /// </summary>
+    public VersionedFhirStore()
+    {
+        _searchTester = new() { FhirStore = this };
+    }
 
     /// <summary>Initializes this object.</summary>
     /// <param name="config">The configuration.</param>
@@ -80,13 +92,45 @@ public class FhirStore : IFhirStore
 
             Type[] tArgs = { t };
 
-            IResourceStore? irs = (IResourceStore?)Activator.CreateInstance(rsType.MakeGenericType(tArgs));
+            IResourceStore? irs = (IResourceStore?)Activator.CreateInstance(rsType.MakeGenericType(tArgs), _searchTester);
 
             if (irs != null)
             {
                 _store.Add(tn, irs);
             }
         }
+    }
+
+    /// <summary>Resolves the given URI into a resource.</summary>
+    /// <exception cref="ArgumentException">Thrown when one or more arguments have unsupported or
+    ///  illegal values.</exception>
+    /// <param name="uri">URI of the resource.</param>
+    /// <returns>An ITypedElement.</returns>
+    public ITypedElement Resolve(string uri)
+    {
+        string[] components = uri.Split('/');
+
+        if (components.Length < 2)
+        {
+            throw new ArgumentException("Invalid URI", nameof(uri));
+        }
+
+        string resourceType = components[components.Length - 2];
+        string id = components[components.Length - 1];
+
+        if (!_store.TryGetValue(resourceType, out IResourceStore? rs))
+        {
+            throw new ArgumentException("Invalid URI - unsupported resource type", nameof(uri));
+        }
+
+        Resource? resource = rs.InstanceRead(id);
+
+        if (resource == null)
+        {
+            throw new ArgumentException("Invalid URI - ID not found", nameof(uri));
+        }
+
+        return resource.ToTypedElement().ToScopedNode();
     }
 
     /// <summary>Builds outcome for request.</summary>
@@ -156,14 +200,17 @@ public class FhirStore : IFhirStore
     }
 
     /// <summary>Instance create.</summary>
+    /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="ifNoneExist">       if none exist.</param>
+    /// <param name="allowExistingId">   True to allow an existing id.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
+    /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceCreate(
         string resourceType,
@@ -171,10 +218,12 @@ public class FhirStore : IFhirStore
         string sourceFormat,
         string destFormat,
         string ifNoneExist,
+        bool allowExistingId,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
-        out string lastModified)
+        out string lastModified,
+        out string location)
     {
         object parsed;
 
@@ -203,6 +252,7 @@ public class FhirStore : IFhirStore
 
                     eTag = string.Empty;
                     lastModified = string.Empty;
+                    location = string.Empty;
                     return HttpStatusCode.UnsupportedMediaType;
                 }
         }
@@ -216,6 +266,7 @@ public class FhirStore : IFhirStore
 
             eTag = string.Empty;
             lastModified = string.Empty;
+            location = string.Empty;
             return HttpStatusCode.UnsupportedMediaType;
         }
 
@@ -228,6 +279,7 @@ public class FhirStore : IFhirStore
 
             eTag = string.Empty;
             lastModified = string.Empty;
+            location = string.Empty;
             return HttpStatusCode.UnsupportedMediaType;
         }
 
@@ -240,6 +292,7 @@ public class FhirStore : IFhirStore
 
             eTag = string.Empty;
             lastModified = string.Empty;
+            location = string.Empty;
             return HttpStatusCode.UnsupportedMediaType;
         }
 
@@ -252,10 +305,11 @@ public class FhirStore : IFhirStore
 
             eTag = string.Empty;
             lastModified = string.Empty;
+            location = string.Empty;
             return HttpStatusCode.UnsupportedMediaType;
         }
 
-        Resource? stored = _store[resourceType].InstanceCreate(r);
+        Resource? stored = _store[resourceType].InstanceCreate(r, allowExistingId);
 
         if (stored == null)
         {
@@ -266,6 +320,7 @@ public class FhirStore : IFhirStore
 
             eTag = string.Empty;
             lastModified = string.Empty;
+            location = string.Empty;
             return HttpStatusCode.UnsupportedMediaType;
         }
 
@@ -275,6 +330,7 @@ public class FhirStore : IFhirStore
 
         eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
         lastModified = (stored.Meta?.LastUpdated == null) ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        location = $"{resourceType}/{stored.Id}";   // TODO: add in base url
         return HttpStatusCode.Created;
     }
 
@@ -394,6 +450,7 @@ public class FhirStore : IFhirStore
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
+    /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceUpdate(
         string resourceType,
@@ -406,7 +463,8 @@ public class FhirStore : IFhirStore
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
-        out string lastModified)
+        out string lastModified,
+        out string location)
     {
         throw new NotImplementedException();
     }
@@ -418,7 +476,7 @@ public class FhirStore : IFhirStore
     /// <param name="serializedBundle"> [out] The serialized bundle.</param>
     /// <param name="serializedOutcome">[out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode TypeSearch(
+    public HttpStatusCode TypeSearch(
         string resourceType,
         string queryString,
         string destFormat,
@@ -445,7 +503,36 @@ public class FhirStore : IFhirStore
             return HttpStatusCode.BadRequest;
         }
 
+        IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(queryString, _store[resourceType], this);
+
+        IEnumerable<Resource>? results = _store[resourceType].TypeSearch(parameters);
+
+        if (results == null)
+        {
+            serializedBundle = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to search resource type: {resourceType}");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            return HttpStatusCode.UnsupportedMediaType;
+        }
+
+        Bundle bundle = new Bundle
+        {
+            Type = Bundle.BundleType.Searchset,
+            Total = results.Count(),
+        };
         
+        foreach (Resource resource in results)
+        {
+            bundle.AddSearchEntry(resource, $"/{resource.TypeName}/{resource.Id}", Bundle.SearchEntryMode.Match);
+        }
+
+        serializedBundle = SerializeFhir(bundle, destFormat, SummaryType.False);
+        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.OK, $"Search {resourceType}");
+        serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
+
+        return HttpStatusCode.OK;
     }
 
 

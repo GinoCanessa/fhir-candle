@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirServerHarness.Extensions;
+using FhirServerHarness.Storage;
 using Hl7.Fhir.Utility;
 using System.Collections.Immutable;
 
@@ -66,6 +67,9 @@ public class ParsedSearchParameter
     /// <summary>Values that represent search modifier codes.</summary>
     public enum SearchModifierCodes
     {
+        /// <summary>An enum constant representing the none option.</summary>
+        None,
+        
         /// <summary>
         /// Tests whether the value in a resource points to a resource of the supplied 
         /// parameter type. Note: a concrete ResourceType is specified as the modifier 
@@ -252,7 +256,7 @@ public class ParsedSearchParameter
     }
 
     /// <summary>(Immutable) Options for controlling the HTTP.</summary>
-    private static readonly ImmutableHashSet<string> _httpParameters = ImmutableHashSet.Create(new string[]
+    internal static readonly ImmutableHashSet<string> _httpParameters = ImmutableHashSet.Create(new string[]
     {
         /// <summary>Override the HTTP content negotiation.</summary>
         "_format",
@@ -268,7 +272,7 @@ public class ParsedSearchParameter
     });
 
     /// <summary>(Immutable) Options for controlling the search result.</summary>
-    private static readonly ImmutableHashSet<string> _searchResultParameters = ImmutableHashSet.Create(new string[]
+    internal static readonly ImmutableHashSet<string> _searchResultParameters = ImmutableHashSet.Create(new string[]
     {
         /// <summary>Request different types of handling for contained resources.</summary>
         "_contained",
@@ -296,7 +300,7 @@ public class ParsedSearchParameter
     });
 
     /// <summary>(Immutable) Options for controlling all resource.</summary>
-    private static readonly Dictionary<string, string> _allResourceParameters = new()
+    internal static readonly Dictionary<string, string> _allResourceParameters = new()
     {
         /// <summary>Searching all textual content of a resource.</summary>
         {"_content", "" },
@@ -341,15 +345,88 @@ public class ParsedSearchParameter
     /// <summary>Gets or sets the name.</summary>
     public required string Name { get; set; }
 
+    /// <summary>Gets or sets the value.</summary>
+    public required string Value { get; set; }
+
     /// <summary>Gets or sets the type of the parameter.</summary>
     public required SearchParameterTypeCodes ParamType { get; set; }
 
     /// <summary>Gets or sets the modifier.</summary>
-    public string? Modifier { get; set; } = null;
+    public string? ModifierLiteral { get; set; } = null;
+
+    /// <summary>Gets or sets the modifier.</summary>
+    public SearchModifierCodes Modifier { get; set; } = SearchModifierCodes.None;
 
     /// <summary>Gets or sets the prefix.</summary>
     public string? Prefix { get; set; } = null;
 
-    /// <summary>Gets or sets the fhirPath query.</summary>
-    public required string Expression { get; set; }
+    /// <summary>Gets or sets the fhirPath extraction query.</summary>
+    public required string SelectExpression { get; set; }
+
+    /// <summary>Enumerates parse in this collection.</summary>
+    /// <param name="queryString">  The query string.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="store">        The store.</param>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process parse in this collection.
+    /// </returns>
+    public static IEnumerable<ParsedSearchParameter> Parse(
+        string queryString,
+        IResourceStore resourceStore,
+        IFhirStore store)
+    {
+        if (string.IsNullOrWhiteSpace(queryString))
+        {
+            yield break;
+        }
+
+        System.Collections.Specialized.NameValueCollection query = System.Web.HttpUtility.ParseQueryString(queryString);
+        foreach (string key in query)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            string? value = query[key];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            string[] keyComponents = key.Split(':');
+
+            string sp = keyComponents[0];
+
+            if (sp.Contains('.'))
+            {
+                // TODO: handle chaining
+            }
+
+            // TODO: handle reverse chaining (additional ':')
+
+            // TODO: check for modifiers (SearchModifierCodes)
+            // TODO: check for resourceType modifier (need to match resources in the store)
+
+
+
+            // TODO: Remove WIP
+            yield return new ParsedSearchParameter
+            {
+                Name = sp,
+                ParamType = SearchParameterTypeCodes.String,
+                ModifierLiteral = keyComponents.Length > 1 ? keyComponents[1] : null,
+                Prefix = keyComponents.Length > 2 ? keyComponents[2] : null,
+                SelectExpression = "Resource.id",
+                Value = value,
+            };
+
+
+            //var parameter = Parse(key, value);
+            //if (parameter != null)
+            //{
+            //    yield return parameter;
+            //}
+        }
+    }
 }

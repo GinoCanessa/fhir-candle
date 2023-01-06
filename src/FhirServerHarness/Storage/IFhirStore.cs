@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirServerHarness.Models;
+using Hl7.Fhir.ElementModel;
 using System.Net;
 
 namespace FhirServerHarness.Storage;
@@ -47,10 +48,12 @@ public interface IFhirStore : IDisposable
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="ifNoneExist">       if none exist.</param>
+    /// <param name="allowExistingId">   True to allow an existing id.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
+    /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceCreate(
         string resourceType,
@@ -58,10 +61,12 @@ public interface IFhirStore : IDisposable
         string sourceFormat,
         string destFormat,
         string ifNoneExist,
+        bool allowExistingId,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
-        out string lastModified);
+        out string lastModified,
+        out string location);
 
     /// <summary>Instance update.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
@@ -75,6 +80,7 @@ public interface IFhirStore : IDisposable
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
+    /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceUpdate(
         string resourceType,
@@ -87,7 +93,8 @@ public interface IFhirStore : IDisposable
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
-        out string lastModified);
+        out string lastModified,
+        out string location);
 
     /// <summary>Instance delete.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
@@ -118,6 +125,11 @@ public interface IFhirStore : IDisposable
         string destFormat,
         out string serializedBundle,
         out string serializedOutcome);
+
+    /// <summary>Resolves the given URI into a resource.</summary>
+    /// <param name="uri">URI of the resource.</param>
+    /// <returns>An ITypedElement.</returns>
+    ITypedElement Resolve(string uri);
 
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources { get; }

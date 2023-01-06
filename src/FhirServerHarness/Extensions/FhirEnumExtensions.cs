@@ -7,7 +7,7 @@ using System.Reflection;
 
 namespace FhirServerHarness.Extensions;
 
-public class FhirEnumExtensions
+public static class FhirEnumExtensions
 {
     private static Dictionary<Type, EnumValueLookups> _typeLookups = new();
 

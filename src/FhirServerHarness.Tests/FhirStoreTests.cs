@@ -48,7 +48,7 @@ public class FhirStoreTests : IDisposable
     [MemberData(nameof(Configurations))]
     public void CreateFhirStore(ProviderConfiguration config)
     {
-        IFhirStore fhirStore = new FhirStore();
+        IFhirStore fhirStore = new VersionedFhirStore();
         fhirStore.Should().NotBeNull("Failed to create FhirStore");
 
         // initialize with the provided configuration

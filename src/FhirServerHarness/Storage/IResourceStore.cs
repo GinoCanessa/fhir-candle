@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirServerHarness.Models;
+using Hl7.Fhir.Model;
 
 namespace FhirServerHarness.Storage;
 
@@ -11,9 +12,6 @@ namespace FhirServerHarness.Storage;
 /// <typeparam name="T">Resource type parameter.</typeparam>
 public interface IResourceStore : IDisposable
 {
-    /// <summary>Gets options for controlling the search.</summary>
-    public Dictionary<string, ParsedSearchParameter> SearchParameters { get; }
-
     /// <summary>Reads a specific instance of a resource.</summary>
     /// <param name="id">[out] The identifier.</param>
     /// <returns>The requested resource or null.</returns>
@@ -41,4 +39,18 @@ public interface IResourceStore : IDisposable
     /// An enumerator that allows foreach to be used to process type search in this collection.
     /// </returns>
     IEnumerable<Hl7.Fhir.Model.Resource>? TypeSearch(IEnumerable<ParsedSearchParameter> parameters);
+
+    /// <summary>Adds a search parameter definition.</summary>
+    /// <param name="spDefinition">The sp definition.</param>
+    void AddSearchParameterDefinition(ModelInfo.SearchParamDefinition spDefinition);
+
+    /// <summary>
+    /// Attempts to get search parameter definition a ModelInfo.SearchParamDefinition from the given
+    /// string.
+    /// </summary>
+    /// <param name="name">        The name.</param>
+    /// <param name="spDefinition">[out] The sp definition.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryGetSearchParamDefinition(string name, out ModelInfo.SearchParamDefinition? spDefinition);
+
 }

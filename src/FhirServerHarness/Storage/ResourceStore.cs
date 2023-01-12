@@ -20,6 +20,9 @@ namespace FhirServerHarness.Storage;
 public class ResourceStore<T> : IResourceStore
     where T : Resource
 {
+    /// <summary>Name of the resource.</summary>
+    private string _resourceName = typeof(T).Name;
+
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;
 
@@ -30,14 +33,13 @@ public class ResourceStore<T> : IResourceStore
     public required SearchTester _searchTester;
 
     /// <summary>(Immutable) The FHIRPath compiler.</summary>
-    private static readonly FhirPathCompiler _compiler = new();
+    private readonly FhirPathCompiler _compiler = new();
+
+    /// <summary>Options for controlling the search.</summary>
+    private Dictionary<string, ModelInfo.SearchParamDefinition> _searchParameters = new();
 
     /// <summary>(Immutable) The compiled FHIRPath expressions.</summary>
     private readonly ConcurrentDictionary<string, CompiledExpression> _fpExpressions = new();
-
-    // TODO: Parse resource-specific search parameters
-    /// <summary>Options for controlling the search.</summary>
-    public Dictionary<string, ParsedSearchParameter> SearchParameters => throw new NotImplementedException();
 
     /// <summary>
     /// Initializes a new instance of the FhirServerHarness.Storage.ResourceStore&lt;T&gt; class.
@@ -157,6 +159,35 @@ public class ResourceStore<T> : IResourceStore
         T instance = _resourceStore[id];
         _ = _resourceStore.Remove(id);
         return instance;
+    }
+
+    /// <summary>Adds a search parameter definition.</summary>
+    /// <param name="spDefinition">The sp definition.</param>
+    public void AddSearchParameterDefinition(ModelInfo.SearchParamDefinition spDefinition)
+    {
+        if (string.IsNullOrEmpty(spDefinition?.Name))
+        {
+            return;
+        }
+
+        if (spDefinition.Resource != _resourceName)
+        {
+            return;
+        }
+
+        _searchParameters.Add(spDefinition.Name, spDefinition);
+    }
+
+    /// <summary>
+    /// Attempts to get search parameter definition a ModelInfo.SearchParamDefinition from the given
+    /// string.
+    /// </summary>
+    /// <param name="name">        The name.</param>
+    /// <param name="spDefinition">[out] The sp definition.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryGetSearchParamDefinition(string name, out ModelInfo.SearchParamDefinition? spDefinition)
+    {
+        return _searchParameters.TryGetValue(name, out spDefinition);
     }
 
     /// <summary>Performs a type search in this resource store.</summary>

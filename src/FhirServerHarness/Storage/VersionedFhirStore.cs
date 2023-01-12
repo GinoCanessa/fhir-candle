@@ -49,7 +49,6 @@ public class VersionedFhirStore : IFhirStore
         IgnoreUnknownElements = true,
     };
 
-
     /// <summary>The store.</summary>
     private Dictionary<string, IResourceStore> _store = new();
 
@@ -97,6 +96,17 @@ public class VersionedFhirStore : IFhirStore
             if (irs != null)
             {
                 _store.Add(tn, irs);
+            }
+        }
+
+        foreach (ModelInfo.SearchParamDefinition spDefinition in ModelInfo.SearchParameters)
+        {
+            if (spDefinition.Resource != null)
+            {
+                if (_store.TryGetValue(spDefinition.Resource, out IResourceStore? rs))
+                {
+                    rs.AddSearchParameterDefinition(spDefinition);
+                }
             }
         }
     }
@@ -503,7 +513,10 @@ public class VersionedFhirStore : IFhirStore
             return HttpStatusCode.BadRequest;
         }
 
-        IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(queryString, _store[resourceType], this);
+        IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(
+            queryString,
+            _store[resourceType],
+            this);
 
         IEnumerable<Resource>? results = _store[resourceType].TypeSearch(parameters);
 

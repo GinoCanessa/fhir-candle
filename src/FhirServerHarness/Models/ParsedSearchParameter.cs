@@ -5,6 +5,7 @@
 
 using FhirServerHarness.Extensions;
 using FhirServerHarness.Storage;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 using System.Collections.Immutable;
 
@@ -13,57 +14,6 @@ namespace FhirServerHarness.Models;
 /// <summary>A parsed search parameter.</summary>
 public class ParsedSearchParameter
 {
-    /// <summary>Values that represent search parameter type codes.</summary>
-    public enum SearchParameterTypeCodes
-    {
-        /// <summary>
-        /// A date parameter searches on a date/time or period.
-        /// </summary>
-        Date,
-
-        /// <summary>
-        /// Searching on a simple numerical value in a resource.
-        /// </summary>
-        Number,
-
-        /// <summary>
-        /// A quantity parameter searches on the Quantity datatype.
-        /// </summary>
-        Quantity,
-
-        /// <summary>
-        /// A reference parameter refers to references between resources.
-        /// </summary>
-        Reference,
-
-        /// <summary>
-        /// For a simple string search, a string parameter serves as the input 
-        /// for a search against sequences of characters.
-        /// </summary>
-        String,
-
-        /// <summary>
-        /// A token type is a parameter that provides a close to exact match 
-        /// search on a string of characters, potentially scoped by a URI.
-        /// </summary>
-        Token,
-
-        /// <summary>
-        /// The uri parameter refers to an element that contains a URI (RFC 3986).
-        /// </summary>
-        Uri,
-
-        /// <summary>
-        /// Composite search parameters are allow joining multiple elements into distinct single values with a $.
-        /// </summary>
-        Composite,
-
-        /// <summary>
-        /// The way this parameter works is unique to the parameter and described with the parameter.
-        /// </summary>
-        Special,
-    }
-
     /// <summary>Values that represent search modifier codes.</summary>
     public enum SearchModifierCodes
     {
@@ -300,56 +250,59 @@ public class ParsedSearchParameter
     });
 
     /// <summary>(Immutable) Options for controlling all resource.</summary>
-    internal static readonly Dictionary<string, string> _allResourceParameters = new()
+    internal static readonly Dictionary<string, ModelInfo.SearchParamDefinition> _allResourceParameters = new()
     {
         /// <summary>Searching all textual content of a resource.</summary>
-        {"_content", "" },
+        {"_content", new() { Name = "_content", Type = SearchParamType.Special } },
 
         /// <summary>Specify an arbitrary query via filter syntax.</summary>
-        { "_filter", "" },
+        { "_filter", new() { Name = "_filter", Type = SearchParamType.Special } },
 
         /// <summary>Searching based on the logical identifier of resources (Resource.id).</summary>
-        { "_id", "Resource.id" },
+        { "_id", new() { Name = "_id", Expression = "Resource.id", Type = SearchParamType.Token } },
 
         /// <summary>Match resources against active membership in collection resources.</summary>
-        { "_in", "" },
+        { "_in", new() { Name = "_in", Type = SearchParamType.Reference } },
 
         /// <summary>Match resources based on the language of the resource used (Resource.language).</summary>
-        { "_language", "Resource.language" },
+        { "_language", new() { Name = "_language", Expression = "Resource.language", Type = SearchParamType.Token } },
 
         /// <summary>Match resources based on when the most recent change has been made (Resource.meta.lastUpdated).</summary>
-        { "_lastUpdated", "Resource.meta.lastUpdated" },
+        { "_lastUpdated", new() { Name = "_lastUpdated", Expression = "Resource.meta.lastUpdated", Type = SearchParamType.Date } },
 
         /// <summary>Test resources against references in a List resource.</summary>
-        { "_list", "" },
+        { "_list", new() { Name = "_list", Type = SearchParamType.Special } },
 
         /// <summary>Match resources based on values in the Resource.meta.profile element.</summary>
-        { "_profile", "Resource.meta.profile" },
+        { "_profile", new() { Name = "_profile", Expression = "Resource.meta.profile", Type = SearchParamType.Reference } },
 
         /// <summary>Execute a pre-defined and named query operation.</summary>
-        { "_query", "" },
+        { "_query", new() { Name = "_query", Type = SearchParamType.Token } },
 
         /// <summary>Match resources based on security labels in the Resource.meta.security.</summary>
-        { "_security", "Resource.meta.security" },
+        { "_security", new() { Name = "_security", Expression = "Resource.meta.security", Type = SearchParamType.Token } },
+        
+        /// <summary>Match resources based on tag information in the Resource.meta.source element</summary>
+        { "_source", new() { Name = "_security", Expression = "Resource.meta.source", Type = SearchParamType.Uri } },
 
         /// <summary>Match resources based on tag information in the Resource.meta.tag element.</summary>
-        { "_tag", "Resource.meta.tag" },
+        { "_tag", new() { Name ="_tag", Expression = "Resource.meta.tag", Type = SearchParamType.Token } },
 
         /// <summary>Perform searches against the narrative content of a resource.</summary>
-        { "_text", "" },
+        { "_text", new() { Name = "_text", Type = SearchParamType.String } },
 
         /// <summary>Allow filtering of types in searches that are performed across multiple resource types (e.g., searches across the server root).</summary>
-        { "_type", "" },
+        { "_type", new() { Name = "_type", Type = SearchParamType.Token } },
     };
 
     /// <summary>Gets or sets the name.</summary>
     public required string Name { get; set; }
 
-    /// <summary>Gets or sets the value.</summary>
-    public required string Value { get; set; }
+    /// <summary>Gets or sets the values.</summary>
+    public required string[] Values { get; set; }
 
     /// <summary>Gets or sets the type of the parameter.</summary>
-    public required SearchParameterTypeCodes ParamType { get; set; }
+    public required SearchParamType ParamType { get; set; }
 
     /// <summary>Gets or sets the modifier.</summary>
     public string? ModifierLiteral { get; set; } = null;
@@ -394,32 +347,120 @@ public class ParsedSearchParameter
                 continue;
             }
 
-            string[] keyComponents = key.Split(':');
+            List<string> values = new();
 
-            string sp = keyComponents[0];
+            int index = 0;
+            while (index < value.Length)
+            {
+                int nextIndex = value.IndexOf(',', index);
+                if (nextIndex == -1)
+                {
+                    // unescape commas
+                    values.Add(value.Substring(index).Replace("\\,", ","));
+                    break;
+                }
 
-            if (sp.Contains('.'))
+                // check for no content (e.g., ",,")
+                if (nextIndex == (index + 1))
+                {
+                    // ignore this value and continue
+                    continue;
+                }
+
+                // check to see if this comma is escaped
+                if (value[nextIndex - 1] == '\\')
+                {
+                    // do not move the start, keep looking for the next comma
+                    continue;
+                }
+
+                // unescape any escaped commas and add this value
+                values.Add(value.Substring(index, nextIndex - index).Replace("\\,", ","));
+                index = nextIndex + 1;
+            }
+
+
+            if (key.Contains('.'))
             {
                 // TODO: handle chaining
             }
 
-            // TODO: handle reverse chaining (additional ':')
+            string[] keyComponents = key.Split(':');
 
-            // TODO: check for modifiers (SearchModifierCodes)
+            string sp = keyComponents[0];
+
+
+            if (keyComponents.Length > 2)
+            {
+                if (!keyComponents.Any(kc => kc.Equals("_has")))
+                {
+                    // TODO: need to fail query, not throw
+                    throw new Exception($"too many modifiers: {key}");
+                }
+
+                // TODO: handle reverse chaining (_has contains additional ':')
+            }
+
+            // check for modifiers (SearchModifierCodes)
+            string modifierLiteral = string.Empty;
+            SearchModifierCodes modifierCode = SearchModifierCodes.None;
+
+            if (keyComponents.Length == 2)
+            {
+                modifierLiteral = keyComponents[1];
+                if (!Enum.TryParse<SearchModifierCodes>(modifierLiteral, true, out modifierCode))
+                {
+                    // TODO: need to fail query, not throw
+                    throw new Exception($"unknown modifier: {modifierLiteral}");
+                }
+            }
+
             // TODO: check for resourceType modifier (need to match resources in the store)
 
-
-
-            // TODO: Remove WIP
-            yield return new ParsedSearchParameter
+            if (_allResourceParameters.ContainsKey(sp))
             {
-                Name = sp,
-                ParamType = SearchParameterTypeCodes.String,
-                ModifierLiteral = keyComponents.Length > 1 ? keyComponents[1] : null,
-                Prefix = keyComponents.Length > 2 ? keyComponents[2] : null,
-                SelectExpression = "Resource.id",
-                Value = value,
-            };
+                yield return new ParsedSearchParameter
+                {
+                    Name = sp,
+                    ParamType = _allResourceParameters[sp].Type,
+                    ModifierLiteral = modifierLiteral,
+                    Modifier = modifierCode,
+                    Prefix = keyComponents.Length > 2 ? keyComponents[2] : null,
+                    SelectExpression = _allResourceParameters[sp].Expression ?? string.Empty,
+                    Values = values.ToArray(),
+                };
+
+                continue;
+            }
+
+            if ((resourceStore != null) &&
+                resourceStore.TryGetSearchParamDefinition(sp, out ModelInfo.SearchParamDefinition? spDefinition))
+            {
+                yield return new ParsedSearchParameter
+                {
+                    Name = sp,
+                    ParamType = spDefinition!.Type,
+                    ModifierLiteral = modifierLiteral,
+                    Modifier = modifierCode,
+                    Prefix = keyComponents.Length > 2 ? keyComponents[2] : null,
+                    SelectExpression = spDefinition!.Expression ?? string.Empty,
+                    Values = values.ToArray(),
+                };
+
+                continue;
+            }
+
+
+            //// TODO: Remove WIP
+            //yield return new ParsedSearchParameter
+            //{
+            //    Name = sp,
+            //    ParamType = SearchParamType.String,
+            //    ModifierLiteral = keyComponents.Length > 1 ? keyComponents[1] : null,
+            //    Prefix = keyComponents.Length > 2 ? keyComponents[2] : null,
+            //    SelectExpression = "Resource.id",
+            //    Value = value,
+            //};
 
 
             //var parameter = Parse(key, value);

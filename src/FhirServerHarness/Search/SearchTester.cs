@@ -64,8 +64,10 @@ public class SearchTester
 
             if (!extracted.Any())
             {
-                if (sp.Modifier == ParsedSearchParameter.SearchModifierCodes.Missing)
+                if ((sp.Modifier == ParsedSearchParameter.SearchModifierCodes.Missing) &&
+                    sp.Values.Any(v => v.StartsWith("t", StringComparison.OrdinalIgnoreCase)))
                 {
+                    // successful match
                     continue;
                 }
 
@@ -73,6 +75,8 @@ public class SearchTester
                 ignoredParameters = ignored;
                 return false;
             }
+
+            bool found = false;
 
             foreach (ITypedElement resultNode in extracted)
             {
@@ -82,13 +86,24 @@ public class SearchTester
                     case "string":
                         if (SearchTestString(resultNode, sp))
                         {
-                            continue;
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "HumanName":
+                        if (SearchTestHumanName(resultNode, sp))
+                        {
+                            found = true;
+                            break;
                         }
                         break;
                 }
-
-                // fallthrough of switch means that a parameter did NOT match
-
+            }
+            
+            if (!found)
+            {
+                // no matches in any extracted value means a parameter did NOT match
                 appliedParameters = applied;
                 ignoredParameters = ignored;
                 return false;
@@ -102,7 +117,7 @@ public class SearchTester
         return true;
     }
 
-    /// <summary>Searches for the first test string.</summary>
+    /// <summary>Performs a search test against a string.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
     /// <param name="valueNode">The value node.</param>
     /// <param name="sp">       The sp.</param>
@@ -120,7 +135,7 @@ public class SearchTester
                         return false;
                     }
 
-                    return value.StartsWith(sp.Value, StringComparison.OrdinalIgnoreCase);
+                    return sp.Values.Any(v => value.StartsWith(v, StringComparison.OrdinalIgnoreCase));
                 }
 
             case ParsedSearchParameter.SearchModifierCodes.Contains:
@@ -130,7 +145,7 @@ public class SearchTester
                         return false;
                     }
 
-                    return value.Contains(sp.Value, StringComparison.OrdinalIgnoreCase);
+                    return sp.Values.Any(v => value.Contains(v, StringComparison.OrdinalIgnoreCase));
                 }
 
             case ParsedSearchParameter.SearchModifierCodes.Exact:
@@ -140,37 +155,19 @@ public class SearchTester
                         return false;
                     }
 
-                    return value.Equals(sp.Value, StringComparison.Ordinal);
+                    return sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal));
                 }
 
             case ParsedSearchParameter.SearchModifierCodes.Missing:
                 {
-                    if (sp.Value.StartsWith("t", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (string.IsNullOrEmpty(value))
-                        {
-                            return true;
-                        }
-
-                        return false;
-                    }
-
-                    if (string.IsNullOrEmpty(value))
-                    {
-                        return false;
-                    }
-
-                    return true;
+                    return sp.Values.Any(v => 
+                        (v.StartsWith("t", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(value)) ||
+                        (v.StartsWith("f", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(value)));
                 }
 
             case ParsedSearchParameter.SearchModifierCodes.Not:
                 {
-                    if (string.IsNullOrEmpty(value))
-                    {
-                        return false;
-                    }
-
-                    return !value.Equals(sp.Value, StringComparison.Ordinal);
+                    return sp.Values.Any(v => !value.Equals(v, StringComparison.Ordinal));
                 }
 
             case ParsedSearchParameter.SearchModifierCodes.ResourceType:
@@ -185,7 +182,90 @@ public class SearchTester
             case ParsedSearchParameter.SearchModifierCodes.Text:
             case ParsedSearchParameter.SearchModifierCodes.TextAdvanced:
             default:
-                throw new Exception($"Invalid search modifier for id: {sp.ModifierLiteral}");
+                throw new Exception($"Invalid search modifier for string: {sp.ModifierLiteral}");
         }
+    }
+
+    /// <summary>Performs a search test against a human name.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    private static bool SearchTestHumanName(ITypedElement valueNode, ParsedSearchParameter sp)
+    {
+        foreach (ITypedElement node in valueNode.Descendants())
+        { 
+            if (node.InstanceType != "string")
+            {
+                continue;
+            }
+            string value = (string)(node?.Value ?? string.Empty);
+
+            switch (sp.Modifier)
+            {
+                case ParsedSearchParameter.SearchModifierCodes.None:
+                    {
+                        if (sp.Values.Any(v => value.StartsWith(v, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ParsedSearchParameter.SearchModifierCodes.Contains:
+                    {
+                        if (sp.Values.Any(v => value.Contains(v, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ParsedSearchParameter.SearchModifierCodes.Exact:
+                    {
+                        if (sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal)))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ParsedSearchParameter.SearchModifierCodes.Missing:
+                    {
+                        if (sp.Values.Any(v =>
+                            (v.StartsWith("t", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(value)) ||
+                            (v.StartsWith("f", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(value))))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ParsedSearchParameter.SearchModifierCodes.Not:
+                    {
+                        if (sp.Values.Any(v => !value.Equals(v, StringComparison.Ordinal)))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+
+                case ParsedSearchParameter.SearchModifierCodes.ResourceType:
+                case ParsedSearchParameter.SearchModifierCodes.Above:
+                case ParsedSearchParameter.SearchModifierCodes.Below:
+                case ParsedSearchParameter.SearchModifierCodes.CodeText:
+                case ParsedSearchParameter.SearchModifierCodes.Identifier:
+                case ParsedSearchParameter.SearchModifierCodes.In:
+                case ParsedSearchParameter.SearchModifierCodes.Iterate:
+                case ParsedSearchParameter.SearchModifierCodes.NotIn:
+                case ParsedSearchParameter.SearchModifierCodes.OfType:
+                case ParsedSearchParameter.SearchModifierCodes.Text:
+                case ParsedSearchParameter.SearchModifierCodes.TextAdvanced:
+                default:
+                    throw new Exception($"Invalid search modifier for HumanName: {sp.ModifierLiteral}");
+            }
+        }
+
+        return false;
     }
 }

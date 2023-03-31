@@ -48,14 +48,14 @@ public static class FhirEnumExtensions
 
         foreach (Enum value in Enum.GetValues(type))
         {
-            FieldInfo fieldInfo = type.GetField(value.ToString());
+            FieldInfo? fieldInfo = type.GetField(value.ToString());
 
             if (fieldInfo == null)
             {
                 continue;
             }
 
-            FhirLiteralAttribute[] attributes = fieldInfo.GetCustomAttributes(
+            FhirLiteralAttribute[]? attributes = fieldInfo.GetCustomAttributes(
                 typeof(FhirLiteralAttribute),
                 false) as FhirLiteralAttribute[];
 
@@ -121,7 +121,7 @@ public static class FhirEnumExtensions
     }
 
     /// <summary>
-    /// A string extension method that attempts to to FHIR enum a T from the given string.
+    /// A string extension method that attempts to try and retrieve FHIR enum a T from the given string.
     /// </summary>
     /// <typeparam name="T">Generic type parameter.</typeparam>
     /// <param name="literal">The literal.</param>

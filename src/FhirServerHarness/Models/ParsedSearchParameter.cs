@@ -8,202 +8,13 @@ using FhirServerHarness.Storage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 using System.Collections.Immutable;
+using static FhirServerHarness.Search.SearchDefinitions;
 
 namespace FhirServerHarness.Models;
 
 /// <summary>A parsed search parameter.</summary>
 public class ParsedSearchParameter
 {
-    /// <summary>Values that represent search modifier codes.</summary>
-    public enum SearchModifierCodes
-    {
-        /// <summary>An enum constant representing the none option.</summary>
-        None,
-        
-        /// <summary>
-        /// Tests whether the value in a resource points to a resource of the supplied 
-        /// parameter type. Note: a concrete ResourceType is specified as the modifier 
-        /// (e.g., not the literal :[type], but a value such as :Patient).
-        /// </summary>
-        ResourceType,
-
-        /// <summary>
-        /// Tests whether the value in a resource is or subsumes the supplied parameter value 
-        /// (is-a, or hierarchical relationships).
-        /// </summary>
-        [FhirLiteral("above")]
-        Above,
-
-        /// <summary>
-        /// Tests whether the value in a resource is or is subsumed by the supplied parameter 
-        /// value (is-a, or hierarchical relationships).
-        /// </summary>
-        [FhirLiteral("below")]
-        Below,
-
-        /// <summary>
-        /// Tests whether the textual display value in a resource (e.g., CodeableConcept.text, 
-        /// Coding.display, or Reference.display) matches the supplied parameter value.
-        /// </summary>
-        [FhirLiteral("code-text")]
-        CodeText,
-
-        /// <summary>
-        /// Tests whether the value in a resource includes the supplied parameter value 
-        /// anywhere within the field being searched.
-        /// </summary>
-        [FhirLiteral("contains")]
-        Contains,
-
-        /// <summary>
-        /// Tests whether the value in a resource exactly matches the supplied parameter 
-        /// value (the whole string, including casing and accents).
-        /// </summary>
-        [FhirLiteral("exact")]
-        Exact,
-
-        /// <summary>
-        /// Tests whether the Reference.identifier in a resource (rather than the 
-        /// Reference.reference) matches the supplied parameter value.
-        /// </summary>
-        [FhirLiteral("identifier")]
-        Identifier,
-
-        /// <summary>
-        /// Tests whether the value in a resource is a member of the supplied parameter ValueSet.
-        /// </summary>
-        [FhirLiteral("in")]
-        In,
-
-        /// <summary>
-        /// The search parameter indicates an inclusion directive (_include, _revinclude) that 
-        /// is applied to an included resource instead of the matching resource.
-        /// </summary>
-        [FhirLiteral("iterate")]
-        Iterate,
-
-        /// <summary>
-        /// Tests whether the value in a resource is present (when the supplied parameter 
-        /// value is true) or absent (when the supplied parameter value is false).
-        /// </summary>
-        [FhirLiteral("missing")]
-        Missing,
-
-        /// <summary>
-        /// Tests whether the value in a resource does not match the specified parameter 
-        /// value. Note that this includes resources that have no value for the parameter.
-        /// </summary>
-        [FhirLiteral("not")]
-        Not,
-
-        /// <summary>
-        /// Tests whether the value in a resource is not a member of the supplied parameter ValueSet.
-        /// </summary>
-        [FhirLiteral("not-in")]
-        NotIn,
-
-        /// <summary>
-        /// Tests whether the Identifier value in a resource matches the supplied parameter value.
-        /// </summary>
-        [FhirLiteral("of-type")]
-        OfType,
-
-        /// <summary>
-        /// reference, token:
-        ///     Tests whether the textual value in a resource (e.g., CodeableConcept.text, 
-        ///     Coding.display, Identifier.type.text, or Reference.display) matches the supplied 
-        ///     parameter value using basic string matching (begins with or is, case-insensitive).
-        /// text:
-        ///     The search parameter value should be processed as input to a search with advanced text handling.
-        /// </summary>
-        [FhirLiteral("text")]
-        Text,
-
-        /// <summary>
-        /// Tests whether the value in a resource matches the supplied parameter value using advanced text 
-        /// handling that searches text associated with the code/value - e.g., CodeableConcept.text, 
-        /// Coding.display, or Identifier.type.text.
-        /// </summary>
-        [FhirLiteral("text-advanced")]
-        TextAdvanced,
-    }
-
-    /// <summary>Values that represent search prefix codes.</summary>
-    public enum SearchPrefixCodes
-    {
-        /// <summary>
-        /// The value for the parameter in the resource is equal to the provided value.
-        /// </summary>
-        [FhirLiteral("eq")]
-        Equal,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and is not equal to the provided value.
-        /// </summary>
-        [FhirLiteral("ne")]
-        NotEqual,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and is greater than the provided value.
-        /// </summary>
-        [FhirLiteral("gt")]
-        GreaterThan,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and is less than the provided value.
-        /// </summary>
-        [FhirLiteral("lt")]
-        LessThan,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and is greater or equal to the provided value.
-        /// </summary>
-        [FhirLiteral("ge")]
-        GreaterThanOrEqual,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and is less or equal to the provided value.
-        /// </summary>
-        [FhirLiteral("le")]
-        LessThanOrEqual,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and starts after the provided value.
-        /// </summary>
-        [FhirLiteral("sa")]
-        StartsAfter,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and ends before the provided value.
-        /// </summary>
-        [FhirLiteral("eb")]
-        EndsBefore,
-
-        /// <summary>
-        /// The value for the parameter in the resource exists and is approximately the same to the provided value.
-        /// </summary>
-        [FhirLiteral("ap")]
-        Approximately,
-    }
-
-    /// <summary>Values that represent parameter type codes.</summary>
-    public enum ParameterTypeCodes
-    {
-        /// <summary>An enum constant representing the HTTP parameter option.</summary>
-        HttpParameter,
-
-        /// <summary>An enum constant representing the search result parameter option.</summary>
-        SearchResultParameter,
-
-        /// <summary>An enum constant representing the all resource parameter option.</summary>
-        AllResourceParameter,
-
-        /// <summary>An enum constant representing the resource-specific parameter option.</summary>
-        ResourceParameter,
-
-        /// <summary>An enum constant representing the subscription topic parameter option.</summary>
-        SubscriptionTopicParameter,
-    }
 
     /// <summary>(Immutable) Options for controlling the HTTP.</summary>
     internal static readonly ImmutableHashSet<string> _httpParameters = ImmutableHashSet.Create(new string[]
@@ -301,6 +112,9 @@ public class ParsedSearchParameter
     /// <summary>Gets or sets the values.</summary>
     public required string[] Values { get; set; }
 
+    /// <summary>Gets or sets the prefix.</summary>
+    public SearchPrefixCodes?[] Prefixes { get; set; } = Array.Empty<SearchPrefixCodes?>();
+
     /// <summary>Gets or sets the type of the parameter.</summary>
     public required SearchParamType ParamType { get; set; }
 
@@ -309,9 +123,6 @@ public class ParsedSearchParameter
 
     /// <summary>Gets or sets the modifier.</summary>
     public SearchModifierCodes Modifier { get; set; } = SearchModifierCodes.None;
-
-    /// <summary>Gets or sets the prefix.</summary>
-    public string? Prefix { get; set; } = null;
 
     /// <summary>Gets or sets the fhirPath extraction query.</summary>
     public required string SelectExpression { get; set; }
@@ -347,8 +158,65 @@ public class ParsedSearchParameter
                 continue;
             }
 
+            if (key.Contains('.'))
+            {
+                // TODO: handle chaining
+            }
+
+            string[] keyComponents = key.Split(':');
+
+            string sp = keyComponents[0];
+
+            if (keyComponents.Length > 2)
+            {
+                if (!keyComponents.Any(kc => kc.Equals("_has")))
+                {
+                    // TODO: need to fail query, not throw
+                    throw new Exception($"too many modifiers: {key}");
+                }
+
+                // TODO: handle reverse chaining (_has contains additional ':')
+            }
+
+            // check for modifiers (SearchModifierCodes)
+            string modifierLiteral = string.Empty;
+            SearchModifierCodes modifierCode = SearchModifierCodes.None;
+
+            if (keyComponents.Length == 2)
+            {
+                modifierLiteral = keyComponents[1];
+                if (!Enum.TryParse(modifierLiteral, true, out modifierCode))
+                {
+                    // TODO: need to fail query, not throw
+                    throw new Exception($"unknown modifier: {modifierLiteral}");
+                }
+            }
+
+            // TODO: check for resourceType modifier (need to match resources in the store)
+
+
+            ModelInfo.SearchParamDefinition? spd = null;
+
+            if (_allResourceParameters.ContainsKey(sp))
+            {
+                spd = _allResourceParameters[sp];
+            }
+
+            if ((spd == null) &&
+                (resourceStore != null))
+            {
+                if (!resourceStore.TryGetSearchParamDefinition(sp, out spd))
+                {
+                    // no definition found
+                    Console.WriteLine($"Unknown search parameter: {sp}");
+                    continue;
+                }
+            }
+
+            List<SearchPrefixCodes?> prefixes = new();
             List<string> values = new();
 
+            // parse parameter string, looking for multi-value
             int index = 0;
             while (index < value.Length)
             {
@@ -379,77 +247,53 @@ public class ParsedSearchParameter
                 index = nextIndex + 1;
             }
 
-
-            if (key.Contains('.'))
+            switch (spd!.Type)
             {
-                // TODO: handle chaining
+                // parameter types that allow prefixes
+                case SearchParamType.Number:
+                case SearchParamType.Date:
+                case SearchParamType.Quantity:
+                    for (int i = 0; i < values.Count; i++)
+                    {
+                        if (values[i].Length < 2)
+                        {
+                            continue;
+                        }
+
+                        if (values[i].Substring(0, 2).TryFhirEnum(out SearchPrefixCodes prefix))
+                        {
+                            prefixes.Add(prefix);
+                            values[i] = values[i].Substring(2);
+                        }
+                        else
+                        {
+                            prefixes.Add(null);
+                        }
+                    }
+
+                    break;
+                //case SearchParamType.String:
+                //case SearchParamType.Token:
+                //case SearchParamType.Reference:
+                //case SearchParamType.Composite:
+                //case SearchParamType.Uri:
+                //case SearchParamType.Special:
+                default:
+                    break;
             }
 
-            string[] keyComponents = key.Split(':');
-
-            string sp = keyComponents[0];
-
-
-            if (keyComponents.Length > 2)
+            yield return new ParsedSearchParameter
             {
-                if (!keyComponents.Any(kc => kc.Equals("_has")))
-                {
-                    // TODO: need to fail query, not throw
-                    throw new Exception($"too many modifiers: {key}");
-                }
+                Name = sp,
+                ParamType = spd.Type,
+                ModifierLiteral = modifierLiteral,
+                Modifier = modifierCode,
+                Prefixes = prefixes.ToArray(),
+                SelectExpression = spd.Expression ?? string.Empty,
+                Values = values.ToArray(),
+            };
 
-                // TODO: handle reverse chaining (_has contains additional ':')
-            }
-
-            // check for modifiers (SearchModifierCodes)
-            string modifierLiteral = string.Empty;
-            SearchModifierCodes modifierCode = SearchModifierCodes.None;
-
-            if (keyComponents.Length == 2)
-            {
-                modifierLiteral = keyComponents[1];
-                if (!Enum.TryParse<SearchModifierCodes>(modifierLiteral, true, out modifierCode))
-                {
-                    // TODO: need to fail query, not throw
-                    throw new Exception($"unknown modifier: {modifierLiteral}");
-                }
-            }
-
-            // TODO: check for resourceType modifier (need to match resources in the store)
-
-            if (_allResourceParameters.ContainsKey(sp))
-            {
-                yield return new ParsedSearchParameter
-                {
-                    Name = sp,
-                    ParamType = _allResourceParameters[sp].Type,
-                    ModifierLiteral = modifierLiteral,
-                    Modifier = modifierCode,
-                    Prefix = keyComponents.Length > 2 ? keyComponents[2] : null,
-                    SelectExpression = _allResourceParameters[sp].Expression ?? string.Empty,
-                    Values = values.ToArray(),
-                };
-
-                continue;
-            }
-
-            if ((resourceStore != null) &&
-                resourceStore.TryGetSearchParamDefinition(sp, out ModelInfo.SearchParamDefinition? spDefinition))
-            {
-                yield return new ParsedSearchParameter
-                {
-                    Name = sp,
-                    ParamType = spDefinition!.Type,
-                    ModifierLiteral = modifierLiteral,
-                    Modifier = modifierCode,
-                    Prefix = keyComponents.Length > 2 ? keyComponents[2] : null,
-                    SelectExpression = spDefinition!.Expression ?? string.Empty,
-                    Values = values.ToArray(),
-                };
-
-                continue;
-            }
-
+            continue;
 
             //// TODO: Remove WIP
             //yield return new ParsedSearchParameter

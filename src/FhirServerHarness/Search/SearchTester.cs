@@ -3,12 +3,16 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirServerHarness.Extensions;
 using FhirServerHarness.Models;
 using FhirServerHarness.Storage;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
+using Newtonsoft.Json.Linq;
+using System.Globalization;
+using static FhirServerHarness.Search.SearchDefinitions;
 
 namespace FhirServerHarness.Search;
 
@@ -58,13 +62,21 @@ public class SearchTester
                 continue;
             }
 
+            // check for unsupported modifiers
+            if ((!string.IsNullOrEmpty(sp.ModifierLiteral)) &&
+                (!IsModifierValidForType(sp.Modifier, sp.ParamType)))
+            {
+                ignored.Add(sp);
+                continue;
+            }
+
             applied.Add(sp);
 
             IEnumerable<ITypedElement> extracted = resource.Select(sp.SelectExpression, fpContext);
 
             if (!extracted.Any())
             {
-                if ((sp.Modifier == ParsedSearchParameter.SearchModifierCodes.Missing) &&
+                if ((sp.Modifier == SearchModifierCodes.Missing) &&
                     sp.Values.Any(v => v.StartsWith("t", StringComparison.OrdinalIgnoreCase)))
                 {
                     // successful match
@@ -80,25 +92,201 @@ public class SearchTester
 
             foreach (ITypedElement resultNode in extracted)
             {
-                switch (resultNode.InstanceType)
+                // all types evaluate missing the same way
+                if (sp.Modifier == SearchModifierCodes.Missing)
                 {
-                    case "id":
-                    case "string":
-                        if (SearchTestString(resultNode, sp))
+                    if (SearchTestMissing(resultNode, sp))
+                    {
+                        found = true;
+                        break;
+                    }
+
+                    continue;
+                }
+
+                // build a routing tuple: {search type}<-{modifier}>-{value type}
+                string combined = string.IsNullOrEmpty(sp.ModifierLiteral)
+                    ? $"{sp.ParamType}-{resultNode.InstanceType}".ToLowerInvariant()
+                    : $"{sp.ParamType}-{sp.ModifierLiteral}-{resultNode.InstanceType}".ToLowerInvariant();
+
+                // note that this switch is intentionally 'unrolled' for performance
+                switch (combined)
+                {
+                    case "date-date":
+                    case "date-time":
+                    case "date-datetime":
+                    case "date-instant":
+                    case "date-period":
+                    case "date-timing":
+                        break;
+
+                    // note that the SDK keeps all ITypedElement 'integer' values in 64-bit format
+                    case "number-integer":
+                    case "number-unsignedint":
+                    case "number-positiveint":
+                    case "number-integer64":
+                        if (EvalNumberSearch.TestNumberAgainstLong(resultNode, sp))
                         {
                             found = true;
                             break;
                         }
                         break;
 
-                    case "HumanName":
-                        if (SearchTestHumanName(resultNode, sp))
+                    case "number-decimal":
+                        if (EvalNumberSearch.TestNumberAgainstDecimal(resultNode, sp))
                         {
                             found = true;
                             break;
                         }
                         break;
+
+                    case "quantity-quantity":
+                        break;
+
+                    // TODO: add modifier tuples
+                    case "reference-canonical":
+                    case "reference-reference":
+                    case "reference-oid":
+                    case "reference-uri":
+                    case "reference-url":
+                    case "reference-uuid":
+                        break;
+
+                    case "string-id":
+                    case "string-string":
+                    case "string-markdown":
+                    case "string-xhtml":
+                        if (EvalStringSearch.TestStringStartsWith(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-contains-id":
+                    case "string-contains-string":
+                    case "string-contains-markdown":
+                    case "string-contains-xhtml":
+                        if (EvalStringSearch.TestStringContains(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-exact-id":
+                    case "string-exact-string":
+                    case "string-exact-markdown":
+                    case "string-exact-xhtml":
+                        if (EvalStringSearch.TestStringExact(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-humanname":
+                        if (EvalStringSearch.TestStringStartsWithAgainstHumanName(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-contains-humanname":
+                        if (EvalStringSearch.TestStringContainsAgainstHumanName(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-exact-humanname":
+                        if (EvalStringSearch.TestStringExactAgainstHumanName(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "token-id":
+                        if (EvalTokenSearch.TestTokenAgainstId(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "token-not-id":
+                        if (EvalTokenSearch.TestTokenNotAgainstId(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // TODO: add modifier tuples
+                    case "token-coding":
+                    case "token-codeableconcept":
+                    case "token-identifier":
+                    case "token-contactpoint":
+                    case "token-code":
+                    case "token-boolean":
+                    case "token-canonical":
+                    case "token-oid":
+                    case "token-uri":
+                    case "token-url":
+                    case "token-uuid":
+                    case "token-string":
+                        break;
+
+                    // TODO: add modifier tuples
+                    case "uri-canonical":
+                    case "uri-oid":
+                    case "uri-uri":
+                    case "uri-url":
+                    case "uri-uuid":
+                        break;
                 }
+
+                //switch (resultNode.InstanceType)
+                //{
+                //    // date parameter type against 'single' date types
+                //    case "date":
+                //    case "time":
+                //    case "dateTime":
+                //    case "instant":
+                //        break;
+
+                //    // date parameter type against 'rage' date types
+                //    case "Period":
+                //        break;
+
+                //    // token parameter type against code (string) type
+                //    case "code":
+                //        break;
+
+                //    // token parameter type against uri type
+                //    case "uri":
+                //    case "url":
+                //    case "oid":
+                //    case "uuid":
+                //    case "canonical":
+                //        break;
+
+                //    // token parameter type against boolean type
+                //    case "boolean":
+                //        break;
+
+                //    // string parameter type against Human Name (special handling)
+                //    case "HumanName":
+                //        if (SearchTestHumanName(resultNode, sp))
+                //        {
+                //            found = true;
+                //            break;
+                //        }
+                //        break;
+                //}
             }
             
             if (!found)
@@ -117,73 +305,36 @@ public class SearchTester
         return true;
     }
 
-    /// <summary>Performs a search test against a string.</summary>
-    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+
+    /// <summary>Searches for the first test missing.</summary>
     /// <param name="valueNode">The value node.</param>
     /// <param name="sp">       The sp.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    private static bool SearchTestString(ITypedElement valueNode, ParsedSearchParameter sp)
+    public static bool SearchTestMissing(ITypedElement valueNode, ParsedSearchParameter sp)
     {
-        string value = (string)(valueNode?.Value ?? string.Empty);
+        bool positive = sp.Values.Any(v => v.StartsWith("t", StringComparison.OrdinalIgnoreCase));
+        bool negative = sp.Values.Any(v => v.StartsWith("f", StringComparison.OrdinalIgnoreCase));
 
-        switch (sp.Modifier)
+        // testing both missing and not missing is always true
+        if (positive && negative)
         {
-            case ParsedSearchParameter.SearchModifierCodes.None:
-                {
-                    if (string.IsNullOrEmpty(value))
-                    {
-                        return false;
-                    }
-
-                    return sp.Values.Any(v => value.StartsWith(v, StringComparison.OrdinalIgnoreCase));
-                }
-
-            case ParsedSearchParameter.SearchModifierCodes.Contains:
-                {
-                    if (string.IsNullOrEmpty(value))
-                    {
-                        return false;
-                    }
-
-                    return sp.Values.Any(v => value.Contains(v, StringComparison.OrdinalIgnoreCase));
-                }
-
-            case ParsedSearchParameter.SearchModifierCodes.Exact:
-                {
-                    if (string.IsNullOrEmpty(value))
-                    {
-                        return false;
-                    }
-
-                    return sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal));
-                }
-
-            case ParsedSearchParameter.SearchModifierCodes.Missing:
-                {
-                    return sp.Values.Any(v => 
-                        (v.StartsWith("t", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(value)) ||
-                        (v.StartsWith("f", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(value)));
-                }
-
-            case ParsedSearchParameter.SearchModifierCodes.Not:
-                {
-                    return sp.Values.Any(v => !value.Equals(v, StringComparison.Ordinal));
-                }
-
-            case ParsedSearchParameter.SearchModifierCodes.ResourceType:
-            case ParsedSearchParameter.SearchModifierCodes.Above:
-            case ParsedSearchParameter.SearchModifierCodes.Below:
-            case ParsedSearchParameter.SearchModifierCodes.CodeText:
-            case ParsedSearchParameter.SearchModifierCodes.Identifier:
-            case ParsedSearchParameter.SearchModifierCodes.In:
-            case ParsedSearchParameter.SearchModifierCodes.Iterate:
-            case ParsedSearchParameter.SearchModifierCodes.NotIn:
-            case ParsedSearchParameter.SearchModifierCodes.OfType:
-            case ParsedSearchParameter.SearchModifierCodes.Text:
-            case ParsedSearchParameter.SearchModifierCodes.TextAdvanced:
-            default:
-                throw new Exception($"Invalid search modifier for string: {sp.ModifierLiteral}");
+            return true;
         }
+
+        // test for missing and a null value
+        if (positive && (valueNode?.Value == null))
+        {
+            return true;
+        }
+
+        // test for not missing and not a null value
+        if (negative && (valueNode?.Value != null))
+        {
+            return true;
+        }
+
+        // other combinations are search misses
+        return false;
     }
 
     /// <summary>Performs a search test against a human name.</summary>
@@ -203,7 +354,7 @@ public class SearchTester
 
             switch (sp.Modifier)
             {
-                case ParsedSearchParameter.SearchModifierCodes.None:
+                case SearchModifierCodes.None:
                     {
                         if (sp.Values.Any(v => value.StartsWith(v, StringComparison.OrdinalIgnoreCase)))
                         {
@@ -212,7 +363,7 @@ public class SearchTester
                     }
                     break;
 
-                case ParsedSearchParameter.SearchModifierCodes.Contains:
+                case SearchModifierCodes.Contains:
                     {
                         if (sp.Values.Any(v => value.Contains(v, StringComparison.OrdinalIgnoreCase)))
                         {
@@ -221,7 +372,7 @@ public class SearchTester
                     }
                     break;
 
-                case ParsedSearchParameter.SearchModifierCodes.Exact:
+                case SearchModifierCodes.Exact:
                     {
                         if (sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal)))
                         {
@@ -230,7 +381,7 @@ public class SearchTester
                     }
                     break;
 
-                case ParsedSearchParameter.SearchModifierCodes.Missing:
+                case SearchModifierCodes.Missing:
                     {
                         if (sp.Values.Any(v =>
                             (v.StartsWith("t", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(value)) ||
@@ -241,7 +392,7 @@ public class SearchTester
                     }
                     break;
 
-                case ParsedSearchParameter.SearchModifierCodes.Not:
+                case SearchModifierCodes.Not:
                     {
                         if (sp.Values.Any(v => !value.Equals(v, StringComparison.Ordinal)))
                         {
@@ -250,17 +401,17 @@ public class SearchTester
                     }
                     break;
 
-                case ParsedSearchParameter.SearchModifierCodes.ResourceType:
-                case ParsedSearchParameter.SearchModifierCodes.Above:
-                case ParsedSearchParameter.SearchModifierCodes.Below:
-                case ParsedSearchParameter.SearchModifierCodes.CodeText:
-                case ParsedSearchParameter.SearchModifierCodes.Identifier:
-                case ParsedSearchParameter.SearchModifierCodes.In:
-                case ParsedSearchParameter.SearchModifierCodes.Iterate:
-                case ParsedSearchParameter.SearchModifierCodes.NotIn:
-                case ParsedSearchParameter.SearchModifierCodes.OfType:
-                case ParsedSearchParameter.SearchModifierCodes.Text:
-                case ParsedSearchParameter.SearchModifierCodes.TextAdvanced:
+                case SearchModifierCodes.ResourceType:
+                case SearchModifierCodes.Above:
+                case SearchModifierCodes.Below:
+                case SearchModifierCodes.CodeText:
+                case SearchModifierCodes.Identifier:
+                case SearchModifierCodes.In:
+                case SearchModifierCodes.Iterate:
+                case SearchModifierCodes.NotIn:
+                case SearchModifierCodes.OfType:
+                case SearchModifierCodes.Text:
+                case SearchModifierCodes.TextAdvanced:
                 default:
                     throw new Exception($"Invalid search modifier for HumanName: {sp.ModifierLiteral}");
             }

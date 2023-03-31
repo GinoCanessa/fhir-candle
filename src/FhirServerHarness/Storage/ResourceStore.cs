@@ -8,10 +8,12 @@ using FhirServerHarness.Models;
 using FhirServerHarness.Search;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
+using Hl7.Fhir.Language.Debugging;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace FhirServerHarness.Storage;
 
@@ -20,6 +22,9 @@ namespace FhirServerHarness.Storage;
 public class ResourceStore<T> : IResourceStore
     where T : Resource
 {
+    /// <summary>The store.</summary>
+    private readonly IFhirStore _store;
+
     /// <summary>Name of the resource.</summary>
     private string _resourceName = typeof(T).Name;
 
@@ -44,9 +49,11 @@ public class ResourceStore<T> : IResourceStore
     /// <summary>
     /// Initializes a new instance of the FhirServerHarness.Storage.ResourceStore&lt;T&gt; class.
     /// </summary>
+    /// <param name="fhirStore">   The FHIR store.</param>
     /// <param name="searchTester">The search tester.</param>
-    public ResourceStore(SearchTester searchTester)
+    public ResourceStore(IFhirStore fhirStore, SearchTester searchTester)
     {
+        _store = fhirStore;
         _searchTester = searchTester;
     }
 
@@ -103,6 +110,14 @@ public class ResourceStore<T> : IResourceStore
         source.Meta.LastUpdated = DateTimeOffset.UtcNow;
 
         _resourceStore.Add(source.Id, (T)source);
+
+        switch (source.TypeName)
+        {
+            case "SearchParameter":
+                SetExecutableSearchParameter((SearchParameter)source);
+                break;
+        }
+
         return source;
     }
 
@@ -138,6 +153,14 @@ public class ResourceStore<T> : IResourceStore
         source.Meta.LastUpdated = DateTimeOffset.UtcNow;
 
         _resourceStore[source.Id] = (T)source;
+
+        switch (source.TypeName)
+        {
+            case "SearchParameter":
+                SetExecutableSearchParameter((SearchParameter)source);
+                break;
+        }
+
         return source;
     }
 
@@ -156,14 +179,101 @@ public class ResourceStore<T> : IResourceStore
             return null;
         }
 
-        T instance = _resourceStore[id];
+        Resource instance = _resourceStore[id];
         _ = _resourceStore.Remove(id);
+
+        switch (instance.TypeName)
+        {
+            case "SearchParameter":
+                RemoveExecutableSearchParameter((SearchParameter)instance);
+                break;
+        }
+
         return instance;
+    }
+
+    /// <summary>Adds or updates an executable search parameter based on a SearchParameter resource.</summary>
+    /// <param name="sp">    The sp.</param>
+    /// <param name="delete">(Optional) True to delete.</param>
+    private void SetExecutableSearchParameter(SearchParameter sp)
+    {
+        if ((sp == null) ||
+            (sp.Type == null))
+        {
+            return;
+        }
+
+        string name = sp.Code ?? sp.Name ?? sp.Id;
+
+        ModelInfo.SearchParamDefinition spDefinition = new()
+        {
+            Name = name,
+            Url = sp.Url,
+            Description = sp.Description,
+            Expression = sp.Expression,
+            Target = sp.Target?.Where(r => r != null).Select(r => (ResourceType)r!).ToArray() ?? null,
+            Type = (SearchParamType)sp.Type!,
+        };
+
+        if (sp.Component.Any())
+        {
+            spDefinition.CompositeParams = sp.Component.Select(cp => cp.Definition).ToArray();
+        }
+
+        foreach (ResourceType? rt in sp.Base)
+        {
+            if (rt == null)
+            {
+                continue;
+            }
+
+            spDefinition.Resource = rt!.ToString()!;
+            _store.TrySetExecutableSearchParameter(spDefinition.Resource, spDefinition);
+        }
+    }
+
+    /// <summary>Removes the executable search parameter described by name.</summary>
+    /// <param name="sp">The sp.</param>
+    private void RemoveExecutableSearchParameter(SearchParameter sp)
+    {
+        if ((sp == null) ||
+            (sp.Type == null))
+        {
+            return;
+        }
+
+        string name = sp.Code ?? sp.Name ?? sp.Id;
+
+        foreach (ResourceType? rt in sp.Base)
+        {
+            if (rt == null)
+            {
+                continue;
+            }
+
+            _store.TryRemoveExecutableSearchParameter(rt!.ToString()!, name);
+        }
+
+    }
+
+    /// <summary>Removes the executable search parameter described by name.</summary>
+    /// <param name="name">The name.</param>
+    public void RemoveExecutableSearchParameter(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return;
+        }
+
+        if (_searchParameters.ContainsKey(name))
+        {
+            _searchParameters.Remove(name);
+        }
     }
 
     /// <summary>Adds a search parameter definition.</summary>
     /// <param name="spDefinition">The sp definition.</param>
-    public void AddSearchParameterDefinition(ModelInfo.SearchParamDefinition spDefinition)
+    public void SetExecutableSearchParameter(ModelInfo.SearchParamDefinition spDefinition)
     {
         if (string.IsNullOrEmpty(spDefinition?.Name))
         {
@@ -176,6 +286,35 @@ public class ResourceStore<T> : IResourceStore
         }
 
         _searchParameters.Add(spDefinition.Name, spDefinition);
+
+        // check for not having a matching search parameter resource
+        if (!_store.TryResolve($"SearchParameter/{_resourceName}-{spDefinition.Name}", out ITypedElement? _))
+        {
+            SearchParameter sp = new()
+            {
+                Id = $"{_resourceName}-{spDefinition.Name}",
+                Name = spDefinition.Name,
+                Code = spDefinition.Name,
+                Url = spDefinition.Url,
+                Description = spDefinition.Description,
+                Expression = spDefinition.Expression,
+                Target = spDefinition.Target?.Select(r => (ResourceType?)r) ?? Array.Empty<ResourceType?>(),
+                Type = spDefinition.Type,
+            };
+
+            if (spDefinition.CompositeParams?.Any() ?? false)
+            {
+                sp.Component = new();
+
+                foreach (string composite in spDefinition.CompositeParams)
+                {
+                    sp.Component.Add(new()
+                    {
+                        Definition = composite,
+                    });
+                }
+            }
+        }
     }
 
     /// <summary>

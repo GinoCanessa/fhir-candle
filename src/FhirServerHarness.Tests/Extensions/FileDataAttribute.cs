@@ -13,10 +13,8 @@ public class FileDataAttribute : DataAttribute
 {
     private readonly string _filePath;
 
-    /// <summary>
-    /// Load file contents as the data source for a theory
-    /// </summary>
-    /// <param name="filePath">The absolute or relative path to the file to load</param>
+    /// <summary>Load file contents as the data source for a theory.</summary>
+    /// <param name="filePath">The absolute or relative path to the file to load.</param>
     public FileDataAttribute(string filePath)
     {
         _filePath = filePath;
@@ -38,6 +36,7 @@ public class FileDataAttribute : DataAttribute
         }
 
         string data = File.ReadAllText(path);
+
         return new object[][] { new object[1] { data } };
     }
 }

@@ -42,7 +42,11 @@ public interface IResourceStore : IDisposable
 
     /// <summary>Adds a search parameter definition.</summary>
     /// <param name="spDefinition">The sp definition.</param>
-    void AddSearchParameterDefinition(ModelInfo.SearchParamDefinition spDefinition);
+    void SetExecutableSearchParameter(ModelInfo.SearchParamDefinition spDefinition);
+
+    /// <summary>Removes the executable search parameter described by name.</summary>
+    /// <param name="name">The name.</param>
+    void RemoveExecutableSearchParameter(string name);
 
     /// <summary>
     /// Attempts to get search parameter definition a ModelInfo.SearchParamDefinition from the given

@@ -33,6 +33,7 @@
   "gender": "female",
   "birthDate": "1982-08-02",
   "deceasedBoolean": true,
+  "multipleBirthInteger": 3,
   "managingOrganization": {
     "reference": "Organization/1",
     "display": "ACME Healthcare, Inc"

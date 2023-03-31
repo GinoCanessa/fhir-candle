@@ -17,6 +17,7 @@ public static class Program
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+        builder.Services.AddCors();
         builder.Services.AddRazorPages();
         builder.Services.AddServerSideBlazor();
         //builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();

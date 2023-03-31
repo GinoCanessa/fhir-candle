@@ -11,7 +11,9 @@ using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using Hl7.FhirPath;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using System.Net;
+using System.Security.AccessControl;
 
 namespace FhirServerHarness.Storage;
 
@@ -91,7 +93,7 @@ public class VersionedFhirStore : IFhirStore
 
             Type[] tArgs = { t };
 
-            IResourceStore? irs = (IResourceStore?)Activator.CreateInstance(rsType.MakeGenericType(tArgs), _searchTester);
+            IResourceStore? irs = (IResourceStore?)Activator.CreateInstance(rsType.MakeGenericType(tArgs), this, _searchTester);
 
             if (irs != null)
             {
@@ -105,10 +107,45 @@ public class VersionedFhirStore : IFhirStore
             {
                 if (_store.TryGetValue(spDefinition.Resource, out IResourceStore? rs))
                 {
-                    rs.AddSearchParameterDefinition(spDefinition);
+                    rs.SetExecutableSearchParameter(spDefinition);
                 }
             }
         }
+    }
+
+    /// <summary>Attempts to resolve an ITypedElement from the given string.</summary>
+    /// <param name="uri">     URI of the resource.</param>
+    /// <param name="resource">[out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryResolve(string uri, out ITypedElement? resource)
+    {
+        string[] components = uri.Split('/');
+
+        if (components.Length < 2)
+        {
+            resource = null;
+            return false;
+        }
+
+        string resourceType = components[components.Length - 2];
+        string id = components[components.Length - 1];
+
+        if (!_store.TryGetValue(resourceType, out IResourceStore? rs))
+        {
+            resource = null;
+            return false;
+        }
+
+        Resource? resolved = rs.InstanceRead(id);
+
+        if (resolved == null)
+        {
+            resource = null;
+            return false;
+        }
+
+        resource = resolved.ToTypedElement().ToScopedNode();
+        return true;
     }
 
     /// <summary>Resolves the given URI into a resource.</summary>
@@ -477,6 +514,38 @@ public class VersionedFhirStore : IFhirStore
         out string location)
     {
         throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Attempts to add an executable search parameter to a given resource.
+    /// </summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="spDefinition">The sp definition.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TrySetExecutableSearchParameter(string resourceType, ModelInfo.SearchParamDefinition spDefinition)
+    {
+        if (!_store.ContainsKey(resourceType))
+        {
+            return false;
+        }
+
+        _store[resourceType].SetExecutableSearchParameter(spDefinition);
+        return true;
+    }
+
+    /// <summary>Attempts to remove an executable search parameter to a given resource.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="name">        The sp name/code/id.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryRemoveExecutableSearchParameter(string resourceType, string name)
+    {
+        if (!_store.ContainsKey(resourceType))
+        {
+            return false;
+        }
+
+        _store[resourceType].RemoveExecutableSearchParameter(name);
+        return true;
     }
 
     /// <summary>Type search.</summary>

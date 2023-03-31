@@ -132,6 +132,28 @@ public interface IFhirStore : IDisposable
     /// <returns>An ITypedElement.</returns>
     ITypedElement Resolve(string uri);
 
+    /// <summary>Attempts to resolve an ITypedElement from the given string.</summary>
+    /// <param name="uri">     URI of the resource.</param>
+    /// <param name="resource">[out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryResolve(string uri, out ITypedElement? resource);
+
+    /// <summary>
+    /// Attempts to add an executable search parameter to a given resource.
+    /// </summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="spDefinition">The sp definition.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TrySetExecutableSearchParameter(string resourceType, ModelInfo.SearchParamDefinition spDefinition);
+
+    /// <summary>Attempts to remove an executable search parameter to a given resource.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="name">        The sp name/code/id.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryRemoveExecutableSearchParameter(string resourceType, string name);
+
+
+
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources { get; }
 }

@@ -5,7 +5,7 @@ VisualStudioVersion = 17.4.33122.133
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirServerHarness", "src\FhirServerHarness\FhirServerHarness.csproj", "{B9B4F2F7-D077-4E85-A9FF-711549BC7169}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirServerHarness.Tests", "src\FhirServerHarness.Tests\FhirServerHarness.Tests.csproj", "{FC92614E-5DB0-4C6D-B8D3-667BD55BAB5B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirServerHarness.Tests", "src\FhirServerHarness.Tests\FhirServerHarness.Tests.csproj", "{FC92614E-5DB0-4C6D-B8D3-667BD55BAB5B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

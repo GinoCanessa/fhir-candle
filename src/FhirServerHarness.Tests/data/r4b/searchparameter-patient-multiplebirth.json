@@ -1,7 +1,7 @@
 {
   "resourceType": "SearchParameter",
   "id": "Patient-multiplebirth",
-  "url": "http://hl7.org/fhir/SearchParameter/example",
+  "url": "http://hl7.org/fhir/SearchParameter/patient-multiplebirth",
   "version": "1",
   "name": "Patient-multiplebirth",
   "title": "Patient Multiple Birth",

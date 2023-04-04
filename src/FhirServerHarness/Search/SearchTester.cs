@@ -109,16 +109,22 @@ public class SearchTester
                     ? $"{sp.ParamType}-{resultNode.InstanceType}".ToLowerInvariant()
                     : $"{sp.ParamType}-{sp.ModifierLiteral}-{resultNode.InstanceType}".ToLowerInvariant();
 
-                // note that this switch is intentionally 'unrolled' for performance
+                // this switch is intentionally 'unrolled' for performance
+                // the 'missing' modifier is handled earlier so never appears in this switch
                 switch (combined)
                 {
                     case "date-date":
-                    case "date-time":
                     case "date-datetime":
                     case "date-instant":
                     case "date-period":
                     case "date-timing":
+                        if (EvalDateSearch.TestDate(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
                         break;
+
 
                     // note that the SDK keeps all ITypedElement 'integer' values in 64-bit format
                     case "number-integer":
@@ -141,6 +147,11 @@ public class SearchTester
                         break;
 
                     case "quantity-quantity":
+                        if (EvalQuantitySearch.TestQuantity(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
                         break;
 
                     // TODO: add modifier tuples
@@ -225,13 +236,57 @@ public class SearchTester
                         }
                         break;
 
-                    // TODO: add modifier tuples
+                    case "token-boolean":
+                        if (EvalTokenSearch.TestTokenAgainstBool(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "token-not-boolean":
+                        if (EvalTokenSearch.TestTokenNotAgainstBool(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "token-code":
                     case "token-coding":
+                        if (EvalTokenSearch.TestTokenAgainstCoding(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "token-not-code":
+                    case "token-not-coding":
+                        break;
+
+                    case "token-above-code":
+                    case "token-above-coding":
+                    case "token-below-code":
+                    case "token-below-coding":
+                    case "token-code-text-code":
+                    case "token-code-text-coding":
+                    case "token-in-code":
+                    case "token-in-coding":
+                    case "token-not-in-code":
+                    case "token-not-in-coding":
+                    case "token-of-type-code":
+                    case "token-of-type-coding":
+                    case "token-text-code":
+                    case "token-text-coding":
+                    case "token-text-advanced-code":
+                    case "token-text-advanced-coding":
+                        break;
+
+                    // TODO: add modifier tuples
                     case "token-codeableconcept":
                     case "token-identifier":
                     case "token-contactpoint":
-                    case "token-code":
-                    case "token-boolean":
                     case "token-canonical":
                     case "token-oid":
                     case "token-uri":
@@ -247,46 +302,12 @@ public class SearchTester
                     case "uri-url":
                     case "uri-uuid":
                         break;
+
+                    // Note that there is no defined way to search for a time
+                    //case "date-time":
+                    default:
+                        break;
                 }
-
-                //switch (resultNode.InstanceType)
-                //{
-                //    // date parameter type against 'single' date types
-                //    case "date":
-                //    case "time":
-                //    case "dateTime":
-                //    case "instant":
-                //        break;
-
-                //    // date parameter type against 'rage' date types
-                //    case "Period":
-                //        break;
-
-                //    // token parameter type against code (string) type
-                //    case "code":
-                //        break;
-
-                //    // token parameter type against uri type
-                //    case "uri":
-                //    case "url":
-                //    case "oid":
-                //    case "uuid":
-                //    case "canonical":
-                //        break;
-
-                //    // token parameter type against boolean type
-                //    case "boolean":
-                //        break;
-
-                //    // string parameter type against Human Name (special handling)
-                //    case "HumanName":
-                //        if (SearchTestHumanName(resultNode, sp))
-                //        {
-                //            found = true;
-                //            break;
-                //        }
-                //        break;
-                //}
             }
             
             if (!found)

@@ -43,8 +43,13 @@ public static class EvalNumberSearch
                 return false;
         }
 
+        if (sp.ValueInts == null)
+        {
+            return false;
+        }
+
         // traverse values and possibly prefixes
-        for (int i = 0; i < sp.Values.Length; i++)
+        for (int i = 0; i < sp.ValueInts.Length; i++)
         {
             // either grab the prefix or default to equality (number default prefix is equality)
             SearchPrefixCodes prefix =
@@ -52,72 +57,67 @@ public static class EvalNumberSearch
                 ? sp.Prefixes![i] ?? SearchPrefixCodes.Equal
                 : SearchPrefixCodes.Equal;
 
-            if (!long.TryParse(sp.Values[i], out long testValue))
-            {
-                continue;
-            }
-
             switch (prefix)
             {
                 case SearchPrefixCodes.Equal:
                 default:
-                    if (elementValue == testValue)
+                    if (elementValue == sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.NotEqual:
-                    if (elementValue != testValue)
+                    if (elementValue != sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.GreaterThan:
-                    if (elementValue > testValue)
+                    if (elementValue > sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.LessThan:
-                    if (elementValue < testValue)
+                    if (elementValue < sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.GreaterThanOrEqual:
-                    if (elementValue >= testValue)
+                    if (elementValue >= sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.LessThanOrEqual:
-                    if (elementValue <= testValue)
+                    if (elementValue <= sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.StartsAfter:
-                    if (elementValue > testValue)
+                    if (elementValue > sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.EndsBefore:
-                    if (elementValue < testValue)
+                    if (elementValue < sp.ValueInts[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.Approximately:
-                    if (Math.Abs(elementValue - testValue) <= 1)
+                    if (Math.Abs(elementValue - sp.ValueInts[i]) <= 1)
                     {
                         return true;
                     }
@@ -142,19 +142,19 @@ public static class EvalNumberSearch
 
         decimal elementValue = (decimal)(valueNode?.Value ?? 0);
 
+        if (sp.ValueDecimals == null)
+        {
+            return false;
+        }
+
         // traverse values and possibly prefixes
-        for (int i = 0; i < sp.Values.Length; i++)
+        for (int i = 0; i < sp.ValueDecimals.Length; i++)
         {
             // either grab the prefix or default to equality (number default prefix is equality)
             SearchPrefixCodes prefix =
                 ((sp.Prefixes?.Length ?? 0) > i)
                 ? sp.Prefixes![i] ?? SearchPrefixCodes.Equal
                 : SearchPrefixCodes.Equal;
-
-            if (!decimal.TryParse(sp.Values[i], out decimal testValue))
-            {
-                continue;
-            }
 
             switch (prefix)
             {
@@ -165,7 +165,7 @@ public static class EvalNumberSearch
 
                     //int digits = testValue.GetSignificantDigitCount();
 
-                    if (decimal.Abs(decimal.Round(elementValue - testValue, 0)) == 0)
+                    if (decimal.Abs(decimal.Round(elementValue - sp.ValueDecimals[i], 0)) == 0)
                     {
                         return true;
                     }
@@ -175,49 +175,49 @@ public static class EvalNumberSearch
                 case SearchPrefixCodes.NotEqual:
 
                     // TODO: This is not proper decimal comparison as defined in the spec.
-                    if (decimal.Abs(decimal.Round(elementValue - testValue, 0)) != 0)
+                    if (decimal.Abs(decimal.Round(elementValue - sp.ValueDecimals[i], 0)) != 0)
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.GreaterThan:
-                    if (elementValue > testValue)
+                    if (elementValue > sp.ValueDecimals[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.LessThan:
-                    if (elementValue < testValue)
+                    if (elementValue < sp.ValueDecimals[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.GreaterThanOrEqual:
-                    if (elementValue >= testValue)
+                    if (elementValue >= sp.ValueDecimals[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.LessThanOrEqual:
-                    if (elementValue <= testValue)
+                    if (elementValue <= sp.ValueDecimals[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.StartsAfter:
-                    if (elementValue > testValue)
+                    if (elementValue > sp.ValueDecimals[i])
                     {
                         return true;
                     }
                     break;
 
                 case SearchPrefixCodes.EndsBefore:
-                    if (elementValue < testValue)
+                    if (elementValue < sp.ValueDecimals[i])
                     {
                         return true;
                     }
@@ -226,7 +226,7 @@ public static class EvalNumberSearch
                 case SearchPrefixCodes.Approximately:
 
                     // values within 10% should match
-                    if ((decimal.Abs(elementValue - testValue) / decimal.Abs(elementValue)) < 0.1m)
+                    if ((decimal.Abs(elementValue - sp.ValueDecimals[i]) / decimal.Abs(elementValue)) < 0.1m)
                     {
                         return true;
                     }

@@ -109,7 +109,7 @@ public class SearchTester
                     ? $"{sp.ParamType}-{resultNode.InstanceType}".ToLowerInvariant()
                     : $"{sp.ParamType}-{sp.ModifierLiteral}-{resultNode.InstanceType}".ToLowerInvariant();
 
-                // this switch is intentionally 'unrolled' for performance
+                // this switch is intentionally 'unrolled' for performance (instead of nesting by type)
                 // the 'missing' modifier is handled earlier so never appears in this switch
                 switch (combined)
                 {
@@ -263,6 +263,11 @@ public class SearchTester
 
                     case "token-not-code":
                     case "token-not-coding":
+                        if (EvalTokenSearch.TestTokenNotAgainstCoding(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
                         break;
 
                     case "token-above-code":

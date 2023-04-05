@@ -313,9 +313,14 @@ public class ParsedSearchParameter
 
                         switch (components.Length)
                         {
+                            // value
+                            case 1:
+                                ValueFhirCodes[i] = new(string.Empty, string.Empty);
+                                break;
+
                             // value and code / unit
                             case 2:
-                                ValueFhirCodes[i] = new(null, components[1]);
+                                ValueFhirCodes[i] = new(string.Empty, components[1]);
                                 break;
 
                             // value, system, and code / unit
@@ -489,6 +494,14 @@ public class ParsedSearchParameter
     /// <returns>True if it succeeds, false if it fails.</returns>
     public static bool TryParseDateString(string dateString, out DateTimeOffset start, out DateTimeOffset end)
     {
+        // need to check for just year because DateTime refuses to parse that
+        if (dateString.Length == 4)
+        {
+            start = new DateTimeOffset(int.Parse(dateString), 1, 1, 0, 0, 0, TimeSpan.Zero);
+            end = start.AddYears(1).AddTicks(-1);
+            return true;
+        }
+
         // note that we are using DateTime and converting to DateTimeOffset to work through TZ stuff without manually parsing each format precision
         if (!DateTime.TryParse(dateString, null, DateTimeStyles.RoundtripKind, out DateTime dt))
         {

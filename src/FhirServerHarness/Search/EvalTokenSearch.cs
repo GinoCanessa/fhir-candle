@@ -143,11 +143,6 @@ public static class EvalTokenSearch
 
         switch (valueNode.Value)
         {
-            case Hl7.Fhir.ElementModel.Types.Code fhirCode:
-                valueSystem = fhirCode.System ?? string.Empty;
-                valueCode = fhirCode.Value;
-                break;
-
             case Hl7.Fhir.Model.Code fhirCode:
                 valueSystem = string.Empty;
                 valueCode = fhirCode.Value;
@@ -156,6 +151,11 @@ public static class EvalTokenSearch
             case Hl7.Fhir.Model.Coding fhirCoding:
                 valueSystem = fhirCoding.System ?? string.Empty;
                 valueCode = fhirCoding.Code ?? string.Empty;
+                break;
+
+            case Hl7.Fhir.ElementModel.Types.Code fhirCode:
+                valueSystem = fhirCode.System ?? string.Empty;
+                valueCode = fhirCode.Value;
                 break;
 
             case string codeString:
@@ -197,11 +197,6 @@ public static class EvalTokenSearch
 
         switch (valueNode.Value)
         {
-            case Hl7.Fhir.ElementModel.Types.Code fhirCode:
-                valueSystem = fhirCode.System ?? string.Empty;
-                valueCode = fhirCode.Value;
-                break;
-
             case Hl7.Fhir.Model.Code fhirCode:
                 valueSystem = string.Empty;
                 valueCode = fhirCode.Value;
@@ -215,6 +210,11 @@ public static class EvalTokenSearch
             case string codeString:
                 valueSystem = string.Empty;
                 valueCode = codeString;
+                break;
+
+            case Hl7.Fhir.ElementModel.Types.Code fhirCode:
+                valueSystem = fhirCode.System ?? string.Empty;
+                valueCode = fhirCode.Value;
                 break;
 
             default:

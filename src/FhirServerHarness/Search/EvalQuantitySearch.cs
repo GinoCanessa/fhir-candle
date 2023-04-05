@@ -16,17 +16,21 @@ public static class EvalQuantitySearch
     /// <summary>Units match.</summary>
     /// <param name="s1">The first system.</param>
     /// <param name="c1">The first code.</param>
+    /// <param name="u1">The first unit.</param>
     /// <param name="s2">The second system.</param>
     /// <param name="c2">The second code.</param>
     /// <returns>True if they match, false if they do not.</returns>
-    private static bool UnitsMatch(string s1, string c1, string s2, string c2)
+    private static bool UnitsMatch(string s1, string c1, string u1, string s2, string c2)
     {
-        if ((string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2)) ||
-            (string.IsNullOrEmpty(s1) && s2.Equals("http://unitsofmeasure.org", StringComparison.Ordinal)) ||
-            (s1.Equals("http://unitsofmeasure.org", StringComparison.Ordinal) && string.IsNullOrEmpty(s2)) ||
+        if (string.IsNullOrEmpty(s1) || 
+            string.IsNullOrEmpty(s2) ||
             s1.Equals(s2, StringComparison.OrdinalIgnoreCase))
         {
-            return c1.Equals(c2, StringComparison.OrdinalIgnoreCase);
+            // if either code is missing, or they match, return true
+            return (string.IsNullOrEmpty(c1) && string.IsNullOrEmpty(u1)) ||
+                string.IsNullOrEmpty(c2) ||
+                c1.Equals(c2, StringComparison.OrdinalIgnoreCase) ||
+                u1.Equals(c2, StringComparison.OrdinalIgnoreCase);
         }
 
         return false;
@@ -38,39 +42,20 @@ public static class EvalQuantitySearch
     /// <returns>True if the test passes, false if the test fails.</returns>
     public static bool TestQuantity(ITypedElement valueNode, ParsedSearchParameter sp)
     {
-        if (valueNode?.Value == null)
+        if ((valueNode == null) ||
+            (valueNode.InstanceType != "Quantity"))
         {
             return false;
         }
 
-        string valueSystem, valueUnit;
-        Hl7.Fhir.Model.Quantity.QuantityComparator? comparator;
-        decimal value;
+        Hl7.Fhir.Model.Quantity q = valueNode.ToPoco<Hl7.Fhir.Model.Quantity>();
 
-        switch (valueNode.Value)
+        if (q.Value == null)
         {
-            case Hl7.Fhir.ElementModel.Types.Quantity q:
-                valueSystem = q.System.ToString();
-                valueUnit = q.Unit;
-                comparator = null;
-                value = q.Value;
-                break;
-
-            case Hl7.Fhir.Model.Quantity q:
-                if (q.Value == null)
-                {
-                    return false;
-                }
-
-                valueSystem = q.System;
-                valueUnit = q.Unit;
-                comparator = q.Comparator;
-                value = (decimal)q.Value;
-                break;
-
-            default:
-                throw new Exception($"Cannot test quantity against type: {valueNode.Value.GetType()}");
+            return false;
         }
+
+        decimal value = (decimal)q.Value!;
 
         if (sp.ValueDecimals == null)
         {
@@ -82,8 +67,9 @@ public static class EvalQuantitySearch
         {
             // TODO: right now only compare if units match - should instead test for unit class matches and do conversion
             if (!UnitsMatch(
-                    valueSystem,
-                    valueUnit, 
+                    q.System ?? string.Empty,
+                    q.Code ?? string.Empty,
+                    q.Unit ?? string.Empty,
                     sp.ValueFhirCodes?[i].System ?? string.Empty, 
                     sp.ValueFhirCodes?[i].Value ?? string.Empty))
             {

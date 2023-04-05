@@ -18,13 +18,10 @@ namespace FhirServerHarness.Tests;
 public class FhirStoreTestsR4BObservation: IDisposable
 {
     /// <summary>The FHIR store.</summary>
-    private IFhirStore _store;
-
-    /// <summary>(Immutable) The test output helper.</summary>
-    private readonly ITestOutputHelper _testOutputHelper;
+    private static IFhirStore _store;
 
     /// <summary>(Immutable) The configuration.</summary>
-    private readonly ProviderConfiguration _config = new()
+    private static readonly ProviderConfiguration _config = new()
     {
         FhirVersion = ProviderConfiguration.FhirVersionCodes.R4B,
         TenantRoute = "r4b",
@@ -33,13 +30,15 @@ public class FhirStoreTestsR4BObservation: IDisposable
     /// <summary>(Immutable) The total observations expected.</summary>
     private const int _expectedTotal = 3;
 
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
     /// <summary>
-    /// Initializes a new instance of the <see cref="FhirStoreTestsR4B"/> class.
+    /// Initializes static members of the FhirServerHarness.Tests.FhirStoreTestsR4BObservation
+    /// class.
     /// </summary>
-    /// <param name="testOutputHelper">The test output helper.</param>
-    public FhirStoreTestsR4BObservation(ITestOutputHelper testOutputHelper)
+    static FhirStoreTestsR4BObservation()
     {
-        _testOutputHelper = testOutputHelper;
         _store = new VersionedFhirStore();
         _store.Init(_config);
 
@@ -79,6 +78,15 @@ public class FhirStoreTestsR4BObservation: IDisposable
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="FhirStoreTestsR4B"/> class.
+    /// </summary>
+    /// <param name="testOutputHelper">The test output helper.</param>
+    public FhirStoreTestsR4BObservation(ITestOutputHelper testOutputHelper)
+    {
+        _testOutputHelper = testOutputHelper;
+    }
+
+    /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
     /// resources.
     /// </summary>
@@ -89,7 +97,7 @@ public class FhirStoreTestsR4BObservation: IDisposable
 
     [Theory]
     [InlineData("_id=example", 1)]
-    [InlineData("_id=invalidIdToSearchFor", 0)]
+    [InlineData("_id=AnIdThatDoesNotExist", 0)]
     [InlineData("_id:not=example", (_expectedTotal - 1))]
     [InlineData("value-quantity=185|http://unitsofmeasure.org|[lb_av]", 1)]
     [InlineData("value-quantity=185|http://unitsofmeasure.org|lbs", 1)]
@@ -98,14 +106,20 @@ public class FhirStoreTestsR4BObservation: IDisposable
     [InlineData("value-quantity=185", 1)]
     [InlineData("value-quantity=ge185|http://unitsofmeasure.org|[lb_av]", 1)]
     [InlineData("value-quantity=ge185||[lb_av]", 1)]
+    [InlineData("value-quantity=ge185||lbs", 1)]
     [InlineData("value-quantity=ge185", 2)]
     [InlineData("value-quantity=gt185|http://unitsofmeasure.org|[lb_av]", 0)]
     [InlineData("value-quantity=gt185||[lb_av]", 0)]
+    [InlineData("value-quantity=gt185||lbs", 0)]
     [InlineData("value-quantity=84.1|http://unitsofmeasure.org|[kg]", 0)]       // test unit conversion
     [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|265201", 1)]
     [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|cL/s", 1)]
+    [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|cl/s", 1)]
     [InlineData("value-quantity=820||265201", 1)]
     [InlineData("value-quantity=820||cL/s", 1)]
+    [InlineData("subject=Patient/example", 1)]
+    [InlineData("subject=Patient/UnknownPatientId", 0)]
+    [InlineData("subject=example", 1)]
     public void ObservationSearchWithCount(string search, int matchCount)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");

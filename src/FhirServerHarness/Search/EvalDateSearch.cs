@@ -10,7 +10,7 @@ using static FhirServerHarness.Search.SearchDefinitions;
 
 namespace FhirServerHarness.Search;
 
-/// <summary>An eval date search.</summary>
+/// <summary>A class that contains functions to test date inputs against various FHIR types.</summary>
 public static class EvalDateSearch
 {
     /// <summary>Performs a search test for a date type.</summary>

@@ -5,12 +5,11 @@
 
 using FhirServerHarness.Models;
 using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.Utility;
 using static FhirServerHarness.Search.SearchDefinitions;
 
 namespace FhirServerHarness.Search;
 
-/// <summary>An eval quantity search.</summary>
+/// <summary>A class that contains functions to test quantity inputs against various FHIR types.</summary>
 public static class EvalQuantitySearch
 {
     /// <summary>Units match.</summary>

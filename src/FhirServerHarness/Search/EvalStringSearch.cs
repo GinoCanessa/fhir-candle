@@ -10,7 +10,7 @@ using static FhirServerHarness.Search.SearchDefinitions;
 
 namespace FhirServerHarness.Search;
 
-/// <summary>A search test string.</summary>
+/// <summary>A class that contains functions to test string inputs against various FHIR types.</summary>
 public static class EvalStringSearch
 {
     /// <summary>Tests a string search value against string-type nodes, using starts-with & case-insensitive.</summary>

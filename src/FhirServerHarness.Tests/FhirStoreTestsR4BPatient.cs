@@ -18,17 +18,17 @@ namespace FhirServerHarness.Tests;
 public class FhirStoreTestsR4BPatient : IDisposable
 {
     /// <summary>The FHIR store.</summary>
-    private IFhirStore _store;
-
-    /// <summary>(Immutable) The test output helper.</summary>
-    private readonly ITestOutputHelper _testOutputHelper;
+    private static IFhirStore _store;
 
     /// <summary>(Immutable) The configuration.</summary>
-    private readonly ProviderConfiguration _config = new ()
+    private static readonly ProviderConfiguration _config = new()
     {
         FhirVersion = ProviderConfiguration.FhirVersionCodes.R4B,
         TenantRoute = "r4b",
     };
+
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
 
     /// <summary>(Immutable) The total patients expected.</summary>
     private const int _expectedTotal = 5;
@@ -40,12 +40,10 @@ public class FhirStoreTestsR4BPatient : IDisposable
     private const int _expectedFemale = 1;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FhirStoreTestsR4B"/> class.
+    /// Initializes static members of the FhirServerHarness.Tests.FhirStoreTestsR4BPatient class.
     /// </summary>
-    /// <param name="testOutputHelper">The test output helper.</param>
-    public FhirStoreTestsR4BPatient(ITestOutputHelper testOutputHelper)
+    static FhirStoreTestsR4BPatient()
     {
-        _testOutputHelper = testOutputHelper;
         _store = new VersionedFhirStore();
         _store.Init(_config);
 
@@ -85,6 +83,15 @@ public class FhirStoreTestsR4BPatient : IDisposable
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="FhirStoreTestsR4B"/> class.
+    /// </summary>
+    /// <param name="testOutputHelper">The test output helper.</param>
+    public FhirStoreTestsR4BPatient(ITestOutputHelper testOutputHelper)
+    {
+        _testOutputHelper = testOutputHelper;
+    }
+
+    /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
     /// resources.
     /// </summary>
@@ -108,7 +115,7 @@ public class FhirStoreTestsR4BPatient : IDisposable
 
     [Theory]
     [InlineData("_id=example", 1)]
-    [InlineData("_id=invalidIdToSearchFor", 0)]
+    [InlineData("_id=AnIdThatDoesNotExist", 0)]
     [InlineData("_id:not=example", (_expectedTotal - 1))]
     [InlineData("name=peter", 1)]
     [InlineData("name=not-present,another-not-present", 0)]
@@ -147,5 +154,4 @@ public class FhirStoreTestsR4BPatient : IDisposable
 
         //_testOutputHelper.WriteLine(bundle);
     }
-
 }

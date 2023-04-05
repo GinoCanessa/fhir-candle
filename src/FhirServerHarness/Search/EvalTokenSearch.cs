@@ -8,9 +8,10 @@ using Hl7.Fhir.ElementModel;
 
 namespace FhirServerHarness.Search;
 
+/// <summary>A class that contains functions to test token inputs against various FHIR types.</summary>
 public static class EvalTokenSearch
 {
-    /// <summary>Units match.</summary>
+    /// <summary>Compare code with system.</summary>
     /// <param name="s1">The first system.</param>
     /// <param name="c1">The first code.</param>
     /// <param name="s2">The second system.</param>
@@ -27,7 +28,6 @@ public static class EvalTokenSearch
 
         return false;
     }
-
 
     /// <summary>Tests a token search value against id-type nodes, using exact matching (equality & case-sensitive).</summary>
     /// <param name="valueNode">The value node.</param>

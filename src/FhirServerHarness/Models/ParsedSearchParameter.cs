@@ -108,6 +108,14 @@ public class ParsedSearchParameter
         /// <summary>Allow filtering of types in searches that are performed across multiple resource types (e.g., searches across the server root).</summary>
         { "_type", new() { Name = "_type", Type = SearchParamType.Token } },
     };
+    
+    /// <summary>A segmented reference.</summary>
+    public record struct SegmentedReference(
+        string ResourceType,
+        string Id,
+        string ResourceVersion,
+        string CanonicalVersion,
+        string Url);
 
     /// <summary>Gets or sets the name.</summary>
     public required string Name { get; set; }
@@ -132,6 +140,9 @@ public class ParsedSearchParameter
 
     /// <summary>Gets or sets the value bools.</summary>
     public bool[]? ValueBools { get; set; }
+
+    /// <summary>Gets or sets the value references.</summary>
+    public SegmentedReference[]? ValueReferences { get; set; }
 
     /// <summary>Gets or sets the prefix.</summary>
     public SearchPrefixCodes?[] Prefixes { get; set; } = Array.Empty<SearchPrefixCodes?>();
@@ -366,6 +377,18 @@ public class ParsedSearchParameter
                 }
                 break;
 
+            case SearchParamType.Reference:
+                {
+                    ValueReferences = new SegmentedReference[values.Count];
+
+                    // traverse values
+                    for (int i = 0; i < values.Count; i++)
+                    {
+                        _ = TryParseReference(value, out ValueReferences[i]);
+                    }
+                }
+                break;
+
                 //case SearchParamType.String:
                 //case SearchParamType.Reference:
                 //case SearchParamType.Composite:
@@ -485,6 +508,68 @@ public class ParsedSearchParameter
 
             continue;
         }
+    }
+
+
+    /// <summary>Parse reference common.</summary>
+    /// <param name="reference">The reference.</param>
+    /// <returns>A SegmentedReference.</returns>
+    private static bool TryParseReference(string reference, out SegmentedReference sr)
+    {
+        if (string.IsNullOrEmpty(reference))
+        {
+            sr = default;
+            return false;
+        }
+
+        string[] parts = reference.Split('/');
+
+        string cv;
+        string cu;
+
+        int index = reference.LastIndexOf('|');
+
+        if (index != -1)
+        {
+            cv = reference.Substring(index + 1);
+            cu = reference.Substring(0, index);
+        }
+        else
+        {
+            cv = string.Empty;
+            cu = reference;
+        }
+
+        switch (parts.Length)
+        {
+            case 1:
+                sr = new SegmentedReference(string.Empty, parts[0], string.Empty, cv, cu);
+                return true;
+
+            case 2:
+                sr = new SegmentedReference(parts[0], parts[1], string.Empty, cv, cu);
+                return true;
+
+            case 4:
+                if (parts[2].Equals("_history", StringComparison.Ordinal))
+                {
+                    sr = new SegmentedReference(parts[0], parts[1], parts[3], cv, cu);
+                    return true;
+                }
+                break;
+        }
+
+        int len = parts.Length;
+
+        // second to last is history literal
+        if (parts[len - 2].Equals("_history", StringComparison.Ordinal))
+        {
+            sr = new SegmentedReference(parts[len - 4], parts[len - 3], parts[len - 1], cv, cu);
+            return true;
+        }
+
+        sr = new SegmentedReference(string.Empty, string.Empty, string.Empty, cv, cu);
+        return true;
     }
 
     /// <summary>Attempts to parse a date string.</summary>

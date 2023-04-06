@@ -25,11 +25,11 @@ public static class EvalQuantitySearch
             string.IsNullOrEmpty(s2) ||
             s1.Equals(s2, StringComparison.OrdinalIgnoreCase))
         {
-            // if either code is missing, or they match, return true
+            // if either code is missing or they match, return true
             return (string.IsNullOrEmpty(c1) && string.IsNullOrEmpty(u1)) ||
                 string.IsNullOrEmpty(c2) ||
-                c1.Equals(c2, StringComparison.OrdinalIgnoreCase) ||
-                u1.Equals(c2, StringComparison.OrdinalIgnoreCase);
+                c2.Equals(c1, StringComparison.OrdinalIgnoreCase) ||
+                c2.Equals(u1, StringComparison.OrdinalIgnoreCase);
         }
 
         return false;

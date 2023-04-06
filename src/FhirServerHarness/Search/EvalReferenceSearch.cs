@@ -22,6 +22,8 @@ public static class EvalReferenceSearch
             (!string.IsNullOrEmpty(s.Id)) &&
             r.Reference.EndsWith("/" + s.Id, StringComparison.Ordinal))
         {
+            // TODO: check resource versions
+
             return true;
         }
 

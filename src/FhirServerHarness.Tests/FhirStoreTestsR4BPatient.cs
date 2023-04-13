@@ -134,11 +134,21 @@ public class FhirStoreTestsR4BPatient : IDisposable
     [InlineData("birthdate=1982-01-23", 1)]
     [InlineData("birthdate=1982-01", 1)]
     [InlineData("birthdate=1982", 2)]
+    [InlineData("gender=InvalidValue", 0)]
     [InlineData("gender=male", _expectedMale)]
     [InlineData("gender=female", _expectedFemale)]
     [InlineData("gender=male,female", (_expectedMale + _expectedFemale))]
     [InlineData("name-use=official", _expectedTotal)]
     [InlineData("name-use=invalid-name-use", 0)]
+    [InlineData("identifier=urn:oid:1.2.36.146.595.217.0.1|12345", 1)]
+    [InlineData("identifier=|12345", 1)]
+    [InlineData("identifier=urn:oid:1.2.36.146.595.217.0.1|ValueThatDoesNotExist", 0)]
+    [InlineData("active=true", _expectedTotal)]
+    [InlineData("active=false", 0)]
+    [InlineData("active=garbage", 0)]
+    [InlineData("telecom=phone|(03) 5555 6473", 1)]
+    [InlineData("telecom=|(03) 5555 6473", 1)]
+    [InlineData("telecom=phone|", 1)]
     public void PatientSearchWithCount(string search, int matchCount)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");

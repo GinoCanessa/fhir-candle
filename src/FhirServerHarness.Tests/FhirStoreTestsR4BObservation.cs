@@ -28,7 +28,13 @@ public class FhirStoreTestsR4BObservation: IDisposable
     };
 
     /// <summary>(Immutable) The total observations expected.</summary>
-    private const int _expectedTotal = 3;
+    private const int _expectedTotal = 6;
+
+    /// <summary>(Immutable) The expected vital signs.</summary>
+    private const int _expectedVitalSigns = 3;
+
+    /// <summary>(Immutable) The expected subject example.</summary>
+    private const int _expectedSubjectExample = 4;
 
     /// <summary>(Immutable) The test output helper.</summary>
     private readonly ITestOutputHelper _testOutputHelper;
@@ -117,9 +123,15 @@ public class FhirStoreTestsR4BObservation: IDisposable
     [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|cl/s", 1)]
     [InlineData("value-quantity=820||265201", 1)]
     [InlineData("value-quantity=820||cL/s", 1)]
-    [InlineData("subject=Patient/example", 1)]
+    [InlineData("subject=Patient/example", _expectedSubjectExample)]
     [InlineData("subject=Patient/UnknownPatientId", 0)]
-    [InlineData("subject=example", 1)]
+    [InlineData("subject=example", _expectedSubjectExample)]
+    [InlineData("code=http://loinc.org|9272-6", 1)]
+    [InlineData("code=http://snomed.info/sct|169895004", 1)]
+    [InlineData("code=http://snomed.info/sct|9272-6", 0)]
+    [InlineData("_profile=http://hl7.org/fhir/StructureDefinition/vitalsigns", _expectedVitalSigns)]
+    [InlineData("_profile:missing=true", (_expectedTotal - _expectedVitalSigns))]
+    [InlineData("_profile:missing=false", _expectedVitalSigns)]
     public void ObservationSearchWithCount(string search, int matchCount)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");

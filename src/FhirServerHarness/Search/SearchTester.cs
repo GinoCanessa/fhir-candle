@@ -105,9 +105,9 @@ public class SearchTester
                 }
 
                 // build a routing tuple: {search type}<-{modifier}>-{value type}
-                string combined = string.IsNullOrEmpty(sp.ModifierLiteral)
+                string combined = sp.Modifier == SearchModifierCodes.None 
                     ? $"{sp.ParamType}-{resultNode.InstanceType}".ToLowerInvariant()
-                    : $"{sp.ParamType}-{sp.ModifierLiteral}-{resultNode.InstanceType}".ToLowerInvariant();
+                    : $"{sp.ParamType}-{sp.Modifier}-{resultNode.InstanceType}".ToLowerInvariant();
 
                 // this switch is intentionally 'unrolled' for performance (instead of nesting by type)
                 // the 'missing' modifier is handled earlier so never appears in this switch
@@ -154,8 +154,10 @@ public class SearchTester
                         }
                         break;
 
+                    case "reference-uri":
+                    case "reference-url":
                     case "reference-canonical":
-                        if (EvalReferenceSearch.TestReferenceAgainstCanonical(resultNode, sp))
+                        if (EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp))
                         {
                             found = true;
                             break;
@@ -163,10 +165,6 @@ public class SearchTester
                         break;
 
                     case "reference-reference":
-                    case "reference-oid":
-                    case "reference-uri":
-                    case "reference-url":
-                    case "reference-uuid":
                         if (EvalReferenceSearch.TestReference(resultNode, sp))
                         {
                             found = true;
@@ -174,77 +172,20 @@ public class SearchTester
                         }
                         break;
 
-                    case "reference-above-canonical":
-                    case "reference-above-reference":
-                    case "reference-above-oid":
-                    case "reference-above-uri":
-                    case "reference-above-url":
-                    case "reference-above-uuid":
+                    case "reference-oid":
+                        if (EvalReferenceSearch.TestReferenceAgainstOid(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
                         break;
 
-                    case "reference-below-canonical":
-                    case "reference-below-reference":
-                    case "reference-below-oid":
-                    case "reference-below-uri":
-                    case "reference-below-url":
-                    case "reference-below-uuid":
-                        break;
-
-                    case "reference-code-text-canonical":
-                    case "reference-code-text-reference":
-                    case "reference-code-text-oid":
-                    case "reference-code-text-uri":
-                    case "reference-code-text-url":
-                    case "reference-code-text-uuid":
-                        break;
-
-                    case "reference-identifier-canonical":
-                    case "reference-identifier-reference":
-                    case "reference-identifier-oid":
-                    case "reference-identifier-uri":
-                    case "reference-identifier-url":
-                    case "reference-identifier-uuid":
-                        break;
-
-                    case "reference-in-canonical":
-                    case "reference-in-reference":
-                    case "reference-in-oid":
-                    case "reference-in-uri":
-                    case "reference-in-url":
-                    case "reference-in-uuid":
-                        break;
-
-                    case "reference-not-in-canonical":
-                    case "reference-not-in-reference":
-                    case "reference-not-in-oid":
-                    case "reference-not-in-uri":
-                    case "reference-not-in-url":
-                    case "reference-not-in-uuid":
-                        break;
-
-                    case "reference-text-canonical":
-                    case "reference-text-reference":
-                    case "reference-text-oid":
-                    case "reference-text-uri":
-                    case "reference-text-url":
-                    case "reference-text-uuid":
-                        break;
-
-                    case "reference-text-advanced-canonical":
-                    case "reference-text-advanced-reference":
-                    case "reference-text-advanced-oid":
-                    case "reference-text-advanced-uri":
-                    case "reference-text-advanced-url":
-                    case "reference-text-advanced-uuid":
-                        break;
-
-                    // note: this is a special case, the literals used are 'actual' resource types (e.g., patient)
-                    case "reference-rt-canonical":
-                    case "reference-rt-reference":
-                    case "reference-rt-oid":
-                    case "reference-rt-uri":
-                    case "reference-rt-url":
-                    case "reference-rt-uuid":
+                    case "reference-uuid":
+                        if (EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
                         break;
 
                     case "string-id":
@@ -304,16 +245,28 @@ public class SearchTester
                         }
                         break;
 
+                    case "token-canonical":
                     case "token-id":
-                        if (EvalTokenSearch.TestTokenAgainstId(resultNode, sp))
+                    case "token-oid":
+                    case "token-uri":
+                    case "token-url":
+                    case "token-uuid":
+                    case "token-string":
+                        if (EvalTokenSearch.TestTokenAgainstStringValue(resultNode, sp))
                         {
                             found = true;
                             break;
                         }
                         break;
 
+                    case "token-not-canonical":
                     case "token-not-id":
-                        if (EvalTokenSearch.TestTokenNotAgainstId(resultNode, sp))
+                    case "token-not-oid":
+                    case "token-not-uri":
+                    case "token-not-url":
+                    case "token-not-uuid":
+                    case "token-not-string":
+                        if (EvalTokenSearch.TestTokenNotAgainstStringValue(resultNode, sp))
                         {
                             found = true;
                             break;
@@ -338,6 +291,8 @@ public class SearchTester
 
                     case "token-code":
                     case "token-coding":
+                    case "token-contactpoint":
+                    case "token-identifier":
                         if (EvalTokenSearch.TestTokenAgainstCoding(resultNode, sp))
                         {
                             found = true;
@@ -347,6 +302,8 @@ public class SearchTester
 
                     case "token-not-code":
                     case "token-not-coding":
+                    case "token-not-contactpoint":
+                    case "token-not-identifier":
                         if (EvalTokenSearch.TestTokenNotAgainstCoding(resultNode, sp))
                         {
                             found = true;
@@ -354,49 +311,113 @@ public class SearchTester
                         }
                         break;
 
+                    case "token-codeableconcept":
+                        if (EvalTokenSearch.TestTokenAgainstCodeableConcept(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "uri-canonical":
+                    case "uri-uri":
+                    case "uri-url":
+                        if (EvalUriSearch.TestUriAgainstStringValue(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "uri-oid":
+                        if (EvalUriSearch.TestUriAgainstOid(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "uri-uuid":
+                        if (EvalUriSearch.TestUriAgainstUuid(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // note: this is a special case, the literals used are 'actual' resource types (e.g., patient)
+                    case "reference-resourcetype-canonical":
+                    case "reference-resourcetype-reference":
+                    case "reference-resourcetype-oid":
+                    case "reference-resourcetype-uri":
+                    case "reference-resourcetype-url":
+                    case "reference-resourcetype-uuid":
+                        break;
+
+                    case "reference-above-canonical":
+                    case "reference-above-reference":
+                    case "reference-above-oid":
+                    case "reference-above-uri":
+                    case "reference-above-url":
+                    case "reference-above-uuid":
+                    case "reference-below-canonical":
+                    case "reference-below-reference":
+                    case "reference-below-oid":
+                    case "reference-below-uri":
+                    case "reference-below-url":
+                    case "reference-below-uuid":
+                    case "reference-codetext-canonical":
+                    case "reference-codetext-reference":
+                    case "reference-codetext-oid":
+                    case "reference-codetext-uri":
+                    case "reference-codetext-url":
+                    case "reference-codetext-uuid":
+                    case "reference-identifier-canonical":
+                    case "reference-identifier-reference":
+                    case "reference-identifier-oid":
+                    case "reference-identifier-uri":
+                    case "reference-identifier-url":
+                    case "reference-identifier-uuid":
+                    case "reference-in-canonical":
+                    case "reference-in-reference":
+                    case "reference-in-oid":
+                    case "reference-in-uri":
+                    case "reference-in-url":
+                    case "reference-in-uuid":
+                    case "reference-notin-canonical":
+                    case "reference-notin-reference":
+                    case "reference-notin-oid":
+                    case "reference-notin-uri":
+                    case "reference-notin-url":
+                    case "reference-notin-uuid":
+                    case "reference-text-canonical":
+                    case "reference-text-reference":
+                    case "reference-text-oid":
+                    case "reference-text-uri":
+                    case "reference-text-url":
+                    case "reference-text-uuid":
+                    case "reference-textadvanced-canonical":
+                    case "reference-textadvanced-reference":
+                    case "reference-textadvanced-oid":
+                    case "reference-textadvanced-uri":
+                    case "reference-textadvanced-url":
+                    case "reference-textadvanced-uuid":
                     case "token-above-code":
                     case "token-above-coding":
-                        break;
-
                     case "token-below-code":
                     case "token-below-coding":
-                        break;
-
-                    case "token-code-text-code":
-                    case "token-code-text-coding":
-                        break;
-
+                    case "token-codetext-code":
+                    case "token-codetext-coding":
                     case "token-in-code":
                     case "token-in-coding":
-                        break;
-
-                    case "token-not-in-code":
-                    case "token-not-in-coding":
-                        break;
-
-                    case "token-of-type-code":
-                    case "token-of-type-coding":
-                        break;
-
+                    case "token-notin-code":
+                    case "token-notin-coding":
+                    case "token-oftype-code":
+                    case "token-oftype-coding":
                     case "token-text-code":
                     case "token-text-coding":
-                        break;
-
-                    case "token-text-advanced-code":
-                    case "token-text-advanced-coding":
-                        break;
-
-                    case "token-codeableconcept":
-                    case "token-identifier":
-                    case "token-contactpoint":
-                    case "token-canonical":
-                    case "token-oid":
-                    case "token-uri":
-                    case "token-url":
-                    case "token-uuid":
-                    case "token-string":
-                        break;
-
+                    case "token-textadvanced-code":
+                    case "token-textadvanced-coding":
                     case "token-above-codeableconcept":
                     case "token-above-identifier":
                     case "token-above-contactpoint":
@@ -406,8 +427,6 @@ public class SearchTester
                     case "token-above-url":
                     case "token-above-uuid":
                     case "token-above-string":
-                        break;
-
                     case "token-below-codeableconcept":
                     case "token-below-identifier":
                     case "token-below-contactpoint":
@@ -417,19 +436,15 @@ public class SearchTester
                     case "token-below-url":
                     case "token-below-uuid":
                     case "token-below-string":
-                        break;
-
-                    case "token-code-text-codeableconcept":
-                    case "token-code-text-identifier":
-                    case "token-code-text-contactpoint":
-                    case "token-code-text-canonical":
-                    case "token-code-text-oid":
-                    case "token-code-text-uri":
-                    case "token-code-text-url":
-                    case "token-code-text-uuid":
-                    case "token-code-text-string":
-                        break;
-
+                    case "token-codetext-codeableconcept":
+                    case "token-codetext-identifier":
+                    case "token-codetext-contactpoint":
+                    case "token-codetext-canonical":
+                    case "token-codetext-oid":
+                    case "token-codetext-uri":
+                    case "token-codetext-url":
+                    case "token-codetext-uuid":
+                    case "token-codetext-string":
                     case "token-in-codeableconcept":
                     case "token-in-identifier":
                     case "token-in-contactpoint":
@@ -439,41 +454,25 @@ public class SearchTester
                     case "token-in-url":
                     case "token-in-uuid":
                     case "token-in-string":
-                        break;
-
                     case "token-not-codeableconcept":
-                    case "token-not-identifier":
-                    case "token-not-contactpoint":
-                    case "token-not-canonical":
-                    case "token-not-oid":
-                    case "token-not-uri":
-                    case "token-not-url":
-                    case "token-not-uuid":
-                    case "token-not-string":
-                        break;
-
-                    case "token-not-in-codeableconcept":
-                    case "token-not-in-identifier":
-                    case "token-not-in-contactpoint":
-                    case "token-not-in-canonical":
-                    case "token-not-in-oid":
-                    case "token-not-in-uri":
-                    case "token-not-in-url":
-                    case "token-not-in-uuid":
-                    case "token-not-in-string":
-                        break;
-
-                    case "token-of-type-codeableconcept":
-                    case "token-of-type-identifier":
-                    case "token-of-type-contactpoint":
-                    case "token-of-type-canonical":
-                    case "token-of-type-oid":
-                    case "token-of-type-uri":
-                    case "token-of-type-url":
-                    case "token-of-type-uuid":
-                    case "token-of-type-string":
-                        break;
-
+                    case "token-notin-codeableconcept":
+                    case "token-notin-identifier":
+                    case "token-notin-contactpoint":
+                    case "token-notin-canonical":
+                    case "token-notin-oid":
+                    case "token-notin-uri":
+                    case "token-notin-url":
+                    case "token-notin-uuid":
+                    case "token-notin-string":
+                    case "token-oftype-codeableconcept":
+                    case "token-oftype-identifier":
+                    case "token-oftype-contactpoint":
+                    case "token-oftype-canonical":
+                    case "token-oftype-oid":
+                    case "token-oftype-uri":
+                    case "token-oftype-url":
+                    case "token-oftype-uuid":
+                    case "token-oftype-string":
                     case "token-text-codeableconcept":
                     case "token-text-identifier":
                     case "token-text-contactpoint":
@@ -483,87 +482,60 @@ public class SearchTester
                     case "token-text-url":
                     case "token-text-uuid":
                     case "token-text-string":
-                        break;
-
-                    case "token-text-advanced-codeableconcept":
-                    case "token-text-advanced-identifier":
-                    case "token-text-advanced-contactpoint":
-                    case "token-text-advanced-canonical":
-                    case "token-text-advanced-oid":
-                    case "token-text-advanced-uri":
-                    case "token-text-advanced-url":
-                    case "token-text-advanced-uuid":
-                    case "token-text-advanced-string":
-                        break;
-
-                    case "uri-canonical":
-                    case "uri-oid":
-                    case "uri-uri":
-                    case "uri-url":
-                    case "uri-uuid":
-                        break;
-
+                    case "token-textadvanced-codeableconcept":
+                    case "token-textadvanced-identifier":
+                    case "token-textadvanced-contactpoint":
+                    case "token-textadvanced-canonical":
+                    case "token-textadvanced-oid":
+                    case "token-textadvanced-uri":
+                    case "token-textadvanced-url":
+                    case "token-textadvanced-uuid":
+                    case "token-textadvanced-string":
                     case "uri-above-canonical":
                     case "uri-above-oid":
                     case "uri-above-uri":
                     case "uri-above-url":
                     case "uri-above-uuid":
-                        break;
-
                     case "uri-below-canonical":
                     case "uri-below-oid":
                     case "uri-below-uri":
                     case "uri-below-url":
                     case "uri-below-uuid":
-                        break;
-
                     case "uri-contains-canonical":
                     case "uri-contains-oid":
                     case "uri-contains-uri":
                     case "uri-contains-url":
                     case "uri-contains-uuid":
-                        break;
-
                     case "uri-in-canonical":
                     case "uri-in-oid":
                     case "uri-in-uri":
                     case "uri-in-url":
                     case "uri-in-uuid":
-                        break;
-
                     case "uri-not-canonical":
                     case "uri-not-oid":
                     case "uri-not-uri":
                     case "uri-not-url":
                     case "uri-not-uuid":
-                        break;
-
-                    case "uri-not-in-canonical":
-                    case "uri-not-in-oid":
-                    case "uri-not-in-uri":
-                    case "uri-not-in-url":
-                    case "uri-not-in-uuid":
-                        break;
-
-                    case "uri-of-type-canonical":
-                    case "uri-of-type-oid":
-                    case "uri-of-type-uri":
-                    case "uri-of-type-url":
-                    case "uri-of-type-uuid":
-                        break;
-
+                    case "uri-notin-canonical":
+                    case "uri-notin-oid":
+                    case "uri-notin-uri":
+                    case "uri-notin-url":
+                    case "uri-notin-uuid":
+                    case "uri-oftype-canonical":
+                    case "uri-oftype-oid":
+                    case "uri-oftype-uri":
+                    case "uri-oftype-url":
+                    case "uri-oftype-uuid":
                     case "uri-text-canonical":
                     case "uri-text-oid":
                     case "uri-text-uri":
                     case "uri-text-url":
                     case "uri-text-uuid":
-                        break;
-
-                    case "uri-text-advanced-canonical":
-                    case "uri-text-advanced-oid":
-                    case "uri-text-advanced-uri":
-                    case "uri-text-advanced-url":
-                    case "uri-text-advanced-uuid":
+                    case "uri-textadvanced-canonical":
+                    case "uri-textadvanced-oid":
+                    case "uri-textadvanced-uri":
+                    case "uri-textadvanced-url":
+                    case "uri-textadvanced-uuid":
                         break;
 
                     // Note that there is no defined way to search for a time

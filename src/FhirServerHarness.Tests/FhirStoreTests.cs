@@ -33,12 +33,14 @@ public class FhirStoreTests : IDisposable
         // cleanup
     }
 
+    /// <summary>Gets the configurations.</summary>
     public static IEnumerable<object[]> Configurations => new List<object[]>
     {
         new object[] { new ProviderConfiguration()
         {
-            FhirVersion = ProviderConfiguration.FhirVersionCodes.R4B,
+            FhirVersion  = Hl7.Fhir.Model.FHIRVersion.N4_1,
             TenantRoute = "r4b",
+            BaseUrl = "http://localhost:5101/r4b",
         } },
     };
 

@@ -42,9 +42,9 @@ public class FhirProvider : IVersionedProvider
             throw new ArgumentNullException(nameof(_config));
         }
 
-        if (_config.FhirVersion != ProviderConfiguration.FhirVersionCodes.R4)
+        if (_config.FhirVersion != Hl7.Fhir.Model.FHIRVersion.N4_1)
         {
-            throw new ArgumentException($"Expected {ProviderConfiguration.FhirVersionCodes.R4} but got {_config.FhirVersion}");
+            throw new ArgumentException($"Expected {Hl7.Fhir.Model.FHIRVersion.N4_1} but got {_config.FhirVersion}");
         }
 
         if (string.IsNullOrEmpty(_config.TenantRoute))

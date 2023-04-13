@@ -24,9 +24,10 @@ public interface IResourceStore : IDisposable
     Hl7.Fhir.Model.Resource? InstanceCreate(Hl7.Fhir.Model.Resource source, bool allowExistingId);
 
     /// <summary>Update a specific instance of a resource.</summary>
-    /// <param name="source">[out] The resource.</param>
+    /// <param name="source">     [out] The resource.</param>
+    /// <param name="allowCreate">True to allow, false to suppress the create.</param>
     /// <returns>The updated resource, or null if it could not be performed.</returns>
-    Hl7.Fhir.Model.Resource? InstanceUpdate(Hl7.Fhir.Model.Resource source);
+    Hl7.Fhir.Model.Resource? InstanceUpdate(Hl7.Fhir.Model.Resource source, bool allowCreate);
 
     /// <summary>Instance delete.</summary>
     /// <param name="id">[out] The identifier.</param>
@@ -57,4 +58,24 @@ public interface IResourceStore : IDisposable
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryGetSearchParamDefinition(string name, out ModelInfo.SearchParamDefinition? spDefinition);
 
+    /// <summary>Gets the search parameter definitions known by this store</summary>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process the search parameter definitions in
+    /// this collection.
+    /// </returns>
+    IEnumerable<ModelInfo.SearchParamDefinition> GetSearchParamDefinitions();
+
+    /// <summary>Gets the search includes supported by this store.</summary>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process the search includes in this
+    /// collection.
+    /// </returns>
+    IEnumerable<string> GetSearchIncludes();
+
+    /// <summary>Gets the search reverse includes supported by this store.</summary>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process the search reverse includes in this
+    /// collection.
+    /// </returns>
+    IEnumerable<string> GetSearchRevIncludes();
 }

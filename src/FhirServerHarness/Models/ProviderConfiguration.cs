@@ -8,19 +8,6 @@ namespace FhirServerHarness.Models;
 /// <summary>A provider configuration.</summary>
 public class ProviderConfiguration
 {
-    /// <summary>Values that represent FHIR versions.</summary>
-    public enum FhirVersionCodes
-    {
-        /// <summary>FHIR R4.</summary>
-        R4,
-
-        /// <summary>FHIR R4B.</summary>
-        R4B,
-
-        /// <summary>FHIR R5.</summary>
-        R5,
-    }
-
     /// <summary>Information about the FHIR package.</summary>
     /// <param name="Id">      The identifier.</param>
     /// <param name="Version"> The version.</param>
@@ -31,13 +18,23 @@ public class ProviderConfiguration
         string Registry);
 
     /// <summary>Gets or sets the version.</summary>
-    public required FhirVersionCodes FhirVersion { get; set; } = FhirVersionCodes.R4;
+    public required Hl7.Fhir.Model.FHIRVersion FhirVersion { get; set; } = Hl7.Fhir.Model.FHIRVersion.N4_1;
 
     /// <summary>Gets or sets the supported resources.</summary>
     public IEnumerable<string> SupportedResources { get; set; } = Array.Empty<string>();
 
+    /// <summary>Gets or sets the supported MIME formats.</summary>
+    public IEnumerable<string> SupportedFormats { get; set; } = new string[]
+    {
+        "application/fhir+json",
+        "application/fhir+xml",
+    };
+
     /// <summary>Gets or sets the tenant route.</summary>
     public required string TenantRoute { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets URL of the base.</summary>
+    public required string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the FHIR packages.</summary>
     public Dictionary<string, FhirPackageInfo> FhirPackages { get; } = new();

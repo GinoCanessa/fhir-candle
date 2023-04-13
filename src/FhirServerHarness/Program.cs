@@ -65,8 +65,9 @@ public static class Program
             //},
             new ProviderConfiguration
             {
-                FhirVersion = ProviderConfiguration.FhirVersionCodes.R4B,
+                FhirVersion = Hl7.Fhir.Model.FHIRVersion.N4_1,
                 TenantRoute = "r4b",
+                BaseUrl = "http://localhost:5101/r4b",
             },
             //new ProviderConfiguration
             //{

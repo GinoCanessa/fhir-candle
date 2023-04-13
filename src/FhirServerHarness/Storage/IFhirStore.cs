@@ -17,6 +17,20 @@ public interface IFhirStore : IDisposable
     /// <param name="config">The configuration.</param>
     void Init(ProviderConfiguration config);
 
+    /// <summary>Gets the metadata for this store.</summary>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <param name="eTag">              [out] The tag.</param>
+    /// <param name="lastModified">      [out] The last modified.</param>
+    /// <returns>The metadata.</returns>
+    HttpStatusCode GetMetadata(
+        string destFormat,
+        out string serializedResource,
+        out string serializedOutcome,
+        out string eTag,
+        out string lastModified);
+
     /// <summary>Instance read.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
@@ -151,8 +165,6 @@ public interface IFhirStore : IDisposable
     /// <param name="name">        The sp name/code/id.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryRemoveExecutableSearchParameter(string resourceType, string name);
-
-
 
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources { get; }

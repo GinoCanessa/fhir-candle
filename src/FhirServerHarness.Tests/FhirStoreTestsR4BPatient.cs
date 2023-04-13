@@ -23,8 +23,9 @@ public class FhirStoreTestsR4BPatient : IDisposable
     /// <summary>(Immutable) The configuration.</summary>
     private static readonly ProviderConfiguration _config = new()
     {
-        FhirVersion = ProviderConfiguration.FhirVersionCodes.R4B,
+        FhirVersion = Hl7.Fhir.Model.FHIRVersion.N4_1,
         TenantRoute = "r4b",
+        BaseUrl = "http://localhost:5101/r4b",
     };
 
     /// <summary>(Immutable) The test output helper.</summary>

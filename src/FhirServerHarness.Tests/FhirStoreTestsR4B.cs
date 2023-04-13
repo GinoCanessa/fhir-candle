@@ -6,8 +6,12 @@
 using FhirServerHarness.Models;
 using FhirServerHarness.Storage;
 using FhirServerHarness.Tests.Extensions;
+using FhirServerHarness.Tests.Models;
 using FluentAssertions;
+using Hl7.Fhir.Model;
 using System.Net;
+using System.Reflection.Metadata;
+using System.Text.Json;
 using Xunit.Abstractions;
 
 namespace FhirServerHarness.Tests;
@@ -17,11 +21,15 @@ public class FhirStoreTestsR4B: IDisposable
 {
     private readonly ITestOutputHelper _testOutputHelper;
 
-    private readonly ProviderConfiguration _config = new ()
+    /// <summary>(Immutable) The configuration.</summary>
+    private static readonly ProviderConfiguration _config = new()
     {
-        FhirVersion = ProviderConfiguration.FhirVersionCodes.R4B,
+        FhirVersion = Hl7.Fhir.Model.FHIRVersion.N4_1,
         TenantRoute = "r4b",
+        BaseUrl = "http://localhost:5101/r4b",
     };
+
+    private const int _expectedRestResources = 140;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FhirStoreTestsR4B"/> class.
@@ -40,7 +48,36 @@ public class FhirStoreTestsR4B: IDisposable
     {
         // cleanup
     }
-    
+
+    [Fact]
+    public void GetMetadata()
+    {
+        IFhirStore fhirStore = new VersionedFhirStore();
+        fhirStore.Init(_config);
+
+        HttpStatusCode scRead = fhirStore.GetMetadata(
+            "application/fhir+json",
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified);
+
+        scRead.Should().Be(HttpStatusCode.OK);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+
+        MinimalCapabilities? capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(serializedResource);
+
+        capabilities.Should().NotBeNull();
+        capabilities!.Rest.Should().NotBeNullOrEmpty();
+
+        MinimalCapabilities.MinimalRest rest = capabilities!.Rest!.First();
+        rest.Mode.Should().Be("server");
+        rest.Resources.Should().NotBeNullOrEmpty();
+        int resourceCount = rest.Resources!.Count();
+        resourceCount.Should().Be(_expectedRestResources);
+    }
+
     [Theory]
     [FileData("data/r4b/patient-example.json")]
     public void ResourceCreatePatient(string json)
@@ -139,7 +176,6 @@ public class FhirStoreTestsR4B: IDisposable
         location.Should().StartWith("Observation/");
     }
 
-
     [Theory]
     [FileData("data/r4b/searchparameter-patient-multiplebirth.json")]
     public void ResourceCreateSearchParameter(string json)
@@ -188,5 +224,94 @@ public class FhirStoreTestsR4B: IDisposable
         eTag.Should().Be("W/\"1\"");
         location.Should().EndWith("SearchParameter/Patient-multiplebirth");
         //_testOutputHelper.WriteLine(bundle);
+    }
+
+    [Theory]
+    [FileData("data/r4b/searchparameter-patient-multiplebirth.json")]
+    public void CreateSearchParameterCapabilityCount(string json)
+    {
+        //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
+
+        IFhirStore fhirStore = new VersionedFhirStore();
+        fhirStore.Init(_config);
+
+        // read the metadata
+        HttpStatusCode scRead = fhirStore.GetMetadata(
+            "application/fhir+json",
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified);
+
+        scRead.Should().Be(HttpStatusCode.OK);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+
+        MinimalCapabilities? capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(serializedResource);
+
+        capabilities.Should().NotBeNull();
+        capabilities!.Rest.Should().NotBeNullOrEmpty();
+
+        MinimalCapabilities.MinimalRest rest = capabilities!.Rest!.First();
+        rest.Mode.Should().Be("server");
+        rest.Resources.Should().NotBeNullOrEmpty();
+
+        int spCount = 0;
+        foreach (MinimalCapabilities.MinimalResource r in rest.Resources!)
+        {
+            if (r.ResourceType != "Patient")
+            {
+                continue;
+            }
+
+            spCount = r.SearchParams?.Count() ?? 0;
+            break;
+        }
+
+        // add a search parameter for the patient resource
+        HttpStatusCode scCreate = fhirStore.InstanceCreate(
+            "SearchParameter",
+            json,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out string location);
+
+        // read the metadata again
+        scRead = fhirStore.GetMetadata(
+            "application/fhir+json",
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified);
+
+        scRead.Should().Be(HttpStatusCode.OK);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+
+        capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(serializedResource);
+
+        capabilities.Should().NotBeNull();
+        capabilities!.Rest.Should().NotBeNullOrEmpty();
+
+        rest = capabilities!.Rest!.First();
+        rest.Mode.Should().Be("server");
+        rest.Resources.Should().NotBeNullOrEmpty();
+
+        foreach (MinimalCapabilities.MinimalResource r in rest.Resources!)
+        {
+            if (r.ResourceType != "Patient")
+            {
+                continue;
+            }
+
+            (r.SearchParams?.Count() ?? 0).Should().Be(spCount + 1);
+            break;
+        }
     }
 }

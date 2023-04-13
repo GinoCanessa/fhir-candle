@@ -46,6 +46,12 @@ public class ResourceStore<T> : IResourceStore
     /// <summary>(Immutable) The compiled FHIRPath expressions.</summary>
     private readonly ConcurrentDictionary<string, CompiledExpression> _fpExpressions = new();
 
+    /// <summary>The supported includes.</summary>
+    private string[] _supportedIncludes = Array.Empty<string>();
+
+    /// <summary>The supported reverse includes.</summary>
+    private string[] _supportedRevIncludes = Array.Empty<string>();
+
     /// <summary>
     /// Initializes a new instance of the FhirServerHarness.Storage.ResourceStore&lt;T&gt; class.
     /// </summary>
@@ -122,16 +128,12 @@ public class ResourceStore<T> : IResourceStore
     }
 
     /// <summary>Update a specific instance of a resource.</summary>
-    /// <param name="source">[out] The resource.</param>
+    /// <param name="source">     [out] The resource.</param>
+    /// <param name="allowCreate">True to allow, false to suppress the create.</param>
     /// <returns>The updated resource, or null if it could not be performed.</returns>
-    public Resource? InstanceUpdate(Resource source)
+    public Resource? InstanceUpdate(Resource source, bool allowCreate)
     {
         if (string.IsNullOrEmpty(source?.Id))
-        {
-            return null;
-        }
-
-        if (!_resourceStore.ContainsKey(source.Id))
         {
             return null;
         }
@@ -141,7 +143,23 @@ public class ResourceStore<T> : IResourceStore
             return null;
         }
 
-        if (int.TryParse(_resourceStore[source.Id].Meta.VersionId, out int version))
+        if (source.Meta == null)
+        {
+            source.Meta = new Meta();
+        }
+
+        if (!_resourceStore.ContainsKey(source.Id))
+        {
+            if (allowCreate)
+            {
+                source.Meta.VersionId = "1";
+            }
+            else
+            {
+                return null;
+            }
+        }
+        else if (int.TryParse(_resourceStore[source.Id].Meta?.VersionId ?? string.Empty, out int version))
         {
             source.Meta.VersionId = (version + 1).ToString();
         }
@@ -328,6 +346,27 @@ public class ResourceStore<T> : IResourceStore
     {
         return _searchParameters.TryGetValue(name, out spDefinition);
     }
+
+    /// <summary>Gets the search parameter definitions known by this store.</summary>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process the search parameter definitions in
+    /// this collection.
+    /// </returns>
+    public IEnumerable<ModelInfo.SearchParamDefinition> GetSearchParamDefinitions() => _searchParameters.Values;
+
+    /// <summary>Gets the search includes supported by this store.</summary>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process the search includes in this
+    /// collection.
+    /// </returns>
+    public IEnumerable<string> GetSearchIncludes() => _supportedIncludes;
+
+    /// <summary>Gets the search reverse includes supported by this store.</summary>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process the search reverse includes in this
+    /// collection.
+    /// </returns>
+    public IEnumerable<string> GetSearchRevIncludes() => _supportedRevIncludes;
 
     /// <summary>Performs a type search in this resource store.</summary>
     /// <param name="query">The query.</param>

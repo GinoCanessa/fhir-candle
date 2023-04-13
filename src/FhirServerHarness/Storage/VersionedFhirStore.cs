@@ -9,6 +9,7 @@ using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Support;
 using Hl7.FhirPath;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -60,6 +61,18 @@ public class VersionedFhirStore : IFhirStore
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources => _store.Keys.ToArray<string>();
 
+    /// <summary>The configuration.</summary>
+    private ProviderConfiguration _config = null!;
+
+    /// <summary>True if capabilities are stale.</summary>
+    private bool _capabilitiesAreStale = true;
+
+    /// <summary>Base URI of this store.</summary>
+    private Uri _baseUri = null!;
+
+    /// <summary>(Immutable) Identifier for the capability statement.</summary>
+    private const string _capabilityStatementId = "metadata";
+
     /// <summary>
     /// Initializes a new instance of the <see cref="VersionedFhirStore"/> class.
     /// </summary>
@@ -72,6 +85,23 @@ public class VersionedFhirStore : IFhirStore
     /// <param name="config">The configuration.</param>
     public void Init(ProviderConfiguration config)
     {
+        if (config == null)
+        {
+            throw new ArgumentNullException(nameof(config));
+        }
+
+        if (string.IsNullOrEmpty(config.BaseUrl))
+        {
+            throw new ArgumentNullException(nameof(config.BaseUrl));
+        }
+
+        _config = config;
+        _baseUri = new Uri(config.BaseUrl);
+        if (_config.BaseUrl.EndsWith('/'))
+        {
+            _config.BaseUrl = _config.BaseUrl.Substring(0, _config.BaseUrl.Length - 1);
+        }
+
         Type rsType = typeof(ResourceStore<>);
 
         foreach ((string tn, Type t) in ModelInfo.FhirTypeToCsType)
@@ -529,6 +559,7 @@ public class VersionedFhirStore : IFhirStore
             return false;
         }
 
+        _capabilitiesAreStale = true;
         _store[resourceType].SetExecutableSearchParameter(spDefinition);
         return true;
     }
@@ -544,6 +575,7 @@ public class VersionedFhirStore : IFhirStore
             return false;
         }
 
+        _capabilitiesAreStale = true;
         _store[resourceType].RemoveExecutableSearchParameter(name);
         return true;
     }
@@ -607,7 +639,7 @@ public class VersionedFhirStore : IFhirStore
         
         foreach (Resource resource in results)
         {
-            bundle.AddSearchEntry(resource, $"/{resource.TypeName}/{resource.Id}", Bundle.SearchEntryMode.Match);
+            bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{resource.TypeName}/{resource.Id}", Bundle.SearchEntryMode.Match);
         }
 
         serializedBundle = SerializeFhir(bundle, destFormat, SummaryType.False);
@@ -617,6 +649,136 @@ public class VersionedFhirStore : IFhirStore
         return HttpStatusCode.OK;
     }
 
+    /// <summary>Gets the server capabilities.</summary>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <param name="eTag">              [out] The tag.</param>
+    /// <param name="lastModified">      [out] The last modified.</param>
+    /// <returns>The capabilities.</returns>
+    public HttpStatusCode GetMetadata(
+        string destFormat,
+        out string serializedResource,
+        out string serializedOutcome,
+        out string eTag,
+        out string lastModified)
+    {
+        if (_capabilitiesAreStale)
+        {
+            UpdateCapabilities();
+        }
+
+        // pass through to a normal instance read
+        return InstanceRead(
+            "CapabilityStatement",
+            _capabilityStatementId,
+            destFormat,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified);
+    }
+
+    /// <summary>Updates the current capabilities of this store.</summary>
+    private void UpdateCapabilities()
+    {
+        Hl7.Fhir.Model.CapabilityStatement cs = new()
+        {
+            Id = _capabilityStatementId,
+            Url = $"{_config.BaseUrl}/CapabilityStatement/{_capabilityStatementId}",
+            Name = "Capabilities" + _config.FhirVersion,
+            Status = PublicationStatus.Active,
+            Date = new DateTimeOffset().ToFhirDateTime(),
+            Kind = CapabilityStatementKind.Instance,
+            Software = new()
+            {
+                Name = "FhirServerHarness",
+            },
+            FhirVersion = _config.FhirVersion,
+            Format = _config.SupportedFormats,
+            Rest = new(),
+        };
+
+        // start building our rest component
+        // commented-out capabilities are ones that are not yet implemented
+        CapabilityStatement.RestComponent restComponent = new()
+        {
+            Mode = CapabilityStatement.RestfulCapabilityMode.Server,
+            Resource = new(),
+            Interaction = new()
+            {
+                //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.Batch },
+                //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.HistorySystem },
+                //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.SearchSystem },
+                //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.Transaction },
+            },
+            //SearchParam = new(),      // currently, search parameters are expanded out to all-resource
+            //Operation = new(),
+            //Compartment = new(),
+        };
+
+        // add our resources
+        foreach ((string resourceName, IResourceStore resourceStore) in _store)
+        {
+            // commented-out capabilities are ones that are not yet implemented
+            CapabilityStatement.ResourceComponent rc = new()
+            {
+                Type = resourceName,
+                Interaction = new()
+                {
+                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Create },
+                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Delete },
+                    //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.HistoryInstance },
+                    //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.HistoryType },
+                    //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Patch },
+                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Read },
+                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.SearchType },
+                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Update },
+                    //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Vread },
+                },
+                Versioning = CapabilityStatement.ResourceVersionPolicy.Versioned,
+                //ReadHistory = true,
+                UpdateCreate = true,
+                //ConditionalCreate = true,
+                ConditionalRead = CapabilityStatement.ConditionalReadStatus.NotSupported,
+                //ConditionalUpdate = true,
+                //ConditionalPatch = true,
+                ConditionalDelete = CapabilityStatement.ConditionalDeleteStatus.NotSupported,
+                ReferencePolicy = new CapabilityStatement.ReferenceHandlingPolicy?[]
+                {
+                    CapabilityStatement.ReferenceHandlingPolicy.Literal,
+                    //CapabilityStatement.ReferenceHandlingPolicy.Logical,
+                    //CapabilityStatement.ReferenceHandlingPolicy.Resolves,
+                    //CapabilityStatement.ReferenceHandlingPolicy.Enforced,
+                    CapabilityStatement.ReferenceHandlingPolicy.Local,
+                },
+                SearchInclude = resourceStore.GetSearchIncludes(),
+                SearchRevInclude = resourceStore.GetSearchRevIncludes(),
+                SearchParam = resourceStore.GetSearchParamDefinitions().Select(sp => new CapabilityStatement.SearchParamComponent()
+                    {
+                        Name = sp.Name,
+                        Definition = sp.Url,
+                        Type = sp.Type,
+                        Documentation = sp.Description,
+                    }).ToList(),
+                //Operation = new(),
+            };
+
+            // add our resource component
+            restComponent.Resource.Add(rc);
+        }
+
+        // add our rest component to the capability statement
+        cs.Rest.Add(restComponent);
+
+        // update our current capabilities
+        _store["CapabilityStatement"].InstanceUpdate(cs, true);
+        _capabilitiesAreStale = false;
+    }
 
     /// <summary>
     /// Releases the unmanaged resources used by the

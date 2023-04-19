@@ -8,9 +8,7 @@ using FhirServerHarness.Storage;
 using FhirServerHarness.Tests.Extensions;
 using FhirServerHarness.Tests.Models;
 using FluentAssertions;
-using Hl7.Fhir.Model;
 using System.Net;
-using System.Reflection.Metadata;
 using System.Text.Json;
 using Xunit.Abstractions;
 

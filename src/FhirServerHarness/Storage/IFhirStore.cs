@@ -152,6 +152,22 @@ public interface IFhirStore : IDisposable
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryResolve(string uri, out ITypedElement? resource);
 
+    /// <summary>Attempts to resolve an ITypedElement from the given string.</summary>
+    /// <param name="uri">     URI of the resource.</param>
+    /// <param name="resource">[out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryResolveAsResource(string uri, out Resource? resource);
+
+    /// <summary>
+    /// Attempts to get search parameter definition a ModelInfo.SearchParamDefinition from the given
+    /// string.
+    /// </summary>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <param name="name">        The name.</param>
+    /// <param name="spDefinition">[out] The sp definition.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryGetSearchParamDefinition(string resource, string name, out ModelInfo.SearchParamDefinition? spDefinition);
+
     /// <summary>
     /// Attempts to add an executable search parameter to a given resource.
     /// </summary>

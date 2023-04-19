@@ -5,10 +5,8 @@
 
 using FhirServerHarness.Models;
 using FhirServerHarness.Storage;
-using FhirServerHarness.Tests.Extensions;
 using FhirServerHarness.Tests.Models;
 using FluentAssertions;
-using System.Net;
 using System.Text.Json;
 using Xunit.Abstractions;
 
@@ -31,24 +29,23 @@ public class FhirStoreTestsR4BResource : IDisposable
     /// <summary>(Immutable) The test output helper.</summary>
     private readonly ITestOutputHelper _testOutputHelper;
 
-    /// <summary>(Immutable) The total patients expected.</summary>
+    /// <summary>(Immutable) The total number of patients.</summary>
     private const int _patientCount = 5;
 
-    /// <summary>(Immutable) The expected male.</summary>
+    /// <summary>(Immutable) The number of patients coded as male.</summary>
     private const int _patientsMale = 3;
 
-    /// <summary>(Immutable) The expected female.</summary>
+    /// <summary>(Immutable) The number of patients coded as female.</summary>
     private const int _patientsFemale = 1;
 
-    /// <summary>(Immutable) The total observations expected.</summary>
+    /// <summary>(Immutable) The total number of observations.</summary>
     private const int _observationCount = 6;
 
-    /// <summary>(Immutable) The expected vital signs.</summary>
+    /// <summary>(Immutable) The number of observations that are vital signs.</summary>
     private const int _observationsVitalSigns = 3;
 
-    /// <summary>(Immutable) The expected subject example.</summary>
-    private const int _observationsWithSubjects = 4;
-
+    /// <summary>(Immutable) The number of observations with the subject 'example'.</summary>
+    private const int _observationsWithSubjectExample = 4;
 
     /// <summary>
     /// Initializes static members of the FhirServerHarness.Tests.FhirStoreTestsR4BPatient class.
@@ -135,9 +132,10 @@ public class FhirStoreTestsR4BResource : IDisposable
     }
 
     [Theory]
-    [InlineData("_id=example", 1)]
-    [InlineData("_id=AnIdThatDoesNotExist", 0)]
     [InlineData("_id:not=example", (_observationCount - 1))]
+    [InlineData("_id=AnIdThatDoesNotExist", 0)]
+    [InlineData("_id=example", 1)]
+    [InlineData("_id=example&_include=Observation:patient", 1, 2)]
     [InlineData("value-quantity=185|http://unitsofmeasure.org|[lb_av]", 1)]
     [InlineData("value-quantity=185|http://unitsofmeasure.org|lbs", 1)]
     [InlineData("value-quantity=185||[lb_av]", 1)]
@@ -156,16 +154,16 @@ public class FhirStoreTestsR4BResource : IDisposable
     [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|cl/s", 1)]
     [InlineData("value-quantity=820||265201", 1)]
     [InlineData("value-quantity=820||cL/s", 1)]
-    [InlineData("subject=Patient/example", _observationsWithSubjects)]
+    [InlineData("subject=Patient/example", _observationsWithSubjectExample)]
     [InlineData("subject=Patient/UnknownPatientId", 0)]
-    [InlineData("subject=example", _observationsWithSubjects)]
+    [InlineData("subject=example", _observationsWithSubjectExample)]
     [InlineData("code=http://loinc.org|9272-6", 1)]
     [InlineData("code=http://snomed.info/sct|169895004", 1)]
     [InlineData("code=http://snomed.info/sct|9272-6", 0)]
     [InlineData("_profile=http://hl7.org/fhir/StructureDefinition/vitalsigns", _observationsVitalSigns)]
     [InlineData("_profile:missing=true", (_observationCount - _observationsVitalSigns))]
     [InlineData("_profile:missing=false", _observationsVitalSigns)]
-    public void ObservationSearch(string search, int matchCount)
+    public void ObservationSearch(string search, int matchCount, int? entryCount = null)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
@@ -177,14 +175,19 @@ public class FhirStoreTestsR4BResource : IDisposable
 
         results.Should().NotBeNull();
         results!.Total.Should().Be(matchCount);
+        if (entryCount != null)
+        {
+            results!.Entries.Should().HaveCount((int)entryCount);
+        }
 
         //_testOutputHelper.WriteLine(bundle);
     }
 
     [Theory]
-    [InlineData("_id=example", 1)]
-    [InlineData("_id=AnIdThatDoesNotExist", 0)]
     [InlineData("_id:not=example", (_patientCount - 1))]
+    [InlineData("_id=AnIdThatDoesNotExist", 0)]
+    [InlineData("_id=example", 1)]
+    [InlineData("_id=example&_revinclude=Observation:patient", 1, (_observationsWithSubjectExample + 1))]
     [InlineData("name=peter", 1)]
     [InlineData("name=not-present,another-not-present", 0)]
     [InlineData("name=peter,not-present", 1)]
@@ -220,7 +223,7 @@ public class FhirStoreTestsR4BResource : IDisposable
     [InlineData("_id=example&name=peter", 1)]
     [InlineData("_id=example&name=not-present", 0)]
     [InlineData("_id=example&_profile:missing=false", 0)]
-    public void PatientSearch(string search, int matchCount)
+    public void PatientSearch(string search, int matchCount, int? entryCount = null)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
@@ -232,6 +235,10 @@ public class FhirStoreTestsR4BResource : IDisposable
 
         results.Should().NotBeNull();
         results!.Total.Should().Be(matchCount);
+        if (entryCount != null)
+        {
+            results!.Entries.Should().HaveCount((int)entryCount);
+        }
 
         //_testOutputHelper.WriteLine(bundle);
     }

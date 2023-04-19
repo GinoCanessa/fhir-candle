@@ -6,15 +6,16 @@
 using FhirServerHarness.Models;
 using FhirServerHarness.Search;
 using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Support;
 using Hl7.FhirPath;
+using Hl7.FhirPath.Expressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using System.Net;
-using System.Security.AccessControl;
 
 namespace FhirServerHarness.Storage;
 
@@ -24,7 +25,7 @@ public class VersionedFhirStore : IFhirStore
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
 
-    private static readonly FhirPathCompiler _compiler = new();
+    private static FhirPathCompiler _compiler = null!;
 
     private FhirJsonParser _jsonParser = new(new ParserSettings()
     {
@@ -78,7 +79,7 @@ public class VersionedFhirStore : IFhirStore
     /// </summary>
     public VersionedFhirStore()
     {
-        _searchTester = new() { FhirStore = this };
+        _searchTester = new() { FhirStore = this, };
     }
 
     /// <summary>Initializes this object.</summary>
@@ -101,6 +102,9 @@ public class VersionedFhirStore : IFhirStore
         {
             _config.BaseUrl = _config.BaseUrl.Substring(0, _config.BaseUrl.Length - 1);
         }
+
+        SymbolTable st = new SymbolTable().AddStandardFP().AddFhirExtensions();
+        _compiler = new(st);
 
         Type rsType = typeof(ResourceStore<>);
 
@@ -178,6 +182,40 @@ public class VersionedFhirStore : IFhirStore
         return true;
     }
 
+
+    /// <summary>Attempts to resolve an ITypedElement from the given string.</summary>
+    /// <param name="uri">     URI of the resource.</param>
+    /// <param name="resource">[out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryResolveAsResource(string uri, out Resource? resource)
+    {
+        string[] components = uri.Split('/');
+
+        if (components.Length < 2)
+        {
+            resource = null;
+            return false;
+        }
+
+        string resourceType = components[components.Length - 2];
+        string id = components[components.Length - 1];
+
+        if (!_store.TryGetValue(resourceType, out IResourceStore? rs))
+        {
+            resource = null;
+            return false;
+        }
+
+        resource = rs.InstanceRead(id);
+
+        if (resource == null)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     /// <summary>Resolves the given URI into a resource.</summary>
     /// <exception cref="ArgumentException">Thrown when one or more arguments have unsupported or
     ///  illegal values.</exception>
@@ -187,9 +225,13 @@ public class VersionedFhirStore : IFhirStore
     {
         string[] components = uri.Split('/');
 
+        // TODO: handle contained resources
+        // TODO: handle bundle-local references
+
         if (components.Length < 2)
         {
-            throw new ArgumentException("Invalid URI", nameof(uri));
+            return null!;
+            //throw new ArgumentException("Invalid URI", nameof(uri));
         }
 
         string resourceType = components[components.Length - 2];
@@ -197,14 +239,16 @@ public class VersionedFhirStore : IFhirStore
 
         if (!_store.TryGetValue(resourceType, out IResourceStore? rs))
         {
-            throw new ArgumentException("Invalid URI - unsupported resource type", nameof(uri));
+            return null!;
+            //throw new ArgumentException("Invalid URI - unsupported resource type", nameof(uri));
         }
 
         Resource? resource = rs.InstanceRead(id);
 
         if (resource == null)
         {
-            throw new ArgumentException("Invalid URI - ID not found", nameof(uri));
+            return null!;
+            //throw new ArgumentException("Invalid URI - ID not found", nameof(uri));
         }
 
         return resource.ToTypedElement().ToScopedNode();
@@ -580,6 +624,31 @@ public class VersionedFhirStore : IFhirStore
         return true;
     }
 
+    /// <summary>
+    /// Attempts to get search parameter definition a ModelInfo.SearchParamDefinition from the given
+    /// string.
+    /// </summary>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <param name="name">        The name.</param>
+    /// <param name="spDefinition">[out] The sp definition.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryGetSearchParamDefinition(string resource, string name, out ModelInfo.SearchParamDefinition? spDefinition)
+    {
+        if (!_store.ContainsKey(resource))
+        {
+            spDefinition = null;
+            return false;
+        }
+
+        if (ParsedSearchParameter._allResourceParameters.ContainsKey(name))
+        {
+            spDefinition = ParsedSearchParameter._allResourceParameters[name];
+            return true;
+        }
+
+        return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
+    }
+
     /// <summary>Type search.</summary>
     /// <param name="resourceType">     Type of the resource.</param>
     /// <param name="queryString">      The query string.</param>
@@ -614,13 +683,20 @@ public class VersionedFhirStore : IFhirStore
             return HttpStatusCode.BadRequest;
         }
 
+        // parse search parameters
         IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(
+            _compiler,
             queryString,
             _store[resourceType],
             this);
 
+        // execute search
         IEnumerable<Resource>? results = _store[resourceType].TypeSearch(parameters);
 
+        // parse search result parameters
+        ParsedResultParameters resultParameters = new ParsedResultParameters(queryString, this);
+
+        // we are done if there are no results found
         if (results == null)
         {
             serializedBundle = string.Empty;
@@ -631,15 +707,42 @@ public class VersionedFhirStore : IFhirStore
             return HttpStatusCode.UnsupportedMediaType;
         }
 
+        // create our bundle for results
         Bundle bundle = new Bundle
         {
             Type = Bundle.BundleType.Searchset,
             Total = results.Count(),
         };
-        
+
+        // TODO: check for a sort and apply to results
+
+        HashSet<string> addedIds = new();
+
         foreach (Resource resource in results)
         {
-            bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{resource.TypeName}/{resource.Id}", Bundle.SearchEntryMode.Match);
+            string id = $"{resource.TypeName}/{resource.Id}";
+
+            if (addedIds.Contains(id))
+            {
+                // promote to match
+                bundle.FindEntry(new ResourceReference(id)).First().Search.Mode = Bundle.SearchEntryMode.Match;
+            }
+            else
+            {
+                // add the matched result to the bundle
+                bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{id}", Bundle.SearchEntryMode.Match);
+
+                // track we have added this id
+                addedIds.Add(id);
+            }
+
+            // add any incuded resources
+            AddInclusions(bundle, resource, resultParameters, addedIds);
+
+            // check for include:iterate directives
+
+            // add any reverse incuded resources
+            AddReverseInclusions(bundle, resource, resultParameters, addedIds);
         }
 
         serializedBundle = SerializeFhir(bundle, destFormat, SummaryType.False);
@@ -647,6 +750,134 @@ public class VersionedFhirStore : IFhirStore
         serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
 
         return HttpStatusCode.OK;
+    }
+
+    /// <summary>Adds a reverse inclusions.</summary>
+    /// <param name="bundle">          The bundle.</param>
+    /// <param name="resource">        [out] The resource.</param>
+    /// <param name="resultParameters">Options for controlling the result.</param>
+    /// <param name="addedIds">        List of identifiers for the added.</param>
+    private void AddReverseInclusions(
+        Bundle bundle,
+        Resource resource,
+        ParsedResultParameters resultParameters,
+        HashSet<string> addedIds)
+    {
+        if (resultParameters.ReverseInclusions.Any())
+        {
+            string matchId = $"{resource.TypeName}/{resource.Id}";
+
+            foreach ((string reverseResourceType, List<ModelInfo.SearchParamDefinition> sps) in resultParameters.ReverseInclusions)
+            {
+                if (!_store.ContainsKey(reverseResourceType))
+                {
+                    continue;
+                }
+
+                foreach (ModelInfo.SearchParamDefinition sp in sps)
+                {
+                    List<ParsedSearchParameter> parameters = new()
+                    {
+                        new ParsedSearchParameter(
+                            _compiler,
+                            sp.Name!, 
+                            string.Empty, 
+                            SearchDefinitions.SearchModifierCodes.None,
+                            matchId,
+                            sp),
+                    };
+
+                    // execute search
+                    IEnumerable<Resource>? results = _store[reverseResourceType].TypeSearch(parameters);
+
+                    if (results?.Any() ?? false)
+                    {
+                        foreach (Resource revIncludeRes in results)
+                        {
+                            string id = $"{revIncludeRes.TypeName}/{revIncludeRes.Id}";
+
+                            if (!addedIds.Contains(id))
+                            {
+                                // add the result to the bundle
+                                bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{id}", Bundle.SearchEntryMode.Include);
+
+                                // track we have added this id
+                                addedIds.Add(id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Adds the inclusions.</summary>
+    /// <param name="bundle">          The bundle.</param>
+    /// <param name="resource">        [out] The resource.</param>
+    /// <param name="resultParameters">Options for controlling the result.</param>
+    /// <param name="addedIds">        List of identifiers for the added.</param>
+    private void AddInclusions(
+        Bundle bundle,
+        Resource resource,
+        ParsedResultParameters resultParameters,
+        HashSet<string> addedIds)
+    {
+        // check for include directives
+        if (resultParameters.Inclusions.ContainsKey(resource.TypeName))
+        {
+            ITypedElement r = resource.ToTypedElement();
+
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(r.ToScopedNode());
+            fpContext.ElementResolver = this.Resolve;
+
+            foreach (ModelInfo.SearchParamDefinition sp in resultParameters.Inclusions[resource.TypeName])
+            {
+                if (string.IsNullOrEmpty(sp.Expression))
+                {
+                    continue;
+                }
+
+                IEnumerable<ITypedElement> extracted = r.Select(sp.Expression, fpContext);
+
+                if (!extracted.Any())
+                {
+                    continue;
+                }
+
+                foreach (ITypedElement element in extracted)
+                {
+                    Hl7.Fhir.Model.ResourceReference reference = element.ToPoco<Hl7.Fhir.Model.ResourceReference>();
+
+                    if (TryResolveAsResource(reference.Reference, out Resource? resolved) &&
+                        (resolved != null))
+                    {
+                        if (sp.Target?.Any() ?? false)
+                        {
+                            // verify this is a valid target type
+                            ResourceType? rt = ModelInfo.FhirTypeNameToResourceType(resolved.TypeName);
+
+                            if ((rt == null) || 
+                                (!sp.Target.Contains(rt.Value)))
+                            {
+                                continue;
+                            }
+                        }
+
+                        string includedId = $"{resolved.TypeName}/{resolved.Id}";
+                        if (addedIds.Contains(includedId))
+                        {
+                            continue;
+                        }
+
+                        // add the matched result to the bundle
+                        bundle.AddSearchEntry(resolved, $"{_config.BaseUrl}/{includedId}", Bundle.SearchEntryMode.Include);
+
+                        // track we have added this id
+                        addedIds.Add(includedId);
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>Gets the server capabilities.</summary>

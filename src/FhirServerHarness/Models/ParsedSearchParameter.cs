@@ -4,10 +4,11 @@
 // </copyright>
 
 using FhirServerHarness.Extensions;
+using FhirServerHarness.Search;
 using FhirServerHarness.Storage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
-using Newtonsoft.Json.Linq;
+using Hl7.FhirPath;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -47,8 +48,11 @@ public class ParsedSearchParameter
         /// <summary>Include additional resources according to a GraphDefinition.</summary>
         "_graph",
 
-        /// <summary>Include additional resources, based on following links forward across references..</summary>
+        /// <summary>Include additional resources, based on following links forward across references.</summary>
         "_include",
+
+        /// <summary>Include additional resources, based on following links forward across references in an included resource.</summary>
+        "_include:iterate",
 
         /// <summary>Include additional resources, based on following reverse links across references.</summary>
         "_revinclude",
@@ -159,9 +163,13 @@ public class ParsedSearchParameter
     /// <summary>Gets or sets the fhirPath extraction query.</summary>
     public required string SelectExpression { get; set; }
 
+    /// <summary>Gets or sets the compiled expression.</summary>
+    public required CompiledExpression? CompiledExpression { get; set; }
+
     /// <summary>
     /// Initializes a new instance of the FhirServerHarness.Models.ParsedSearchParameter class.
     /// </summary>
+    /// <param name="compiler">       The compiler.</param>
     /// <param name="name">           The name.</param>
     /// <param name="modifierLiteral">The modifier.</param>
     /// <param name="modifierCode">   The modifier code.</param>
@@ -169,6 +177,7 @@ public class ParsedSearchParameter
     /// <param name="spd">            The speed.</param>
     [SetsRequiredMembers]
     public ParsedSearchParameter(
+        FhirPathCompiler compiler,
         string name, 
         string modifierLiteral,
         SearchModifierCodes modifierCode,
@@ -180,6 +189,10 @@ public class ParsedSearchParameter
         ModifierLiteral = modifierLiteral;
         ParamType = spd.Type;
         SelectExpression = spd.Expression ?? string.Empty;
+        if (!string.IsNullOrEmpty(SelectExpression))
+        {
+            CompiledExpression = compiler.Compile(SelectExpression);
+        }
 
         List<SearchPrefixCodes?> prefixes = new();
         List<string> values = new();
@@ -398,6 +411,8 @@ public class ParsedSearchParameter
     }
 
     /// <summary>Enumerates parse in this collection.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="compiler">     The compiler.</param>
     /// <param name="queryString">  The query string.</param>
     /// <param name="resourceStore">The resource store.</param>
     /// <param name="store">        The store.</param>
@@ -405,6 +420,7 @@ public class ParsedSearchParameter
     /// An enumerator that allows foreach to be used to process parse in this collection.
     /// </returns>
     public static IEnumerable<ParsedSearchParameter> Parse(
+        FhirPathCompiler compiler,
         string queryString,
         IResourceStore resourceStore,
         IFhirStore store)
@@ -431,6 +447,12 @@ public class ParsedSearchParameter
             if (key.Contains('.'))
             {
                 // TODO: handle chaining
+            }
+
+            // check for search result parameters, which are not search parameters
+            if (ParsedResultParameters.SearchResultParameters.Contains(key))
+            {
+                continue;
             }
 
             string[] keyComponents = key.Split(':');
@@ -464,7 +486,6 @@ public class ParsedSearchParameter
 
             // TODO: check for resourceType modifier (need to match resources in the store)
 
-
             ModelInfo.SearchParamDefinition? spd = null;
 
             if (_allResourceParameters.ContainsKey(sp))
@@ -489,6 +510,7 @@ public class ParsedSearchParameter
             }
 
             yield return new ParsedSearchParameter(
+                compiler,
                 sp,
                 modifierLiteral,
                 modifierCode,
@@ -509,7 +531,6 @@ public class ParsedSearchParameter
             continue;
         }
     }
-
 
     /// <summary>Parse reference common.</summary>
     /// <param name="reference">The reference.</param>

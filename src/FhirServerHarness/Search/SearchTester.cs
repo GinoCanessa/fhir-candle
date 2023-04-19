@@ -20,7 +20,7 @@ namespace FhirServerHarness.Search;
 public class SearchTester
 {
     /// <summary>Gets or sets the store.</summary>
-    public required IFhirStore FhirStore { get; set; }
+    public required IFhirStore FhirStore { get; init; }
 
     /// <summary>Tests a resource against parsed search parameters for matching.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
@@ -55,7 +55,7 @@ public class SearchTester
 
         foreach (ParsedSearchParameter sp in searchParameters)
         {
-            if (string.IsNullOrEmpty(sp.SelectExpression))
+            if (sp.CompiledExpression == null)
             {
                 // TODO: Handle non-trivial search parameters
                 ignored.Add(sp);
@@ -72,7 +72,8 @@ public class SearchTester
 
             applied.Add(sp);
 
-            IEnumerable<ITypedElement> extracted = resource.Select(sp.SelectExpression, fpContext);
+            //IEnumerable<ITypedElement> extracted = resource.Select(sp.SelectExpression, fpContext);
+            IEnumerable<ITypedElement> extracted = sp.CompiledExpression.Invoke(resource, fpContext);
 
             if (!extracted.Any())
             {

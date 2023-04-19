@@ -344,6 +344,12 @@ public class ResourceStore<T> : IResourceStore
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryGetSearchParamDefinition(string name, out ModelInfo.SearchParamDefinition? spDefinition)
     {
+        if (ParsedSearchParameter._allResourceParameters.ContainsKey(name))
+        {
+            spDefinition = ParsedSearchParameter._allResourceParameters[name];
+            return true;
+        }
+
         return _searchParameters.TryGetValue(name, out spDefinition);
     }
 

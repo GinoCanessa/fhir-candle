@@ -177,7 +177,7 @@ public class ParsedSearchParameter
     /// <param name="spd">            The speed.</param>
     [SetsRequiredMembers]
     public ParsedSearchParameter(
-        FhirPathCompiler compiler,
+        IFhirStore store,
         string name, 
         string modifierLiteral,
         SearchModifierCodes modifierCode,
@@ -191,7 +191,7 @@ public class ParsedSearchParameter
         SelectExpression = spd.Expression ?? string.Empty;
         if (!string.IsNullOrEmpty(SelectExpression))
         {
-            CompiledExpression = compiler.Compile(SelectExpression);
+            CompiledExpression = store.GetCompiled(spd.Resource ?? string.Empty, name, SelectExpression);
         }
 
         List<SearchPrefixCodes?> prefixes = new();
@@ -420,7 +420,6 @@ public class ParsedSearchParameter
     /// An enumerator that allows foreach to be used to process parse in this collection.
     /// </returns>
     public static IEnumerable<ParsedSearchParameter> Parse(
-        FhirPathCompiler compiler,
         string queryString,
         IResourceStore resourceStore,
         IFhirStore store)
@@ -510,7 +509,7 @@ public class ParsedSearchParameter
             }
 
             yield return new ParsedSearchParameter(
-                compiler,
+                store,
                 sp,
                 modifierLiteral,
                 modifierCode,

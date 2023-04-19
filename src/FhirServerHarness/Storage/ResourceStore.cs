@@ -43,9 +43,6 @@ public class ResourceStore<T> : IResourceStore
     /// <summary>Options for controlling the search.</summary>
     private Dictionary<string, ModelInfo.SearchParamDefinition> _searchParameters = new();
 
-    /// <summary>(Immutable) The compiled FHIRPath expressions.</summary>
-    private readonly ConcurrentDictionary<string, CompiledExpression> _fpExpressions = new();
-
     /// <summary>The supported includes.</summary>
     private string[] _supportedIncludes = Array.Empty<string>();
 
@@ -271,7 +268,6 @@ public class ResourceStore<T> : IResourceStore
 
             _store.TryRemoveExecutableSearchParameter(rt!.ToString()!, name);
         }
-
     }
 
     /// <summary>Removes the executable search parameter described by name.</summary>

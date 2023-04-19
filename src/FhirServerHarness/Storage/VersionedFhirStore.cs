@@ -15,7 +15,9 @@ using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using System.Linq.Expressions;
 using System.Net;
+using System.Xml.Linq;
 
 namespace FhirServerHarness.Storage;
 
@@ -25,6 +27,7 @@ public class VersionedFhirStore : IFhirStore
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
 
+    /// <summary>The compiler.</summary>
     private static FhirPathCompiler _compiler = null!;
 
     private FhirJsonParser _jsonParser = new(new ParserSettings()
@@ -61,6 +64,9 @@ public class VersionedFhirStore : IFhirStore
 
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources => _store.Keys.ToArray<string>();
+
+    /// <summary>(Immutable) The cache of non-resource search parameters.</summary>
+    private static readonly Dictionary<string, CompiledExpression> _compiledSearchParameters = new();
 
     /// <summary>The configuration.</summary>
     private ProviderConfiguration _config = null!;
@@ -145,6 +151,23 @@ public class VersionedFhirStore : IFhirStore
                 }
             }
         }
+    }
+
+    /// <summary>Gets a compiled.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="name">        The sp name/code/id.</param>
+    /// <param name="expression">  The expression.</param>
+    /// <returns>The compiled.</returns>
+    public CompiledExpression GetCompiled(string resourceType, string name, string expression)
+    {
+        string c = resourceType + "." + name;
+
+        if (!_compiledSearchParameters.ContainsKey(c))
+        {
+            _compiledSearchParameters.Add(c, _compiler.Compile(expression));
+        }
+
+        return _compiledSearchParameters[c];
     }
 
     /// <summary>Attempts to resolve an ITypedElement from the given string.</summary>
@@ -603,6 +626,12 @@ public class VersionedFhirStore : IFhirStore
             return false;
         }
 
+        string c = resourceType + "." + spDefinition.Name;
+        if (_compiledSearchParameters.ContainsKey(c))
+        {
+            _compiledSearchParameters.Remove(c);
+        }
+
         _capabilitiesAreStale = true;
         _store[resourceType].SetExecutableSearchParameter(spDefinition);
         return true;
@@ -617,6 +646,12 @@ public class VersionedFhirStore : IFhirStore
         if (!_store.ContainsKey(resourceType))
         {
             return false;
+        }
+
+        string c = resourceType + "." + name;
+        if (_compiledSearchParameters.ContainsKey(c))
+        {
+            _compiledSearchParameters.Remove(c);
         }
 
         _capabilitiesAreStale = true;
@@ -685,7 +720,6 @@ public class VersionedFhirStore : IFhirStore
 
         // parse search parameters
         IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(
-            _compiler,
             queryString,
             _store[resourceType],
             this);
@@ -779,7 +813,7 @@ public class VersionedFhirStore : IFhirStore
                     List<ParsedSearchParameter> parameters = new()
                     {
                         new ParsedSearchParameter(
-                            _compiler,
+                            this,
                             sp.Name!, 
                             string.Empty, 
                             SearchDefinitions.SearchModifierCodes.None,
@@ -837,7 +871,7 @@ public class VersionedFhirStore : IFhirStore
                     continue;
                 }
 
-                IEnumerable<ITypedElement> extracted = r.Select(sp.Expression, fpContext);
+                IEnumerable<ITypedElement> extracted = GetCompiled(resource.TypeName, sp.Name ?? string.Empty, sp.Expression).Invoke(r, fpContext);
 
                 if (!extracted.Any())
                 {

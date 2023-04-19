@@ -5,6 +5,7 @@
 
 using FhirServerHarness.Models;
 using Hl7.Fhir.Model;
+using Hl7.FhirPath;
 
 namespace FhirServerHarness.Storage;
 

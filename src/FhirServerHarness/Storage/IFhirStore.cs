@@ -6,6 +6,7 @@
 using FhirServerHarness.Models;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
+using Hl7.FhirPath;
 using System.Net;
 
 namespace FhirServerHarness.Storage;
@@ -181,6 +182,13 @@ public interface IFhirStore : IDisposable
     /// <param name="name">        The sp name/code/id.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryRemoveExecutableSearchParameter(string resourceType, string name);
+
+    /// <summary>Gets a compiled expression for a search parameter.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="name">        The search parameter name.</param>
+    /// <param name="expression">  The expression.</param>
+    /// <returns>The compiled.</returns>
+    CompiledExpression GetCompiled(string resourceType, string name, string expression);
 
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources { get; }

@@ -1,20 +1,24 @@
-﻿// <copyright file="ResourceStoreBasicTests.cs" company="Microsoft Corporation">
+﻿// <copyright file="FhirStoreTestsR4B.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Models;
-using FhirServerHarness.Storage;
+extern alias storeR4B;
+
+using FhirStore.Common.Models;
+using FhirStore.Common.Storage;
 using FhirServerHarness.Tests.Extensions;
 using FhirServerHarness.Tests.Models;
 using FluentAssertions;
 using System.Net;
 using System.Text.Json;
 using Xunit.Abstractions;
+using storeR4B::FhirStore.Models;
+using storeR4B::FhirStore.Storage;
 
 namespace FhirServerHarness.Tests;
 
-/// <summary>Unit tests core FhirStore functionality.</summary>
+/// <summary>Unit tests core FhirStore R4 functionality.</summary>
 public class FhirStoreTestsR4B: IDisposable
 {
     private readonly ITestOutputHelper _testOutputHelper;
@@ -22,7 +26,7 @@ public class FhirStoreTestsR4B: IDisposable
     /// <summary>(Immutable) The configuration.</summary>
     private static readonly ProviderConfiguration _config = new()
     {
-        FhirVersion = Hl7.Fhir.Model.FHIRVersion.N4_1,
+        FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
         TenantRoute = "r4b",
         BaseUrl = "http://localhost:5101/r4b",
     };

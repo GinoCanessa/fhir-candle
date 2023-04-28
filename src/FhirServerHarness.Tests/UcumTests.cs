@@ -3,8 +3,6 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Models;
-using FhirServerHarness.Storage;
 using FhirServerHarness.Tests.Extensions;
 using FhirServerHarness.Ucum;
 using FluentAssertions;

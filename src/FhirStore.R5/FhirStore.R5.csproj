@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <Import Project="..\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems" Label="Shared" />
+
+  <Import Project="..\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems" Label="Shared" />
+
+  <ItemGroup>
+    <PackageReference Include="Hl7.Fhir.R5" Version="5.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\FhirStore.Common\FhirStore.Common.csproj" />
+  </ItemGroup>
+
+</Project>

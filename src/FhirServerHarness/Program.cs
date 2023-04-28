@@ -3,8 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Models;
 using FhirServerHarness.Services;
+using FhirStore.Common.Models;
 
 namespace FhirServerHarness;
 
@@ -65,7 +65,7 @@ public static class Program
             //},
             new ProviderConfiguration
             {
-                FhirVersion = Hl7.Fhir.Model.FHIRVersion.N4_1,
+                FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
                 TenantRoute = "r4b",
                 BaseUrl = "http://localhost:5101/r4b",
             },

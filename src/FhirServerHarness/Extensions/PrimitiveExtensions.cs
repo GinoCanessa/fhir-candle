@@ -3,8 +3,9 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirServerHarness.Extensions;
+namespace FhirStore.Extensions;
 
+/// <summary>A primitive extensions.</summary>
 public static class PrimitiveExtensions
 {
     /// <summary>A decimal extension method that gets significant digit count.</summary>

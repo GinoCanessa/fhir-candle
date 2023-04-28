@@ -7,19 +7,54 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Services\FhirWebSerializer.cs" />
+	  <Compile Remove="Services\IFhirWebSerializer.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <PackageReference Include="Antlr4.Runtime.Standard" Version="4.12.0" />
-	  <PackageReference Include="Hl7.Fhir.R4B" Version="5.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 	  <Folder Include="data\" />
+	  <Folder Include="Models\" />
+	  <Folder Include="Search\" />
+	  <Folder Include="Storage\" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\FhirStore.Common\FhirStore.Common.csproj" />
+	  <ProjectReference Include="..\FhirStore.R4\FhirStore.R4.csproj" />
+	  <ProjectReference Include="..\FhirStore.R4B\FhirStore.R4B.csproj" />
+	  <ProjectReference Include="..\FhirStore.R5\FhirStore.R5.csproj" />
+	</ItemGroup>
+
+	<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
+		<ItemGroup>
+			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4'">
+				<Aliases>storeR4</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4B'">
+				<Aliases>storeR4B</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='FhirStore.R5'">
+				<Aliases>storeR5</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4.Core'">
+				<Aliases>coreR4</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4B.Core'">
+				<Aliases>coreR4B</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R5.Core'">
+				<Aliases>coreR5</Aliases>
+			</ReferencePath>
+
+		</ItemGroup>
+	</Target>
 
 	<!--<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
 		<ItemGroup>
-			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4.Core'"><Aliases>coreR4</Aliases></ReferencePath>
-			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4B.Core'"><Aliases>coreR4B</Aliases></ReferencePath>
-			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R5.Core'"><Aliases>coreR5</Aliases></ReferencePath>
 		</ItemGroup>
 	</Target>-->
 

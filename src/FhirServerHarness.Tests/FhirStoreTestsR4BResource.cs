@@ -3,12 +3,16 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Models;
-using FhirServerHarness.Storage;
+extern alias storeR4B;
+
+using FhirStore.Common.Models;
+using FhirStore.Common.Storage;
 using FhirServerHarness.Tests.Models;
 using FluentAssertions;
 using System.Text.Json;
 using Xunit.Abstractions;
+using storeR4B::FhirStore.Models;
+using storeR4B::FhirStore.Storage;
 
 namespace FhirServerHarness.Tests;
 
@@ -21,7 +25,7 @@ public class FhirStoreTestsR4BResource : IDisposable
     /// <summary>(Immutable) The configuration.</summary>
     private static readonly ProviderConfiguration _config = new()
     {
-        FhirVersion = Hl7.Fhir.Model.FHIRVersion.N4_1,
+        FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
         TenantRoute = "r4b",
         BaseUrl = "http://localhost:5101/r4b",
     };
@@ -136,6 +140,7 @@ public class FhirStoreTestsR4BResource : IDisposable
     [InlineData("_id=AnIdThatDoesNotExist", 0)]
     [InlineData("_id=example", 1)]
     [InlineData("_id=example&_include=Observation:patient", 1, 2)]
+    //[InlineData("code-value-quantity=http://loinc.org|29463-7$185|http://unitsofmeasure.org|[lb_av]", 1)]
     [InlineData("value-quantity=185|http://unitsofmeasure.org|[lb_av]", 1)]
     [InlineData("value-quantity=185|http://unitsofmeasure.org|lbs", 1)]
     [InlineData("value-quantity=185||[lb_av]", 1)]

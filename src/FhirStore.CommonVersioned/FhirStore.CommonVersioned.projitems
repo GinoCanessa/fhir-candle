@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>05dd03de-a22d-4fd8-a8a8-06fd05f20a18</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>FhirStore.CommonVersioned</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Extensions\FhirEnumExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Extensions\FhirLiteralAttribute.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Extensions\SearchParamDefinitionExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ParsedResultParameter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ParsedSearchParameter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\EvalDateSearch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\EvalNumberSearch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\EvalQuantitySearch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\EvalReferenceSearch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\EvalStringSearch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\EvalTokenSearch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\EvalUriSearch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\SearchDefinitions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Search\SearchTester.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Storage\IResourceStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Services\" />
+  </ItemGroup>
+</Project>

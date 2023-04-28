@@ -3,7 +3,10 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirServerHarness.Services;
+using FhirStore.Common.Models;
+using System.Net;
+
+namespace FhirStore.Common.Services;
 
 /// <summary>Interface for FHIR web serializer.</summary>
 public interface IFhirWebSerializer : IHostedService, IDisposable

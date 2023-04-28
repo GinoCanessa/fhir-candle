@@ -1,0 +1,17 @@
+{
+  "resourceType": "SearchParameter",
+  "id": "Patient-name-use",
+  "url": "http://hl7.org/fhir/SearchParameter/patient-name-use",
+  "version": "1",
+  "name": "Patient-name-use",
+  "title": "Patient Name Use",
+  "status": "draft",
+  "experimental": true,
+  "description": "Search by patient.name.use",
+  "purpose": "Need to search by a name use",
+  "code": "name-use",
+  "base": [ "Patient" ],
+  "type": "token",
+  "expression": "Patient.name.use",
+  "processingMode": "normal"
+}

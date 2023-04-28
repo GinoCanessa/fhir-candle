@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Models;
+using FhirStore.Common.Models;
 using Microsoft.AspNetCore.Http;
 
 namespace FhirServerHarness.Services;
@@ -23,6 +23,4 @@ public interface IVersionedProvider : IDisposable
 
     /// <summary>Gets or sets the configuration.</summary>
     ProviderConfiguration Configuration { get; set; }
-
-    
 }

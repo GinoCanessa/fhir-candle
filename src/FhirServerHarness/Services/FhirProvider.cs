@@ -3,9 +3,9 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Models;
 using FhirServerHarness.Services;
 using Microsoft.AspNetCore.Http;
+using FhirStore.Common.Models;
 
 namespace FhirServerHarness.VersionedProvider.R4;
 
@@ -42,7 +42,7 @@ public class FhirProvider : IVersionedProvider
             throw new ArgumentNullException(nameof(_config));
         }
 
-        if (_config.FhirVersion != Hl7.Fhir.Model.FHIRVersion.N4_1)
+        if (_config.FhirVersion != ProviderConfiguration.SupportedFhirVersions.R4B)
         {
             throw new ArgumentException($"Expected {Hl7.Fhir.Model.FHIRVersion.N4_1} but got {_config.FhirVersion}");
         }

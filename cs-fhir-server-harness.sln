@@ -7,6 +7,20 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirServerHarness", "src\Fh
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirServerHarness.Tests", "src\FhirServerHarness.Tests\FhirServerHarness.Tests.csproj", "{FC92614E-5DB0-4C6D-B8D3-667BD55BAB5B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.R4B", "src\FhirStore.R4B\FhirStore.R4B.csproj", "{759EB849-EE81-4DAE-8AB4-941E1F2824E7}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned", "src\FhirStore.CommonVersioned\FhirStore.Versioned.shproj", "{05DD03DE-A22D-4FD8-A8A8-06FD05F20A18}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.R5", "src\FhirStore.R5\FhirStore.R5.csproj", "{B767A8A4-910F-4FC3-BE6B-A0515C6E167E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.R4", "src\FhirStore.R4\FhirStore.R4.csproj", "{316B7737-194D-41D8-8725-B79C09CD8F93}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.Common", "FhirStore.Common\FhirStore.Common.csproj", "{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R5", "src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.shproj", "{ADCCCEBD-B2BE-4364-8694-B5D6462AE60C}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R4", "src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.shproj", "{E449F416-1E58-4920-90B0-4FD0BB429E80}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,11 +35,38 @@ Global
 		{FC92614E-5DB0-4C6D-B8D3-667BD55BAB5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FC92614E-5DB0-4C6D-B8D3-667BD55BAB5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FC92614E-5DB0-4C6D-B8D3-667BD55BAB5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{759EB849-EE81-4DAE-8AB4-941E1F2824E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{759EB849-EE81-4DAE-8AB4-941E1F2824E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{759EB849-EE81-4DAE-8AB4-941E1F2824E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{759EB849-EE81-4DAE-8AB4-941E1F2824E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B767A8A4-910F-4FC3-BE6B-A0515C6E167E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B767A8A4-910F-4FC3-BE6B-A0515C6E167E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B767A8A4-910F-4FC3-BE6B-A0515C6E167E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B767A8A4-910F-4FC3-BE6B-A0515C6E167E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{316B7737-194D-41D8-8725-B79C09CD8F93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{316B7737-194D-41D8-8725-B79C09CD8F93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{316B7737-194D-41D8-8725-B79C09CD8F93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{316B7737-194D-41D8-8725-B79C09CD8F93}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {2F9896CC-1A33-4A99-95F9-8D13DF291779}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{05dd03de-a22d-4fd8-a8a8-06fd05f20a18}*SharedItemsImports = 13
+		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{316b7737-194d-41d8-8725-b79c09cd8f93}*SharedItemsImports = 5
+		src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems*{316b7737-194d-41d8-8725-b79c09cd8f93}*SharedItemsImports = 5
+		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
+		src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
+		src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems*{adcccebd-b2be-4364-8694-b5d6462ae60c}*SharedItemsImports = 13
+		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{b767a8a4-910f-4fc3-be6b-a0515c6e167e}*SharedItemsImports = 5
+		src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems*{b767a8a4-910f-4fc3-be6b-a0515c6e167e}*SharedItemsImports = 5
+		src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems*{e449f416-1e58-4920-90b0-4fd0bb429e80}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

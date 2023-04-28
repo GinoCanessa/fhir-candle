@@ -1,10 +1,14 @@
-// <copyright file="ResourceStoreBasicTests.cs" company="Microsoft Corporation">
+// <copyright file="FhirStoreTests.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Models;
-using FhirServerHarness.Storage;
+extern alias storeR4;
+extern alias storeR4B;
+extern alias storeR5;
+
+using FhirStore.Common.Models;
+using FhirStore.Common.Storage;
 using FluentAssertions;
 using Xunit.Abstractions;
 
@@ -36,12 +40,33 @@ public class FhirStoreTests : IDisposable
     /// <summary>Gets the configurations.</summary>
     public static IEnumerable<object[]> Configurations => new List<object[]>
     {
-        new object[] { new ProviderConfiguration()
+        new object[]
         {
-            FhirVersion  = Hl7.Fhir.Model.FHIRVersion.N4_1,
-            TenantRoute = "r4b",
-            BaseUrl = "http://localhost:5101/r4b",
-        } },
+            new ProviderConfiguration()
+            {
+                FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4,
+                TenantRoute = "r4",
+                BaseUrl = "http://localhost:5101/r4",
+            },
+        },
+        new object[]
+        {
+            new ProviderConfiguration()
+            {
+                FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4B,
+                TenantRoute = "r4b",
+                BaseUrl = "http://localhost:5101/r4b",
+            },
+        },
+        new object[]
+        {
+            new ProviderConfiguration()
+            {
+                FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R5,
+                TenantRoute = "r5",
+                BaseUrl = "http://localhost:5101/r5",
+            },
+        },
     };
 
     /// <summary>Creates FHIR store.</summary>
@@ -50,7 +75,23 @@ public class FhirStoreTests : IDisposable
     [MemberData(nameof(Configurations))]
     public void CreateFhirStore(ProviderConfiguration config)
     {
-        IFhirStore fhirStore = new VersionedFhirStore();
+        IFhirStore fhirStore;
+
+        switch (config.FhirVersion)
+        {
+            case ProviderConfiguration.SupportedFhirVersions.R4:
+                fhirStore = new storeR4::FhirStore.Storage.VersionedFhirStore();
+                break;
+            case ProviderConfiguration.SupportedFhirVersions.R4B:
+                fhirStore = new storeR4B::FhirStore.Storage.VersionedFhirStore();
+                break;
+            case ProviderConfiguration.SupportedFhirVersions.R5:
+                fhirStore = new storeR5::FhirStore.Storage.VersionedFhirStore();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(config), $"Unsupported FHIR Version: {config.FhirVersion}");
+        }
+
         fhirStore.Should().NotBeNull("Failed to create FhirStore");
 
         // initialize with the provided configuration

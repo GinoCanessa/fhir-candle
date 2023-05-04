@@ -110,7 +110,6 @@ public class SearchTester
 
             applied.Add(sp);
 
-            //IEnumerable<ITypedElement> extracted = resource.Select(sp.SelectExpression, fpContext);
             IEnumerable<ITypedElement> extracted = sp.CompiledExpression.Invoke(resource, fpContext);
 
             if (!extracted.Any())

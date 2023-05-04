@@ -3,7 +3,10 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Common.Models;
+using FhirStore.Common.Storage;
 using FhirStore.Models;
+using FhirStore.Storage;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 
@@ -79,4 +82,25 @@ public interface IResourceStore : IDisposable
     /// collection.
     /// </returns>
     IEnumerable<string> GetSearchRevIncludes();
+
+    /// <summary>Sets executable subscription information.</summary>
+    /// <param name="url">             URL of the resource.</param>
+    /// <param name="compiledTriggers">The compiled triggers.</param>
+    void SetExecutableSubscriptionTopic(string url, List<CompiledExpression> compiledTriggers);
+
+    /// <summary>Removes the executable subscription information described by topicUrl.</summary>
+    /// <param name="topicUrl">URL of the topic.</param>
+    void RemoveExecutableSubscriptionTopic(string topicUrl);
+
+    /// <summary>Sets executable subscription.</summary>
+    /// <param name="topicUrl">URL of the topic.</param>
+    /// <param name="id">      The subscription id.</param>
+    /// <param name="filters"> The filters.</param>
+    void SetExecutableSubscription(string topicUrl, string id, List<ParsedSearchParameter> filters);
+
+    /// <summary>Removes the executable subscription.</summary>
+    /// <param name="topicUrl">URL of the topic.</param>
+    /// <param name="id">      The subscription id.</param>
+    void RemoveExecutableSubscription(string topicUrl, string id);
+
 }

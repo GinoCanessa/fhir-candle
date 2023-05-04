@@ -196,7 +196,7 @@ public class ParsedSearchParameter
         SelectExpression = spd.Expression ?? string.Empty;
         if (!string.IsNullOrEmpty(SelectExpression))
         {
-            CompiledExpression = store.GetCompiled(spd.Resource ?? string.Empty, name, SelectExpression);
+            CompiledExpression = store.GetCompiledSearchParameter(spd.Resource ?? string.Empty, name, SelectExpression);
         }
 
         if (spd.Type == SearchParamType.Composite)

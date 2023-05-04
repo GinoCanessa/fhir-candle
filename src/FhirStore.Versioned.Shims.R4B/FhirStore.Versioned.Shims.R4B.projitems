@@ -3,10 +3,10 @@
   <PropertyGroup>
     <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
     <HasSharedItems>true</HasSharedItems>
-    <SharedGUID>e449f416-1e58-4920-90b0-4fd0bb429e80</SharedGUID>
+    <SharedGUID>786db8ab-9a51-4a71-8ad2-7db7d373c98b</SharedGUID>
   </PropertyGroup>
   <PropertyGroup Label="Configuration">
-    <Import_RootNamespace>FhirStore.Versioned.Shims.R4</Import_RootNamespace>
+    <Import_RootNamespace>FhirStore.Versioned.Shims.R4B</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\VersionedShims.cs" />

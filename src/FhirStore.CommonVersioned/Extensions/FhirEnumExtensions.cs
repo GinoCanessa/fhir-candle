@@ -19,7 +19,7 @@ public static class FhirEnumExtensions
     {
         if (fhirEnum == null)
         {
-            return null;
+            return string.Empty;
         }
 
         Type type = fhirEnum.GetType();

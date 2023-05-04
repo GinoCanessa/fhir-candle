@@ -21,6 +21,8 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R4", "src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.shproj", "{E449F416-1E58-4920-90B0-4FD0BB429E80}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R4B", "src\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.shproj", "{786DB8AB-9A51-4A71-8AD2-7DB7D373C98B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -63,7 +65,8 @@ Global
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{316b7737-194d-41d8-8725-b79c09cd8f93}*SharedItemsImports = 5
 		src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems*{316b7737-194d-41d8-8725-b79c09cd8f93}*SharedItemsImports = 5
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
-		src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
+		src\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
+		src\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.projitems*{786db8ab-9a51-4a71-8ad2-7db7d373c98b}*SharedItemsImports = 13
 		src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems*{adcccebd-b2be-4364-8694-b5d6462ae60c}*SharedItemsImports = 13
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{b767a8a4-910f-4fc3-be6b-a0515c6e167e}*SharedItemsImports = 5
 		src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems*{b767a8a4-910f-4fc3-be6b-a0515c6e167e}*SharedItemsImports = 5

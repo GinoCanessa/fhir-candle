@@ -1,0 +1,29 @@
+{
+  "resourceType": "Subscription",
+  "id": "example",
+  "name": "Example",
+  "status": "active",
+  "topic": "http://example.org/FHIR/R5/SubscriptionTopic/example",
+  "reason": "Example subscription for example topic",
+  "filterBy": [
+    {
+      "filterParameter": "patient",
+      "value": "Patient/example"
+    }
+  ],
+  "channelType": {
+    "code": "rest-hook"
+  },
+  "endpoint": "https://example.org/Endpoints/P123",
+  "parameter": [
+    {
+      "name": "Authorization",
+      "value": "Bearer secret-token-abc-123"
+    }
+  ],
+  "heartbeatPeriod": 600,
+  "timeout": 5,
+  "contentType": "application/fhir+json",
+  "content": "id-only",
+  "maxCount": 100
+}

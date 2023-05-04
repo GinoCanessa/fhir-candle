@@ -3,6 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Common.Models;
+using FhirStore.Common.Storage;
 using FhirStore.Extensions;
 using FhirStore.Models;
 using FhirServerHarness.Search;
@@ -15,6 +17,7 @@ using Hl7.FhirPath.Expressions;
 using System.Collections.Concurrent;
 using System.Linq;
 using FhirStore.Versioned.Shims.Extensions;
+using FhirStore.Versioned.Shims.Subscriptions;
 
 namespace FhirStore.Storage;
 
@@ -38,11 +41,17 @@ public class ResourceStore<T> : IResourceStore
     /// <summary>The search tester.</summary>
     public required SearchTester _searchTester;
 
-    /// <summary>(Immutable) The FHIRPath compiler.</summary>
-    private readonly FhirPathCompiler _compiler = new();
+    /// <summary>The topic converter.</summary>
+    public required TopicConverter _topicConverter;
 
-    /// <summary>Options for controlling the search.</summary>
+    /// <summary>The subscription converter.</summary>
+    public required SubscriptionConverter _subscriptionConverter;
+
+    /// <summary>The search parameters for this resource, by Name.</summary>
     private Dictionary<string, ModelInfo.SearchParamDefinition> _searchParameters = new();
+
+    /// <summary>The executable subscriptions, by subscription topic url.</summary>
+    private Dictionary<string, ExecutableSubscriptionInfo> _executableSubscriptions = new();
 
     /// <summary>The supported includes.</summary>
     private string[] _supportedIncludes = Array.Empty<string>();
@@ -55,10 +64,16 @@ public class ResourceStore<T> : IResourceStore
     /// </summary>
     /// <param name="fhirStore">   The FHIR store.</param>
     /// <param name="searchTester">The search tester.</param>
-    public ResourceStore(VersionedFhirStore fhirStore, SearchTester searchTester)
+    public ResourceStore(
+        VersionedFhirStore fhirStore,
+        SearchTester searchTester,
+        TopicConverter topicConverter,
+        SubscriptionConverter subscriptionConverter)
     {
         _store = fhirStore;
         _searchTester = searchTester;
+        _topicConverter = topicConverter;
+        _subscriptionConverter = subscriptionConverter;
     }
 
     /// <summary>Reads a specific instance of a resource.</summary>
@@ -115,10 +130,22 @@ public class ResourceStore<T> : IResourceStore
 
         _resourceStore.Add(source.Id, (T)source);
 
+        TestCreateAgainstSubscriptions((T)source);
+
         switch (source.TypeName)
         {
             case "SearchParameter":
                 SetExecutableSearchParameter((SearchParameter)source);
+                break;
+
+            case "SubscriptionTopic":
+                // TODO: should fail the request if this fails
+                _ = TryProcessSubscriptionTopic((object)source);
+                break;
+
+            case "Subscription":
+                // TODO: should fail the request if this fails
+                _ = TryProcessSubscription((object)source);
                 break;
         }
 
@@ -146,11 +173,14 @@ public class ResourceStore<T> : IResourceStore
             source.Meta = new Meta();
         }
 
+        Resource? previous;
+
         if (!_resourceStore.ContainsKey(source.Id))
         {
             if (allowCreate)
             {
                 source.Meta.VersionId = "1";
+                previous = null;
             }
             else
             {
@@ -160,15 +190,26 @@ public class ResourceStore<T> : IResourceStore
         else if (int.TryParse(_resourceStore[source.Id].Meta?.VersionId ?? string.Empty, out int version))
         {
             source.Meta.VersionId = (version + 1).ToString();
+            previous = _resourceStore[source.Id];
         }
         else
         {
             source.Meta.VersionId = "1";
+            previous = _resourceStore[source.Id];
         }
 
         source.Meta.LastUpdated = DateTimeOffset.UtcNow;
 
         _resourceStore[source.Id] = (T)source;
+
+        if (previous == null)
+        {
+            TestCreateAgainstSubscriptions((T)source);
+        }
+        else
+        {
+            TestUpdateAgainstSubscriptions((T)source, (T)previous);
+        }
 
         switch (source.TypeName)
         {
@@ -195,18 +236,285 @@ public class ResourceStore<T> : IResourceStore
             return null;
         }
 
-        Resource instance = _resourceStore[id];
+        Resource previous = _resourceStore[id];
         _ = _resourceStore.Remove(id);
 
-        switch (instance.TypeName)
+        TestDeleteAgainstSubscriptions((T)previous);
+
+
+        switch (previous.TypeName)
         {
             case "SearchParameter":
-                RemoveExecutableSearchParameter((SearchParameter)instance);
+                RemoveExecutableSearchParameter((SearchParameter)previous);
                 break;
         }
 
-        return instance;
+        return previous;
     }
+
+    /// <summary>Process the subscription topic.</summary>
+    /// <param name="st">The versioned FHIR subscription topic object.</param>
+    private bool TryProcessSubscriptionTopic(object st)
+    {
+        if (st == null)
+        {
+            return false;
+        }
+
+        // get a common subscription topic for execution
+        if (!_topicConverter.TryParse(st, out ParsedSubscriptionTopic topic))
+        {
+            return false;
+        }
+
+        // process this at the store level
+        return _store.SetExecutableSubscriptionTopic(topic);
+    }
+
+    /// <summary>Process the subscription described by sub.</summary>
+    /// <param name="sub">The versioned FHIR subscription object.</param>
+    private bool TryProcessSubscription(object sub)
+    {
+        if (sub == null)
+        {
+            return false;
+        }
+
+        // get a common subscription topic for execution
+        if (!_subscriptionConverter.TryParse(sub, out ParsedSubscription subscription))
+        {
+            return false;
+        }
+
+        // process this at the store level
+        return _store.SetExecutableSubscription(subscription);
+    }
+
+    /// <summary>Sets executable subscription topic.</summary>
+    /// <param name="url">             URL of the resource.</param>
+    /// <param name="compiledTriggers">The compiled triggers.</param>
+    public void SetExecutableSubscriptionTopic(string url, List<CompiledExpression> compiledTriggers)
+    {
+        if (_executableSubscriptions.ContainsKey(url))
+        {
+            _executableSubscriptions[url].CompiledTopicTriggers = compiledTriggers;
+        }
+        else
+        {
+            _executableSubscriptions.Add(url, new()
+            {
+                TopicUrl = url,
+                CompiledTopicTriggers = compiledTriggers,
+            });
+        }
+    }
+
+    /// <summary>Sets executable subscription.</summary>
+    /// <param name="topicUrl">URL of the topic.</param>
+    /// <param name="id">      The subscription id.</param>
+    /// <param name="filters"> The compiled filters.</param>
+    public void SetExecutableSubscription(string topicUrl, string id, List<ParsedSearchParameter> filters)
+    {
+        if (!_executableSubscriptions.ContainsKey(topicUrl))
+        {
+            return;
+        }
+
+        if (_executableSubscriptions[topicUrl].FiltersBySubscription.ContainsKey(id))
+        {
+            _executableSubscriptions[topicUrl].FiltersBySubscription[id] = filters;
+        }
+        else
+        {
+            _executableSubscriptions[topicUrl].FiltersBySubscription.Add(id, filters);
+        }
+    }
+
+    /// <summary>Removes the executable subscription described by subscriptionTopicUrl.</summary>
+    /// <param name="subscriptionTopicUrl">URL of the subscription topic.</param>
+    public void RemoveExecutableSubscriptionTopic(string subscriptionTopicUrl)
+    {
+        if (_executableSubscriptions.ContainsKey(subscriptionTopicUrl))
+        {
+            _executableSubscriptions.Remove(subscriptionTopicUrl);
+        }
+    }
+
+    /// <summary>Removes the executable subscription.</summary>
+    /// <param name="topicUrl">URL of the topic.</param>
+    /// <param name="id">      The subscription id.</param>
+    public void RemoveExecutableSubscription(string topicUrl, string id)
+    {
+        if (!_executableSubscriptions.ContainsKey(topicUrl))
+        {
+            return;
+        }
+
+        if (!_executableSubscriptions[topicUrl].FiltersBySubscription.ContainsKey(id))
+        {
+            return;
+        }
+
+        _executableSubscriptions[topicUrl].FiltersBySubscription.Remove(id);
+    }
+
+
+    /// <summary>Performs the subscription test action.</summary>
+    /// <param name="currentTE">The current te.</param>
+    /// <param name="fpContext">The context.</param>
+    private void PerformSubscriptionTest(ITypedElement currentTE, FhirEvaluationContext fpContext)
+    {
+        HashSet<string> notifiedSubscriptions = new();
+
+        foreach ((string topicUrl, ExecutableSubscriptionInfo executable) in _executableSubscriptions)
+        {
+            foreach (CompiledExpression ce in executable.CompiledTopicTriggers)
+            {
+                ITypedElement? result = ce.Invoke(currentTE, fpContext).First() ?? null;
+
+                if ((result == null) ||
+                    (result.Value == null) ||
+                    (!(result.Value is bool val)) ||
+                    (val == false))
+                {
+                    continue;
+                }
+
+                // check against subscriptions
+
+                foreach ((string subscriptionId, List<ParsedSearchParameter> filters) in executable.FiltersBySubscription)
+                {
+                    // don't trigger twice on multiple passing filters
+                    if (notifiedSubscriptions.Contains(subscriptionId))
+                    {
+                        continue;
+                    }
+
+                    if (_searchTester.TestForMatch(currentTE, filters, out _, out _, fpContext))
+                    {
+                        notifiedSubscriptions.Add(subscriptionId);
+
+                        // TODO: actually notify subscription
+                        Console.WriteLine($"Trigger subscription {subscriptionId} (topic: {topicUrl})");
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Tests a create interaction against all subscriptions.</summary>
+    /// <param name="current">The current resource version.</param>
+    private void TestCreateAgainstSubscriptions(T current)
+    {
+        // TODO: Change this to async
+
+        if (!_executableSubscriptions.Any())
+        {
+            return;
+        }
+
+        ITypedElement currentTE = current.ToTypedElement();
+
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode());
+
+        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+        {
+            NextResolver = _store.Resolve,
+            Variables = new()
+            {
+                { "current", currentTE },
+                //{ "previous", Enumerable.Empty<ITypedElement>() },
+            },
+        };
+
+        fpContext.ElementResolver = resolver.Resolve;
+
+        PerformSubscriptionTest(currentTE, fpContext);
+    }
+
+    /// <summary>Tests an update interaction against all subscriptions.</summary>
+    /// <param name="current"> The current resource version.</param>
+    /// <param name="previous">The previous resource version.</param>
+    private void TestUpdateAgainstSubscriptions(T current, T previous)
+    {
+        // TODO: Change this to async
+
+        if (!_executableSubscriptions.Any())
+        {
+            return;
+        }
+
+        ITypedElement currentTE = current.ToTypedElement();
+        ITypedElement previousTE = previous.ToTypedElement();
+
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode());
+
+        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+        {
+            NextResolver = _store.Resolve,
+            Variables = new()
+            {
+                { "current", currentTE },
+                { "previous", previousTE },
+            },
+        };
+
+        fpContext.ElementResolver = resolver.Resolve;
+
+        PerformSubscriptionTest(currentTE, fpContext);
+    }
+
+    /// <summary>Tests a delete interaction against all subscriptions.</summary>
+    /// <param name="previous">The previous resource version.</param>
+    private void TestDeleteAgainstSubscriptions(T previous)
+    {
+        // TODO: Change this to async
+
+        if (!_executableSubscriptions.Any())
+        {
+            return;
+        }
+
+        ITypedElement previousTE = previous.ToTypedElement();
+
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode());
+
+        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+        {
+            NextResolver = _store.Resolve,
+            Variables = new()
+            {
+                //{ "current", currentTE },
+                { "previous", previousTE },
+            },
+        };
+
+        fpContext.ElementResolver = resolver.Resolve;
+
+        PerformSubscriptionTest(previousTE, fpContext);
+    }
+
+    ///// <summary>Sets executable subscription topic.</summary>
+    ///// <param name="topic">The topic.</param>
+    //public void SetExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
+    //{
+    //    if (_subscriptionTopics.ContainsKey(topic.Id))
+    //    {
+    //        _subscriptionTopics.Remove(topic.Id);
+    //    }
+
+    //    _subscriptionTopics.Add(topic.Id, topic);
+    //}
+
+    ///// <summary>Removes the executable subscription topic described by ID.</summary>
+    ///// <param name="id">The identifier.</param>
+    //public void RemoveExecutableSubscriptionTopic(string id)
+    //{
+    //    if (_subscriptionTopics.ContainsKey(id))
+    //    {
+    //        _subscriptionTopics.Remove(id);
+    //    }
+    //}
 
     /// <summary>Adds or updates an executable search parameter based on a SearchParameter resource.</summary>
     /// <param name="sp">    The sp.</param>
@@ -304,7 +612,6 @@ public class ResourceStore<T> : IResourceStore
                 Description = spDefinition.Description,
                 Expression = spDefinition.Expression,
                 Target = VersionedShims.CopyTargetsNullable(spDefinition.Target),
-                //Target = spDefinition.Target?.Select(r => (ResourceType?)r) ?? Array.Empty<ResourceType?>(),
                 Type = spDefinition.Type,
             };
 

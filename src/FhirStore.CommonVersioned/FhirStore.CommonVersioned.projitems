@@ -12,6 +12,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\FhirEnumExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\FhirLiteralAttribute.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\SearchParamDefinitionExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ExecutableSubscriptionInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\FhirPathVariableResolver.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ParsedResultParameter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ParsedSearchParameter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\EvalDateSearch.cs" />
@@ -28,6 +30,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Services\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Subscription\" />
   </ItemGroup>
 </Project>

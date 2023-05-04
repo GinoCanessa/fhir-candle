@@ -18,6 +18,10 @@ using Hl7.FhirPath.Expressions;
 using System.Linq.Expressions;
 using System.Net;
 using System.Xml.Linq;
+using FhirStore.Versioned.Shims.Subscriptions;
+using System.Text.RegularExpressions;
+using Hl7.Fhir.Language.Debugging;
+using static FhirServerHarness.Search.SearchDefinitions;
 
 namespace FhirStore.Storage;
 
@@ -65,8 +69,23 @@ public class VersionedFhirStore : IFhirStore
     /// <summary>Gets the supported resources.</summary>
     public IEnumerable<string> SupportedResources => _store.Keys.ToArray<string>();
 
-    /// <summary>(Immutable) The cache of non-resource search parameters.</summary>
-    private static readonly Dictionary<string, CompiledExpression> _compiledSearchParameters = new();
+    /// <summary>(Immutable) The cache of compiled search parameter extraction functions.</summary>
+    private readonly Dictionary<string, CompiledExpression> _compiledSearchParameters = new();
+
+    /// <summary>The subscription topic converter.</summary>
+    private static TopicConverter _topicConverter = new();
+
+    /// <summary>The subscription converter.</summary>
+    private static SubscriptionConverter _subscriptionConverter = new();
+
+    /// <summary>(Immutable) The topics, by id.</summary>
+    private readonly Dictionary<string, ParsedSubscriptionTopic> _topics = new();
+
+    /// <summary>(Immutable) The subscriptions, by id.</summary>
+    private readonly Dictionary<string, ParsedSubscription> _subscriptions = new();
+
+    /// <summary>(Immutable) The fhirpath variable matcher.</summary>
+    private static readonly Regex _fhirpathVarMatcher = new("[%][\\w\\-]+", RegexOptions.Compiled);
 
     /// <summary>The configuration.</summary>
     private ProviderConfiguration _config = null!;
@@ -133,7 +152,12 @@ public class VersionedFhirStore : IFhirStore
 
             Type[] tArgs = { t };
 
-            IResourceStore? irs = (IResourceStore?)Activator.CreateInstance(rsType.MakeGenericType(tArgs), this, _searchTester);
+            IResourceStore? irs = (IResourceStore?)Activator.CreateInstance(
+                rsType.MakeGenericType(tArgs),
+                this,
+                _searchTester,
+                _topicConverter,
+                _subscriptionConverter);
 
             if (irs != null)
             {
@@ -153,12 +177,12 @@ public class VersionedFhirStore : IFhirStore
         }
     }
 
-    /// <summary>Gets a compiled.</summary>
+    /// <summary>Gets a compiled search parameter expression.</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="name">        The sp name/code/id.</param>
-    /// <param name="expression">  The expression.</param>
+    /// <param name="expression">  The FHIRPath expression.</param>
     /// <returns>The compiled.</returns>
-    public CompiledExpression GetCompiled(string resourceType, string name, string expression)
+    public CompiledExpression GetCompiledSearchParameter(string resourceType, string name, string expression)
     {
         string c = resourceType + "." + name;
 
@@ -320,7 +344,7 @@ public class VersionedFhirStore : IFhirStore
     /// <param name="destFormat"> Destination format.</param>
     /// <param name="summaryType">(Optional) Type of the summary.</param>
     /// <returns>A string.</returns>
-    private string SerializeFhir(
+    internal string SerializeFhir(
         Resource instance,
         string destFormat,
         SummaryType summaryType = SummaryType.False)
@@ -684,6 +708,192 @@ public class VersionedFhirStore : IFhirStore
         return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
     }
 
+    /// <summary>Sets an executable subscription topic.</summary>
+    /// <param name="topic">The topic.</param>
+    public bool SetExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
+    {
+        bool priorExisted = _topics.ContainsKey(topic.Url);
+
+        // set our local reference
+        if (priorExisted)
+        {
+            _topics[topic.Url] = topic;
+        }
+        else
+        {
+            _topics.Add(topic.Url, topic);
+        }
+
+        // check for no resource triggers
+        if (!topic.ResourceTriggers.Any())
+        {
+            // remove from all resources
+            foreach (IResourceStore rs in _store.Values)
+            {
+                rs.RemoveExecutableSubscriptionTopic(topic.Url);
+            }
+
+            // if we cannot execute, fail the update
+            return false;
+        }
+
+        bool canExecute = false;
+
+        // loop over all resources to account for a topic changing resources
+        foreach ((string resourceName, IResourceStore rs) in _store)
+        {
+            if (!topic.ResourceTriggers.ContainsKey(resourceName))
+            {
+                if (priorExisted)
+                {
+                    rs.RemoveExecutableSubscriptionTopic(topic.Url);
+                }
+                continue;
+            }
+
+            List<CompiledExpression> compiledTriggers = new();
+
+            string[] keys = new string[3] { resourceName, "*", "Resource" };
+
+            foreach (string key in keys)
+            {
+                if (!topic.ResourceTriggers.ContainsKey(key))
+                {
+                    continue;
+                }
+
+                foreach (ParsedSubscriptionTopic.ResourceTrigger rt in topic.ResourceTriggers[key])
+                {
+                    // prefer FHIRPath if present
+                    if (!string.IsNullOrEmpty(rt.FhirPathCritiera))
+                    {
+                        string fpc = rt.FhirPathCritiera;
+
+                        MatchCollection matches = _fhirpathVarMatcher.Matches(fpc);
+
+                        // replace the variable with a resolve call
+                        foreach (string matchValue in matches.Select(m => m.Value).Distinct())
+                        {
+                            fpc = fpc.Replace(matchValue, $"'{FhirPathVariableResolver._fhirPathPrefix}{matchValue.Substring(1)}'.resolve()");
+                        }
+
+                        compiledTriggers.Add(_compiler.Compile(fpc));
+
+                        canExecute = true;
+                    }
+
+                    // TODO: add support for query-based criteria
+                }
+
+                // either update or remove this topic from this resource
+                if (compiledTriggers.Any())
+                {
+                    // update the executable definition for the current resource
+                    rs.SetExecutableSubscriptionTopic(topic.Url, compiledTriggers);
+                }
+                else
+                {
+                    rs.RemoveExecutableSubscriptionTopic(topic.Url);
+                }
+            }
+        }
+
+        return canExecute;
+    }
+
+    /// <summary>Sets executable subscription.</summary>
+    /// <param name="subscription">The subscription.</param>
+    public bool SetExecutableSubscription(ParsedSubscription subscription)
+    {
+        // check for existing record
+        bool priorExisted = _subscriptions.ContainsKey(subscription.Id);
+
+        if (priorExisted)
+        {
+            _subscriptions[subscription.Id] = subscription;
+        }
+        else
+        {
+            _subscriptions.Add(subscription.Id, subscription);
+        }
+
+        // check to see if we have this topic
+        if (!_topics.ContainsKey(subscription.TopicUrl))
+        {
+            return false;
+        }
+
+        ParsedSubscriptionTopic topic = _topics[subscription.TopicUrl];
+
+        // loop over all resources to account for a topic changing resources
+        foreach ((string resourceName, IResourceStore rs) in _store)
+        {
+            if (!topic.ResourceTriggers.ContainsKey(resourceName))
+            {
+                continue;
+            }
+
+            if ((!subscription.Filters.ContainsKey(resourceName)) &&
+                (!subscription.Filters.ContainsKey("*")) &&
+                (!subscription.Filters.ContainsKey("Resource")))
+            {
+                // add an empty filter record so the engine knows about the subscription
+                rs.SetExecutableSubscription(subscription.TopicUrl, subscription.Id, new());
+                continue;
+            }
+
+            List<ParsedSearchParameter> parsedFilters = new();
+
+            string[] keys = new string[3] { resourceName, "*", "Resource" };
+
+            foreach (string key in keys)
+            {
+                if (!subscription.Filters.ContainsKey(key))
+                {
+                    continue;
+                }
+
+                foreach (ParsedSubscription.SubscriptionFilter filter in subscription.Filters[key])
+                {
+                    // TODO: validate this is working for generic parameters (e.g., _id)
+
+                    // TODO: support inline-defined parameters
+                    if ((!rs.TryGetSearchParamDefinition(filter.Name, out ModelInfo.SearchParamDefinition? spd)) ||
+                        (spd == null))
+                    {
+                        Console.WriteLine($"Cannot apply filter with no search parameter definition {resourceName}?{filter.Name}");
+                        continue;
+                    }
+
+                    SearchModifierCodes modifierCode = SearchModifierCodes.None;
+
+                    if (!string.IsNullOrEmpty(filter.Modifier))
+                    {
+                        if (!Enum.TryParse(filter.Modifier, true, out modifierCode))
+                        {
+                            Console.WriteLine($"Ignoring unknown modifier: {resourceName}?{filter.Name}:{filter.Modifier}");
+                        }
+                    }
+
+                    ParsedSearchParameter sp = new(
+                        this,
+                        rs,
+                        filter.Name,
+                        filter.Modifier,
+                        modifierCode,
+                        string.IsNullOrEmpty(filter.Comparator) ? filter.Value : filter.Comparator + filter.Value,
+                        spd);
+
+                    parsedFilters.Add(sp);
+                }
+
+                rs.SetExecutableSubscription(subscription.TopicUrl, subscription.Id, parsedFilters);
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>Type search.</summary>
     /// <param name="resourceType">     Type of the resource.</param>
     /// <param name="queryString">      The query string.</param>
@@ -882,7 +1092,7 @@ public class VersionedFhirStore : IFhirStore
                 continue;
             }
 
-            IEnumerable<ITypedElement> extracted = GetCompiled(resource.TypeName, sp.Name ?? string.Empty, sp.Expression).Invoke(r, fpContext);
+            IEnumerable<ITypedElement> extracted = GetCompiledSearchParameter(resource.TypeName, sp.Name ?? string.Empty, sp.Expression).Invoke(r, fpContext);
 
             if (!extracted.Any())
             {

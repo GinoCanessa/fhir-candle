@@ -51,6 +51,12 @@ public class FhirStoreTestsR5Resource : IDisposable
     /// <summary>(Immutable) The number of observations with the subject 'example'.</summary>
     private const int _observationsWithSubjectExample = 4;
 
+    /// <summary>(Immutable) Number of encounters.</summary>
+    private const int _encounterCount = 1;
+
+    /// <summary>(Immutable) Number of subscription topics.</summary>
+    private const int _subscriptionTopicCount = 1;
+
     /// <summary>
     /// Initializes static members of the FhirServerHarness.Tests.FhirStoreTestsR4BPatient class.
     /// </summary>
@@ -62,6 +68,8 @@ public class FhirStoreTestsR5Resource : IDisposable
         string path = Path.GetRelativePath(Directory.GetCurrentDirectory(), "data/r4b");
         LoadTestJsons(path, "Patient");
         LoadTestJsons(path, "Observation");
+        LoadTestJsons(path, "Encounter");
+        //LoadTestJsons(path, "SubscriptionTopic");
     }
 
     /// <summary>Loads for resource.</summary>

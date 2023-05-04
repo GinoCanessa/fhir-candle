@@ -394,8 +394,18 @@ public class ResourceStore<T> : IResourceStore
                     {
                         notifiedSubscriptions.Add(subscriptionId);
 
-                        // TODO: actually notify subscription
-                        Console.WriteLine($"Trigger subscription {subscriptionId} (topic: {topicUrl})");
+                        // TODO: resolve additional context
+
+                        SubscriptionEvent subEvent = new()
+                        {
+                            SubscriptionId = subscriptionId,
+                            TopicUrl = topicUrl,
+                            EventNumber = _store.GetSubscriptionEventCount(subscriptionId, true),
+                            Focus = currentTE.ToPoco(),
+                            AdditionalContext = null,
+                        };
+
+                        _store.RegisterEvent(subscriptionId, subEvent);
                     }
                 }
             }

@@ -8,6 +8,9 @@ namespace FhirStore.Models;
 /// <summary>A common subscription.</summary>
 public class ParsedSubscription
 {
+    private long _currentEventCount = 0;
+    private Dictionary<long, SubscriptionEvent> _generatedEvents = new();
+
     /// <summary>An allowed filter.</summary>
     /// <param name="ResourceType">Type of the resource.</param>
     /// <param name="Name">        The name of the filter parameter.</param>
@@ -52,8 +55,33 @@ public class ParsedSubscription
     public string ContentType { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the content level.</summary>
-    public string ContentLevel { get; set;} = string.Empty;
+    public string ContentLevel { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the maximum events per notification.</summary>
     public int MaxEventsPerNotification { get; set; } = 0;
+
+    /// <summary>Gets or sets the number of current events.</summary>
+    public long CurrentEventCount { get => _currentEventCount; }
+
+    /// <summary>Increment event count.</summary>
+    /// <returns>A long.</returns>
+    public long IncrementEventCount()
+    {
+        return Interlocked.Increment(ref _currentEventCount);
+    }
+
+    /// <summary>Gets or sets the generated events.</summary>
+    public Dictionary<long, SubscriptionEvent> GeneratedEvents { get => _generatedEvents; }
+
+    public void RegisterEvent(SubscriptionEvent subscriptionEvent)
+    {
+        if (_generatedEvents.ContainsKey(subscriptionEvent.EventNumber))
+        {
+            // TODO: for now just overwrite, figure out what we want to do later
+            _generatedEvents[subscriptionEvent.EventNumber] = subscriptionEvent;
+            return;
+        }
+
+        _generatedEvents.Add(subscriptionEvent.EventNumber, subscriptionEvent);
+    }
 }

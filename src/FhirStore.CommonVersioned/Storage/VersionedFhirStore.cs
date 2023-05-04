@@ -801,6 +801,33 @@ public class VersionedFhirStore : IFhirStore
         return canExecute;
     }
 
+    /// <summary>Gets subscription event count.</summary>
+    /// <param name="subscriptionId">Identifier for the subscription.</param>
+    /// <param name="increment">     True to increment.</param>
+    /// <returns>The subscription event count.</returns>
+    public long GetSubscriptionEventCount(string subscriptionId, bool increment)
+    {
+        if (!_subscriptions.ContainsKey(subscriptionId))
+        {
+            return 0;
+        }
+
+        if (increment)
+        {
+            return _subscriptions[subscriptionId].IncrementEventCount();
+        }
+
+        return _subscriptions[subscriptionId].CurrentEventCount;
+    }
+
+    /// <summary>Registers the event.</summary>
+    /// <param name="subscriptionId">   Identifier for the subscription.</param>
+    /// <param name="subscriptionEvent">The subscription event.</param>
+    public void RegisterEvent(string subscriptionId, SubscriptionEvent subscriptionEvent)
+    {
+        _subscriptions[subscriptionId].RegisterEvent(subscriptionEvent);
+    }
+
     /// <summary>Sets executable subscription.</summary>
     /// <param name="subscription">The subscription.</param>
     public bool SetExecutableSubscription(ParsedSubscription subscription)

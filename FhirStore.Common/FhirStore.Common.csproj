@@ -8,6 +8,10 @@
 
   <ItemGroup>
     <Folder Include="Services\" />
+    <Folder Include="Subscriptions\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Subscriptions\" />
+  </ItemGroup>
 </Project>

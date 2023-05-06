@@ -60,6 +60,9 @@ public class ParsedSubscription
     /// <summary>Gets or sets the maximum events per notification.</summary>
     public int MaxEventsPerNotification { get; set; } = 0;
 
+    /// <summary>Gets or sets the current status of the subscription.</summary>
+    public string CurrentStatus { get; set; } = "active";
+
     /// <summary>Gets or sets the number of current events.</summary>
     public long CurrentEventCount { get => _currentEventCount; }
 

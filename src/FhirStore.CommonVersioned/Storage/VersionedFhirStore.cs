@@ -344,7 +344,7 @@ public class VersionedFhirStore : IFhirStore
     /// <param name="destFormat"> Destination format.</param>
     /// <param name="summaryType">(Optional) Type of the summary.</param>
     /// <returns>A string.</returns>
-    internal string SerializeFhir(
+    public string SerializeFhir(
         Resource instance,
         string destFormat,
         SummaryType summaryType = SummaryType.False)
@@ -435,7 +435,7 @@ public class VersionedFhirStore : IFhirStore
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.UnsupportedMediaType;
+            return HttpStatusCode.UnprocessableEntity;
         }
 
         if (parsed is not Resource r)
@@ -448,7 +448,7 @@ public class VersionedFhirStore : IFhirStore
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.UnsupportedMediaType;
+            return HttpStatusCode.UnprocessableEntity;
         }
 
         if (r.TypeName != resourceType)
@@ -461,7 +461,7 @@ public class VersionedFhirStore : IFhirStore
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.UnsupportedMediaType;
+            return HttpStatusCode.UnprocessableEntity;
         }
 
         if (!_store.ContainsKey(resourceType))
@@ -474,7 +474,7 @@ public class VersionedFhirStore : IFhirStore
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.UnsupportedMediaType;
+            return HttpStatusCode.UnprocessableEntity;
         }
 
         Resource? stored = _store[resourceType].InstanceCreate(r, allowExistingId);
@@ -489,7 +489,7 @@ public class VersionedFhirStore : IFhirStore
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.UnsupportedMediaType;
+            return HttpStatusCode.InternalServerError;
         }
 
         serializedResource = SerializeFhir(stored, destFormat, SummaryType.False);
@@ -518,7 +518,36 @@ public class VersionedFhirStore : IFhirStore
         out string serializedResource,
         out string serializedOutcome)
     {
-        throw new NotImplementedException();
+        if (!_store.ContainsKey(resourceType))
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            serializedResource = string.Empty;
+            serializedOutcome = string.Empty;
+            return HttpStatusCode.UnprocessableEntity;
+        }
+
+        // attempt delete
+        Resource? deleted = _store[resourceType].InstanceDelete(id);
+
+        if (deleted == null)
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource {id} not found");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            return HttpStatusCode.NotFound;
+        }
+
+        serializedResource = SerializeFhir(deleted, destFormat, SummaryType.False);
+        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.Created, $"Deleted {resourceType}/{id}");
+        serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
+
+        return HttpStatusCode.OK;
     }
 
     /// <summary>Instance read.</summary>
@@ -614,6 +643,7 @@ public class VersionedFhirStore : IFhirStore
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="ifMatch">           A match specifying if.</param>
     /// <param name="ifNoneMatch">       A match specifying if none.</param>
+    /// <param name="allowCreate">       If the operation should allow a create as an update.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
@@ -628,13 +658,120 @@ public class VersionedFhirStore : IFhirStore
         string destFormat,
         string ifMatch,
         string ifNoneMatch,
+        bool allowCreate,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
         out string lastModified,
         out string location)
     {
-        throw new NotImplementedException();
+        object parsed;
+
+        switch (sourceFormat)
+        {
+            case "json":
+            case "fhir+json":
+            case "application/json":
+            case "application/fhir+json":
+                parsed = _jsonParser.Parse(content);
+                break;
+
+            case "xml":
+            case "fhir+xml":
+            case "application/xml":
+            case "application/fhir+xml":
+                parsed = _xmlParser.Parse(content);
+                break;
+
+            default:
+                {
+                    serializedResource = string.Empty;
+
+                    OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.UnsupportedMediaType, "Unsupported media type");
+                    serializedOutcome = SerializeFhir(oo, destFormat);
+
+                    eTag = string.Empty;
+                    lastModified = string.Empty;
+                    location = string.Empty;
+                    return HttpStatusCode.UnsupportedMediaType;
+                }
+        }
+
+        if (parsed == null)
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Failed to parse resource content");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            location = string.Empty;
+            return HttpStatusCode.UnprocessableEntity;
+        }
+
+        if (parsed is not Resource r)
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Data is not a valid FHIR resource");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            location = string.Empty;
+            return HttpStatusCode.UnprocessableEntity;
+        }
+
+        if (r.TypeName != resourceType)
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {r.TypeName} does not match request: {resourceType}");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            location = string.Empty;
+            return HttpStatusCode.UnprocessableEntity;
+        }
+
+        if (!_store.ContainsKey(resourceType))
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            location = string.Empty;
+            return HttpStatusCode.UnprocessableEntity;
+        }
+
+        Resource? updated = _store[resourceType].InstanceUpdate(r, allowCreate);
+
+        if (updated == null)
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to update resource");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            location = string.Empty;
+            return HttpStatusCode.InternalServerError;
+        }
+
+        serializedResource = SerializeFhir(updated, destFormat, SummaryType.False);
+        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.Created, $"Updated {updated.TypeName}/{updated.Id}");
+        serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
+
+        eTag = string.IsNullOrEmpty(updated.Meta?.VersionId) ? string.Empty : $"W/\"{updated.Meta.VersionId}\"";
+        lastModified = (updated.Meta?.LastUpdated == null) ? string.Empty : updated.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        location = $"{resourceType}/{updated.Id}";   // TODO: add in base url
+        return HttpStatusCode.OK;
     }
 
     /// <summary>
@@ -826,6 +963,30 @@ public class VersionedFhirStore : IFhirStore
     public void RegisterEvent(string subscriptionId, SubscriptionEvent subscriptionEvent)
     {
         _subscriptions[subscriptionId].RegisterEvent(subscriptionEvent);
+    }
+
+    /// <summary>
+    /// Serialize one or more subscription events into the desired format and content level.
+    /// </summary>
+    /// <param name="subscriptionId">  The subscription id of the subscription the events belong to.</param>
+    /// <param name="eventNumbers">    One or more event numbers to include.</param>
+    /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
+    /// <param name="contentType">     Override for the content type specified in the subscription.</param>
+    /// <param name="contentLevel">    Override for the content level specified in the subscription.</param>
+    /// <returns></returns>
+    public string SerializeSubscriptionEvents(
+        string subscriptionId,
+        IEnumerable<long> eventNumbers,
+        string notificationType,
+        string contentType = "",
+        string contentLevel = "")
+    {
+        if (_subscriptions.ContainsKey(subscriptionId))
+        {
+            return _subscriptionConverter.SerializeSubscriptionEvents(_subscriptions[subscriptionId], eventNumbers, notificationType, contentType, contentLevel);
+        }
+
+        return string.Empty;
     }
 
     /// <summary>Sets executable subscription.</summary>

@@ -360,9 +360,10 @@ public class ResourceStore<T> : IResourceStore
 
 
     /// <summary>Performs the subscription test action.</summary>
-    /// <param name="currentTE">The current te.</param>
-    /// <param name="fpContext">The context.</param>
-    private void PerformSubscriptionTest(ITypedElement currentTE, FhirEvaluationContext fpContext)
+    /// <param name="current">  The current resource POCO</param>
+    /// <param name="currentTE">The current resource ITypedElement.</param>
+    /// <param name="fpContext">The FHIRPath evaluation context.</param>
+    private void PerformSubscriptionTest(T current, ITypedElement currentTE, FhirEvaluationContext fpContext)
     {
         HashSet<string> notifiedSubscriptions = new();
 
@@ -401,7 +402,7 @@ public class ResourceStore<T> : IResourceStore
                             SubscriptionId = subscriptionId,
                             TopicUrl = topicUrl,
                             EventNumber = _store.GetSubscriptionEventCount(subscriptionId, true),
-                            Focus = currentTE.ToPoco(),
+                            Focus = current,
                             AdditionalContext = null,
                         };
 
@@ -439,7 +440,7 @@ public class ResourceStore<T> : IResourceStore
 
         fpContext.ElementResolver = resolver.Resolve;
 
-        PerformSubscriptionTest(currentTE, fpContext);
+        PerformSubscriptionTest(current, currentTE, fpContext);
     }
 
     /// <summary>Tests an update interaction against all subscriptions.</summary>
@@ -471,7 +472,7 @@ public class ResourceStore<T> : IResourceStore
 
         fpContext.ElementResolver = resolver.Resolve;
 
-        PerformSubscriptionTest(currentTE, fpContext);
+        PerformSubscriptionTest(current, currentTE, fpContext);
     }
 
     /// <summary>Tests a delete interaction against all subscriptions.</summary>
@@ -501,7 +502,7 @@ public class ResourceStore<T> : IResourceStore
 
         fpContext.ElementResolver = resolver.Resolve;
 
-        PerformSubscriptionTest(previousTE, fpContext);
+        PerformSubscriptionTest(previous, previousTE, fpContext);
     }
 
     ///// <summary>Sets executable subscription topic.</summary>

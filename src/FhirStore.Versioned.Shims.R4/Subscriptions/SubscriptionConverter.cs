@@ -5,6 +5,9 @@
 
 using FhirStore.Common.Models;
 using FhirStore.Models;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using static Hl7.Fhir.Model.Subscription;
 
 namespace FhirStore.Versioned.Shims.Subscriptions;
 
@@ -28,6 +31,32 @@ public class SubscriptionConverter
 
     /// <summary>(Immutable) URL of the content.</summary>
     private const string _contentUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content";
+
+    private FhirJsonParser _jsonParser = new(new ParserSettings()
+    {
+        AcceptUnknownMembers = true,
+        AllowUnrecognizedEnums = true,
+    });
+
+    private FhirJsonSerializationSettings _jsonSerializerSettings = new()
+    {
+        AppendNewLine = false,
+        Pretty = false,
+        IgnoreUnknownElements = true,
+    };
+
+    private FhirXmlParser _xmlParser = new(new ParserSettings()
+    {
+        AcceptUnknownMembers = true,
+        AllowUnrecognizedEnums = true,
+    });
+
+    private FhirXmlSerializationSettings _xmlSerializerSettings = new()
+    {
+        AppendNewLine = false,
+        Pretty = false,
+        IgnoreUnknownElements = true,
+    };
 
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
@@ -185,5 +214,189 @@ public class SubscriptionConverter
         }
 
         return true;
+    }
+
+
+    public string SerializeSubscriptionEvents(
+        ParsedSubscription subscription,
+        IEnumerable<long> eventNumbers,
+        string notificationType,
+        string contentType = "",
+        string contentLevel = "")
+    {
+        if (string.IsNullOrEmpty(contentLevel))
+        {
+            contentLevel = subscription.ContentLevel;
+        }
+
+        // create our notification bundle
+        Bundle bundle = new()
+        {
+            Type = Bundle.BundleType.SubscriptionNotification,
+            Timestamp = DateTimeOffset.Now,
+            Entry = new(),
+        };
+
+        // create our status parameters
+        Parameters status = new()
+        {
+            Parameter = new()
+            {
+                new()
+                {
+                    Name = "subscription",
+                    Value = new FhirString("Subscription/" + subscription.Id)
+                },
+                new()
+                {
+                    Name = "topic",
+                    Value = new Canonical(subscription.TopicUrl),
+                },
+                new()
+                {
+                    Name = "status",
+                    Value = new Code(subscription.CurrentStatus)
+                },
+                new()
+                {
+                    Name = "type",
+                    Value = new Code(notificationType),
+                },
+                new()
+                {
+                    Name = "events-since-subscription-start",
+                    Value = new FhirString(subscription.CurrentEventCount.ToString())
+                },
+            },
+        };
+
+        throw new NotImplementedException();
+
+        //Parameters.ParameterComponent statusEventParam = new()
+        //{
+        //    Name = "notification-event",
+        //};
+
+
+        //if (!Enum.TryParse(subscription.CurrentStatus, out SubscriptionStatusCodes statusCode))
+        //{
+        //    statusCode = SubscriptionStatusCodes.Active;
+        //}
+
+        //// create our status resource
+        //SubscriptionStatus status = new()
+        //{
+        //    Subscription = new ResourceReference("Subscription/" + subscription.Id),
+        //    EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
+        //    Status = statusCode,
+        //    NotificationEvent = new(),
+        //};
+
+        //// add a status placeholder to the bundle
+        //bundle.Entry.Add(new Bundle.EntryComponent());
+
+        //HashSet<string> addedResources = new();
+
+        //bool isEmpty = contentLevel.Equals("empty", StringComparison.Ordinal);
+        //bool isFullResource = contentLevel.Equals("full-resource", StringComparison.Ordinal);
+
+        //// no event numbers means return all
+        //if (!eventNumbers.Any())
+        //{
+        //    eventNumbers = subscription.GeneratedEvents.Keys;
+        //}
+
+        //// iterate over the events
+        //foreach (long eventNumber in eventNumbers)
+        //{
+        //    if (!subscription.GeneratedEvents.ContainsKey(eventNumber))
+        //    {
+        //        continue;
+        //    }
+
+        //    SubscriptionEvent se = subscription.GeneratedEvents[eventNumber];
+
+        //    // check for empty notifications
+        //    if (isEmpty)
+        //    {
+        //        // add just this event number to our status
+        //        status.NotificationEvent.Add(new()
+        //        {
+        //            EventNumber = eventNumber.ToString(),
+        //            Timestamp = se.Timestamp,
+        //        });
+
+        //        // empty notifications do not contain bundle entries
+        //        continue;
+        //    }
+
+        //    Resource r = (Resource)se.Focus;
+        //    string relativeUrl = $"{r.TypeName}/{r.Id}";
+
+        //    // add this event to our status
+        //    status.NotificationEvent.Add(new()
+        //    {
+        //        EventNumber = eventNumber.ToString(),
+        //        Focus = new ResourceReference(relativeUrl),
+        //        AdditionalContext = (se.AdditionalContext?.Any() ?? false)
+        //            ? se.AdditionalContext.Select(o => new ResourceReference($"{((Resource)o).TypeName}/{((Resource)o).Id}")).ToList()
+        //            : new List<ResourceReference>(),
+        //        Timestamp = se.Timestamp,
+        //    });
+
+        //    // add the focus to our bundle
+        //    if (!addedResources.Contains(relativeUrl))
+        //    {
+        //        bundle.Entry.Add(new Bundle.EntryComponent()
+        //        {
+        //            // TODO: pass through information to build the full url
+        //            FullUrl = relativeUrl,
+        //            Resource = isFullResource ? r : null,
+        //        });
+
+        //        addedResources.Add(relativeUrl);
+        //    }
+
+        //    // add any additional context
+        //    if (se.AdditionalContext?.Any() ?? false)
+        //    {
+        //        foreach (object ac in se.AdditionalContext)
+        //        {
+        //            Resource acr = (Resource)ac;
+        //            string acrRelative = $"{acr.TypeName}/{acr.Id}";
+
+        //            if (!addedResources.Contains(acrRelative))
+        //            {
+        //                bundle.Entry.Add(new Bundle.EntryComponent()
+        //                {
+        //                    // TODO: pass through information to build the full url
+        //                    FullUrl = acrRelative,
+        //                    Resource = isFullResource ? acr : null,
+        //                });
+
+        //                addedResources.Add(acrRelative);
+        //            }
+        //        }
+        //    }
+        //}
+
+        //// set our status information in our bundle
+        //bundle.Entry[0].Resource = status;
+
+        //// serialize our bundle
+        //switch (contentType)
+        //{
+        //    case "xml":
+        //    case "fhir+xml":
+        //    case "application/xml":
+        //    case "application/fhir+xml":
+        //        return bundle.ToXml(_xmlSerializerSettings);
+
+        //    // default to JSON
+        //    case "application/json":
+        //    case "application/fhir+json":
+        //    default:
+        //        return bundle.ToJson(_jsonSerializerSettings);
+        //}
     }
 }

@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirStore.Common.Models;
+using FhirStore.Models;
 using System.Net;
 
 namespace FhirStore.Common.Storage;
@@ -87,8 +88,9 @@ public interface IFhirStore : IDisposable
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
-    /// <param name="ifMatch">           A match specifying if.</param>
-    /// <param name="ifNoneMatch">       A match specifying if none.</param>
+    /// <param name="ifMatch">           Criteria that must match to preform the update.</param>
+    /// <param name="ifNoneMatch">       Criteria that must NOT match to preform the update.</param>
+    /// <param name="allowCreate">       If the update should be allowed to create a new resource.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
@@ -103,6 +105,7 @@ public interface IFhirStore : IDisposable
         string destFormat,
         string ifMatch,
         string ifNoneMatch,
+        bool allowCreate,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
@@ -187,6 +190,22 @@ public interface IFhirStore : IDisposable
     ///// <returns>The compiled.</returns>
     //CompiledExpression GetCompiled(string resourceType, string name, string expression);
 
+    /// <summary>
+    /// Serialize one or more subscription events into the desired format and content level.
+    /// </summary>
+    /// <param name="subscriptionId">  The subscription id of the subscription the events belong to.</param>
+    /// <param name="eventNumbers">    One or more event numbers to include.</param>
+    /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
+    /// <param name="contentType">     Override for the content type specified in the subscription.</param>
+    /// <param name="contentLevel">    Override for the content level specified in the subscription.</param>
+    /// <returns></returns>
+    string SerializeSubscriptionEvents(
+        string subscriptionId,
+        IEnumerable<long> eventNumbers,
+        string notificationType,
+        string contentType = "",
+        string contentLevel = "");
+
     /// <summary>Gets the supported resources.</summary>
-    public IEnumerable<string> SupportedResources { get; }
+    IEnumerable<string> SupportedResources { get; }
 }

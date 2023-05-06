@@ -6,6 +6,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
 
+	<PropertyGroup Condition=" '$(RunConfiguration)' == 'http' " />
 	<ItemGroup>
 	  <Compile Remove="Services\FhirWebSerializer.cs" />
 	  <Compile Remove="Services\IFhirWebSerializer.cs" />

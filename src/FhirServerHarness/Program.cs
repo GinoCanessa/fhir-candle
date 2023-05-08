@@ -6,6 +6,7 @@
 using FhirServerHarness.Services;
 using FhirStore.Common.Models;
 using Microsoft.AspNetCore.Builder;
+using MudBlazor.Services;
 
 namespace FhirServerHarness;
 
@@ -28,6 +29,8 @@ public static class Program
         //builder.Services.AddHostedService<IFhirStoreManager>(sp => new FhirStoreManager(configurations));
         //builder.Services.AddHostedService<FhirStoreManager>();
         //builder.Services.AddSingleton<FhirStoreR4>();
+
+        builder.Services.AddMudServices();
 
         //builder.Services.AddControllersWithViews(options =>
         //{
@@ -97,8 +100,7 @@ public static class Program
             //new ProviderConfiguration
             //{
             //    FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4,
-            //    TenantRoute = "r4",
-            //    BaseUrl = "http://localhost:5101/r4",
+            //    ControllerName = "r4",
             //},
             //new ProviderConfiguration
             //{

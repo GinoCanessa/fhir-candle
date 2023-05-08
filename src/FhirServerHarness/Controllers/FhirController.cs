@@ -11,8 +11,8 @@ using Microsoft.Net.Http.Headers;
 
 namespace FhirServerHarness.Controllers;
 
-
-/// <summary>A FHIR R4 controller.</summary>
+/// <summary>A FHIR API controller.</summary>
+[ApiController]
 [Route("fhir", Order = 1)]
 [Produces("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
 public class FhirController : ControllerBase
@@ -25,8 +25,8 @@ public class FhirController : ControllerBase
         "application/fhir+xml",
         "application/json",
         "application/xml",
-        "json",
-        "xml",
+        //"json",
+        //"xml",
     };
 
     /// <summary>
@@ -79,7 +79,31 @@ public class FhirController : ControllerBase
             return accept;
         }
 
-        return "application/json";
+        return "application/fhir+json";
+    }
+
+    private async Task AddBody(HttpResponse response, string? prefer, string resource, string outcome)
+    {
+        switch (prefer)
+        {
+            case "return=minimal":
+                break;
+
+            default:
+            case "return=representation":
+                if (!string.IsNullOrEmpty(resource))
+                {
+                    await response.WriteAsync(resource);
+                }
+                break;
+
+            case "return=OperationOutcome":
+                if (!string.IsNullOrEmpty(outcome))
+                {
+                    await response.WriteAsync(outcome);
+                }
+                break;
+        }
     }
 
     [HttpGet, Route("{store}/metadata")]
@@ -176,7 +200,8 @@ public class FhirController : ControllerBase
     public async Task PostResourceType(
         [FromRoute] string store,
         [FromRoute] string resourceName,
-        [FromQuery(Name = "_format")] string? format)
+        [FromQuery(Name = "_format")] string? format,
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -233,10 +258,7 @@ public class FhirController : ControllerBase
                 HttpContext.Response.ContentType = format;
                 HttpContext.Response.StatusCode = (int)sc;
 
-                if (!string.IsNullOrEmpty(resource))
-                {
-                    await HttpContext.Response.WriteAsync(resource);
-                }
+                await AddBody(HttpContext.Response, prefer, resource, outcome);
             }
         }
         catch (Exception ex)
@@ -259,7 +281,8 @@ public class FhirController : ControllerBase
         [FromRoute] string store,
         [FromRoute] string resourceName,
         [FromRoute] string id,
-        [FromQuery(Name = "_format")] string? format)
+        [FromQuery(Name = "_format")] string? format,
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -318,10 +341,7 @@ public class FhirController : ControllerBase
                 HttpContext.Response.ContentType = format;
                 HttpContext.Response.StatusCode = (int)sc;
 
-                if (!string.IsNullOrEmpty(resource))
-                {
-                    await HttpContext.Response.WriteAsync(resource);
-                }
+                await AddBody(HttpContext.Response, prefer, resource, outcome);
             }
         }
         catch (Exception ex)
@@ -343,7 +363,7 @@ public class FhirController : ControllerBase
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -365,10 +385,7 @@ public class FhirController : ControllerBase
         HttpContext.Response.ContentType = format;
         HttpContext.Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(resource))
-        {
-            await HttpContext.Response.WriteAsync(resource);
-        }
+        await AddBody(HttpContext.Response, prefer, resource, outcome);
     }
 
     [HttpGet, Route("{store}/{resourceName}")]

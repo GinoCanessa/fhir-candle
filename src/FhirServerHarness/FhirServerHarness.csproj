@@ -14,6 +14,7 @@
 
 	<ItemGroup>
 	  <PackageReference Include="Antlr4.Runtime.Standard" Version="4.12.0" />
+	  <PackageReference Include="MudBlazor" Version="6.2.3" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -21,6 +22,7 @@
 	  <Folder Include="Models\" />
 	  <Folder Include="Search\" />
 	  <Folder Include="Storage\" />
+	  <Folder Include="Models\" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -30,6 +32,9 @@
 	  <ProjectReference Include="..\FhirStore.R5\FhirStore.R5.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <None Remove="Models\" />
+	</ItemGroup>
 	<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
 		<ItemGroup>
 			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4'">

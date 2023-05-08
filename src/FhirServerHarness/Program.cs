@@ -5,6 +5,7 @@
 
 using FhirServerHarness.Services;
 using FhirStore.Common.Models;
+using Microsoft.AspNetCore.Builder;
 
 namespace FhirServerHarness;
 
@@ -17,14 +18,24 @@ public static class Program
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+        IEnumerable<ProviderConfiguration> configurations = BuildTeantConfigurations();
+
         builder.Services.AddCors();
         builder.Services.AddRazorPages();
         builder.Services.AddServerSideBlazor();
         //builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();
-        //builder.Services.AddSingleton<IFhirStoreManager>(new FhirStoreManager(BuildTeantConfigurations()));
-        builder.Services.AddHostedService<IFhirStoreManager>(sp => new FhirStoreManager(BuildTeantConfigurations()));
+        builder.Services.AddSingleton<IFhirStoreManager>(new FhirStoreManager(configurations));
+        //builder.Services.AddHostedService<IFhirStoreManager>(sp => new FhirStoreManager(configurations));
         //builder.Services.AddHostedService<FhirStoreManager>();
         //builder.Services.AddSingleton<FhirStoreR4>();
+
+        //builder.Services.AddControllersWithViews(options =>
+        //{
+        //    foreach (ProviderConfiguration config in configurations)
+        //    {
+        //        options.Conventions.Add(new FhirRoutingConvention(config.ControllerName));
+        //    }
+        //});
 
         WebApplication app = builder.Build();
 
@@ -37,6 +48,31 @@ public static class Program
         app.UseStaticFiles();
 
         app.UseRouting();
+
+        //app.MapDynamicControllerRoute()
+
+        app.MapControllers();
+
+        //foreach (ProviderConfiguration config in configurations)
+        //{
+        //    app.MapControllers()
+        //    //app.MapControllerRoute(
+        //    //    config.ControllerName,
+        //    //    )
+        //}
+
+
+        //app.UseMvc(routes =>
+        //{
+        //    foreach (ProviderConfiguration config in configurations)
+        //    {
+        //        routes.MapRoute("default",
+        //            "{controller}/{action}/{id?}",
+        //            new { controller = "Home", action = "Index" },
+        //            new { controller = @"^(?!User).*$" }// exclude user controller
+        //        );
+        //    }
+        //});
 
         app.MapBlazorHub();
         app.MapFallbackToPage("/_Host");
@@ -60,20 +96,21 @@ public static class Program
         {
             //new ProviderConfiguration
             //{
-            //    FhirVersion = ProviderConfiguration.FhirVersionCodes.R4,
+            //    FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4,
             //    TenantRoute = "r4",
+            //    BaseUrl = "http://localhost:5101/r4",
+            //},
+            //new ProviderConfiguration
+            //{
+            //    FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
+            //    TenantRoute = "r4b",
+            //    BaseUrl = "http://localhost:5101/r4b",
             //},
             new ProviderConfiguration
             {
-                FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
-                TenantRoute = "r4b",
-                BaseUrl = "http://localhost:5101/r4b",
+                FhirVersion = ProviderConfiguration.SupportedFhirVersions.R5,
+                ControllerName = "r5",      // route will be /fhir/r5
             },
-            //new ProviderConfiguration
-            //{
-            //    FhirVersion = ProviderConfiguration.FhirVersionCodes.R5,
-            //    TenantRoute = "r5",
-            //},
         };
     }
 }

@@ -206,6 +206,8 @@ public interface IFhirStore : IDisposable
         string contentType = "",
         string contentLevel = "");
 
+    bool SupportsResource(string resourceName);
+
     /// <summary>Gets the supported resources.</summary>
     IEnumerable<string> SupportedResources { get; }
 }

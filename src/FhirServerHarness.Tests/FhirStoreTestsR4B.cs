@@ -27,8 +27,7 @@ public class FhirStoreTestsR4B: IDisposable
     private static readonly ProviderConfiguration _config = new()
     {
         FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
-        TenantRoute = "r4b",
-        BaseUrl = "http://localhost:5101/r4b",
+        ControllerName = "r4b",
     };
 
     private const int _expectedRestResources = 140;

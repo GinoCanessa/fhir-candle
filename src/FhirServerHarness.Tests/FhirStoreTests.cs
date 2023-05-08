@@ -45,8 +45,7 @@ public class FhirStoreTests : IDisposable
             new ProviderConfiguration()
             {
                 FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4,
-                TenantRoute = "r4",
-                BaseUrl = "http://localhost:5101/r4",
+                ControllerName = "r4",
             },
         },
         new object[]
@@ -54,8 +53,7 @@ public class FhirStoreTests : IDisposable
             new ProviderConfiguration()
             {
                 FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4B,
-                TenantRoute = "r4b",
-                BaseUrl = "http://localhost:5101/r4b",
+                ControllerName = "r4b",
             },
         },
         new object[]
@@ -63,8 +61,7 @@ public class FhirStoreTests : IDisposable
             new ProviderConfiguration()
             {
                 FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R5,
-                TenantRoute = "r5",
-                BaseUrl = "http://localhost:5101/r5",
+                ControllerName = "r5",
             },
         },
     };

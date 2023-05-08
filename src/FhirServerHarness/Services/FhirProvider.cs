@@ -47,7 +47,7 @@ public class FhirProvider : IVersionedProvider
             throw new ArgumentException($"Expected {Hl7.Fhir.Model.FHIRVersion.N4_1} but got {_config.FhirVersion}");
         }
 
-        if (string.IsNullOrEmpty(_config.TenantRoute))
+        if (string.IsNullOrEmpty(_config.ControllerName))
         {
             throw new ArgumentException("Tenant route cannot be null or empty");
         }

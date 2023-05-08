@@ -3,10 +3,19 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Common.Storage;
+
 namespace FhirServerHarness.Services;
 
 /// <summary>Interface for FHIR store manager.</summary>
-public interface IFhirStoreManager : IHostedService, IDisposable
+public interface IFhirStoreManager : IHostedService, IDisposable, IReadOnlyDictionary<string, IFhirStore>
 {
+    /// <summary>
+    /// Attempt to get the controller based on the controller name
+    /// </summary>
+    /// <param name="controllerName"></param>
+    /// <param name="store"></param>
+    /// <returns></returns>
+    public bool TryGetStore(string controllerName, out IFhirStore store);
 
 }

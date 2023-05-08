@@ -38,11 +38,13 @@ public class ProviderConfiguration
         "application/fhir+xml",
     };
 
-    /// <summary>Gets or sets the tenant route.</summary>
-    public required string TenantRoute { get; set; } = string.Empty;
+    /// <summary>Gets or sets route controller name.</summary>
+    public required string ControllerName { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets URL of the base.</summary>
-    public required string BaseUrl { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets the absolute base url of this store.
+    /// </summary>
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the FHIR packages.</summary>
     public Dictionary<string, FhirPackageInfo> FhirPackages { get; } = new();

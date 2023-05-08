@@ -3,7 +3,13 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+extern alias storeR4;
+extern alias storeR4B;
+extern alias storeR5;
+
+using System.Collections;
 using FhirStore.Common.Models;
+using FhirStore.Common.Storage;
 
 namespace FhirServerHarness.Services;
 
@@ -13,14 +19,59 @@ public class FhirStoreManager : IFhirStoreManager
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;
 
+    private Dictionary<string, IFhirStore> _storesByController = new(StringComparer.OrdinalIgnoreCase);
+
+
+    IEnumerable<string> IReadOnlyDictionary<string, IFhirStore>.Keys => _storesByController.Keys;
+
+    IEnumerable<IFhirStore> IReadOnlyDictionary<string, IFhirStore>.Values => _storesByController.Values;
+
+    int IReadOnlyCollection<KeyValuePair<string, IFhirStore>>.Count => _storesByController.Count;
+
+    IFhirStore IReadOnlyDictionary<string, IFhirStore>.this[string key] => _storesByController[key];
+
+    bool IReadOnlyDictionary<string, IFhirStore>.ContainsKey(string key) => _storesByController.ContainsKey(key);
+
+    bool IReadOnlyDictionary<string, IFhirStore>.TryGetValue(string key, out IFhirStore value) => _storesByController.TryGetValue(key, out value!);
+
+    IEnumerator<KeyValuePair<string, IFhirStore>> IEnumerable<KeyValuePair<string, IFhirStore>>.GetEnumerator() => _storesByController.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => (IEnumerator)_storesByController.GetEnumerator();
+
+
     /// <summary>
     /// Initializes a new instance of the <see cref="FhirStoreManager"/> class.
     /// </summary>
     /// <param name="tenantConfigurations">The tenant configurations.</param>
     public FhirStoreManager(IEnumerable<ProviderConfiguration> tenantConfigurations)
     {
-        Console.WriteLine("In constructor...");
+        // initialize the requested fhir stores
+        foreach (ProviderConfiguration config in tenantConfigurations)
+        {
+            if (_storesByController.ContainsKey(config.ControllerName))
+            {
+                throw new Exception($"Duplicate controller names configured!: {config.ControllerName}");
+            }
+
+            switch (config.FhirVersion)
+            {
+                case ProviderConfiguration.SupportedFhirVersions.R4:
+                    _storesByController.Add(config.ControllerName, new storeR4::FhirStore.Storage.VersionedFhirStore());
+                    break;
+
+                case ProviderConfiguration.SupportedFhirVersions.R4B:
+                    _storesByController.Add(config.ControllerName, new storeR4B::FhirStore.Storage.VersionedFhirStore());
+                    break;
+
+                case ProviderConfiguration.SupportedFhirVersions.R5:
+                    _storesByController.Add(config.ControllerName, new storeR5::FhirStore.Storage.VersionedFhirStore());
+                    break;
+            }
+
+            _storesByController[config.ControllerName].Init(config);
+        }
     }
+
 
     /// <summary>Triggered when the application host is ready to start the service.</summary>
     /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
@@ -39,6 +90,24 @@ public class FhirStoreManager : IFhirStoreManager
     {
         Console.WriteLine("In StopAsync...");
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Attempt to get the controller based on the controller name
+    /// </summary>
+    /// <param name="controllerName"></param>
+    /// <param name="store"></param>
+    /// <returns></returns>
+    public bool TryGetStore(string controllerName, out IFhirStore store)
+    {
+        if (!_storesByController.ContainsKey(controllerName))
+        {
+            store = null!;
+            return false;
+        }
+
+        store = _storesByController[controllerName];
+        return true;
     }
 
     /// <summary>
@@ -72,5 +141,10 @@ public class FhirStoreManager : IFhirStoreManager
         // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
+    }
+
+    bool IFhirStoreManager.TryGetStore(string controllerName, out IFhirStore store)
+    {
+        throw new NotImplementedException();
     }
 }

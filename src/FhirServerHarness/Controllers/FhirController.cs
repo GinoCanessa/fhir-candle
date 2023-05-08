@@ -241,7 +241,7 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"HandlePost <<< caught: {ex.Message}");
+            System.Console.WriteLine($"PostResourceType <<< caught: {ex.Message}");
             if (ex.InnerException != null)
             {
                 System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
@@ -249,7 +249,6 @@ public class FhirController : ControllerBase
 
             HttpContext.Response.StatusCode = 500;
             return;
-            //return StatusCode(500, ex.Message);
         }
     }
 
@@ -327,7 +326,7 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"HandlePost <<< caught: {ex.Message}");
+            System.Console.WriteLine($"PutResourceInstance <<< caught: {ex.Message}");
             if (ex.InnerException != null)
             {
                 System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
@@ -335,10 +334,8 @@ public class FhirController : ControllerBase
 
             HttpContext.Response.StatusCode = 500;
             return;
-            //return StatusCode(500, ex.Message);
         }
     }
-
 
     [HttpDelete, Route("{store}/{resourceName}/{id}")]
     public async Task DeleteResourceInstance(
@@ -374,4 +371,96 @@ public class FhirController : ControllerBase
         }
     }
 
+    [HttpGet, Route("{store}/{resourceName}")]
+    public async Task GetResourceTypeSearch(
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            HttpContext.Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, HttpContext.Request);
+
+        HttpStatusCode sc = _fhirStoreManager[store].TypeSearch(
+            resourceName,
+            HttpContext.Request.QueryString.ToString(),
+            format,
+            out string results,
+            out string outcome);
+
+        HttpContext.Response.ContentType = format;
+        HttpContext.Response.StatusCode = (int)sc;
+
+        if (!string.IsNullOrEmpty(results))
+        {
+            await HttpContext.Response.WriteAsync(results);
+        }
+    }
+
+    [HttpPost, Route("{store}/{resourceName}/_search")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task PostResourceTypeSearch(
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            HttpContext.Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, HttpContext.Request);
+
+        // sanity check
+        if ((Request == null) || (Request.Body == null))
+        {
+            System.Console.WriteLine("PostResourceTypeSearch <<< cannot process a PUT without data!");
+            HttpContext.Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+
+                HttpStatusCode sc = _fhirStoreManager[store].TypeSearch(
+                    resourceName,
+                    content,
+                    format,
+                    out string results,
+                    out string outcome);
+
+                HttpContext.Response.ContentType = format;
+                HttpContext.Response.StatusCode = (int)sc;
+
+                if (!string.IsNullOrEmpty(results))
+                {
+                    await HttpContext.Response.WriteAsync(results);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"PostResourceTypeSearch <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            HttpContext.Response.StatusCode = 500;
+            return;
+        }
+    }
 }

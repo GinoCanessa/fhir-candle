@@ -19,8 +19,10 @@ public class FhirStoreManager : IFhirStoreManager
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;
 
-    private Dictionary<string, IFhirStore> _storesByController = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Occurs when On Changed.</summary>
+    public event EventHandler<EventArgs>? OnChanged;
 
+    private Dictionary<string, IFhirStore> _storesByController = new(StringComparer.OrdinalIgnoreCase);
 
     IEnumerable<string> IReadOnlyDictionary<string, IFhirStore>.Keys => _storesByController.Keys;
 
@@ -129,6 +131,17 @@ public class FhirStoreManager : IFhirStoreManager
             // TODO: free unmanaged resources (unmanaged objects) and override finalizer
             // TODO: set large fields to null
             _hasDisposed = true;
+        }
+    }
+
+    /// <summary>State has changed.</summary>
+    public void StateHasChanged()
+    {
+        EventHandler<EventArgs>? handler = OnChanged;
+
+        if (handler != null)
+        {
+            handler(this, new());
         }
     }
 

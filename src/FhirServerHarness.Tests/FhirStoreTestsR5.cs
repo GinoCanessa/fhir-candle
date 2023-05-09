@@ -29,6 +29,7 @@ public class FhirStoreTestsR5: IDisposable
     {
         FhirVersion = ProviderConfiguration.SupportedFhirVersions.R5,
         ControllerName = "r5",
+        BaseUrl = "http://localhost/fhir/r5",
     };
 
     private const int _expectedRestResources = 157;
@@ -107,7 +108,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Be("Patient/example");
+        location.Should().EndWith("Patient/example");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "Patient",
@@ -126,7 +127,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
-        location.Should().StartWith("Patient/");
+        location.Should().Contain("Patient/");
     }
 
     [Theory]
@@ -154,7 +155,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Be("Observation/example");
+        location.Should().EndWith("Observation/example");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "Observation",
@@ -173,7 +174,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
-        location.Should().StartWith("Observation/");
+        location.Should().Contain("Observation/");
     }
 
 
@@ -201,7 +202,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Be("Observation/example");
+        location.Should().EndWith("Observation/example");
 
         json = json.Replace("185,", "180,");
 
@@ -219,7 +220,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"2\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Be("Observation/example");
+        location.Should().EndWith("Observation/example");
     }
 
     [Theory]
@@ -249,7 +250,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().StartWith("SearchParameter/");
+        location.Should().Contain("SearchParameter/");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "SearchParameter",
@@ -386,7 +387,7 @@ public class FhirStoreTestsR5: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().StartWith("SubscriptionTopic/");
+        location.Should().EndWith("SubscriptionTopic/encounter-example");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "SubscriptionTopic",
@@ -677,7 +678,7 @@ public class FhirStoreTestsR5: IDisposable
             out lastModified,
             out location);
         sc.Should().Be(HttpStatusCode.Created);
-        location.Should().StartWith(resourceType);
+        location.Should().Contain(resourceType);
         return sc;
     }
 
@@ -717,7 +718,7 @@ public class FhirStoreTestsR5: IDisposable
             out lastModified,
             out location);
         sc.Should().Be(HttpStatusCode.OK);
-        location.Should().StartWith(resourceType);
+        location.Should().Contain(resourceType);
         return sc;
     }
 }

@@ -18,12 +18,13 @@ using System.Collections.Concurrent;
 using System.Linq;
 using FhirStore.Versioned.Shims.Extensions;
 using FhirStore.Versioned.Shims.Subscriptions;
+using System.Collections;
 
 namespace FhirStore.Storage;
 
 /// <summary>A resource store.</summary>
 /// <typeparam name="T">Resource type parameter.</typeparam>
-public class ResourceStore<T> : IResourceStore
+public class ResourceStore<T> : IVersionedResourceStore
     where T : Resource
 {
     /// <summary>The store.</summary>
@@ -37,6 +38,9 @@ public class ResourceStore<T> : IResourceStore
 
     /// <summary>The resource store.</summary>
     private Dictionary<string, T> _resourceStore = new();
+
+    /// <summary>Occurs when On Changed.</summary>
+    public event EventHandler<EventArgs>? OnChanged;
 
     /// <summary>The search tester.</summary>
     public required SearchTester _searchTester;
@@ -58,6 +62,51 @@ public class ResourceStore<T> : IResourceStore
 
     /// <summary>The supported reverse includes.</summary>
     private string[] _supportedRevIncludes = Array.Empty<string>();
+
+    IEnumerable<string> IReadOnlyDictionary<string, Resource>.Keys => _resourceStore.Keys;
+
+    IEnumerable<Resource> IReadOnlyDictionary<string, Resource>.Values => _resourceStore.Values;
+
+    int IReadOnlyCollection<KeyValuePair<string, Resource>>.Count => _resourceStore.Count;
+
+    Resource IReadOnlyDictionary<string, Resource>.this[string key] => _resourceStore[key];
+
+    bool IReadOnlyDictionary<string, Resource>.ContainsKey(string key) => _resourceStore.ContainsKey(key);
+
+    bool IReadOnlyDictionary<string, Resource>.TryGetValue(string key, out Resource value)
+    {
+        bool result = _resourceStore.TryGetValue(key, out T? tVal);
+        value = tVal ?? null!;
+        return result;
+    }
+
+    IEnumerator<KeyValuePair<string, Resource>> IEnumerable<KeyValuePair<string, Resource>>.GetEnumerator() =>
+            _resourceStore.Select(kvp => new KeyValuePair<string, Resource>(kvp.Key, kvp.Value)).GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() =>
+            _resourceStore.Select(kvp => new KeyValuePair<string, Resource>(kvp.Key, kvp.Value)).GetEnumerator();
+
+
+    IEnumerable<string> IReadOnlyDictionary<string, object>.Keys => _resourceStore.Keys;
+
+    IEnumerable<object> IReadOnlyDictionary<string, object>.Values => _resourceStore.Values;
+
+    int IReadOnlyCollection<KeyValuePair<string, object>>.Count => _resourceStore.Count;
+
+    object IReadOnlyDictionary<string, object>.this[string key] => _resourceStore[key];
+
+    bool IReadOnlyDictionary<string, object>.ContainsKey(string key) => _resourceStore.ContainsKey(key);
+
+    bool IReadOnlyDictionary<string, object>.TryGetValue(string key, out object value)
+    {
+        bool result = _resourceStore.TryGetValue(key, out T? tVal);
+        value = tVal ?? null!;
+        return result;
+    }
+
+    IEnumerator<KeyValuePair<string, object>> IEnumerable<KeyValuePair<string, object>>.GetEnumerator() =>
+        _resourceStore.Select(kvp => new KeyValuePair<string, object>(kvp.Key, kvp.Value)).GetEnumerator();
+
 
     /// <summary>
     /// Initializes a new instance of the FhirStore.Storage.ResourceStore&lt;T&gt; class.
@@ -761,6 +810,18 @@ public class ResourceStore<T> : IResourceStore
         //}
 
         //return _resourceStore.Values.Where(r => _fpExpressions[query].Predicate(r));
+    }
+
+
+    /// <summary>State has changed.</summary>
+    public void StateHasChanged()
+    {
+        EventHandler<EventArgs>? handler = OnChanged;
+
+        if (handler != null)
+        {
+            handler(this, new());
+        }
     }
 
     /// <summary>

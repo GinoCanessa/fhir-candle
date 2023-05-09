@@ -1,4 +1,4 @@
-﻿// <copyright file="IResourceStore.cs" company="Microsoft Corporation">
+﻿// <copyright file="IVersionedResourceStore.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
@@ -14,7 +14,7 @@ namespace FhirStore.Storage;
 
 /// <summary>Interface for resource store.</summary>
 /// <typeparam name="T">Resource type parameter.</typeparam>
-public interface IResourceStore : IDisposable
+public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>
 {
     /// <summary>Reads a specific instance of a resource.</summary>
     /// <param name="id">[out] The identifier.</param>

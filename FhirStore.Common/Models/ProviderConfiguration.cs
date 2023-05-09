@@ -44,7 +44,7 @@ public class ProviderConfiguration
     /// <summary>
     /// Gets or sets the absolute base url of this store.
     /// </summary>
-    public string BaseUrl { get; set; } = string.Empty;
+    public required string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the FHIR packages.</summary>
     public Dictionary<string, FhirPackageInfo> FhirPackages { get; } = new();

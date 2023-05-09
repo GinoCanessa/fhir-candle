@@ -25,7 +25,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Search\EvalUriSearch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\SearchDefinitions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\SearchTester.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Storage\IResourceStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Storage\IVersionedResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
   </ItemGroup>

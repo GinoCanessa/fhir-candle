@@ -22,14 +22,18 @@ using FhirStore.Versioned.Shims.Subscriptions;
 using System.Text.RegularExpressions;
 using Hl7.Fhir.Language.Debugging;
 using static FhirServerHarness.Search.SearchDefinitions;
+using System.Collections;
 
 namespace FhirStore.Storage;
 
 /// <summary>A FHIR store.</summary>
-public class VersionedFhirStore : IFhirStore
+public partial class VersionedFhirStore : IFhirStore
 {
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
+
+    /// <summary>Occurs when On Changed.</summary>
+    public event EventHandler<EventArgs>? OnChanged;
 
     /// <summary>The compiler.</summary>
     private static FhirPathCompiler _compiler = null!;
@@ -61,13 +65,13 @@ public class VersionedFhirStore : IFhirStore
     };
 
     /// <summary>The store.</summary>
-    private Dictionary<string, IResourceStore> _store = new();
+    private Dictionary<string, IVersionedResourceStore> _store = new();
 
     /// <summary>The search tester.</summary>
     private SearchTester _searchTester;
 
     /// <summary>Gets the supported resources.</summary>
-    public IEnumerable<string> SupportedResources => _store.Keys.ToArray<string>();
+    public IEnumerable<string> SupportedResources => _store.Keys.ToArray();
 
     /// <summary>(Immutable) The cache of compiled search parameter extraction functions.</summary>
     private readonly Dictionary<string, CompiledExpression> _compiledSearchParameters = new();
@@ -84,8 +88,10 @@ public class VersionedFhirStore : IFhirStore
     /// <summary>(Immutable) The subscriptions, by id.</summary>
     private readonly Dictionary<string, ParsedSubscription> _subscriptions = new();
 
+
     /// <summary>(Immutable) The fhirpath variable matcher.</summary>
-    private static readonly Regex _fhirpathVarMatcher = new("[%][\\w\\-]+", RegexOptions.Compiled);
+    [GeneratedRegex("[%][\\w\\-]+", RegexOptions.Compiled)]
+    private static partial Regex _fhirpathVarMatcher();
 
     /// <summary>The configuration.</summary>
     private ProviderConfiguration _config = null!;
@@ -153,7 +159,7 @@ public class VersionedFhirStore : IFhirStore
 
             Type[] tArgs = { t };
 
-            IResourceStore? irs = (IResourceStore?)Activator.CreateInstance(
+            IVersionedResourceStore? irs = (IVersionedResourceStore?)Activator.CreateInstance(
                 rsType.MakeGenericType(tArgs),
                 this,
                 _searchTester,
@@ -163,6 +169,7 @@ public class VersionedFhirStore : IFhirStore
             if (irs != null)
             {
                 _store.Add(tn, irs);
+                irs.OnChanged += ResourceStore_OnChanged;
             }
         }
 
@@ -170,7 +177,7 @@ public class VersionedFhirStore : IFhirStore
         {
             if (spDefinition.Resource != null)
             {
-                if (_store.TryGetValue(spDefinition.Resource, out IResourceStore? rs))
+                if (_store.TryGetValue(spDefinition.Resource, out IVersionedResourceStore? rs))
                 {
                     rs.SetExecutableSearchParameter(spDefinition);
                 }
@@ -182,6 +189,29 @@ public class VersionedFhirStore : IFhirStore
 
     public bool SupportsResource(string resourceName) => _store.ContainsKey(resourceName);
 
+
+    IEnumerable<string> IReadOnlyDictionary<string, IResourceStore>.Keys => _store.Keys;
+
+    IEnumerable<IResourceStore> IReadOnlyDictionary<string, IResourceStore>.Values => _store.Values;
+
+    int IReadOnlyCollection<KeyValuePair<string, IResourceStore>>.Count => _store.Count;
+
+    IResourceStore IReadOnlyDictionary<string, IResourceStore>.this[string key] => _store[key];
+
+    bool IReadOnlyDictionary<string, IResourceStore>.ContainsKey(string key) => _store.ContainsKey(key);
+
+    bool IReadOnlyDictionary<string, IResourceStore>.TryGetValue(string key, out IResourceStore value)
+    {
+        bool result = _store.TryGetValue(key, out IVersionedResourceStore? rStore);
+        value = rStore ?? null!;
+        return result;
+    }
+
+    IEnumerator<KeyValuePair<string, IResourceStore>> IEnumerable<KeyValuePair<string, IResourceStore>>.GetEnumerator() =>
+        _store.Select(kvp => new KeyValuePair<string, IResourceStore>(kvp.Key, kvp.Value)).GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() =>
+        _store.Select(kvp => new KeyValuePair<string, IResourceStore>(kvp.Key, kvp.Value)).GetEnumerator();
 
     /// <summary>Gets a compiled search parameter expression.</summary>
     /// <param name="resourceType">Type of the resource.</param>
@@ -217,7 +247,7 @@ public class VersionedFhirStore : IFhirStore
         string resourceType = components[components.Length - 2];
         string id = components[components.Length - 1];
 
-        if (!_store.TryGetValue(resourceType, out IResourceStore? rs))
+        if (!_store.TryGetValue(resourceType, out IVersionedResourceStore? rs))
         {
             resource = null;
             return false;
@@ -253,7 +283,7 @@ public class VersionedFhirStore : IFhirStore
         string resourceType = components[components.Length - 2];
         string id = components[components.Length - 1];
 
-        if (!_store.TryGetValue(resourceType, out IResourceStore? rs))
+        if (!_store.TryGetValue(resourceType, out IVersionedResourceStore? rs))
         {
             resource = null;
             return false;
@@ -290,7 +320,7 @@ public class VersionedFhirStore : IFhirStore
         string resourceType = components[components.Length - 2];
         string id = components[components.Length - 1];
 
-        if (!_store.TryGetValue(resourceType, out IResourceStore? rs))
+        if (!_store.TryGetValue(resourceType, out IVersionedResourceStore? rs))
         {
             return null!;
             //throw new ArgumentException("Invalid URI - unsupported resource type", nameof(uri));
@@ -503,7 +533,7 @@ public class VersionedFhirStore : IFhirStore
         serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
 
         eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
-        lastModified = (stored.Meta?.LastUpdated == null) ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
         return HttpStatusCode.Created;
     }
@@ -637,7 +667,7 @@ public class VersionedFhirStore : IFhirStore
         serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
 
         eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
-        lastModified = (stored.Meta?.LastUpdated == null) ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         return HttpStatusCode.OK;
     }
 
@@ -775,7 +805,7 @@ public class VersionedFhirStore : IFhirStore
         serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
 
         eTag = string.IsNullOrEmpty(updated.Meta?.VersionId) ? string.Empty : $"W/\"{updated.Meta.VersionId}\"";
-        lastModified = (updated.Meta?.LastUpdated == null) ? string.Empty : updated.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        lastModified = updated.Meta?.LastUpdated == null ? string.Empty : updated.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         location = $"{_config.BaseUrl}/{resourceType}/{updated.Id}";
         return HttpStatusCode.OK;
     }
@@ -871,7 +901,7 @@ public class VersionedFhirStore : IFhirStore
         if (!topic.ResourceTriggers.Any())
         {
             // remove from all resources
-            foreach (IResourceStore rs in _store.Values)
+            foreach (IVersionedResourceStore rs in _store.Values)
             {
                 rs.RemoveExecutableSubscriptionTopic(topic.Url);
             }
@@ -883,7 +913,7 @@ public class VersionedFhirStore : IFhirStore
         bool canExecute = false;
 
         // loop over all resources to account for a topic changing resources
-        foreach ((string resourceName, IResourceStore rs) in _store)
+        foreach ((string resourceName, IVersionedResourceStore rs) in _store)
         {
             if (!topic.ResourceTriggers.ContainsKey(resourceName))
             {
@@ -912,7 +942,7 @@ public class VersionedFhirStore : IFhirStore
                     {
                         string fpc = rt.FhirPathCritiera;
 
-                        MatchCollection matches = _fhirpathVarMatcher.Matches(fpc);
+                        MatchCollection matches = _fhirpathVarMatcher().Matches(fpc);
 
                         // replace the variable with a resolve call
                         foreach (string matchValue in matches.Select(m => m.Value).Distinct())
@@ -1020,16 +1050,16 @@ public class VersionedFhirStore : IFhirStore
         ParsedSubscriptionTopic topic = _topics[subscription.TopicUrl];
 
         // loop over all resources to account for a topic changing resources
-        foreach ((string resourceName, IResourceStore rs) in _store)
+        foreach ((string resourceName, IVersionedResourceStore rs) in _store)
         {
             if (!topic.ResourceTriggers.ContainsKey(resourceName))
             {
                 continue;
             }
 
-            if ((!subscription.Filters.ContainsKey(resourceName)) &&
-                (!subscription.Filters.ContainsKey("*")) &&
-                (!subscription.Filters.ContainsKey("Resource")))
+            if (!subscription.Filters.ContainsKey(resourceName) &&
+                !subscription.Filters.ContainsKey("*") &&
+                !subscription.Filters.ContainsKey("Resource"))
             {
                 // add an empty filter record so the engine knows about the subscription
                 rs.SetExecutableSubscription(subscription.TopicUrl, subscription.Id, new());
@@ -1052,8 +1082,8 @@ public class VersionedFhirStore : IFhirStore
                     // TODO: validate this is working for generic parameters (e.g., _id)
 
                     // TODO: support inline-defined parameters
-                    if ((!rs.TryGetSearchParamDefinition(filter.Name, out ModelInfo.SearchParamDefinition? spd)) ||
-                        (spd == null))
+                    if (!rs.TryGetSearchParamDefinition(filter.Name, out ModelInfo.SearchParamDefinition? spd) ||
+                        spd == null)
                     {
                         Console.WriteLine($"Cannot apply filter with no search parameter definition {resourceName}?{filter.Name}");
                         continue;
@@ -1228,8 +1258,8 @@ public class VersionedFhirStore : IFhirStore
                         this,
                         _store[reverseResourceType],
                         sp.Name!, 
-                        string.Empty, 
-                        SearchDefinitions.SearchModifierCodes.None,
+                        string.Empty,
+                        SearchModifierCodes.None,
                         matchId,
                         sp),
                 };
@@ -1277,7 +1307,7 @@ public class VersionedFhirStore : IFhirStore
         ITypedElement r = resource.ToTypedElement();
 
         FhirEvaluationContext fpContext = new FhirEvaluationContext(r.ToScopedNode());
-        fpContext.ElementResolver = this.Resolve;
+        fpContext.ElementResolver = Resolve;
 
         foreach (ModelInfo.SearchParamDefinition sp in resultParameters.Inclusions[resource.TypeName])
         {
@@ -1306,18 +1336,18 @@ public class VersionedFhirStore : IFhirStore
                         continue;
                 }
 
-                Hl7.Fhir.Model.ResourceReference reference = element.ToPoco<Hl7.Fhir.Model.ResourceReference>();
+                ResourceReference reference = element.ToPoco<ResourceReference>();
 
                 if (TryResolveAsResource(reference.Reference, out Resource? resolved) &&
-                    (resolved != null))
+                    resolved != null)
                 {
                     if (sp.Target?.Any() ?? false)
                     {
                         // verify this is a valid target type
                         ResourceType? rt = ModelInfo.FhirTypeNameToResourceType(resolved.TypeName);
 
-                        if ((rt == null) || 
-                            (!sp.Target.Contains(rt.Value)))
+                        if (rt == null || 
+                            !sp.Target.Contains(rt.Value))
                         {
                             continue;
                         }
@@ -1399,7 +1429,7 @@ public class VersionedFhirStore : IFhirStore
     /// <summary>Updates the current capabilities of this store.</summary>
     private void UpdateCapabilities()
     {
-        Hl7.Fhir.Model.CapabilityStatement cs = new()
+        CapabilityStatement cs = new()
         {
             Id = _capabilityStatementId,
             Url = $"{_config.BaseUrl}/CapabilityStatement/{_capabilityStatementId}",
@@ -1435,7 +1465,7 @@ public class VersionedFhirStore : IFhirStore
         };
 
         // add our resources
-        foreach ((string resourceName, IResourceStore resourceStore) in _store)
+        foreach ((string resourceName, IVersionedResourceStore resourceStore) in _store)
         {
             // commented-out capabilities are ones that are not yet implemented
             CapabilityStatement.ResourceComponent rc = new()
@@ -1443,14 +1473,14 @@ public class VersionedFhirStore : IFhirStore
                 Type = resourceName,
                 Interaction = new()
                 {
-                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Create },
-                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Delete },
+                    new() { Code = CapabilityStatement.TypeRestfulInteraction.Create },
+                    new() { Code = CapabilityStatement.TypeRestfulInteraction.Delete },
                     //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.HistoryInstance },
                     //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.HistoryType },
                     //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Patch },
-                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Read },
-                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.SearchType },
-                    new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Update },
+                    new() { Code = CapabilityStatement.TypeRestfulInteraction.Read },
+                    new() { Code = CapabilityStatement.TypeRestfulInteraction.SearchType },
+                    new() { Code = CapabilityStatement.TypeRestfulInteraction.Update },
                     //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Vread },
                 },
                 Versioning = CapabilityStatement.ResourceVersionPolicy.Versioned,
@@ -1493,6 +1523,26 @@ public class VersionedFhirStore : IFhirStore
         _capabilitiesAreStale = false;
     }
 
+    /// <summary>State has changed.</summary>
+    public void StateHasChanged()
+    {
+        EventHandler<EventArgs>? handler = OnChanged;
+
+        if (handler != null)
+        {
+            handler(this, new());
+        }
+    }
+
+
+    /// <summary>FHIR resource store on changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Event information.</param>
+    private void ResourceStore_OnChanged(object? sender, EventArgs e)
+    {
+        StateHasChanged();
+    }
+
     /// <summary>
     /// Releases the unmanaged resources used by the
     /// FhirModelComparer.Server.Services.FhirManagerService and optionally releases the managed
@@ -1507,6 +1557,11 @@ public class VersionedFhirStore : IFhirStore
             if (disposing)
             {
                 // TODO: dispose managed state (managed objects)
+
+                foreach (IResourceStore rs in _store.Values)
+                {
+                    rs.OnChanged -= ResourceStore_OnChanged;
+                }
             }
 
             // TODO: free unmanaged resources (unmanaged objects) and override finalizer
@@ -1525,4 +1580,5 @@ public class VersionedFhirStore : IFhirStore
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
+
 }

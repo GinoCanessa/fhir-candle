@@ -28,6 +28,7 @@ public class FhirStoreTestsR4: IDisposable
     {
         FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4,
         ControllerName = "r4",
+        BaseUrl = "http://localhost/fhir/r4",
     };
 
     private const int _expectedRestResources = 146;
@@ -106,7 +107,7 @@ public class FhirStoreTestsR4: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Be("Patient/example");
+        location.Should().EndWith("Patient/example");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "Patient",
@@ -125,7 +126,7 @@ public class FhirStoreTestsR4: IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
-        location.Should().StartWith("Patient/");
+        location.Should().Contain("Patient/");
     }
 
     [Theory]
@@ -155,7 +156,7 @@ public class FhirStoreTestsR4: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Be("Observation/example");
+        location.Should().EndWith("Observation/example");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "Observation",
@@ -174,7 +175,7 @@ public class FhirStoreTestsR4: IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
-        location.Should().StartWith("Observation/");
+        location.Should().Contain("Observation/");
     }
 
     [Theory]
@@ -204,7 +205,7 @@ public class FhirStoreTestsR4: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().StartWith("SearchParameter/");
+        location.Should().Contain("SearchParameter/");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "SearchParameter",

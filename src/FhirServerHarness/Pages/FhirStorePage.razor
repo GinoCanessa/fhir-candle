@@ -1,0 +1,111 @@
+﻿@page "/store"
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+
+@implements IDisposable
+
+<PageTitle>FHIR Dev Server</PageTitle>
+
+@if (!loaded)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <MudTable Items="@StoreManager[StoreName].OrderBy(kvp => kvp.Key)"
+              Dense="true"
+              Striped="true"
+              Height="calc(100vh - (var(--mud-appbar-height) * 2))"
+              FixedHeader="true">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">FHIR Resources: @StoreName</MudText>
+            <MudSpacer />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh></MudTh>
+            <MudTh>Resource Name</MudTh>
+            <MudTh>Count</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd></MudTd>
+            <MudTd DataLabel="Resource Name">@context.Key</MudTd>
+            <MudTd DataLabel="Count">@context.Value.Count</MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "storeName")]
+    public string StoreName { get; set; } = "";
+
+    private bool loaded = false;
+
+    private IFhirStore _store = null!;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+        if (_store != null)
+        {
+            _store.OnChanged += FhirStore_OnChanged;
+        }
+
+        NavTracker?.NotifyNav("Store: " + StoreName, "/store?storeName=" + StoreName, 1);
+        loaded = true;
+    }
+
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/store?"))
+        {
+            if (_store != null)
+            {
+                _store.OnChanged -= FhirStore_OnChanged;
+            }
+
+            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+            if (_store != null)
+            {
+                _store.OnChanged += FhirStore_OnChanged;
+            }
+
+            NavTracker?.NotifyNav("Store: " + StoreName, "/store?storeName=" + StoreName, 1);
+        }
+    }
+
+    /// <summary>FHIR store on changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Event information.</param>
+    private void FhirStore_OnChanged(object? sender, EventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_store != null)
+        {
+            _store.OnChanged -= FhirStore_OnChanged;
+        }
+    }
+}

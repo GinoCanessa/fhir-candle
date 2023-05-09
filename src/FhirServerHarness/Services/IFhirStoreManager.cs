@@ -10,6 +10,12 @@ namespace FhirServerHarness.Services;
 /// <summary>Interface for FHIR store manager.</summary>
 public interface IFhirStoreManager : IHostedService, IDisposable, IReadOnlyDictionary<string, IFhirStore>
 {
+    /// <summary>Occurs when On Changed.</summary>
+    event EventHandler<EventArgs>? OnChanged;
+
+    /// <summary>State has changed.</summary>
+    void StateHasChanged();
+
     /// <summary>
     /// Attempt to get the controller based on the controller name
     /// </summary>

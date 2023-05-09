@@ -27,6 +27,7 @@ public class FhirStoreTestsR4Resource : IDisposable
     {
         FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4,
         ControllerName = "r4",
+        BaseUrl = "http://localhost/fhir/r4",
     };
 
     /// <summary>(Immutable) The test output helper.</summary>

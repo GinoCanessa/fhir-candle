@@ -46,6 +46,7 @@ public class FhirStoreTests : IDisposable
             {
                 FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4,
                 ControllerName = "r4",
+                BaseUrl = "http://localhost/fhir/r5",
             },
         },
         new object[]
@@ -54,6 +55,7 @@ public class FhirStoreTests : IDisposable
             {
                 FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4B,
                 ControllerName = "r4b",
+                BaseUrl = "http://localhost/fhir/r5",
             },
         },
         new object[]
@@ -62,6 +64,7 @@ public class FhirStoreTests : IDisposable
             {
                 FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R5,
                 ControllerName = "r5",
+                BaseUrl = "http://localhost/fhir/r5",
             },
         },
     };

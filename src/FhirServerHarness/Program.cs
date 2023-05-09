@@ -46,12 +46,11 @@ public static partial class Program
             .Build();
 
         // update configuration to make sure listen url is properly formatted
-        Regex regex = InputUrlFormatRegex();
-        Match match = regex.Match(Configuration["Server_Public_Url"] ?? string.Empty);
+        Match match = InputUrlFormatRegex().Match(Configuration["Server_Public_Url"] ?? string.Empty);
         Configuration["Server_Public_Url"] = match.ToString();
         PublicUrl = match.ToString();
 
-        match = regex.Match(Configuration["Server_Internal_Url"] ?? string.Empty);
+        match = InputUrlFormatRegex().Match(Configuration["Server_Internal_Url"] ?? string.Empty);
         Configuration["Server_Internal_Url"] = match.ToString();
         InternalUrl = match.ToString();
 

@@ -182,7 +182,7 @@ public class ParsedSearchParameter
     [SetsRequiredMembers]
     public ParsedSearchParameter(
         VersionedFhirStore store,
-        IResourceStore resourceStore,
+        IVersionedResourceStore resourceStore,
         string name, 
         string modifierLiteral,
         SearchModifierCodes modifierCode,
@@ -227,7 +227,7 @@ public class ParsedSearchParameter
     /// <returns>The extracted composite parameters.</returns>
     private static void ExtractCompositeParams(
         VersionedFhirStore store,
-        IResourceStore resourceStore,
+        IVersionedResourceStore resourceStore,
         string value,
         out List<ParsedSearchParameter> cpValues)
     {
@@ -512,7 +512,7 @@ public class ParsedSearchParameter
     public static IEnumerable<ParsedSearchParameter> Parse(
         string queryString,
         VersionedFhirStore store,
-        IResourceStore resourceStore)
+        IVersionedResourceStore resourceStore)
     {
         if (string.IsNullOrWhiteSpace(queryString))
         {

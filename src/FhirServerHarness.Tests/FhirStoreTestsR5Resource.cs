@@ -26,7 +26,8 @@ public class FhirStoreTestsR5Resource : IDisposable
     private static readonly ProviderConfiguration _config = new()
     {
         FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
-        ControllerName = "r4b",
+        ControllerName = "r5",
+        BaseUrl = "http://localhost/fhir/r5",
     };
 
     /// <summary>(Immutable) The test output helper.</summary>

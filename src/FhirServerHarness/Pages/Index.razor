@@ -1,5 +1,7 @@
 ﻿@page "/"
 @inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+
 @implements IDisposable
 
 <PageTitle>FHIR Dev Server</PageTitle>
@@ -10,8 +12,35 @@
 }
 else
 {
-
-}
+    <MudTable Items="@StoreManager.OrderBy(kvp => kvp.Key)"
+              Dense="true"
+              Striped="true"
+              Height="calc(100vh - (var(--mud-appbar-height) * 2))"
+              FixedHeader="true">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">FHIR Roots</MudText>
+            <MudSpacer />
+        </ToolBarContent>
+        @*<ColGroup>
+            <col style="width: 15vw!important;" />
+            <col style="width: 15vw!important;" />
+            <col style="width: 5vw!important;" />
+            <col style="width: 20vw!important;" />
+            <col style="width: 45vw!important;" />
+        </ColGroup>*@
+        <HeaderContent>
+            <MudTh></MudTh>
+            <MudTh>Public URL</MudTh>
+            <MudTh>Internal URL</MudTh>
+            <MudTh>FHIR Version</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd></MudTd>
+            <MudTd DataLabel="Path">@($"{Program.InternalUrl}/fhir/{context.Key}"))</MudTd>
+            <MudTd DataLabel="Path">@context.Value.Config.BaseUrl</MudTd>
+            <MudTd DataLabel="FHIR Version">@context.Value.Config.FhirVersion</MudTd>
+        </RowTemplate>
+    </MudTable>}
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>

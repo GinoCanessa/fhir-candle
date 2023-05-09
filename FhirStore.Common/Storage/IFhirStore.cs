@@ -16,6 +16,8 @@ public interface IFhirStore : IDisposable
     /// <param name="config">The configuration.</param>
     void Init(ProviderConfiguration config);
 
+    public ProviderConfiguration Config { get; }
+
     /// <summary>Gets the metadata for this store.</summary>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>

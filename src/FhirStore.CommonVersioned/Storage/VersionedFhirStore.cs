@@ -121,12 +121,13 @@ public class VersionedFhirStore : IFhirStore
             throw new ArgumentNullException(nameof(config.ControllerName));
         }
 
+        if (string.IsNullOrEmpty(config.BaseUrl))
+        {
+            throw new ArgumentNullException(nameof(config.BaseUrl));
+        }
+
         _config = config;
         //_baseUri = new Uri(config.ControllerName);
-        if (_config.ControllerName.EndsWith('/'))
-        {
-            _config.ControllerName = _config.ControllerName.Substring(0, _config.ControllerName.Length - 1);
-        }
 
         SymbolTable st = new SymbolTable().AddStandardFP().AddFhirExtensions();
         _compiler = new(st);
@@ -176,6 +177,8 @@ public class VersionedFhirStore : IFhirStore
             }
         }
     }
+
+    public ProviderConfiguration Config => _config;
 
     public bool SupportsResource(string resourceName) => _store.ContainsKey(resourceName);
 
@@ -501,7 +504,7 @@ public class VersionedFhirStore : IFhirStore
 
         eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
         lastModified = (stored.Meta?.LastUpdated == null) ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
-        location = $"{resourceType}/{stored.Id}";   // TODO: add in base url
+        location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
         return HttpStatusCode.Created;
     }
 
@@ -773,7 +776,7 @@ public class VersionedFhirStore : IFhirStore
 
         eTag = string.IsNullOrEmpty(updated.Meta?.VersionId) ? string.Empty : $"W/\"{updated.Meta.VersionId}\"";
         lastModified = (updated.Meta?.LastUpdated == null) ? string.Empty : updated.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
-        location = $"{resourceType}/{updated.Id}";   // TODO: add in base url
+        location = $"{_config.BaseUrl}/{resourceType}/{updated.Id}";
         return HttpStatusCode.OK;
     }
 
@@ -986,7 +989,7 @@ public class VersionedFhirStore : IFhirStore
     {
         if (_subscriptions.ContainsKey(subscriptionId))
         {
-            return _subscriptionConverter.SerializeSubscriptionEvents(_subscriptions[subscriptionId], eventNumbers, notificationType, contentType, contentLevel);
+            return _subscriptionConverter.SerializeSubscriptionEvents(_subscriptions[subscriptionId], eventNumbers, notificationType, _config.BaseUrl, contentType, contentLevel);
         }
 
         return string.Empty;
@@ -1165,7 +1168,7 @@ public class VersionedFhirStore : IFhirStore
             else
             {
                 // add the matched result to the bundle
-                bundle.AddSearchEntry(resource, $"{_config.ControllerName}/{id}", Bundle.SearchEntryMode.Match);
+                bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{id}", Bundle.SearchEntryMode.Match);
 
                 // track we have added this id
                 addedIds.Add(id);
@@ -1243,7 +1246,7 @@ public class VersionedFhirStore : IFhirStore
                         if (!addedIds.Contains(id))
                         {
                             // add the result to the bundle
-                            bundle.AddSearchEntry(resource, $"{_config.ControllerName}/{id}", Bundle.SearchEntryMode.Include);
+                            bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{id}", Bundle.SearchEntryMode.Include);
 
                             // track we have added this id
                             addedIds.Add(id);
@@ -1327,7 +1330,7 @@ public class VersionedFhirStore : IFhirStore
                     }
 
                     // add the matched result to the bundle
-                    bundle.AddSearchEntry(resolved, $"{_config.ControllerName}/{includedId}", Bundle.SearchEntryMode.Include);
+                    bundle.AddSearchEntry(resolved, $"{_config.BaseUrl}/{includedId}", Bundle.SearchEntryMode.Include);
 
                     // track we have added this id
                     addedIds.Add(includedId);
@@ -1399,7 +1402,7 @@ public class VersionedFhirStore : IFhirStore
         Hl7.Fhir.Model.CapabilityStatement cs = new()
         {
             Id = _capabilityStatementId,
-            Url = $"{_config.ControllerName}/CapabilityStatement/{_capabilityStatementId}",
+            Url = $"{_config.BaseUrl}/CapabilityStatement/{_capabilityStatementId}",
             Name = "Capabilities" + _config.FhirVersion,
             Status = PublicationStatus.Active,
             Date = new DateTimeOffset().ToFhirDateTime(),

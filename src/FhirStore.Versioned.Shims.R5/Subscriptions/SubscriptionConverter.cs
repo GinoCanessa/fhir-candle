@@ -120,6 +120,7 @@ public class SubscriptionConverter
         ParsedSubscription subscription,
         IEnumerable<long> eventNumbers,
         string notificationType,
+        string baseUrl,
         string contentType = "",
         string contentLevel = "")
     {
@@ -214,8 +215,7 @@ public class SubscriptionConverter
             {
                 bundle.Entry.Add(new Bundle.EntryComponent()
                 {
-                    // TODO: pass through information to build the full url
-                    FullUrl = relativeUrl,
+                    FullUrl = baseUrl + "/" + relativeUrl,
                     Resource = isFullResource ? r : null,
                 });
 
@@ -234,8 +234,7 @@ public class SubscriptionConverter
                     {
                         bundle.Entry.Add(new Bundle.EntryComponent()
                         {
-                            // TODO: pass through information to build the full url
-                            FullUrl = acrRelative,
+                            FullUrl = baseUrl + "/" + acrRelative,
                             Resource = isFullResource ? acr : null,
                         });
 

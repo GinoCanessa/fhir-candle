@@ -6,6 +6,8 @@
 using System.Net;
 using FhirServerHarness.Services;
 using FhirStore.Common.Storage;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
@@ -34,7 +36,7 @@ public class FhirController : ControllerBase
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="fhirStore">The FHIR store.</param>
-    public FhirController([FromServices] IFhirStoreManager fhirStoreManager)
+    public FhirController([FromServices] IFhirStoreManager fhirStoreManager)            // , [FromServices] IServer host
     {
         if (fhirStoreManager == null)
         {
@@ -42,6 +44,16 @@ public class FhirController : ControllerBase
         }
 
         _fhirStoreManager = fhirStoreManager;
+
+        //if (host != null)
+        //{
+        //    ICollection<string> addresses = host.Features?.Get<IServerAddressesFeature>()?.Addresses ?? Array.Empty<string>();
+        //    foreach (string address in addresses)
+        //    {
+        //        Console.WriteLine($"Listening on: {address}");
+        //    }
+        //}
+
     }
 
     private string GetMimeType(string? queryParam, HttpRequest request)

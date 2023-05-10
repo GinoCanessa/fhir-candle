@@ -5,7 +5,7 @@
 
 using System.Text.RegularExpressions;
 using FhirServerHarness.Services;
-using FhirStore.Common.Models;
+using FhirStore.Models;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -60,7 +60,10 @@ public static partial class Program
         IEnumerable<ProviderConfiguration> configurations = BuildTeantConfigurations();
 
         builder.Services.AddCors();
-        builder.Services.AddRazorPages();
+        builder.Services.AddRazorPages(options =>
+        {
+            options.Conventions.AddPageRoute("/store", "/store/{storeName}");
+        });
         builder.Services.AddServerSideBlazor();
         //builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();
         builder.Services.AddSingleton<IFhirStoreManager>(new FhirStoreManager(configurations));

@@ -16,7 +16,7 @@
         <MudBreadcrumbs Items="_crumbs"></MudBreadcrumbs>
         <MudSpacer />
         <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Color="Color.Inherit" Href="https://github.com/GinoCanessa/cs-fhir-server-harness" Target="_blank" />
-        <MudToggleIconButton @bind-Toggled="@_isDarkMode"
+        <MudToggleIconButton @bind-Toggled="@IsDarkMode"
                              Color="Color.Inherit"
                              Icon="@Icons.Material.Filled.LightMode"
                              ToggledIcon="@Icons.Material.Filled.DarkMode" />
@@ -67,10 +67,28 @@
             }
         }
     };
-    private bool _isDarkMode;
+
+    private bool _isDarkMode = true;
+
+    private bool IsDarkMode
+    {
+        get
+        {
+            return _isDarkMode;
+        }
+
+        set
+        {
+            if (_isDarkMode != value)
+            {
+                _isDarkMode = value;
+                BrowserStore.SetAsync("darkMode", _isDarkMode);
+            }
+        }
+    }
 
     private List<BreadcrumbItem> _crumbs = new()
-{
+    {
         new BreadcrumbItem("FHIR Cache", "#"),
     };
 
@@ -101,7 +119,7 @@
         {
             ProtectedBrowserStorageResult<bool> optReadResult = await BrowserStore.GetAsync<bool>("darkMode");
 
-            _isDarkMode = optReadResult.Value;
+            IsDarkMode = optReadResult.Value;
             StateHasChanged();
         }
     }

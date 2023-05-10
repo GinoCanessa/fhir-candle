@@ -1,10 +1,12 @@
-﻿@page "/store"
+﻿@page "/store/ext/subscriptions"
+
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
 
 @implements IDisposable
 
-<PageTitle>FHIR Dev Server</PageTitle>
+<PageTitle>Subscription Dashboard</PageTitle>
+
 
 @if (!loaded)
 {
@@ -12,26 +14,27 @@
 }
 else
 {
-    <MudTable Items="@StoreManager[StoreName].OrderBy(kvp => kvp.Key)"
-              Dense="true"
-              Striped="true"
-              Height="calc(100vh - (var(--mud-appbar-height) * 2))"
-              FixedHeader="true">
-        <ToolBarContent>
-            <MudText Typo="Typo.h6">FHIR Resources: @StoreName</MudText>
-            <MudSpacer />
-        </ToolBarContent>
-        <HeaderContent>
-            <MudTh></MudTh>
-            <MudTh>Resource Name</MudTh>
-            <MudTh>Count</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd></MudTd>
-            <MudTd DataLabel="Resource Name">@context.Key</MudTd>
-            <MudTd DataLabel="Count">@context.Value.Count</MudTd>
-        </RowTemplate>
-    </MudTable>
+    <MudGrid>
+        @foreach (ParsedSubscription sub in _store.CurrentSubscriptions)
+        {
+        <MudItem>
+            <MudBadge Content="@sub.GeneratedEvents.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
+                <MudCard Outlined="true">
+                    <MudCardContent>
+                        <MudField Label="Subscription">Subscription/@sub.Id</MudField>
+                        <MudField Label="Topic">@sub.TopicUrl</MudField>
+                        <MudField Label="Channel">@sub.ChannelCode</MudField>
+                        <MudField Label="Endpoint">@sub.Endpoint</MudField>
+                        @if (sub.GeneratedEvents.Any())
+                        {
+                            <MudField Label="Latest">@HeaderFor(sub.GeneratedEvents.Last().Value)</MudField>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudBadge>
+        </MudItem>
+        }
+    </MudGrid>
 }
 
 @code {
@@ -58,10 +61,10 @@ else
 
         if (_store != null)
         {
-            _store.OnChanged += FhirStore_OnChanged;
+            _store.OnChanged += Store_OnChanged;
         }
 
-        NavTracker?.NotifyNav("Store: " + StoreName, "/store?storeName=" + StoreName, 1);
+        NavTracker?.NotifyNav("Subscriptions Dashboard", "", 3);
         loaded = true;
     }
 
@@ -74,27 +77,33 @@ else
         {
             if (_store != null)
             {
-                _store.OnChanged -= FhirStore_OnChanged;
+                _store.OnChanged -= Store_OnChanged;
             }
 
             _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
 
             if (_store != null)
             {
-                _store.OnChanged += FhirStore_OnChanged;
+                _store.OnChanged += Store_OnChanged;
             }
 
             NavTracker?.NotifyNav("Store: " + StoreName, "/store?storeName=" + StoreName, 1);
         }
     }
 
+    private string HeaderFor(SubscriptionEvent subEvent)
+    {
+        return $"{subEvent.EventNumber}: {subEvent.Timestamp.ToLocalTime().ToString("u")}...";
+    }
+
     /// <summary>FHIR store on changed.</summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">     Event information.</param>
-    private void FhirStore_OnChanged(object? sender, EventArgs e)
+    private void Store_OnChanged(object? sender, EventArgs e)
     {
         InvokeAsync(() => StateHasChanged());
     }
+
 
     /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
@@ -104,7 +113,8 @@ else
     {
         if (_store != null)
         {
-            _store.OnChanged -= FhirStore_OnChanged;
+            _store.OnChanged -= Store_OnChanged;
         }
     }
-}
+    }
+

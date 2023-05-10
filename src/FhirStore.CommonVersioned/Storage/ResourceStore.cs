@@ -3,11 +3,10 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Common.Models;
-using FhirStore.Common.Storage;
+using FhirServerHarness.Search;
 using FhirStore.Extensions;
 using FhirStore.Models;
-using FhirServerHarness.Search;
+using FhirStore.Storage;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Language.Debugging;

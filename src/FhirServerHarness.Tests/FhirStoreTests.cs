@@ -7,8 +7,8 @@ extern alias storeR4;
 extern alias storeR4B;
 extern alias storeR5;
 
-using FhirStore.Common.Models;
-using FhirStore.Common.Storage;
+using FhirStore.Models;
+using FhirStore.Storage;
 using FluentAssertions;
 using Xunit.Abstractions;
 

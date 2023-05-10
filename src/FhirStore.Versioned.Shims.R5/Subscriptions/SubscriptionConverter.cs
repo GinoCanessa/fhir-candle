@@ -3,7 +3,6 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Common.Models;
 using FhirStore.Models;
 using FhirStore.Subscriptions;
 using Hl7.Fhir.Model;

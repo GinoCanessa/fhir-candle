@@ -4,7 +4,6 @@
 // </copyright>
 
 
-using FhirStore.Common.Models;
 using FhirStore.Models;
 using Hl7.FhirPath;
 

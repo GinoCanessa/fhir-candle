@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirStore.Common.Models;
+namespace FhirStore.Models;
 
 /// <summary>A provider configuration.</summary>
 public class ProviderConfiguration

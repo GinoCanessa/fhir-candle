@@ -3,11 +3,10 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Common.Models;
 using FhirStore.Models;
 using System.Net;
 
-namespace FhirStore.Common.Storage;
+namespace FhirStore.Storage;
 
 /// <summary>Interface for versioned store.</summary>
 public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResourceStore>
@@ -170,4 +169,8 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
 
     /// <summary>Gets the supported resources.</summary>
     IEnumerable<string> SupportedResources { get; }
+
+    IEnumerable<ParsedSubscriptionTopic> CurrentTopics { get; }
+
+    IEnumerable<ParsedSubscription> CurrentSubscriptions { get; }
 }

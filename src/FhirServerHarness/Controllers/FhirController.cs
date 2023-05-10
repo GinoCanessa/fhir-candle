@@ -5,7 +5,7 @@
 
 using System.Net;
 using FhirServerHarness.Services;
-using FhirStore.Common.Storage;
+using FhirStore.Storage;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc;
@@ -125,11 +125,11 @@ public class FhirController : ControllerBase
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
-            HttpContext.Response.StatusCode = 404;
+            Response.StatusCode = 404;
             return;
         }
 
-        format = GetMimeType(format, HttpContext.Request);
+        format = GetMimeType(format, Request);
         //string format = GetMimeType(string.Empty, HttpContext.Request);
 
         HttpStatusCode sc = _fhirStoreManager[store].GetMetadata(
@@ -141,20 +141,20 @@ public class FhirController : ControllerBase
 
         if (!string.IsNullOrEmpty(eTag))
         {
-            HttpContext.Response.Headers.Add(HeaderNames.ETag, eTag);
+            Response.Headers.Add(HeaderNames.ETag, eTag);
         }
 
         if (!string.IsNullOrEmpty(lastModified))
         {
-            HttpContext.Response.Headers.Add(HeaderNames.LastModified, lastModified);
+            Response.Headers.Add(HeaderNames.LastModified, lastModified);
         }
 
-        HttpContext.Response.ContentType = format;
-        HttpContext.Response.StatusCode = (int)sc;
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
 
         if (!string.IsNullOrEmpty(resource))
         {
-            await HttpContext.Response.WriteAsync(resource);
+            await Response.WriteAsync(resource);
         }
     }
 
@@ -169,11 +169,11 @@ public class FhirController : ControllerBase
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
         {
-            HttpContext.Response.StatusCode = 404;
+            Response.StatusCode = 404;
             return;
         }
 
-        format = GetMimeType(format, HttpContext.Request);
+        format = GetMimeType(format, Request);
 
         HttpStatusCode sc = _fhirStoreManager[store].InstanceRead(
             resourceName,
@@ -190,20 +190,20 @@ public class FhirController : ControllerBase
 
         if (!string.IsNullOrEmpty(eTag))
         {
-            HttpContext.Response.Headers.Add(HeaderNames.ETag, eTag);
+            Response.Headers.Add(HeaderNames.ETag, eTag);
         }
 
         if (!string.IsNullOrEmpty(lastModified))
         {
-            HttpContext.Response.Headers.Add(HeaderNames.LastModified, lastModified);
+            Response.Headers.Add(HeaderNames.LastModified, lastModified);
         }
 
-        HttpContext.Response.ContentType = format;
-        HttpContext.Response.StatusCode = (int)sc;
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
 
         if (!string.IsNullOrEmpty(resource))
         {
-            await HttpContext.Response.WriteAsync(resource);
+            await Response.WriteAsync(resource);
         }
     }
 
@@ -218,7 +218,7 @@ public class FhirController : ControllerBase
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
         {
-            HttpContext.Response.StatusCode = 404;
+            Response.StatusCode = 404;
             return;
         }
 
@@ -228,7 +228,7 @@ public class FhirController : ControllerBase
         if ((Request == null) || (Request.Body == null))
         {
             System.Console.WriteLine("PostResourceType <<< cannot process a POST without data!");
-            HttpContext.Response.StatusCode = 400;
+            Response.StatusCode = 400;
             return;
         }
 
@@ -242,7 +242,7 @@ public class FhirController : ControllerBase
                 HttpStatusCode sc = _fhirStoreManager[store].InstanceCreate(
                     resourceName,
                     content,
-                    HttpContext.Request.ContentType ?? string.Empty,
+                    Request.ContentType ?? string.Empty,
                     format,
                     string.Empty,
                     true,
@@ -254,23 +254,23 @@ public class FhirController : ControllerBase
 
                 if (!string.IsNullOrEmpty(eTag))
                 {
-                    HttpContext.Response.Headers.Add(HeaderNames.ETag, eTag);
+                    Response.Headers.Add(HeaderNames.ETag, eTag);
                 }
 
                 if (!string.IsNullOrEmpty(lastModified))
                 {
-                    HttpContext.Response.Headers.Add(HeaderNames.LastModified, lastModified);
+                    Response.Headers.Add(HeaderNames.LastModified, lastModified);
                 }
 
                 if (!string.IsNullOrEmpty(location))
                 {
-                    HttpContext.Response.Headers.Add(HeaderNames.Location, location);
+                    Response.Headers.Add(HeaderNames.Location, location);
                 }
 
-                HttpContext.Response.ContentType = format;
-                HttpContext.Response.StatusCode = (int)sc;
+                Response.ContentType = format;
+                Response.StatusCode = (int)sc;
 
-                await AddBody(HttpContext.Response, prefer, resource, outcome);
+                await AddBody(Response, prefer, resource, outcome);
             }
         }
         catch (Exception ex)
@@ -281,7 +281,7 @@ public class FhirController : ControllerBase
                 System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
             }
 
-            HttpContext.Response.StatusCode = 500;
+            Response.StatusCode = 500;
             return;
         }
     }
@@ -299,17 +299,17 @@ public class FhirController : ControllerBase
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
         {
-            HttpContext.Response.StatusCode = 404;
+            Response.StatusCode = 404;
             return;
         }
 
-        format = GetMimeType(format, HttpContext.Request);
+        format = GetMimeType(format, Request);
 
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
             System.Console.WriteLine("PutResourceInstance <<< cannot process a PUT without data!");
-            HttpContext.Response.StatusCode = 400;
+            Response.StatusCode = 400;
             return;
         }
 
@@ -337,23 +337,23 @@ public class FhirController : ControllerBase
 
                 if (!string.IsNullOrEmpty(eTag))
                 {
-                    HttpContext.Response.Headers.Add(HeaderNames.ETag, eTag);
+                    Response.Headers.Add(HeaderNames.ETag, eTag);
                 }
 
                 if (!string.IsNullOrEmpty(lastModified))
                 {
-                    HttpContext.Response.Headers.Add(HeaderNames.LastModified, lastModified);
+                    Response.Headers.Add(HeaderNames.LastModified, lastModified);
                 }
 
                 if (!string.IsNullOrEmpty(location))
                 {
-                    HttpContext.Response.Headers.Add(HeaderNames.Location, location);
+                    Response.Headers.Add(HeaderNames.Location, location);
                 }
 
-                HttpContext.Response.ContentType = format;
-                HttpContext.Response.StatusCode = (int)sc;
+                Response.ContentType = format;
+                Response.StatusCode = (int)sc;
 
-                await AddBody(HttpContext.Response, prefer, resource, outcome);
+                await AddBody(Response, prefer, resource, outcome);
             }
         }
         catch (Exception ex)
@@ -364,7 +364,7 @@ public class FhirController : ControllerBase
                 System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
             }
 
-            HttpContext.Response.StatusCode = 500;
+            Response.StatusCode = 500;
             return;
         }
     }
@@ -380,11 +380,11 @@ public class FhirController : ControllerBase
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
         {
-            HttpContext.Response.StatusCode = 404;
+            Response.StatusCode = 404;
             return;
         }
 
-        format = GetMimeType(format, HttpContext.Request);
+        format = GetMimeType(format, Request);
 
         HttpStatusCode sc = _fhirStoreManager[store].InstanceDelete(
             resourceName,
@@ -394,10 +394,10 @@ public class FhirController : ControllerBase
             out string resource,
             out string outcome);
 
-        HttpContext.Response.ContentType = format;
-        HttpContext.Response.StatusCode = (int)sc;
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
 
-        await AddBody(HttpContext.Response, prefer, resource, outcome);
+        await AddBody(Response, prefer, resource, outcome);
     }
 
     [HttpGet, Route("{store}/{resourceName}")]
@@ -410,25 +410,25 @@ public class FhirController : ControllerBase
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
         {
-            HttpContext.Response.StatusCode = 404;
+            Response.StatusCode = 404;
             return;
         }
 
-        format = GetMimeType(format, HttpContext.Request);
+        format = GetMimeType(format, Request);
 
         HttpStatusCode sc = _fhirStoreManager[store].TypeSearch(
             resourceName,
-            HttpContext.Request.QueryString.ToString(),
+            Request.QueryString.ToString(),
             format,
             out string results,
             out string outcome);
 
-        HttpContext.Response.ContentType = format;
-        HttpContext.Response.StatusCode = (int)sc;
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
 
         if (!string.IsNullOrEmpty(results))
         {
-            await HttpContext.Response.WriteAsync(results);
+            await Response.WriteAsync(results);
         }
     }
 
@@ -443,17 +443,17 @@ public class FhirController : ControllerBase
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
         {
-            HttpContext.Response.StatusCode = 404;
+            Response.StatusCode = 404;
             return;
         }
 
-        format = GetMimeType(format, HttpContext.Request);
+        format = GetMimeType(format, Request);
 
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
             System.Console.WriteLine("PostResourceTypeSearch <<< cannot process a PUT without data!");
-            HttpContext.Response.StatusCode = 400;
+            Response.StatusCode = 400;
             return;
         }
 
@@ -471,12 +471,12 @@ public class FhirController : ControllerBase
                     out string results,
                     out string outcome);
 
-                HttpContext.Response.ContentType = format;
-                HttpContext.Response.StatusCode = (int)sc;
+                Response.ContentType = format;
+                Response.StatusCode = (int)sc;
 
                 if (!string.IsNullOrEmpty(results))
                 {
-                    await HttpContext.Response.WriteAsync(results);
+                    await Response.WriteAsync(results);
                 }
             }
         }
@@ -488,7 +488,7 @@ public class FhirController : ControllerBase
                 System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
             }
 
-            HttpContext.Response.StatusCode = 500;
+            Response.StatusCode = 500;
             return;
         }
     }

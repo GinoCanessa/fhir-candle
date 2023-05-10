@@ -5,8 +5,8 @@
 
 extern alias storeR4B;
 
-using FhirStore.Common.Models;
-using FhirStore.Common.Storage;
+using FhirStore.Models;
+using FhirStore.Storage;
 using FhirServerHarness.Tests.Models;
 using FluentAssertions;
 using System.Text.Json;

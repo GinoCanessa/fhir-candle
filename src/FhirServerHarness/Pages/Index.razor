@@ -36,6 +36,12 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>
+                <MudTooltip Text="Subscriptions">
+                    <MudFab StartIcon="@Icons.Material.Filled.RssFeed"
+                            @onclick="() => NavToSubscriptions(context.Key)"
+                            Size="Size.Small" />
+                </MudTooltip>
+
                 <MudTooltip Text="FHIR Store Contents">
                     <MudFab StartIcon="@Icons.Material.Filled.ViewInAr"
                             @onclick="() => NavToFhirStore(context.Key)"
@@ -68,6 +74,11 @@ else
     private void NavToFhirStore(string name)
     {
         NavigationManager.NavigateTo($"/store?storeName={name}");
+    }
+
+    private void NavToSubscriptions(string name)
+    {
+        NavigationManager.NavigateTo($"/store/ext/subscriptions?storeName={name}");
     }
 
     /// <summary>

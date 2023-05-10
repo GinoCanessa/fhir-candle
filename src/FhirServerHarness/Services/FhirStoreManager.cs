@@ -8,8 +8,8 @@ extern alias storeR4B;
 extern alias storeR5;
 
 using System.Collections;
-using FhirStore.Common.Models;
-using FhirStore.Common.Storage;
+using FhirStore.Models;
+using FhirStore.Storage;
 
 namespace FhirServerHarness.Services;
 
@@ -95,24 +95,6 @@ public class FhirStoreManager : IFhirStoreManager
     }
 
     /// <summary>
-    /// Attempt to get the controller based on the controller name
-    /// </summary>
-    /// <param name="controllerName"></param>
-    /// <param name="store"></param>
-    /// <returns></returns>
-    public bool TryGetStore(string controllerName, out IFhirStore store)
-    {
-        if (!_storesByController.ContainsKey(controllerName))
-        {
-            store = null!;
-            return false;
-        }
-
-        store = _storesByController[controllerName];
-        return true;
-    }
-
-    /// <summary>
     /// Releases the unmanaged resources used by the
     /// FhirModelComparer.Server.Services.FhirManagerService and optionally releases the managed
     /// resources.
@@ -154,10 +136,5 @@ public class FhirStoreManager : IFhirStoreManager
         // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
-    }
-
-    bool IFhirStoreManager.TryGetStore(string controllerName, out IFhirStore store)
-    {
-        throw new NotImplementedException();
     }
 }

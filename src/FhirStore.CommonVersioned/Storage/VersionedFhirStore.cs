@@ -3,10 +3,9 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Common.Models;
-using FhirStore.Common.Storage;
-using FhirStore.Models;
 using FhirServerHarness.Search;
+using FhirStore.Models;
+using FhirStore.Storage;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
@@ -195,6 +194,10 @@ public partial class VersionedFhirStore : IFhirStore
     IEnumerable<IResourceStore> IReadOnlyDictionary<string, IResourceStore>.Values => _store.Values;
 
     int IReadOnlyCollection<KeyValuePair<string, IResourceStore>>.Count => _store.Count;
+
+    IEnumerable<ParsedSubscriptionTopic> IFhirStore.CurrentTopics => _topics.Values;
+
+    IEnumerable<ParsedSubscription> IFhirStore.CurrentSubscriptions => _subscriptions.Values;
 
     IResourceStore IReadOnlyDictionary<string, IResourceStore>.this[string key] => _store[key];
 
@@ -999,6 +1002,7 @@ public partial class VersionedFhirStore : IFhirStore
     public void RegisterEvent(string subscriptionId, SubscriptionEvent subscriptionEvent)
     {
         _subscriptions[subscriptionId].RegisterEvent(subscriptionEvent);
+        StateHasChanged();
     }
 
     /// <summary>

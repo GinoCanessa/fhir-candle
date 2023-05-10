@@ -5,8 +5,8 @@
 
 extern alias storeR5;
 
-using FhirStore.Common.Models;
-using FhirStore.Common.Storage;
+using FhirStore.Models;
+using FhirStore.Storage;
 using FhirServerHarness.Tests.Extensions;
 using FhirServerHarness.Tests.Models;
 using FluentAssertions;

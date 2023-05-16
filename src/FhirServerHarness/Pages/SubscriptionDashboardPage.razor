@@ -62,6 +62,8 @@ else
         if (_store != null)
         {
             _store.OnChanged += Store_OnChanged;
+            _store.OnSubscriptionEvent += Store_OnSubscriptionEvent;
+            _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
         }
 
         NavTracker?.NotifyNav("Subscriptions Dashboard", "", 3);
@@ -78,6 +80,7 @@ else
             if (_store != null)
             {
                 _store.OnChanged -= Store_OnChanged;
+                _store.OnSubscriptionEvent -= Store_OnSubscriptionEvent;
             }
 
             _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
@@ -85,6 +88,7 @@ else
             if (_store != null)
             {
                 _store.OnChanged += Store_OnChanged;
+                _store.OnSubscriptionEvent += Store_OnSubscriptionEvent;
             }
 
             NavTracker?.NotifyNav("Store: " + StoreName, "/store?storeName=" + StoreName, 1);
@@ -94,6 +98,22 @@ else
     private string HeaderFor(SubscriptionEvent subEvent)
     {
         return $"{subEvent.EventNumber}: {subEvent.Timestamp.ToLocalTime().ToString("u")}...";
+    }
+
+    /// <summary>Event handler. Called by Store when a subscription changes.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Subscription event information.</param>
+    private void Store_OnSubscriptionsChanged(object? sender, SubscriptionChangedEventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    /// <summary>Event handler. Called by Store for on subscription events.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Subscription event information.</param>
+    private void Store_OnSubscriptionEvent(object? sender, SubscriptionEventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
     }
 
     /// <summary>FHIR store on changed.</summary>
@@ -116,5 +136,5 @@ else
             _store.OnChanged -= Store_OnChanged;
         }
     }
-    }
+}
 

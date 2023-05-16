@@ -22,6 +22,7 @@ public static partial class Program
     private static partial Regex InputUrlFormatRegex();
 
     private static IConfiguration _configuration = null!;
+    private static readonly Dictionary<string, ProviderConfiguration> _tenants = new();
 
     /// <summary>Gets or sets the configuration.</summary>
     /// <value>The configuration.</value>
@@ -34,6 +35,9 @@ public static partial class Program
     /// <summary>Gets or sets URL of the public.</summary>
     /// <value>The internal URL.</value>
     public static string InternalUrl { get; set; } = string.Empty;
+
+    /// <summary>Gets the tenants.</summary>
+    public static Dictionary<string, ProviderConfiguration> Tenants => _tenants;
 
     /// <summary>Main entry-point for this application.</summary>
     /// <param name="args">An array of command-line argument strings.</param>
@@ -54,10 +58,9 @@ public static partial class Program
         Configuration["Server_Internal_Url"] = match.ToString();
         InternalUrl = match.ToString();
 
+        BuildTeantConfigurations();
 
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-
-        IEnumerable<ProviderConfiguration> configurations = BuildTeantConfigurations();
 
         builder.Services.AddCors();
         builder.Services.AddRazorPages(options =>
@@ -65,9 +68,14 @@ public static partial class Program
             options.Conventions.AddPageRoute("/store", "/store/{storeName}");
         });
         builder.Services.AddServerSideBlazor();
-        //builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();
-        builder.Services.AddSingleton<IFhirStoreManager>(new FhirStoreManager(configurations));
-        //builder.Services.AddHostedService<IFhirStoreManager>(sp => new FhirStoreManager(configurations));
+
+        // add a FHIR-Store singleton, then register as a hosted service
+        builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();
+        builder.Services.AddHostedService<IFhirStoreManager>(sp => sp.GetRequiredService<IFhirStoreManager>());
+
+        // add a FHIR-Store singleton, then register as a hosted service
+        builder.Services.AddSingleton<INotificationManager, NotificationManager>();
+        builder.Services.AddHostedService<INotificationManager>(sp => sp.GetRequiredService<INotificationManager>());
 
         builder.Services.AddMudServices();
 
@@ -88,11 +96,6 @@ public static partial class Program
         app.MapBlazorHub();
         app.MapFallbackToPage("/_Host");
 
-        // warm up services that take a long time to start
-        //app.Services.GetService<IFhirStoreManager>()?.Init();
-        //await app.Services.GetRequiredService<IFhirStoreManager>().StartAsync();
-        //app.Services.GetService<FhirStoreR4>()?.Init();
-
         // run the server
         app.Run();
     }
@@ -102,29 +105,28 @@ public static partial class Program
     /// An enumerator that allows foreach to be used to process build teant configurations in this
     /// collection.
     /// </returns>
-    private static IEnumerable<ProviderConfiguration> BuildTeantConfigurations()
+    private static void BuildTeantConfigurations()
     {
-        return new List<ProviderConfiguration>
+        _tenants.Add("r4", new()
         {
-            //new ProviderConfiguration
-            //{
-            //    FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4,
-            //    ControllerName = "r4",
-            //    BaseUrl = PublicUrl + "/fhir/r4",
-            //},
-            //new ProviderConfiguration
-            //{
-            //    FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
-            //    ControllerName = "r4b",
-            //    BaseUrl = PublicUrl + "/fhir/r4b",
-            //},
-            new ProviderConfiguration
-            {
-                FhirVersion = ProviderConfiguration.SupportedFhirVersions.R5,
-                ControllerName = "r5",      // route will be /fhir/r5
-                BaseUrl = PublicUrl + "/fhir/r5",
-            },
-        };
+            FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4,
+            ControllerName = "r4",
+            BaseUrl = PublicUrl + "/fhir/r4",
+        });
+
+        _tenants.Add("r4b", new()
+        {
+            FhirVersion = ProviderConfiguration.SupportedFhirVersions.R4B,
+            ControllerName = "r4b",
+            BaseUrl = PublicUrl + "/fhir/r4b",
+        });
+
+        _tenants.Add("r5", new()
+        {
+            FhirVersion = ProviderConfiguration.SupportedFhirVersions.R5,
+            ControllerName = "r5",
+            BaseUrl = PublicUrl + "/fhir/r5",
+        });
     }
 
 }

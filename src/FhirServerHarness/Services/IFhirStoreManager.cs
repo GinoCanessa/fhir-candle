@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Models;
 using FhirStore.Storage;
 
 namespace FhirServerHarness.Services;
@@ -15,7 +16,4 @@ public interface IFhirStoreManager : IHostedService, IDisposable, IReadOnlyDicti
 
     /// <summary>State has changed.</summary>
     void StateHasChanged();
-
-
-
 }

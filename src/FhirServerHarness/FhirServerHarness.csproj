@@ -21,6 +21,7 @@
 	<ItemGroup>
 	  <Folder Include="data\" />
 	  <Folder Include="Models\" />
+	  <Folder Include="Processors\" />
 	  <Folder Include="Search\" />
 	  <Folder Include="Storage\" />
 	  <Folder Include="Models\" />

@@ -300,10 +300,23 @@ public class SubscriptionConverter
         //bool isEmpty = contentLevel.Equals("empty", StringComparison.Ordinal);
         //bool isFullResource = contentLevel.Equals("full-resource", StringComparison.Ordinal);
 
-        //// no event numbers means return all
+        //// determine behavior of no event numbers
         //if (!eventNumbers.Any())
         //{
-        //    eventNumbers = subscription.GeneratedEvents.Keys;
+        //    // query-event should send all
+        //    if (notificationType.Equals("query-event"))
+        //    {
+        //        eventNumbers = subscription.GeneratedEvents.Keys;
+        //    }
+        //    // others send the most recent if there is one
+        //    else if (subscription.GeneratedEvents.Any())
+        //    {
+        //        eventNumbers = new long[] { subscription.GeneratedEvents.Keys.Last() };
+        //    }
+        //    else
+        //    {
+        //        eventNumbers = Array.Empty<long>();
+        //    }
         //}
 
         //// iterate over the events

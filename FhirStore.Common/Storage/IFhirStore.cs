@@ -14,6 +14,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <summary>Occurs when On Changed.</summary>
     event EventHandler<EventArgs>? OnChanged;
 
+    /// <summary>Occurs when a Subscription or SubscriptionTopic resource has changed.</summary>
+    event EventHandler<SubscriptionChangedEventArgs>? OnSubscriptionsChanged;
+
+    /// <summary>Occurs when on Subscription.</summary>
+    event EventHandler<SubscriptionEventArgs>? OnSubscriptionEvent;
+
     /// <summary>State has changed.</summary>
     void StateHasChanged();
 
@@ -155,9 +161,11 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="subscriptionId">  The subscription id of the subscription the events belong to.</param>
     /// <param name="eventNumbers">    One or more event numbers to include.</param>
     /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
-    /// <param name="contentType">     Override for the content type specified in the subscription.</param>
-    /// <param name="contentLevel">    Override for the content level specified in the subscription.</param>
-    /// <returns></returns>
+    /// <param name="contentType">     (Optional) Override for the content type specified in the
+    ///  subscription.</param>
+    /// <param name="contentLevel">    (Optional) Override for the content level specified in the
+    ///  subscription.</param>
+    /// <returns>A string.</returns>
     string SerializeSubscriptionEvents(
         string subscriptionId,
         IEnumerable<long> eventNumbers,

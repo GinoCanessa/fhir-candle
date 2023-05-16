@@ -264,6 +264,16 @@ public class ResourceStore<T> : IVersionedResourceStore
             case "SearchParameter":
                 SetExecutableSearchParameter((SearchParameter)source);
                 break;
+
+            case "SubscriptionTopic":
+                // TODO: should fail the request if this fails
+                _ = TryProcessSubscriptionTopic((object)source);
+                break;
+
+            case "Subscription":
+                // TODO: should fail the request if this fails
+                _ = TryProcessSubscription((object)source);
+                break;
         }
 
         return source;
@@ -289,12 +299,22 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         TestDeleteAgainstSubscriptions((T)previous);
 
-
         switch (previous.TypeName)
         {
             case "SearchParameter":
                 RemoveExecutableSearchParameter((SearchParameter)previous);
                 break;
+
+            case "SubscriptionTopic":
+                // TODO: should fail the request if this fails
+                _ = TryRemoveSubscriptionTopic(previous);
+                break;
+
+            case "Subscription":
+                // TODO: should fail the request if this fails
+                _ = TryRemoveSubscription(previous);
+                break;
+
         }
 
         return previous;
@@ -319,6 +339,26 @@ public class ResourceStore<T> : IVersionedResourceStore
         return _store.SetExecutableSubscriptionTopic(topic);
     }
 
+    /// <summary>Attempts to remove subscription topic.</summary>
+    /// <param name="st">The versioned FHIR subscription topic object.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    private bool TryRemoveSubscriptionTopic(object st)
+    {
+        if (st == null)
+        {
+            return false;
+        }
+
+        // get a common subscription topic for execution
+        if (!_topicConverter.TryParse(st, out ParsedSubscriptionTopic topic))
+        {
+            return false;
+        }
+
+        // process this at the store level
+        return _store.RemoveExecutableSubscriptionTopic(topic);
+    }
+
     /// <summary>Process the subscription described by sub.</summary>
     /// <param name="sub">The versioned FHIR subscription object.</param>
     private bool TryProcessSubscription(object sub)
@@ -337,6 +377,27 @@ public class ResourceStore<T> : IVersionedResourceStore
         // process this at the store level
         return _store.SetExecutableSubscription(subscription);
     }
+
+    /// <summary>Attempts to remove subscription.</summary>
+    /// <param name="sub">The versioned FHIR subscription object.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    private bool TryRemoveSubscription(object sub)
+    {
+        if (sub == null)
+        {
+            return false;
+        }
+
+        // get a common subscription topic for execution
+        if (!_subscriptionConverter.TryParse(sub, out ParsedSubscription subscription))
+        {
+            return false;
+        }
+
+        // process this at the store level
+        return _store.RemoveExecutableSubscription(subscription);
+    }
+
 
     /// <summary>Sets executable subscription topic.</summary>
     /// <param name="url">             URL of the resource.</param>

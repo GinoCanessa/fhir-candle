@@ -34,6 +34,12 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>Occurs when On Changed.</summary>
     public event EventHandler<EventArgs>? OnChanged;
 
+    /// <summary>Occurs when a Subscription or SubscriptionTopic resource has changed.</summary>
+    public event EventHandler<SubscriptionChangedEventArgs>? OnSubscriptionsChanged;
+
+    /// <summary>Occurs when On Changed.</summary>
+    public event EventHandler<SubscriptionEventArgs>? OnSubscriptionEvent;
+
     /// <summary>The compiler.</summary>
     private static FhirPathCompiler _compiler = null!;
 
@@ -884,6 +890,26 @@ public partial class VersionedFhirStore : IFhirStore
         return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
     }
 
+    /// <summary>Removes the executable subscription topic described by topic.</summary>
+    /// <param name="topic">The topic.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool RemoveExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
+    {
+        if (!_topics.ContainsKey(topic.Url))
+        {
+            return false;
+        }
+
+        // remove from all resources
+        foreach (IVersionedResourceStore rs in _store.Values)
+        {
+            rs.RemoveExecutableSubscriptionTopic(topic.Url);
+        }
+
+        return true;
+    }
+
+
     /// <summary>Sets an executable subscription topic.</summary>
     /// <param name="topic">The topic.</param>
     public bool SetExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
@@ -974,6 +1000,8 @@ public partial class VersionedFhirStore : IFhirStore
             }
         }
 
+        //RegisterSubscriptionsChanged();
+
         return canExecute;
     }
 
@@ -996,13 +1024,50 @@ public partial class VersionedFhirStore : IFhirStore
         return _subscriptions[subscriptionId].CurrentEventCount;
     }
 
+    /// <summary>Registers the subscriptions changed.</summary>
+    /// <param name="subscription"> The subscription.</param>
+    /// <param name="removed">      (Optional) True if removed.</param>
+    /// <param name="sendHandshake">(Optional) True to send handshake.</param>
+    public void RegisterSubscriptionsChanged(
+        ParsedSubscription? subscription,
+        bool removed = false,
+        bool sendHandshake = false)
+    {
+        EventHandler<SubscriptionChangedEventArgs>? handler = OnSubscriptionsChanged;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                Tenant = _config,
+                ChangedSubscription = subscription,
+                RemovedSubscriptionId = removed ? subscription?.Id : null,
+                SendHandshake = sendHandshake,
+            });
+        }
+    }
+
     /// <summary>Registers the event.</summary>
     /// <param name="subscriptionId">   Identifier for the subscription.</param>
     /// <param name="subscriptionEvent">The subscription event.</param>
     public void RegisterEvent(string subscriptionId, SubscriptionEvent subscriptionEvent)
     {
         _subscriptions[subscriptionId].RegisterEvent(subscriptionEvent);
-        StateHasChanged();
+
+        EventHandler<SubscriptionEventArgs>? handler = OnSubscriptionEvent;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                Tenant = _config,
+                Subscription = _subscriptions[subscriptionId],
+                NotificationEvents = new List<SubscriptionEvent>() { subscriptionEvent },
+                NotificationType = ParsedSubscription.NotificationTypeCodes.EventNotification,
+            });
+        }
+
+        //StateHasChanged();
     }
 
     /// <summary>
@@ -1029,19 +1094,45 @@ public partial class VersionedFhirStore : IFhirStore
         return string.Empty;
     }
 
+    /// <summary>Removes the executable subscription described by subscription.</summary>
+    /// <param name="subscription">The subscription.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool RemoveExecutableSubscription(ParsedSubscription subscription)
+    {
+        if (!_subscriptions.ContainsKey(subscription.Id))
+        {
+            return false;
+        }
+
+        // remove from all resources
+        foreach (IVersionedResourceStore rs in _store.Values)
+        {
+            rs.RemoveExecutableSubscription(subscription.TopicUrl, subscription.Id);
+        }
+
+        _subscriptions.Remove(subscription.Id);
+
+        RegisterSubscriptionsChanged(subscription, true);
+
+        return true;
+    }
+
     /// <summary>Sets executable subscription.</summary>
     /// <param name="subscription">The subscription.</param>
     public bool SetExecutableSubscription(ParsedSubscription subscription)
     {
         // check for existing record
         bool priorExisted = _subscriptions.ContainsKey(subscription.Id);
+        string priorState;
 
         if (priorExisted)
         {
+            priorState = _subscriptions[subscription.Id].CurrentStatus;
             _subscriptions[subscription.Id] = subscription;
         }
         else
         {
+            priorState = "off";
             _subscriptions.Add(subscription.Id, subscription);
         }
 
@@ -1118,6 +1209,8 @@ public partial class VersionedFhirStore : IFhirStore
                 rs.SetExecutableSubscription(subscription.TopicUrl, subscription.Id, parsedFilters);
             }
         }
+
+        RegisterSubscriptionsChanged(subscription, false, priorState.Equals("off"));
 
         return true;
     }
@@ -1439,7 +1532,7 @@ public partial class VersionedFhirStore : IFhirStore
             Url = $"{_config.BaseUrl}/CapabilityStatement/{_capabilityStatementId}",
             Name = "Capabilities" + _config.FhirVersion,
             Status = PublicationStatus.Active,
-            Date = new DateTimeOffset().ToFhirDateTime(),
+            Date = DateTimeOffset.Now.ToFhirDateTime(),
             Kind = CapabilityStatementKind.Instance,
             Software = new()
             {
@@ -1526,6 +1619,8 @@ public partial class VersionedFhirStore : IFhirStore
         _store["CapabilityStatement"].InstanceUpdate(cs, true);
         _capabilitiesAreStale = false;
     }
+
+
 
     /// <summary>State has changed.</summary>
     public void StateHasChanged()

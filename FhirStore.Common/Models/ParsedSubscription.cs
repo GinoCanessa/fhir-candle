@@ -80,7 +80,7 @@ public class ParsedSubscription
     public string Endpoint { get; set; } = string.Empty;
 
     /// <summary>Gets or sets options for controlling the subscription.</summary>
-    public Dictionary<string, List<string>> Parameters { get; set; } = new();
+    public Dictionary<string, List<string>> Parameters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Gets or sets the heartbeat seconds.</summary>
     public int HeartbeatSeconds { get; set; } = 0;
@@ -99,6 +99,9 @@ public class ParsedSubscription
 
     /// <summary>Gets or sets the current status of the subscription.</summary>
     public string CurrentStatus { get; set; } = "active";
+
+    /// <summary>Gets or sets the system tick (time) when the last communication was sent.</summary>
+    public long LastCommunicationTicks { get; set; } = 0;
 
     /// <summary>Gets or sets the number of current events.</summary>
     public long CurrentEventCount { get => _currentEventCount; }

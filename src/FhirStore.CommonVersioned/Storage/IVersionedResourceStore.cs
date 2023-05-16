@@ -5,7 +5,6 @@
 
 using FhirStore.Models;
 using FhirStore.Storage;
-using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 
 namespace FhirStore.Storage;
@@ -45,7 +44,7 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
 
     /// <summary>Adds a search parameter definition.</summary>
     /// <param name="spDefinition">The sp definition.</param>
-    void SetExecutableSearchParameter(ModelInfo.SearchParamDefinition spDefinition);
+    void SetExecutableSearchParameter(Hl7.Fhir.Model.ModelInfo.SearchParamDefinition spDefinition);
 
     /// <summary>Removes the executable search parameter described by name.</summary>
     /// <param name="name">The name.</param>
@@ -58,14 +57,14 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <param name="name">        The name.</param>
     /// <param name="spDefinition">[out] The sp definition.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryGetSearchParamDefinition(string name, out ModelInfo.SearchParamDefinition? spDefinition);
+    bool TryGetSearchParamDefinition(string name, out Hl7.Fhir.Model.ModelInfo.SearchParamDefinition? spDefinition);
 
     /// <summary>Gets the search parameter definitions known by this store</summary>
     /// <returns>
     /// An enumerator that allows foreach to be used to process the search parameter definitions in
     /// this collection.
     /// </returns>
-    IEnumerable<ModelInfo.SearchParamDefinition> GetSearchParamDefinitions();
+    IEnumerable<Hl7.Fhir.Model.ModelInfo.SearchParamDefinition> GetSearchParamDefinitions();
 
     /// <summary>Gets the search includes supported by this store.</summary>
     /// <returns>

@@ -248,11 +248,6 @@ public class SubscriptionConverter
             statusCode = SubscriptionStatusCodes.Active;
         }
 
-        if (!Enum.TryParse(notificationType, out SubscriptionStatus.SubscriptionNotificationType notificationTypeCode))
-        {
-            notificationTypeCode = SubscriptionStatus.SubscriptionNotificationType.EventNotification;
-        }
-
         // create our status resource
         SubscriptionStatus status = new()
         {
@@ -260,7 +255,7 @@ public class SubscriptionConverter
             Topic = subscription.TopicUrl,
             EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
             Status = statusCode,
-            Type = notificationTypeCode,
+            Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
             NotificationEvent = new(),
         };
 

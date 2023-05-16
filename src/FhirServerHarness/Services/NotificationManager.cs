@@ -3,9 +3,9 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirServerHarness.Zulip;
 using FhirStore.Models;
 using FhirStore.Storage;
-using System.Reflection.PortableExecutable;
 using System.Text;
 
 namespace FhirServerHarness.Services;
@@ -22,21 +22,117 @@ public class NotificationManager : INotificationManager
     /// <summary>Manager for store.</summary>
     private IFhirStoreManager _storeManager;
 
+    /// <summary>The heartbeat timer.</summary>
+    private Timer _heartbeatTimer = null!;
+
+    private string _zulipSite;
+    private string _zulipEmail;
+    private string _zulipKey;
+
     /// <summary>Initializes a new instance of the <see cref="NotificationManager"/> class.</summary>
     /// <param name="fhirStoreManager">Manager for FHIR store.</param>
     public NotificationManager(IFhirStoreManager fhirStoreManager)
     {
         _storeManager = fhirStoreManager;
+
+        _zulipSite = Program.Configuration["Zulip_Site"] ?? string.Empty;
+        _zulipEmail = Program.Configuration["Zulip_Email"] ?? string.Empty;
+        _zulipKey = Program.Configuration["Zulip_Key"] ?? string.Empty;
+
+        if (string.IsNullOrEmpty(_zulipSite) ||
+            string.IsNullOrEmpty(_zulipEmail) ||
+            string.IsNullOrEmpty(_zulipKey))
+        {
+            Console.WriteLine("Zulip information not found - Zulip notification will not be sent");
+        }
+        else
+        {
+            Console.WriteLine($"Found zulip configuration for: {_zulipSite} ({_zulipEmail})");
+            ZulipClientPool.AddOrRegisterClient(_zulipSite, _zulipEmail, _zulipKey);
+        }
     }
 
-    /// <summary>Attempts to notify REST hook.</summary>
-    /// <param name="store">           The store.</param>
-    /// <param name="e">            Subscription event information.</param>
-    /// <param name="notificationType">(Optional) Type of the notification.</param>
+    /// <summary>Try notify via the appropriate channel type.</summary>
+    /// <param name="store">The store.</param>
+    /// <param name="e">    Subscription event information.</param>
+    /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
+    private async Task<bool> TryNotify(IFhirStore store, SubscriptionEventArgs e)
+    {
+        string contents;
+
+        switch (e.NotificationType)
+        {
+            case ParsedSubscription.NotificationTypeCodes.Handshake:
+                {
+                    contents = store.SerializeSubscriptionEvents(
+                                    e.Subscription.Id,
+                                    Array.Empty<long>(),
+                                    "handshake");
+                }
+                break;
+
+            case ParsedSubscription.NotificationTypeCodes.Heartbeat:
+                {
+                    contents = store.SerializeSubscriptionEvents(
+                                    e.Subscription.Id,
+                                    Array.Empty<long>(),
+                                    "heartbeat");
+                }
+                break;
+
+            case ParsedSubscription.NotificationTypeCodes.EventNotification:
+                {
+                    if (!e.NotificationEvents.Any())
+                    {
+                        return false;
+                    }
+
+                    contents = store.SerializeSubscriptionEvents(
+                                    e.Subscription.Id,
+                                    e.NotificationEvents.Select(ne => ne.EventNumber),
+                                    "event-notification");
+                }
+                break;
+
+            case ParsedSubscription.NotificationTypeCodes.QueryStatus:
+                throw new NotImplementedException();
+            //break;
+
+            case ParsedSubscription.NotificationTypeCodes.QueryEvent:
+                throw new NotImplementedException();
+            //break;
+
+            default:
+                Console.WriteLine($"Unknown notification type: {e.NotificationType}");
+                return false;
+        }
+
+        switch (e.Subscription.ChannelCode.ToLowerInvariant())
+        {
+            case "email":
+            case "websocket":
+                throw new NotImplementedException();
+
+            case "zulip":
+                return await TryNotifyZulip(store, e, contents);
+
+            case "rest-hook":
+                return await TryNotifyRestHook(store, e, contents);
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Attempt to send a notification via REST Hook.</summary>
+    /// <param name="store">   The store.</param>
+    /// <param name="e">       Subscription event information.</param>
+    /// <param name="contents">Serialized contents of the notification.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     private async Task<bool> TryNotifyRestHook(
         IFhirStore store,
-        SubscriptionEventArgs e)
+        SubscriptionEventArgs e,
+        string contents)
     {
         // auto-pass any notifications to example.org
         if (e.Subscription.Endpoint.Contains("example.org", StringComparison.Ordinal))
@@ -49,56 +145,6 @@ public class NotificationManager : INotificationManager
         // send the request to the endpoint
         try
         {
-            // serialize our contents
-            string contents;
-
-            switch (e.NotificationType)
-            {
-                case ParsedSubscription.NotificationTypeCodes.Handshake:
-                    {
-                        contents = store.SerializeSubscriptionEvents(
-                                        e.Subscription.Id,
-                                        Array.Empty<long>(),
-                                        "handshake");
-                    }
-                    break;
-
-                case ParsedSubscription.NotificationTypeCodes.Heartbeat:
-                    {
-                        contents = store.SerializeSubscriptionEvents(
-                                        e.Subscription.Id,
-                                        Array.Empty<long>(),
-                                        "heartbeat");
-                    }
-                    break;
-
-                case ParsedSubscription.NotificationTypeCodes.EventNotification:
-                    {
-                        if (!e.NotificationEvents.Any())
-                        {
-                            return false;
-                        }
-
-                        contents = store.SerializeSubscriptionEvents(
-                                        e.Subscription.Id,
-                                        e.NotificationEvents.Select(ne => ne.EventNumber),
-                                        "event-notification");
-                    }
-                    break;
-
-                case ParsedSubscription.NotificationTypeCodes.QueryStatus:
-                    throw new NotImplementedException();
-                    //break;
-
-                case ParsedSubscription.NotificationTypeCodes.QueryEvent:
-                    throw new NotImplementedException();
-                    //break;
-    
-                default:
-                    Console.WriteLine($"Unknown notification type: {e.NotificationType}");
-                    return false;
-            }
-
             // build our request
             request = new HttpRequestMessage()
             {
@@ -136,6 +182,8 @@ public class NotificationManager : INotificationManager
                 return false;
             }
 
+            e.Subscription.LastCommunicationTicks = DateTime.Now.Ticks;
+
             if (e.NotificationEvents.Any())
             {
                 Console.WriteLine(
@@ -166,6 +214,137 @@ public class NotificationManager : INotificationManager
         return true;
     }
 
+    /// <summary>Attempt to send a notification via Zulip.</summary>
+    /// <param name="store">   The store.</param>
+    /// <param name="e">       Subscription event information.</param>
+    /// <param name="contents">Serialized contents of the notification.</param>
+    /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
+    private async Task<bool> TryNotifyZulip(
+        IFhirStore store,
+        SubscriptionEventArgs e,
+        string contents)
+    {
+        string zulipSite = e.Subscription.Parameters.ContainsKey("site") ? e.Subscription.Parameters["site"].First() : _zulipSite;
+        string zulipEmail = e.Subscription.Parameters.ContainsKey("email") ? e.Subscription.Parameters["email"].First() : _zulipEmail;
+        string zulipKey = e.Subscription.Parameters.ContainsKey("key") ? e.Subscription.Parameters["key"].First() : _zulipKey;
+
+        if (string.IsNullOrEmpty(zulipSite) ||
+            string.IsNullOrEmpty(zulipEmail) ||
+            string.IsNullOrEmpty(zulipKey))
+        {
+            return false;
+        }
+
+        // send the request to the endpoint
+        try
+        {
+            zulip_cs_lib.ZulipClient client = ZulipClientPool.GetOrCreateClient(zulipSite, zulipEmail, zulipKey);
+
+            if (client == null)
+            {
+                return false;
+            }
+
+            string messageText = BuildZulipMessage(store, e, contents);
+
+            if (e.Subscription.Parameters.ContainsKey("streamId"))
+            {
+                foreach (string value in e.Subscription.Parameters["streamId"])
+                {
+                    if (!int.TryParse(value, out int id))
+                    {
+                        continue;
+                    }
+
+                    (bool success, string details, ulong messageId) result = await client.Messages.TrySendStream(
+                        messageText,
+                        "Subscription Notification",
+                        new int[] { id });
+                }
+            }
+
+            if (e.Subscription.Parameters.ContainsKey("userId"))
+            {
+                foreach (string value in e.Subscription.Parameters["userId"])
+                {
+                    if (!int.TryParse(value, out int id))
+                    {
+                        continue;
+                    }
+
+                    (bool success, string details, ulong messageId) result = await client.Messages.TrySendPrivate(
+                        messageText,
+                        new int[] { id });
+                }
+            }
+
+            e.Subscription.LastCommunicationTicks = DateTime.Now.Ticks;
+        }
+        catch (Exception ex)
+        {
+            e.Subscription.RegisterError($"Zulip {e.NotificationType} to {e.Subscription.Endpoint} failed: {ex.Message}");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Builds zulip message.</summary>
+    /// <param name="store">   The store.</param>
+    /// <param name="e">       Subscription event information.</param>
+    /// <param name="contents">Serialized contents of the notification.</param>
+    /// <returns>A string.</returns>
+    private string BuildZulipMessage(IFhirStore store, SubscriptionEventArgs e, string contents)
+    {
+        // TODO: need to build a persistent opt-out
+
+        string shortMime = e.Subscription.ContentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+            ? "json"
+            : "xml";
+
+        switch (e.NotificationType)
+        {
+            case ParsedSubscription.NotificationTypeCodes.Handshake:
+                return $"[{e.Subscription.Id}]({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+                    $" is going to send you notifications.\n" +
+                    $"To opt out, please click ~~here~~\n" +
+                    $"```spoiler Bundle\n```{shortMime}\n{contents}\n```\n```\n";
+
+            case ParsedSubscription.NotificationTypeCodes.Heartbeat:
+                return $"[{e.Subscription.Id}]({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+                    $" is alive with nothing to report.\n" +
+                    $"To opt out, please click ~~here~~\n" +
+                    $"```spoiler Bundle\n```{shortMime}\n{contents}\n```\n```\n";
+
+            case ParsedSubscription.NotificationTypeCodes.EventNotification:
+                return $"[{e.Subscription.Id}]({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+                    $" is reporting notification" +
+                    $" {string.Join(',', e.NotificationEvents.Select(ne => ne.EventNumber))}.\n" +
+                    $"To opt out, please click ~~here~~\n" +
+                    $"```spoiler Bundle\n```{shortMime}\n{contents}\n```\n```\n";
+
+            case ParsedSubscription.NotificationTypeCodes.QueryStatus:
+                return $"[{e.Subscription.Id}]({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+                    $" is responding to a status query" +
+                    $" {string.Join(',', e.NotificationEvents.Select(ne => ne.EventNumber))}.\n" +
+                    $"To opt out, please click ~~here~~" +
+                    $"```spoiler Bundle\n```{shortMime}\n{contents}\n```\n```\n";
+
+            case ParsedSubscription.NotificationTypeCodes.QueryEvent:
+                return $"[{e.Subscription.Id}]({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+                    $" is resending events" +
+                    $" {string.Join(',', e.NotificationEvents.Select(ne => ne.EventNumber))}.\n" +
+                    $"To opt out, please click ~~here~~\n" +
+                    $"```spoiler Bundle\n```{shortMime}\n{contents}\n```\n```\n";
+
+            default:
+                return $"[{e.Subscription.Id}]({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+                    $" type: `{e.NotificationType}`." +
+                    $"To opt out, please click ~~here~~\n" +
+                    $"```spoiler Bundle\n```{shortMime}\n{contents}\n```\n```\n";
+        }
+    }
+
     /// <summary>Triggered when the application host is ready to start the service.</summary>
     /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
     /// <returns>An asynchronous result.</returns>
@@ -181,7 +360,49 @@ public class NotificationManager : INotificationManager
             store.OnSubscriptionEvent += Store_OnSubscriptionEvent;
         }
 
+        // start our heartbeat timer
+        _heartbeatTimer = new Timer(
+                CheckAndSendHeartbeats,
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(2));
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>Check and send heartbeats.</summary>
+    /// <param name="state">The state.</param>
+    private void CheckAndSendHeartbeats(object? state)
+    {
+        long currentTicks = DateTime.Now.Ticks;
+
+        // traverse stores to check subscriptions
+        foreach (IFhirStore store in _storeManager.Values)
+        {
+            // traverse active subscriptions
+            foreach (ParsedSubscription sub in store.CurrentSubscriptions)
+            {
+                if ((!sub.CurrentStatus.Equals("active", StringComparison.Ordinal)) ||
+                    (sub.HeartbeatSeconds <= 0))
+                {
+                    continue;
+                }
+
+                long threshold = currentTicks - (sub.HeartbeatSeconds * TimeSpan.TicksPerSecond);
+
+                if (sub.LastCommunicationTicks < threshold)
+                {
+                    sub.LastCommunicationTicks = currentTicks;
+
+                    _ = TryNotify(store, new()
+                    {
+                        Tenant = store.Config,
+                        Subscription = sub,
+                        NotificationType = ParsedSubscription.NotificationTypeCodes.Heartbeat,
+                    });
+                }
+            }
+        }
     }
 
     /// <summary>Event handler. Called by Store for on subscription events.</summary>
@@ -195,17 +416,7 @@ public class NotificationManager : INotificationManager
             return;
         }
 
-        switch (e.Subscription.ChannelCode.ToLowerInvariant())
-        {
-            case "zulip":
-            case "email":
-            case "websocket":
-                break;
-
-            case "rest-hook":
-                _ = TryNotifyRestHook(_storeManager[e.Tenant.ControllerName], e);
-                break;
-        }
+        _ = TryNotify(_storeManager[e.Tenant.ControllerName], e);
     }
 
     /// <summary>Event handler. Called by Store for on subscriptions changed events.</summary>
@@ -235,7 +446,7 @@ public class NotificationManager : INotificationManager
                 return;
             }
 
-            bool success = TryNotifyRestHook(store, new()
+            bool success = TryNotify(store, new()
             {
                 Tenant = e.Tenant,
                 Subscription = e.ChangedSubscription!,
@@ -265,6 +476,8 @@ public class NotificationManager : INotificationManager
     /// <returns>An asynchronous result.</returns>
     Task IHostedService.StopAsync(CancellationToken cancellationToken)
     {
+        _heartbeatTimer?.Change(Timeout.Infinite, 0);
+
         return Task.CompletedTask;
     }
 
@@ -282,6 +495,7 @@ public class NotificationManager : INotificationManager
             if (disposing)
             {
                 // TODO: dispose managed state (managed objects)
+                _heartbeatTimer?.Dispose();
             }
 
             // TODO: free unmanaged resources (unmanaged objects) and override finalizer

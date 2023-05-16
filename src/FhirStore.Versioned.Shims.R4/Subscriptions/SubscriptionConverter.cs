@@ -289,6 +289,7 @@ public class SubscriptionConverter
         //    Subscription = new ResourceReference("Subscription/" + subscription.Id),
         //    EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
         //    Status = statusCode,
+        //Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
         //    NotificationEvent = new(),
         //};
 

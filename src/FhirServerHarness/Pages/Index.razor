@@ -6,60 +6,52 @@
 
 <PageTitle>FHIR Dev Server</PageTitle>
 
-@if (!loaded)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <MudTable Items="@StoreManager.OrderBy(kvp => kvp.Key)"
-              Dense="true"
-              Striped="true"
-              Height="calc(100vh - (var(--mud-appbar-height) * 2))"
-              FixedHeader="true">
-        <ToolBarContent>
-            <MudText Typo="Typo.h6">FHIR Roots</MudText>
-            <MudSpacer />
-        </ToolBarContent>
-        @*<ColGroup>
-            <col style="width: 15vw!important;" />
-            <col style="width: 15vw!important;" />
-            <col style="width: 5vw!important;" />
-            <col style="width: 20vw!important;" />
-            <col style="width: 45vw!important;" />
-        </ColGroup>*@
-        <HeaderContent>
-            <MudTh></MudTh>
-            <MudTh>Public URL</MudTh>
-            <MudTh>Internal URL</MudTh>
-            <MudTh>FHIR Version</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd>
-                <MudTooltip Text="Subscriptions">
-                    <MudFab StartIcon="@Icons.Material.Filled.RssFeed"
-                            @onclick="() => NavToSubscriptions(context.Key)"
-                            Size="Size.Small" />
-                </MudTooltip>
+<MudTable Items="@StoreManager.OrderBy(kvp => kvp.Key)"
+        Dense="true"
+        Striped="true"
+        Height="calc(100vh - (var(--mud-appbar-height) * 2))"
+        FixedHeader="true">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">FHIR Roots</MudText>
+        <MudSpacer />
+    </ToolBarContent>
+    @*<ColGroup>
+        <col style="width: 15vw!important;" />
+        <col style="width: 15vw!important;" />
+        <col style="width: 5vw!important;" />
+        <col style="width: 20vw!important;" />
+        <col style="width: 45vw!important;" />
+    </ColGroup>*@
+    <HeaderContent>
+        <MudTh></MudTh>
+        <MudTh>Public URL</MudTh>
+        <MudTh>Internal URL</MudTh>
+        <MudTh>FHIR Version</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>
+            <MudTooltip Text="Subscriptions">
+                <MudFab StartIcon="@Icons.Material.Filled.RssFeed"
+                        @onclick="() => NavToSubscriptions(context.Key)"
+                        Size="Size.Small" />
+            </MudTooltip>
 
-                <MudTooltip Text="FHIR Store Contents">
-                    <MudFab StartIcon="@Icons.Material.Filled.ViewInAr"
-                            @onclick="() => NavToFhirStore(context.Key)"
-                            Size="Size.Small" />
-                </MudTooltip>
-            </MudTd>
-            <MudTd DataLabel="Public URL">@($"{Program.InternalUrl}/fhir/{context.Key}")</MudTd>
-            <MudTd DataLabel="Internal URL">@context.Value.Config.BaseUrl</MudTd>
-            <MudTd DataLabel="FHIR Version">@context.Value.Config.FhirVersion</MudTd>
-        </RowTemplate>
-    </MudTable>}
+            <MudTooltip Text="FHIR Store Contents">
+                <MudFab StartIcon="@Icons.Material.Filled.ViewInAr"
+                        @onclick="() => NavToFhirStore(context.Key)"
+                        Size="Size.Small" />
+            </MudTooltip>
+        </MudTd>
+        <MudTd DataLabel="Public URL">@($"{Program.InternalUrl}/fhir/{context.Key}")</MudTd>
+        <MudTd DataLabel="Internal URL">@context.Value.Config.BaseUrl</MudTd>
+        <MudTd DataLabel="FHIR Version">@context.Value.Config.FhirVersion</MudTd>
+    </RowTemplate>
+</MudTable>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
-
-    private bool loaded = false;
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
@@ -68,7 +60,6 @@ else
         base.OnInitialized();
 
         NavTracker?.NotifyNav("FHIR Dev Server", "", 0);
-        loaded = true;
     }
 
     private void NavToFhirStore(string name)

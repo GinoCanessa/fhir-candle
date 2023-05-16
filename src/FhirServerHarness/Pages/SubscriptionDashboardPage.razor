@@ -7,35 +7,27 @@
 
 <PageTitle>Subscription Dashboard</PageTitle>
 
-
-@if (!loaded)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <MudGrid>
-        @foreach (ParsedSubscription sub in _store.CurrentSubscriptions)
-        {
-        <MudItem>
-            <MudBadge Content="@sub.GeneratedEvents.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
-                <MudCard Outlined="true">
-                    <MudCardContent>
-                        <MudField Label="Subscription">Subscription/@sub.Id</MudField>
-                        <MudField Label="Topic">@sub.TopicUrl</MudField>
-                        <MudField Label="Channel">@sub.ChannelCode</MudField>
-                        <MudField Label="Endpoint">@sub.Endpoint</MudField>
-                        @if (sub.GeneratedEvents.Any())
-                        {
-                            <MudField Label="Latest">@HeaderFor(sub.GeneratedEvents.Last().Value)</MudField>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudBadge>
-        </MudItem>
-        }
-    </MudGrid>
-}
+<MudGrid>
+    @foreach (ParsedSubscription sub in _store?.CurrentSubscriptions ?? Array.Empty<ParsedSubscription>())
+    {
+    <MudItem>
+        <MudBadge Content="@sub.GeneratedEvents.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
+            <MudCard Outlined="true">
+                <MudCardContent>
+                    <MudField Label="Subscription">Subscription/@sub.Id</MudField>
+                    <MudField Label="Topic">@sub.TopicUrl</MudField>
+                    <MudField Label="Channel">@sub.ChannelCode</MudField>
+                    <MudField Label="Endpoint">@sub.Endpoint</MudField>
+                    @if (sub.GeneratedEvents.Any())
+                    {
+                        <MudField Label="Latest">@HeaderFor(sub.GeneratedEvents.Last().Value)</MudField>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudBadge>
+    </MudItem>
+    }
+</MudGrid>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
@@ -46,8 +38,6 @@ else
     [Parameter]
     [SupplyParameterFromQuery(Name = "storeName")]
     public string StoreName { get; set; } = "";
-
-    private bool loaded = false;
 
     private IFhirStore _store = null!;
 
@@ -66,8 +56,9 @@ else
             _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
         }
 
-        NavTracker?.NotifyNav("Subscriptions Dashboard", "", 3);
-        loaded = true;
+        // notify of store root in case user clicked here directly
+        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+        NavTracker?.NotifyNav($"Subscriptions Dashboard", "/store/ext/subscriptions?storeName=" + StoreName, 2);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -75,7 +66,7 @@ else
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store?"))
+        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -91,7 +82,9 @@ else
                 _store.OnSubscriptionEvent += Store_OnSubscriptionEvent;
             }
 
-            NavTracker?.NotifyNav("Store: " + StoreName, "/store?storeName=" + StoreName, 1);
+            // notify of store root in case user clicked here directly
+            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+            NavTracker?.NotifyNav($"Subscriptions Dashboard", "/store/ext/subscriptions?storeName=" + StoreName, 2);
         }
     }
 

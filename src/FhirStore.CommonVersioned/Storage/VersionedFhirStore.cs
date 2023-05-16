@@ -1088,7 +1088,13 @@ public partial class VersionedFhirStore : IFhirStore
     {
         if (_subscriptions.ContainsKey(subscriptionId))
         {
-            return _subscriptionConverter.SerializeSubscriptionEvents(_subscriptions[subscriptionId], eventNumbers, notificationType, _config.BaseUrl, contentType, contentLevel);
+            return _subscriptionConverter.SerializeSubscriptionEvents(
+                _subscriptions[subscriptionId],
+                eventNumbers,
+                notificationType,
+                _config.BaseUrl,
+                contentType,
+                contentLevel);
         }
 
         return string.Empty;

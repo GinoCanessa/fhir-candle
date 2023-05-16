@@ -19,6 +19,9 @@ public class FhirStoreManager : IFhirStoreManager
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;
 
+    /// <summary>The logger.</summary>
+    private ILogger _logger;
+
     /// <summary>Occurs when On Changed.</summary>
     public event EventHandler<EventArgs>? OnChanged;
 
@@ -92,28 +95,12 @@ public class FhirStoreManager : IFhirStoreManager
     /// </returns>
     IEnumerator IEnumerable.GetEnumerator() => (IEnumerator)_storesByController.GetEnumerator();
 
-    ///// <summary>
-    ///// Initializes a new instance of the <see cref="FhirStoreManager"/> class.
-    ///// </summary>
-    ///// <param name="services">The services.</param>
-    //public FhirStoreManager(IEnumerable<IHostedService> services)
-    //{
-    //    _services = services;
-    //}
-
-    ///// <summary>Event handler. Called by FhirStoreManager for on subscription events.</summary>
-    ///// <param name="sender">The sender.</param>
-    ///// <param name="e">     Subscription event information.</param>
-    //private void FhirStoreManager_OnSubscriptionEvent(object? sender, SubscriptionEventArgs e)
-    //{
-    //    if (!_storesByController.ContainsKey(e.Tenant.ControllerName))
-    //    {
-    //        Console.WriteLine($"Cannot send subscription for non-existing tenant: {e.Tenant.ControllerName}");
-    //        return;
-    //    }
-
-    //    _notificationManager.HandleSubscriptionEvent(_storesByController[e.Tenant.ControllerName], e);
-    //}
+    /// <summary>Initializes a new instance of the <see cref="FhirStoreManager"/> class.</summary>
+    /// <param name="logger">The logger.</param>
+    public FhirStoreManager(ILogger<FhirStoreManager> logger)
+    {
+        _logger = logger;
+    }
 
     /// <summary>State has changed.</summary>
     public void StateHasChanged()
@@ -131,7 +118,7 @@ public class FhirStoreManager : IFhirStoreManager
     /// <returns>An asynchronous result.</returns>
     Task IHostedService.StartAsync(CancellationToken cancellationToken)
     {
-        Console.WriteLine("Starting FhirStoreManager...");
+        _logger.LogInformation("Starting FhirStoreManager...");
 
         // initialize the requested fhir stores
         foreach ((string name, ProviderConfiguration config) in Program.Tenants)

@@ -19,20 +19,29 @@ public class NotificationManager : INotificationManager
     /// <summary>The HTTP client for REST notifications.</summary>
     private HttpClient _httpClient = new();
 
+    /// <summary>The logger.</summary>
+    private ILogger _logger;
+
     /// <summary>Manager for store.</summary>
     private IFhirStoreManager _storeManager;
 
     /// <summary>The heartbeat timer.</summary>
     private Timer _heartbeatTimer = null!;
 
+    /// <summary>The zulip site URL (e.g., https://chat.fhir.org/).</summary>
     private string _zulipSite;
+
+    /// <summary>The zulip bot email address.</summary>
     private string _zulipEmail;
+
+    /// <summary>The zulip bot API key.</summary>
     private string _zulipKey;
 
     /// <summary>Initializes a new instance of the <see cref="NotificationManager"/> class.</summary>
     /// <param name="fhirStoreManager">Manager for FHIR store.</param>
-    public NotificationManager(IFhirStoreManager fhirStoreManager)
+    public NotificationManager(ILogger<NotificationManager> logger, IFhirStoreManager fhirStoreManager)
     {
+        _logger = logger;
         _storeManager = fhirStoreManager;
 
         _zulipSite = Program.Configuration["Zulip_Site"] ?? string.Empty;
@@ -43,11 +52,11 @@ public class NotificationManager : INotificationManager
             string.IsNullOrEmpty(_zulipEmail) ||
             string.IsNullOrEmpty(_zulipKey))
         {
-            Console.WriteLine("Zulip information not found - Zulip notification will not be sent");
+            _logger.LogInformation("Zulip information not found - Zulip notification will not be sent");
         }
         else
         {
-            Console.WriteLine($"Found zulip configuration for: {_zulipSite} ({_zulipEmail})");
+            _logger.LogInformation($"Found zulip configuration for: {_zulipSite} ({_zulipEmail})");
             ZulipClientPool.AddOrRegisterClient(_zulipSite, _zulipEmail, _zulipKey);
         }
     }
@@ -95,15 +104,15 @@ public class NotificationManager : INotificationManager
                 break;
 
             case ParsedSubscription.NotificationTypeCodes.QueryStatus:
-                throw new NotImplementedException();
+                throw new NotImplementedException("TryNotify <<< QueryStatus is not an implemented mode for notifications");
             //break;
 
             case ParsedSubscription.NotificationTypeCodes.QueryEvent:
-                throw new NotImplementedException();
+                throw new NotImplementedException("TryNotify <<< QueryEvent is not an implemented mode for notifications");
             //break;
 
             default:
-                Console.WriteLine($"Unknown notification type: {e.NotificationType}");
+                _logger.LogError($"TryNotify <<< Unknown notification type: {e.NotificationType}");
                 return false;
         }
 
@@ -111,7 +120,7 @@ public class NotificationManager : INotificationManager
         {
             case "email":
             case "websocket":
-                throw new NotImplementedException();
+                throw new NotImplementedException($"TryNotify <<< unimplemented channel type: {e.Subscription.ChannelCode}");
 
             case "zulip":
                 return await TryNotifyZulip(store, e, contents);
@@ -186,14 +195,14 @@ public class NotificationManager : INotificationManager
 
             if (e.NotificationEvents.Any())
             {
-                Console.WriteLine(
+                _logger.LogInformation(
                     $" <<< Subscription/{e.Subscription.Id}" +
                     $" POST: {e.Subscription.Endpoint}" +
                     $" Events: {string.Join(',', e.NotificationEvents.Select(ne => ne.EventNumber))}");
             }
             else
             {
-                Console.WriteLine(
+                _logger.LogInformation(
                     $" <<< Subscription/{e.Subscription.Id}" +
                     $" POST {e.NotificationType}: {e.Subscription.Endpoint}");
             }
@@ -350,7 +359,7 @@ public class NotificationManager : INotificationManager
     /// <returns>An asynchronous result.</returns>
     Task IHostedService.StartAsync(CancellationToken cancellationToken)
     {
-        Console.WriteLine("Starting NotificationManager...");
+        _logger.LogInformation("Starting NotificationManager...");
 
         // traverse stores and initialize our event handlers
         foreach (IFhirStore store in _storeManager.Values)
@@ -412,7 +421,7 @@ public class NotificationManager : INotificationManager
     {
         if (!_storeManager.ContainsKey(e.Tenant.ControllerName))
         {
-            Console.WriteLine($"Cannot send subscription for non-existing tenant: {e.Tenant.ControllerName}");
+            _logger.LogError($"Cannot send subscription for non-existing tenant: {e.Tenant.ControllerName}");
             return;
         }
 

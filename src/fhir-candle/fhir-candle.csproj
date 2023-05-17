@@ -9,6 +9,25 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'http' " />
+
+	<ItemGroup>
+	  <Compile Remove="data\**" />
+	  <Compile Remove="Processors\**" />
+	  <Compile Remove="Search\**" />
+	  <Compile Remove="Storage\**" />
+	  <Content Remove="data\**" />
+	  <Content Remove="Processors\**" />
+	  <Content Remove="Search\**" />
+	  <Content Remove="Storage\**" />
+	  <EmbeddedResource Remove="data\**" />
+	  <EmbeddedResource Remove="Processors\**" />
+	  <EmbeddedResource Remove="Search\**" />
+	  <EmbeddedResource Remove="Storage\**" />
+	  <None Remove="data\**" />
+	  <None Remove="Processors\**" />
+	  <None Remove="Search\**" />
+	  <None Remove="Storage\**" />
+	</ItemGroup>
 	<ItemGroup>
 	  <Compile Remove="Services\FhirWebSerializer.cs" />
 	  <Compile Remove="Services\IFhirWebSerializer.cs" />
@@ -23,11 +42,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="data\" />
 	  <Folder Include="Models\" />
-	  <Folder Include="Processors\" />
-	  <Folder Include="Search\" />
-	  <Folder Include="Storage\" />
 	  <Folder Include="Models\" />
 	</ItemGroup>
 

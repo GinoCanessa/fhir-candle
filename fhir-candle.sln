@@ -23,6 +23,15 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R4B", "src\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.shproj", "{786DB8AB-9A51-4A71-8AD2-7DB7D373C98B}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8B6BFF93-0260-40D3-BF26-175BC295D77B}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		CONTRIBUTING.MD = CONTRIBUTING.MD
+		LICENSE = LICENSE
+		README.md = README.md
+		THIRDPARTYNOTICES.md = THIRDPARTYNOTICES.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

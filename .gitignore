@@ -16,6 +16,9 @@
 # Mono auto generated files
 mono_crash.*
 
+# Mac specific
+.DS_Store
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/

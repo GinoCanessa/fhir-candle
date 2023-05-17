@@ -11,6 +11,6 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\VersionedShims.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Subscriptions\SubscriptionConverter.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)subscriptions\TopicConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Subscriptions\TopicConverter.cs" />
   </ItemGroup>
 </Project>

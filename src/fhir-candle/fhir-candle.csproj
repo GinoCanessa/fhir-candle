@@ -1,0 +1,73 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net7.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RootNamespace>fhir.candle</RootNamespace>
+		<StartupObject>fhir.candle.Program</StartupObject>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" '$(RunConfiguration)' == 'http' " />
+	<ItemGroup>
+	  <Compile Remove="Services\FhirWebSerializer.cs" />
+	  <Compile Remove="Services\IFhirWebSerializer.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Antlr4.Runtime.Standard" Version="4.12.0" />
+	  <PackageReference Include="MailKit" Version="4.0.0" />
+	  <PackageReference Include="MudBlazor" Version="6.2.3" />
+	  <PackageReference Include="BlazorMonaco" Version="3.0.0" />
+	  <PackageReference Include="zulip-cs-lib" Version="0.0.1-alpha.6" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="data\" />
+	  <Folder Include="Models\" />
+	  <Folder Include="Processors\" />
+	  <Folder Include="Search\" />
+	  <Folder Include="Storage\" />
+	  <Folder Include="Models\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\FhirStore.Common\FhirStore.Common.csproj" />
+	  <ProjectReference Include="..\FhirStore.R4\FhirStore.R4.csproj" />
+	  <ProjectReference Include="..\FhirStore.R4B\FhirStore.R4B.csproj" />
+	  <ProjectReference Include="..\FhirStore.R5\FhirStore.R5.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="Models\" />
+	</ItemGroup>
+	<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
+		<ItemGroup>
+			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4'">
+				<Aliases>storeR4</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4B'">
+				<Aliases>storeR4B</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='FhirStore.R5'">
+				<Aliases>storeR5</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4.Core'">
+				<Aliases>coreR4</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4B.Core'">
+				<Aliases>coreR4B</Aliases>
+			</ReferencePath>
+			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R5.Core'">
+				<Aliases>coreR5</Aliases>
+			</ReferencePath>
+
+		</ItemGroup>
+	</Target>
+
+	<!--<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
+		<ItemGroup>
+		</ItemGroup>
+	</Target>-->
+
+</Project>

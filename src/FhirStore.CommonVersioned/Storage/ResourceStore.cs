@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Search;
+using fhir.candle.Search;
 using FhirStore.Extensions;
 using FhirStore.Models;
 using FhirStore.Storage;

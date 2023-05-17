@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirServerHarness.Search;
+using fhir.candle.Search;
 using FhirStore.Models;
 using FhirStore.Storage;
 using Hl7.Fhir.ElementModel;
@@ -20,7 +20,7 @@ using System.Xml.Linq;
 using FhirStore.Versioned.Shims.Subscriptions;
 using System.Text.RegularExpressions;
 using Hl7.Fhir.Language.Debugging;
-using static FhirServerHarness.Search.SearchDefinitions;
+using static fhir.candle.Search.SearchDefinitions;
 using System.Collections;
 
 namespace FhirStore.Storage;
@@ -1539,7 +1539,7 @@ public partial class VersionedFhirStore : IFhirStore
             Kind = CapabilityStatementKind.Instance,
             Software = new()
             {
-                Name = "FhirServerHarness",
+                Name = "fhir-candle",
             },
             FhirVersion = CommonToFirelyVersion(_config.FhirVersion),
             Format = _config.SupportedFormats,

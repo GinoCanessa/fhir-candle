@@ -6,9 +6,9 @@
 using FhirStore.Models;
 using Hl7.Fhir.ElementModel;
 using System.Globalization;
-using static FhirServerHarness.Search.SearchDefinitions;
+using static fhir.candle.Search.SearchDefinitions;
 
-namespace FhirServerHarness.Search;
+namespace fhir.candle.Search;
 
 /// <summary>A class that contains functions to test date inputs against various FHIR types.</summary>
 public static class EvalDateSearch

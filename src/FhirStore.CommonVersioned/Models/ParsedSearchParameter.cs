@@ -4,7 +4,7 @@
 // </copyright>
 
 using FhirStore.Extensions;
-using FhirServerHarness.Search;
+using fhir.candle.Search;
 using FhirStore.Storage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
@@ -13,7 +13,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
-using static FhirServerHarness.Search.SearchDefinitions;
+using static fhir.candle.Search.SearchDefinitions;
 
 namespace FhirStore.Models;
 

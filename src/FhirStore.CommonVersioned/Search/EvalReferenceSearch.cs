@@ -6,7 +6,7 @@
 using FhirStore.Models;
 using Hl7.Fhir.ElementModel;
 
-namespace FhirServerHarness.Search;
+namespace fhir.candle.Search;
 
 /// <summary>A class that contains functions to test reference inputs against various FHIR types.</summary>
 public static class EvalReferenceSearch

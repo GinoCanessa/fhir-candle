@@ -6,7 +6,7 @@
 using FhirStore.Extensions;
 using Hl7.Fhir.Model;
 
-namespace FhirServerHarness.Search;
+namespace fhir.candle.Search;
 
 /// <summary>Common search definitions.</summary>
 public static class SearchDefinitions

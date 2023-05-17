@@ -5,9 +5,9 @@
 
 using FhirStore.Models;
 using Hl7.Fhir.ElementModel;
-using static FhirServerHarness.Search.SearchDefinitions;
+using static fhir.candle.Search.SearchDefinitions;
 
-namespace FhirServerHarness.Search;
+namespace fhir.candle.Search;
 
 /// <summary>An eval number search.</summary>
 public static class EvalNumberSearch

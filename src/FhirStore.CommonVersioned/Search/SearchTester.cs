@@ -12,9 +12,9 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
-using static FhirServerHarness.Search.SearchDefinitions;
+using static fhir.candle.Search.SearchDefinitions;
 
-namespace FhirServerHarness.Search;
+namespace fhir.candle.Search;
 
 /// <summary>Test parsed search parameters against resources.</summary>
 public class SearchTester

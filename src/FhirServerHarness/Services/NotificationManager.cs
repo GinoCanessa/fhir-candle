@@ -7,6 +7,9 @@ using FhirServerHarness.Zulip;
 using FhirStore.Models;
 using FhirStore.Storage;
 using System.Text;
+using MailKit.Net.Smtp;
+using MailKit;
+using MimeKit;
 
 namespace FhirServerHarness.Services;
 
@@ -37,6 +40,18 @@ public class NotificationManager : INotificationManager
     /// <summary>The zulip bot API key.</summary>
     private string _zulipKey;
 
+    /// <summary>The SMTP host.</summary>
+    private string _smtpHost;
+
+    /// <summary>The SMTP port.</summary>
+    private int _smtpPort;
+
+    /// <summary>The SMTP user.</summary>
+    private string _smtpUser;
+
+    /// <summary>The SMTP password.</summary>
+    private string _smtpPassword;
+
     /// <summary>Initializes a new instance of the <see cref="NotificationManager"/> class.</summary>
     /// <param name="fhirStoreManager">Manager for FHIR store.</param>
     public NotificationManager(ILogger<NotificationManager> logger, IFhirStoreManager fhirStoreManager)
@@ -56,8 +71,29 @@ public class NotificationManager : INotificationManager
         }
         else
         {
-            _logger.LogInformation($"Found zulip configuration for: {_zulipSite} ({_zulipEmail})");
+            _logger.LogInformation($"Found Zulip configuration: {_zulipSite} ({_zulipEmail})");
             ZulipClientPool.AddOrRegisterClient(_zulipSite, _zulipEmail, _zulipKey);
+        }
+
+        _smtpHost = Program.Configuration["SMTP_Host"] ?? string.Empty;
+        string value = Program.Configuration["SMTP_Port"] ?? string.Empty;
+        if (!int.TryParse(value, out _smtpPort))
+        {
+            _smtpPort = 0;
+        }
+        _smtpUser = Program.Configuration["SMTP_User"] ?? string.Empty;
+        _smtpPassword = Program.Configuration["SMTP_Password"] ?? string.Empty;
+
+        if (string.IsNullOrEmpty(_smtpHost) ||
+            string.IsNullOrEmpty(_smtpUser) ||
+            string.IsNullOrEmpty(_smtpPassword) ||
+            (_smtpPort == 0))
+        {
+            _logger.LogInformation("SMTP information not found - Email notification will not be sent");
+        }
+        else
+        {
+            _logger.LogInformation($"Found SMTP configuration: {_smtpHost}:{_smtpPort} ({_smtpUser})");
         }
     }
 
@@ -119,16 +155,17 @@ public class NotificationManager : INotificationManager
         switch (e.Subscription.ChannelCode.ToLowerInvariant())
         {
             case "email":
-            case "websocket":
-                throw new NotImplementedException($"TryNotify <<< unimplemented channel type: {e.Subscription.ChannelCode}");
-
-            case "zulip":
-                return await TryNotifyZulip(store, e, contents);
+                return await TryNotifyEmail(store, e, contents);
 
             case "rest-hook":
                 return await TryNotifyRestHook(store, e, contents);
 
+            case "zulip":
+                return await TryNotifyZulip(store, e, contents);
+
+            case "websocket":
             default:
+                _logger.LogError($"TryNotify <<< unimplemented channel type: {e.Subscription.ChannelCode}");
                 return false;
         }
     }
@@ -298,7 +335,129 @@ public class NotificationManager : INotificationManager
         return true;
     }
 
-    /// <summary>Builds zulip message.</summary>
+    /// <summary>Attempt to send a notification via Email.</summary>
+    /// <param name="store">   The store.</param>
+    /// <param name="e">       Subscription event information.</param>
+    /// <param name="contents">Serialized contents of the notification.</param>
+    /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
+    private async Task<bool> TryNotifyEmail(
+        IFhirStore store,
+        SubscriptionEventArgs e,
+        string contents)
+    {
+        string from = e.Subscription.Parameters.ContainsKey("from") ? e.Subscription.Parameters["from"].First() : "FHIR Notification";
+        string destination = e.Subscription.Endpoint ?? string.Empty;
+
+        if (string.IsNullOrEmpty(destination) ||
+            string.IsNullOrEmpty(_smtpHost) ||
+            string.IsNullOrEmpty(_smtpUser) ||
+            (_smtpPort == 0))
+        {
+            return false;
+        }
+
+        if (destination.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+        {
+            destination = destination.Substring(7).Trim();
+        }
+
+        // send the request to the endpoint
+        try
+        {
+            using (MemoryStream ms = new MemoryStream((byte[])System.Text.Encoding.UTF8.GetBytes(contents)))
+            {
+                long eventLo = e.NotificationEvents.Any() ? e.NotificationEvents.Min(ne => ne.EventNumber) : 0;
+                long eventHi = e.NotificationEvents.Any() ? e.NotificationEvents.Max(ne => ne.EventNumber) : 0;
+
+                string shortMime = e.Subscription.ContentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                    ? "json"
+                    : "xml";
+
+                MimeMessage message = new();
+                message.From.Add(new MailboxAddress(from, _smtpUser));
+                message.To.Add(new MailboxAddress(destination, destination));
+
+                BodyBuilder bodyBuilder = new();
+                bodyBuilder.TextBody = BuildEmailMessage(store, e);
+
+                // no events included
+                if (eventLo == 0)
+                {
+                    message.Subject = $"Subscription {e.Subscription.Id} {e.NotificationType}";
+
+                    bodyBuilder.Attachments.Add(
+                        $"notifications-{e.NotificationType}.{shortMime}",
+                        ms,
+                        ContentType.Parse(e.Subscription.ContentType));
+                }
+
+                // one event included
+                else if (eventLo == eventHi)
+                {
+                    message.Subject = $"Subscription {e.Subscription.Id} Event {eventLo}";
+
+                    bodyBuilder.Attachments.Add(
+                        $"notification-{eventLo}.{shortMime}",
+                        ms,
+                        ContentType.Parse(e.Subscription.ContentType));
+                }
+
+                // multiple events included
+                else
+                {
+                    message.Subject = $"Subscription {e.Subscription.Id} Events {eventLo}-{eventHi}";
+
+                    bodyBuilder.Attachments.Add(
+                        $"notifications-{eventLo}-{eventHi}.{shortMime}",
+                        ms,
+                        ContentType.Parse(e.Subscription.ContentType));
+                }
+
+                message.Body = bodyBuilder.ToMessageBody();
+
+                using (SmtpClient client = new())
+                {
+                    client.Connect(_smtpHost, _smtpPort, true);
+                    client.Authenticate(_smtpUser, _smtpPassword);
+                    await client.SendAsync(message);
+                    client.Disconnect(true);
+                }
+            }
+
+            e.Subscription.LastCommunicationTicks = DateTime.Now.Ticks;
+        }
+        catch (Exception ex)
+        {
+            e.Subscription.RegisterError($"Email {e.NotificationType} to {e.Subscription.Endpoint} failed: {ex.Message}");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Builds an email message.</summary>
+    /// <param name="store">   The store.</param>
+    /// <param name="e">       Subscription event information.</param>
+    /// <param name="contents">Serialized contents of the notification.</param>
+    /// <returns>A string.</returns>
+    private string BuildEmailMessage(IFhirStore store, SubscriptionEventArgs e)
+    {
+        // TODO: need to build a persistent opt-out
+
+        if (e.NotificationEvents.Any())
+        {
+            return $"Subscription {e.Subscription.Id} ({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+                $" is sending you a {e.NotificationType} notification for events" +
+                $" {string.Join(',', e.NotificationEvents.Select(ne => ne.EventNumber))}.\n\n" +
+                $"The FHIR contents can be found as an attachment to this message.";
+        }
+
+        return $"Subscription {e.Subscription.Id} ({store.Config.BaseUrl}/Subscription/{e.Subscription.Id})" +
+            $" is sending you a {e.NotificationType} notification.\n\n" +
+            $"The FHIR contents can be found as an attachment to this message.";
+    }
+
+    /// <summary>Builds a zulip message.</summary>
     /// <param name="store">   The store.</param>
     /// <param name="e">       Subscription event information.</param>
     /// <param name="contents">Serialized contents of the notification.</param>
@@ -394,6 +553,13 @@ public class NotificationManager : INotificationManager
                 if ((!sub.CurrentStatus.Equals("active", StringComparison.Ordinal)) ||
                     (sub.HeartbeatSeconds <= 0))
                 {
+                    continue;
+                }
+
+                // wait one offset if the subscription is new
+                if (sub.LastCommunicationTicks == 0)
+                {
+                    sub.LastCommunicationTicks = currentTicks + (sub.HeartbeatSeconds - 1 * TimeSpan.TicksPerSecond);
                     continue;
                 }
 

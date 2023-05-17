@@ -15,7 +15,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.R5", "src\FhirSto
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.R4", "src\FhirStore.R4\FhirStore.R4.csproj", "{316B7737-194D-41D8-8725-B79C09CD8F93}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.Common", "FhirStore.Common\FhirStore.Common.csproj", "{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirStore.Common", "src\FhirStore.Common\FhirStore.Common.csproj", "{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R5", "src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.shproj", "{ADCCCEBD-B2BE-4364-8694-B5D6462AE60C}"
 EndProject

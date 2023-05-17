@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FhirStore.Common\FhirStore.Common.csproj" />
+    <ProjectReference Include="..\FhirStore.Common\FhirStore.Common.csproj" />
     <ProjectReference Include="..\FhirServerHarness\FhirServerHarness.csproj" />
     <ProjectReference Include="..\FhirStore.R4\FhirStore.R4.csproj" />
     <ProjectReference Include="..\FhirStore.R4B\FhirStore.R4B.csproj" />

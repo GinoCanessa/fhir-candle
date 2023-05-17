@@ -8,11 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Services\" />
-    <Folder Include="Subscriptions\" />
+    <Folder Include="Models\" />
+    <Folder Include="Storage\" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Remove="Subscriptions\" />
-  </ItemGroup>
 </Project>

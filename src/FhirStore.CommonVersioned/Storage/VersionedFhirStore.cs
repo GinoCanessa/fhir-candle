@@ -104,9 +104,6 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>True if capabilities are stale.</summary>
     private bool _capabilitiesAreStale = true;
 
-    /// <summary>Base URI of this store.</summary>
-    private Uri _baseUri = null!;
-
     /// <summary>(Immutable) Identifier for the capability statement.</summary>
     private const string _capabilityStatementId = "metadata";
 

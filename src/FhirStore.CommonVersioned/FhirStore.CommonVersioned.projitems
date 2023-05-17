@@ -29,7 +29,4 @@
     <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Subscription\" />
-  </ItemGroup>
 </Project>

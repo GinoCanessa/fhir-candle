@@ -4,7 +4,6 @@
   "url": "http://hl7.org/fhir/SearchParameter/patient-multiplebirth",
   "version": "1",
   "name": "Patient-multiplebirth",
-  "title": "Patient Multiple Birth",
   "status": "draft",
   "experimental": true,
   "description": "Search by patient.multipleBirthInteger",
@@ -12,6 +11,5 @@
   "code": "multiplebirth",
   "base": [ "Patient" ],
   "type": "number",
-  "expression": "(Patient.multipleBirth as integer)",
-  "processingMode": "normal"
+  "expression": "(Patient.multipleBirth as integer)"
 }

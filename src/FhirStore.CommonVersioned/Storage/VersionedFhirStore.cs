@@ -43,31 +43,22 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The compiler.</summary>
     private static FhirPathCompiler _compiler = null!;
 
-    private FhirJsonParser _jsonParser = new(new ParserSettings()
+    FhirJsonPocoDeserializer _jsonParser = new(new FhirJsonPocoDeserializerSettings()
     {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
+        DisableBase64Decoding = false,
     });
 
-    private FhirJsonSerializationSettings _jsonSerializerSettings = new()
+    FhirJsonPocoSerializer _jsonSerializer = new(new FhirJsonPocoSerializerSettings()
     {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
-
-    private FhirXmlParser _xmlParser = new(new ParserSettings()
-    {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
+        SummaryFilter = null,
     });
 
-    private FhirXmlSerializationSettings _xmlSerializerSettings = new()
+    FhirXmlPocoDeserializer _xmlParser = new(new FhirXmlPocoDeserializerSettings()
     {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
+        DisableBase64Decoding=false,
+    });
+
+    FhirXmlPocoSerializer _xmlSerializer = new();
 
     /// <summary>The store.</summary>
     private Dictionary<string, IVersionedResourceStore> _store = new();
@@ -400,11 +391,13 @@ public partial class VersionedFhirStore : IFhirStore
                 case "fhir+xml":
                 case "application/xml":
                 case "application/fhir+xml":
-                    return instance.ToXml(_xmlSerializerSettings);
+                    //return instance.ToXml(_xmlSerializerSettings);
+                    return _xmlSerializer.SerializeToString(instance);
 
                 // default to JSON
                 default:
-                    return instance.ToJson(_jsonSerializerSettings);
+                    //return instance.ToJson(_jsonSerializerSettings);
+                    return _jsonSerializer.SerializeToString(instance);
             }
         //}
     }
@@ -443,14 +436,16 @@ public partial class VersionedFhirStore : IFhirStore
             case "fhir+json":
             case "application/json":
             case "application/fhir+json":
-                parsed = _jsonParser.Parse(content);
+                //parsed = _jsonParser.Parse(content);
+                parsed = _jsonParser.DeserializeResource(content);
                 break;
 
             case "xml":
             case "fhir+xml":
             case "application/xml":
             case "application/fhir+xml":
-                parsed = _xmlParser.Parse(content);
+                //parsed = _xmlParser.Parse(content);
+                parsed = _xmlParser.DeserializeResource(content);
                 break;
 
             default:
@@ -715,14 +710,16 @@ public partial class VersionedFhirStore : IFhirStore
             case "fhir+json":
             case "application/json":
             case "application/fhir+json":
-                parsed = _jsonParser.Parse(content);
+                //parsed = _jsonParser.Parse(content);
+                parsed = _jsonParser.DeserializeResource(content);
                 break;
 
             case "xml":
             case "fhir+xml":
             case "application/xml":
             case "application/fhir+xml":
-                parsed = _xmlParser.Parse(content);
+                //parsed = _xmlParser.Parse(content);
+                parsed = _xmlParser.DeserializeResource(content);
                 break;
 
             default:

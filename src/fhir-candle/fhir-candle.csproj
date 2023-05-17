@@ -6,8 +6,11 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>fhir.candle</RootNamespace>
 		<StartupObject>fhir.candle.Program</StartupObject>
-		<Version>0.0.1-beta.1</Version>
+		<VersionPrefix>0.0.1</VersionPrefix>
+		<VersionSuffix>beta1</VersionSuffix>
+		<Version>$(VersionPrefix)</Version>
 		<AssemblyVersion>0.0.1.1</AssemblyVersion>
+		<FileVersion>0.0.1.1</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'http' " />

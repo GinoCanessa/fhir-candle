@@ -6,6 +6,8 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>fhir.candle</RootNamespace>
 		<StartupObject>fhir.candle.Program</StartupObject>
+		<Version>0.0.1-beta.1</Version>
+		<AssemblyVersion>0.0.1.1</AssemblyVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'http' " />
@@ -36,14 +38,11 @@
 	<ItemGroup>
 	  <PackageReference Include="Antlr4.Runtime.Standard" Version="4.12.0" />
 	  <PackageReference Include="MailKit" Version="4.0.0" />
-	  <PackageReference Include="MudBlazor" Version="6.2.3" />
+	  <PackageReference Include="MudBlazor" Version="6.2.5" />
 	  <PackageReference Include="BlazorMonaco" Version="3.0.0" />
+	  <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+	  <PackageReference Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
 	  <PackageReference Include="zulip-cs-lib" Version="0.0.1-alpha.6" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Models\" />
-	  <Folder Include="Models\" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -42,27 +42,27 @@ public class FhirStoreTests : IDisposable
     {
         new object[]
         {
-            new ProviderConfiguration()
+            new TenantConfiguration()
             {
-                FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4,
+                FhirVersion  = TenantConfiguration.SupportedFhirVersions.R4,
                 ControllerName = "r4",
                 BaseUrl = "http://localhost/fhir/r5",
             },
         },
         new object[]
         {
-            new ProviderConfiguration()
+            new TenantConfiguration()
             {
-                FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R4B,
+                FhirVersion  = TenantConfiguration.SupportedFhirVersions.R4B,
                 ControllerName = "r4b",
                 BaseUrl = "http://localhost/fhir/r5",
             },
         },
         new object[]
         {
-            new ProviderConfiguration()
+            new TenantConfiguration()
             {
-                FhirVersion  = ProviderConfiguration.SupportedFhirVersions.R5,
+                FhirVersion  = TenantConfiguration.SupportedFhirVersions.R5,
                 ControllerName = "r5",
                 BaseUrl = "http://localhost/fhir/r5",
             },
@@ -73,19 +73,19 @@ public class FhirStoreTests : IDisposable
     /// <param name="config">The configuration.</param>
     [Theory]
     [MemberData(nameof(Configurations))]
-    public void CreateFhirStore(ProviderConfiguration config)
+    public void CreateFhirStore(TenantConfiguration config)
     {
         IFhirStore fhirStore;
 
         switch (config.FhirVersion)
         {
-            case ProviderConfiguration.SupportedFhirVersions.R4:
+            case TenantConfiguration.SupportedFhirVersions.R4:
                 fhirStore = new storeR4::FhirStore.Storage.VersionedFhirStore();
                 break;
-            case ProviderConfiguration.SupportedFhirVersions.R4B:
+            case TenantConfiguration.SupportedFhirVersions.R4B:
                 fhirStore = new storeR4B::FhirStore.Storage.VersionedFhirStore();
                 break;
-            case ProviderConfiguration.SupportedFhirVersions.R5:
+            case TenantConfiguration.SupportedFhirVersions.R5:
                 fhirStore = new storeR5::FhirStore.Storage.VersionedFhirStore();
                 break;
             default:

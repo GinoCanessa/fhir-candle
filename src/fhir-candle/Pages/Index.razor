@@ -1,6 +1,7 @@
 ﻿@page "/"
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
+@inject ServerConfiguration ServerConfig
 
 @implements IDisposable
 
@@ -42,8 +43,8 @@
                         Size="Size.Small" />
             </MudTooltip>
         </MudTd>
-        <MudTd DataLabel="Public URL">@($"{Program.InternalUrl}/fhir/{context.Key}")</MudTd>
-        <MudTd DataLabel="Internal URL">@context.Value.Config.BaseUrl</MudTd>
+        <MudTd DataLabel="Public URL">@context.Value.Config.BaseUrl</MudTd>
+        <MudTd DataLabel="Internal URL">@($"http://localhost:{ServerConfig.ListenPort}/fhir/{context.Key}")</MudTd>
         <MudTd DataLabel="FHIR Version">@context.Value.Config.FhirVersion</MudTd>
     </RowTemplate>
 </MudTable>

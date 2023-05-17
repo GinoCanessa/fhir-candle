@@ -25,9 +25,9 @@ public class FhirStoreTestsR5: IDisposable
     private readonly ITestOutputHelper _testOutputHelper;
 
     /// <summary>(Immutable) The configuration.</summary>
-    private static readonly ProviderConfiguration _config = new()
+    private static readonly TenantConfiguration _config = new()
     {
-        FhirVersion = ProviderConfiguration.SupportedFhirVersions.R5,
+        FhirVersion = TenantConfiguration.SupportedFhirVersions.R5,
         ControllerName = "r5",
         BaseUrl = "http://localhost/fhir/r5",
     };

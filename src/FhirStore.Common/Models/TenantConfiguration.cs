@@ -1,4 +1,4 @@
-﻿// <copyright file="ProviderConfiguration.cs" company="Microsoft Corporation">
+﻿// <copyright file="TenantConfiguration.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
@@ -6,7 +6,7 @@
 namespace FhirStore.Models;
 
 /// <summary>A provider configuration.</summary>
-public class ProviderConfiguration
+public class TenantConfiguration
 {
     /// <summary>Values that represent supported FHIR versions.</summary>
     public enum SupportedFhirVersions

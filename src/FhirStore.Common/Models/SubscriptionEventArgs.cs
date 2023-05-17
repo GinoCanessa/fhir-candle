@@ -9,7 +9,7 @@ namespace FhirStore.Models;
 public class SubscriptionEventArgs : EventArgs
 {
     /// <summary>Gets the tenant.</summary>
-    public required ProviderConfiguration Tenant { get; init; }
+    public required TenantConfiguration Tenant { get; init; }
 
     /// <summary>Gets the parsed subscription.</summary>
     public required ParsedSubscription Subscription { get; init; }

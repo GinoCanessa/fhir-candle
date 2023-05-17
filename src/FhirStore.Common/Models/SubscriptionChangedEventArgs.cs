@@ -9,7 +9,7 @@ namespace FhirStore.Models;
 public class SubscriptionChangedEventArgs
 {
     /// <summary>Gets or initializes the tenant.</summary>
-    public required ProviderConfiguration Tenant { get; init; }
+    public required TenantConfiguration Tenant { get; init; }
 
     /// <summary>Gets or initializes the subscription.</summary>
     public ParsedSubscription? ChangedSubscription { get; init; } = null;

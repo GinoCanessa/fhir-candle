@@ -10,6 +10,7 @@ using System.Text;
 using MailKit.Net.Smtp;
 using MailKit;
 using MimeKit;
+using fhir.candle.Models;
 
 namespace fhir.candle.Services;
 
@@ -32,7 +33,7 @@ public class NotificationManager : INotificationManager
     private Timer _heartbeatTimer = null!;
 
     /// <summary>The zulip site URL (e.g., https://chat.fhir.org/).</summary>
-    private string _zulipSite;
+    private string _zulipUrl;
 
     /// <summary>The zulip bot email address.</summary>
     private string _zulipEmail;
@@ -53,17 +54,24 @@ public class NotificationManager : INotificationManager
     private string _smtpPassword;
 
     /// <summary>Initializes a new instance of the <see cref="NotificationManager"/> class.</summary>
+    /// <param name="serverConfig">    The server configuration.</param>
+    /// <param name="tenants">         The tenants.</param>
     /// <param name="fhirStoreManager">Manager for FHIR store.</param>
-    public NotificationManager(ILogger<NotificationManager> logger, IFhirStoreManager fhirStoreManager)
+    /// <param name="logger">          The logger.</param>
+    public NotificationManager(
+        ServerConfiguration serverConfig,
+        Dictionary<string, TenantConfiguration> tenants,
+        IFhirStoreManager fhirStoreManager,
+        ILogger<NotificationManager> logger)
     {
         _logger = logger;
         _storeManager = fhirStoreManager;
 
-        _zulipSite = Program.Configuration["Zulip_Site"] ?? string.Empty;
-        _zulipEmail = Program.Configuration["Zulip_Email"] ?? string.Empty;
-        _zulipKey = Program.Configuration["Zulip_Key"] ?? string.Empty;
+        _zulipUrl = serverConfig.ZulipUrl;
+        _zulipEmail = serverConfig.ZulipEmail;
+        _zulipKey = serverConfig.ZulipKey;
 
-        if (string.IsNullOrEmpty(_zulipSite) ||
+        if (string.IsNullOrEmpty(_zulipUrl) ||
             string.IsNullOrEmpty(_zulipEmail) ||
             string.IsNullOrEmpty(_zulipKey))
         {
@@ -71,18 +79,14 @@ public class NotificationManager : INotificationManager
         }
         else
         {
-            _logger.LogInformation($"Found Zulip configuration: {_zulipSite} ({_zulipEmail})");
-            ZulipClientPool.AddOrRegisterClient(_zulipSite, _zulipEmail, _zulipKey);
+            _logger.LogInformation($"Found Zulip configuration: {_zulipUrl} ({_zulipEmail})");
+            ZulipClientPool.AddOrRegisterClient(_zulipUrl, _zulipEmail, _zulipKey);
         }
 
-        _smtpHost = Program.Configuration["SMTP_Host"] ?? string.Empty;
-        string value = Program.Configuration["SMTP_Port"] ?? string.Empty;
-        if (!int.TryParse(value, out _smtpPort))
-        {
-            _smtpPort = 0;
-        }
-        _smtpUser = Program.Configuration["SMTP_User"] ?? string.Empty;
-        _smtpPassword = Program.Configuration["SMTP_Password"] ?? string.Empty;
+        _smtpHost = serverConfig.SmtpHost;
+        _smtpPort = serverConfig.SmtpPort;
+        _smtpUser = serverConfig.SmtpUser;
+        _smtpPassword = serverConfig.SmtpPassword;
 
         if (string.IsNullOrEmpty(_smtpHost) ||
             string.IsNullOrEmpty(_smtpUser) ||
@@ -270,7 +274,7 @@ public class NotificationManager : INotificationManager
         SubscriptionEventArgs e,
         string contents)
     {
-        string zulipSite = e.Subscription.Parameters.ContainsKey("site") ? e.Subscription.Parameters["site"].First() : _zulipSite;
+        string zulipSite = e.Subscription.Parameters.ContainsKey("site") ? e.Subscription.Parameters["site"].First() : _zulipUrl;
         string zulipEmail = e.Subscription.Parameters.ContainsKey("email") ? e.Subscription.Parameters["email"].First() : _zulipEmail;
         string zulipKey = e.Subscription.Parameters.ContainsKey("key") ? e.Subscription.Parameters["key"].First() : _zulipKey;
 

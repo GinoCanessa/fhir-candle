@@ -99,7 +99,7 @@ public partial class VersionedFhirStore : IFhirStore
     private static partial Regex _fhirpathVarMatcher();
 
     /// <summary>The configuration.</summary>
-    private ProviderConfiguration _config = null!;
+    private TenantConfiguration _config = null!;
 
     /// <summary>True if capabilities are stale.</summary>
     private bool _capabilitiesAreStale = true;
@@ -117,7 +117,7 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>Initializes this object.</summary>
     /// <param name="config">The configuration.</param>
-    public void Init(ProviderConfiguration config)
+    public void Init(TenantConfiguration config)
     {
         if (config == null)
         {
@@ -187,7 +187,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
-    public ProviderConfiguration Config => _config;
+    public TenantConfiguration Config => _config;
 
     public bool SupportsResource(string resourceName) => _store.ContainsKey(resourceName);
 
@@ -1508,17 +1508,17 @@ public partial class VersionedFhirStore : IFhirStore
     ///  required range.</exception>
     /// <param name="v">The SupportedFhirVersions to process.</param>
     /// <returns>A FHIRVersion.</returns>
-    private FHIRVersion CommonToFirelyVersion(ProviderConfiguration.SupportedFhirVersions v)
+    private FHIRVersion CommonToFirelyVersion(TenantConfiguration.SupportedFhirVersions v)
     {
         switch (v)
         {
-            case ProviderConfiguration.SupportedFhirVersions.R4:
+            case TenantConfiguration.SupportedFhirVersions.R4:
                 return FHIRVersion.N4_0_1;
 
-            case ProviderConfiguration.SupportedFhirVersions.R4B:
+            case TenantConfiguration.SupportedFhirVersions.R4B:
                 return FHIRVersion.N4_3_0;
 
-            case ProviderConfiguration.SupportedFhirVersions.R5:
+            case TenantConfiguration.SupportedFhirVersions.R5:
                 return FHIRVersion.N5_0_0;
 
             default:

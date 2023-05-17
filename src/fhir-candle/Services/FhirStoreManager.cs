@@ -8,6 +8,7 @@ extern alias storeR4B;
 extern alias storeR5;
 
 using System.Collections;
+using fhir.candle.Models;
 using FhirStore.Models;
 using FhirStore.Storage;
 
@@ -21,6 +22,9 @@ public class FhirStoreManager : IFhirStoreManager
 
     /// <summary>The logger.</summary>
     private ILogger _logger;
+
+    /// <summary>The tenants.</summary>
+    private Dictionary<string, TenantConfiguration> _tenants;
 
     /// <summary>Occurs when On Changed.</summary>
     public event EventHandler<EventArgs>? OnChanged;
@@ -96,9 +100,13 @@ public class FhirStoreManager : IFhirStoreManager
     IEnumerator IEnumerable.GetEnumerator() => (IEnumerator)_storesByController.GetEnumerator();
 
     /// <summary>Initializes a new instance of the <see cref="FhirStoreManager"/> class.</summary>
-    /// <param name="logger">The logger.</param>
-    public FhirStoreManager(ILogger<FhirStoreManager> logger)
+    /// <param name="tenants">The tenants.</param>
+    /// <param name="logger"> The logger.</param>
+    public FhirStoreManager(
+        Dictionary<string, TenantConfiguration> tenants,
+        ILogger<FhirStoreManager> logger)
     {
+        _tenants = tenants;
         _logger = logger;
     }
 
@@ -121,7 +129,7 @@ public class FhirStoreManager : IFhirStoreManager
         _logger.LogInformation("Starting FhirStoreManager...");
 
         // initialize the requested fhir stores
-        foreach ((string name, ProviderConfiguration config) in Program.Tenants)
+        foreach ((string name, TenantConfiguration config) in _tenants)
         {
             if (_storesByController.ContainsKey(config.ControllerName))
             {
@@ -130,15 +138,15 @@ public class FhirStoreManager : IFhirStoreManager
 
             switch (config.FhirVersion)
             {
-                case ProviderConfiguration.SupportedFhirVersions.R4:
+                case TenantConfiguration.SupportedFhirVersions.R4:
                     _storesByController.Add(name, new storeR4::FhirStore.Storage.VersionedFhirStore());
                     break;
 
-                case ProviderConfiguration.SupportedFhirVersions.R4B:
+                case TenantConfiguration.SupportedFhirVersions.R4B:
                     _storesByController.Add(name, new storeR4B::FhirStore.Storage.VersionedFhirStore());
                     break;
 
-                case ProviderConfiguration.SupportedFhirVersions.R5:
+                case TenantConfiguration.SupportedFhirVersions.R5:
                     _storesByController.Add(name, new storeR5::FhirStore.Storage.VersionedFhirStore());
                     break;
             }

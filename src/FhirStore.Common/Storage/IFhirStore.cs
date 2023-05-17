@@ -25,9 +25,9 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
 
     /// <summary>Initializes this service.</summary>
     /// <param name="config">The configuration.</param>
-    void Init(ProviderConfiguration config);
+    void Init(TenantConfiguration config);
 
-    public ProviderConfiguration Config { get; }
+    public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>
     /// <param name="destFormat">        Destination format.</param>

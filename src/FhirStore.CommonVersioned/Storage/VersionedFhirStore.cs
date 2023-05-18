@@ -48,9 +48,24 @@ public partial class VersionedFhirStore : IFhirStore
         DisableBase64Decoding = false,
     });
 
-    FhirJsonPocoSerializer _jsonSerializer = new(new FhirJsonPocoSerializerSettings()
+    FhirJsonPocoSerializer _jsonSerializerFull = new(new FhirJsonPocoSerializerSettings()
     {
         SummaryFilter = null,
+    });
+
+    FhirJsonPocoSerializer _jsonSerializerData = new(new FhirJsonPocoSerializerSettings()
+    {
+        SummaryFilter = SerializationFilter.ForText(),
+    });
+
+    FhirJsonPocoSerializer _jsonSerializerText = new(new FhirJsonPocoSerializerSettings()
+    {
+        SummaryFilter = SerializationFilter.ForData(),
+    });
+
+    FhirJsonPocoSerializer _jsonSerializerSummary = new(new FhirJsonPocoSerializerSettings()
+    {
+        SummaryFilter = SerializationFilter.ForSummary(),
     });
 
     FhirXmlPocoDeserializer _xmlParser = new(new FhirXmlPocoDeserializerSettings()
@@ -382,24 +397,59 @@ public partial class VersionedFhirStore : IFhirStore
         string destFormat,
         SummaryType summaryType = SummaryType.False)
     {
-        // TODO: Need to add back in summary provider
-        //if (summaryType == SummaryType.False)
-        //{
-            switch (destFormat)
-            {
-                case "xml":
-                case "fhir+xml":
-                case "application/xml":
-                case "application/fhir+xml":
-                    //return instance.ToXml(_xmlSerializerSettings);
-                    return _xmlSerializer.SerializeToString(instance);
+        switch (destFormat)
+        {
+            case "xml":
+            case "fhir+xml":
+            case "application/xml":
+            case "application/fhir+xml":
+                {
+                    SerializationFilter? serializationFilter;
 
-                // default to JSON
-                default:
-                    //return instance.ToJson(_jsonSerializerSettings);
-                    return _jsonSerializer.SerializeToString(instance);
-            }
-        //}
+                    switch (summaryType)
+                    {
+                        case SummaryType.False:
+                        default:
+                            serializationFilter = null;
+                            break;
+
+                        case SummaryType.True:
+                            serializationFilter = SerializationFilter.ForSummary();
+                            break;
+
+                        case SummaryType.Text:
+                            serializationFilter = SerializationFilter.ForText();
+                            break;
+
+                        case SummaryType.Data:
+                            serializationFilter = SerializationFilter.ForData();
+                            break;
+                    }
+
+                    return _xmlSerializer.SerializeToString(instance, serializationFilter);
+                }
+
+            // default to JSON
+            default:
+                {
+                    switch (summaryType)
+                    {
+                        case SummaryType.False:
+                        default:
+                            return _jsonSerializerFull.SerializeToString(instance);
+
+                        case SummaryType.True:
+                            return _jsonSerializerSummary.SerializeToString(instance);
+
+                        case SummaryType.Text:
+                            return _jsonSerializerText.SerializeToString(instance);
+
+                        case SummaryType.Data:
+                            return _jsonSerializerData.SerializeToString(instance);
+                    }
+                }
+                //return instance.ToJson(_jsonSerializerSettings);
+        }
     }
 
     /// <summary>Instance create.</summary>
@@ -436,16 +486,44 @@ public partial class VersionedFhirStore : IFhirStore
             case "fhir+json":
             case "application/json":
             case "application/fhir+json":
-                //parsed = _jsonParser.Parse(content);
-                parsed = _jsonParser.DeserializeResource(content);
+                try
+                {
+                    parsed = _jsonParser.DeserializeResource(content);
+                }
+                catch (Exception ex)
+                {
+                    serializedResource = string.Empty;
+
+                    OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"JSON Parse failed: {ex.Message}");
+                    serializedOutcome = SerializeFhir(oo, destFormat);
+
+                    eTag = string.Empty;
+                    lastModified = string.Empty;
+                    location = string.Empty;
+                    return HttpStatusCode.BadRequest;
+                }
                 break;
 
             case "xml":
             case "fhir+xml":
             case "application/xml":
             case "application/fhir+xml":
-                //parsed = _xmlParser.Parse(content);
-                parsed = _xmlParser.DeserializeResource(content);
+                try
+                {
+                    parsed = _xmlParser.DeserializeResource(content);
+                }
+                catch (Exception ex)
+                {
+                    serializedResource = string.Empty;
+
+                    OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"XML Parse failed: {ex.Message}");
+                    serializedOutcome = SerializeFhir(oo, destFormat);
+
+                    eTag = string.Empty;
+                    lastModified = string.Empty;
+                    location = string.Empty;
+                    return HttpStatusCode.BadRequest;
+                }
                 break;
 
             default:

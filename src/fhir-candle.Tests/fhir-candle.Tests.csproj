@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FhirStore.Common\FhirStore.Common.csproj" />
     <ProjectReference Include="..\fhir-candle\fhir-candle.csproj" />
     <ProjectReference Include="..\FhirStore.R4\FhirStore.R4.csproj" />

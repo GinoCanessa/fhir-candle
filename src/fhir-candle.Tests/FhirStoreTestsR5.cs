@@ -131,6 +131,66 @@ public class FhirStoreTestsR5: IDisposable
     }
 
     [Theory]
+    [FileData("data/r5/patient-invalid.json")]
+    public void PatientCreateInvalid(string json)
+    {
+        //_testOutputHelper.WriteLine(json);
+
+        IFhirStore fhirStore = new VersionedFhirStore();
+        fhirStore.Init(_config);
+
+        HttpStatusCode scCreate = fhirStore.InstanceCreate(
+            "Patient",
+            json,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        scCreate.Should().Be(HttpStatusCode.BadRequest);
+        serializedResource.Should().BeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().BeNullOrEmpty();
+        lastModified.Should().BeNullOrEmpty();
+        location.Should().BeNullOrEmpty();
+    }
+
+    [Theory]
+    [FileData("data/r5/patient-example.json")]
+    public void PatientCreateWrongLocation(string json)
+    {
+        //_testOutputHelper.WriteLine(json);
+
+        IFhirStore fhirStore = new VersionedFhirStore();
+        fhirStore.Init(_config);
+
+        HttpStatusCode scCreate = fhirStore.InstanceCreate(
+            "Encounter",
+            json,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        scCreate.Should().Be(HttpStatusCode.UnprocessableEntity);
+        serializedResource.Should().BeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().BeNullOrEmpty();
+        lastModified.Should().BeNullOrEmpty();
+        location.Should().BeNullOrEmpty();
+    }
+
+    [Theory]
     [FileData("data/r5/Observation-example.json")]
     public void ObservationCreateRead(string json)
     {

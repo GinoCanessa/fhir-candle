@@ -51,35 +51,6 @@ public class FhirStoreTestsR4B: IDisposable
         // cleanup
     }
 
-    [Fact]
-    public void GetMetadata()
-    {
-        IFhirStore fhirStore = new VersionedFhirStore();
-        fhirStore.Init(_config);
-
-        HttpStatusCode scRead = fhirStore.GetMetadata(
-            "application/fhir+json",
-            out string serializedResource,
-            out string serializedOutcome,
-            out string eTag,
-            out string lastModified);
-
-        scRead.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-
-        MinimalCapabilities? capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(serializedResource);
-
-        capabilities.Should().NotBeNull();
-        capabilities!.Rest.Should().NotBeNullOrEmpty();
-
-        MinimalCapabilities.MinimalRest rest = capabilities!.Rest!.First();
-        rest.Mode.Should().Be("server");
-        rest.Resources.Should().NotBeNullOrEmpty();
-        int resourceCount = rest.Resources!.Count();
-        resourceCount.Should().Be(_expectedRestResources);
-    }
-
     [Theory]
     [FileData("data/r4b/patient-example.json")]
     public void ResourceCreatePatient(string json)

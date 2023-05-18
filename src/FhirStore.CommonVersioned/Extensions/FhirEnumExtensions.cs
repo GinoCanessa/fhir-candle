@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace FhirStore.Extensions;
@@ -10,7 +11,7 @@ namespace FhirStore.Extensions;
 /// <summary>A FHIR enum extensions.</summary>
 public static class FhirEnumExtensions
 {
-    private static Dictionary<Type, EnumValueLookups> _typeLookups = new();
+    private static ConcurrentDictionary<Type, EnumValueLookups> _typeLookups = new();
 
     /// <summary>An Enum extension method that converts a value to a literal.</summary>
     /// <param name="fhirEnum">The fhirEnumValue to act on.</param>

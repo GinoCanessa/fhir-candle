@@ -191,6 +191,54 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
         }
+
+        // check for a load directory
+        if (config.LoadDirectory != null)
+        {
+            string serializedResource, serializedOutcome, eTag, lastModified, location;
+            HttpStatusCode sc;
+
+            foreach (FileInfo file in config.LoadDirectory.GetFiles("*.*", SearchOption.AllDirectories))
+            {
+                switch (file.Extension.ToLowerInvariant())
+                {
+                    case ".json":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+json",
+                            "application/fhir+json",
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    case ".xml":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+xml",
+                            "application/fhir+xml",
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    default:
+                        continue;
+                }
+
+                Console.WriteLine($"{config.ControllerName} <<< {sc}: {file.FullName}");
+            }
+        }
     }
 
     public TenantConfiguration Config => _config;
@@ -397,6 +445,8 @@ public partial class VersionedFhirStore : IFhirStore
         string destFormat,
         SummaryType summaryType = SummaryType.False)
     {
+        // TODO: Need to add support for count
+
         switch (destFormat)
         {
             case "xml":
@@ -564,6 +614,11 @@ public partial class VersionedFhirStore : IFhirStore
             lastModified = string.Empty;
             location = string.Empty;
             return HttpStatusCode.UnprocessableEntity;
+        }
+
+        if (string.IsNullOrEmpty(resourceType))
+        {
+            resourceType = r.TypeName;
         }
 
         if (r.TypeName != resourceType)

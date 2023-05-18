@@ -295,6 +295,33 @@ public static partial class Program
             });
         }
 
+        DirectoryInfo? loadDir = null;
+
+        if (config.SourceDirectory != null)
+        {
+            if (config.SourceDirectory.Exists)
+            {
+                loadDir = config.SourceDirectory;
+            }
+        }
+
+        if (loadDir != null)
+        {
+            foreach (TenantConfiguration tenant in tenants.Values)
+            {
+                // check for a tenant-named sub-directory
+                string subPath = Path.Combine(loadDir.FullName, tenant.ControllerName);
+                if (Directory.Exists(subPath))
+                {
+                    tenant.LoadDirectory = new DirectoryInfo(subPath);
+                }
+                else
+                {
+                    tenant.LoadDirectory = loadDir;
+                }
+            }
+        }
+
         return tenants;
     }
 

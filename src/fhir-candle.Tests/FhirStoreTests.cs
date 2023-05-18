@@ -105,4 +105,22 @@ public class FhirStoreTests : IDisposable
         fhirStore.SupportedResources.Should().Contain("Encounter", "FhirStore should support Encounter");
         fhirStore.SupportedResources.Should().Contain("Observation", "FhirStore should support Observation");
     }
+
+    [Fact]
+    public void TestLoadR5()
+    {
+        TenantConfiguration tenant = new TenantConfiguration()
+        {
+            FhirVersion = TenantConfiguration.SupportedFhirVersions.R5,
+            ControllerName = "r5",
+            BaseUrl = "http://localhost/fhir/r5",
+            LoadDirectory = new DirectoryInfo("/Users/ginocanessa/git/fhir-candle/src/fhir-candle.Tests/data/r5"),
+        };
+
+        IFhirStore fhirStore = new storeR5::FhirStore.Storage.VersionedFhirStore();
+
+        fhirStore.Init(tenant);
+
+        fhirStore.SupportedResources.Should().Contain("Patient", "FhirStore should support Patient");
+    }
 }

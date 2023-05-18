@@ -48,4 +48,6 @@ public class TenantConfiguration
 
     /// <summary>Gets or sets the FHIR packages.</summary>
     public Dictionary<string, FhirPackageInfo> FhirPackages { get; } = new();
+
+    public System.IO.DirectoryInfo? LoadDirectory { get; set; } = null;
 }

@@ -8,6 +8,7 @@
   "profiles": {
     "http": {
       "commandName": "Project",
+      "commandLineArgs": "--fhir-source /Users/ginocanessa/git/fhir-candle/src/fhir-candle.Tests/data",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

@@ -22,6 +22,7 @@ namespace fhir.candle.Tests;
 /// <summary>Unit tests core FhirStore R5 functionality.</summary>
 public class FhirStoreTestsR5: IDisposable
 {
+    /// <summary>(Immutable) The test output helper.</summary>
     private readonly ITestOutputHelper _testOutputHelper;
 
     /// <summary>(Immutable) The configuration.</summary>
@@ -35,7 +36,7 @@ public class FhirStoreTestsR5: IDisposable
     private const int _expectedRestResources = 157;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FhirStoreTestsR4B"/> class.
+    /// Initializes a new instance of the <see cref="FhirStoreTestsR5"/> class.
     /// </summary>
     /// <param name="testOutputHelper">The test output helper.</param>
     public FhirStoreTestsR5(ITestOutputHelper testOutputHelper)

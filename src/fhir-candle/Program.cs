@@ -203,8 +203,8 @@ public static partial class Program
             builder.Services.AddSingleton<INotificationManager, NotificationManager>();
             builder.Services.AddHostedService<INotificationManager>(sp => sp.GetRequiredService<INotificationManager>());
 
-
             builder.Services.AddControllers();
+
             if (!config.NoGui)
             {
                 builder.Services.AddRazorPages(options =>

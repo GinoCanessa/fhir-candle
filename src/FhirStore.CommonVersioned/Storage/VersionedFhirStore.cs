@@ -22,6 +22,7 @@ using System.Text.RegularExpressions;
 using Hl7.Fhir.Language.Debugging;
 using static fhir.candle.Search.SearchDefinitions;
 using System.Collections;
+using System.Collections.Concurrent;
 
 namespace FhirStore.Storage;
 
@@ -70,7 +71,7 @@ public partial class VersionedFhirStore : IFhirStore
 
     FhirXmlPocoDeserializer _xmlParser = new(new FhirXmlPocoDeserializerSettings()
     {
-        DisableBase64Decoding=false,
+        DisableBase64Decoding = false,
     });
 
     FhirXmlPocoSerializer _xmlSerializer = new();
@@ -85,7 +86,10 @@ public partial class VersionedFhirStore : IFhirStore
     public IEnumerable<string> SupportedResources => _store.Keys.ToArray();
 
     /// <summary>(Immutable) The cache of compiled search parameter extraction functions.</summary>
-    private readonly Dictionary<string, CompiledExpression> _compiledSearchParameters = new();
+    private readonly ConcurrentDictionary<string, CompiledExpression> _compiledSearchParameters = new();
+
+    /// <summary>The sp lock object.</summary>
+    private object _spLockObject = new();
 
     /// <summary>The subscription topic converter.</summary>
     private static TopicConverter _topicConverter = new();
@@ -94,11 +98,10 @@ public partial class VersionedFhirStore : IFhirStore
     private static SubscriptionConverter _subscriptionConverter = new();
 
     /// <summary>(Immutable) The topics, by id.</summary>
-    private readonly Dictionary<string, ParsedSubscriptionTopic> _topics = new();
+    private readonly ConcurrentDictionary<string, ParsedSubscriptionTopic> _topics = new();
 
     /// <summary>(Immutable) The subscriptions, by id.</summary>
-    private readonly Dictionary<string, ParsedSubscription> _subscriptions = new();
-
+    private readonly ConcurrentDictionary<string, ParsedSubscription> _subscriptions = new();
 
     /// <summary>(Immutable) The fhirpath variable matcher.</summary>
     [GeneratedRegex("[%][\\w\\-]+", RegexOptions.Compiled)]
@@ -241,25 +244,69 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
+    /// <summary>Gets the configuration.</summary>
     public TenantConfiguration Config => _config;
 
+    /// <summary>Supports resource.</summary>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     public bool SupportsResource(string resourceName) => _store.ContainsKey(resourceName);
 
-
+    /// <summary>
+    /// Gets an enumerable collection that contains the keys in the read-only dictionary.
+    /// </summary>
+    /// <typeparam name="string">        Type of the string.</typeparam>
+    /// <typeparam name="IResourceStore">Type of the resource store.</typeparam>
     IEnumerable<string> IReadOnlyDictionary<string, IResourceStore>.Keys => _store.Keys;
 
+    /// <summary>
+    /// Gets an enumerable collection that contains the values in the read-only dictionary.
+    /// </summary>
+    /// <typeparam name="string">        Type of the string.</typeparam>
+    /// <typeparam name="IResourceStore">Type of the resource store.</typeparam>
     IEnumerable<IResourceStore> IReadOnlyDictionary<string, IResourceStore>.Values => _store.Values;
 
+    /// <summary>Gets the number of elements in the collection.</summary>
+    /// <typeparam name="string">         Type of the string.</typeparam>
+    /// <typeparam name="IResourceStore>">Type of the resource store></typeparam>
     int IReadOnlyCollection<KeyValuePair<string, IResourceStore>>.Count => _store.Count;
 
+    /// <summary>Gets the current topics.</summary>
     IEnumerable<ParsedSubscriptionTopic> IFhirStore.CurrentTopics => _topics.Values;
 
+    /// <summary>Gets the current subscriptions.</summary>
     IEnumerable<ParsedSubscription> IFhirStore.CurrentSubscriptions => _subscriptions.Values;
 
+    /// <summary>Gets the element that has the specified key in the read-only dictionary.</summary>
+    /// <typeparam name="string">        Type of the string.</typeparam>
+    /// <typeparam name="IResourceStore">Type of the resource store.</typeparam>
+    /// <param name="key">The key to locate.</param>
+    /// <returns>The element that has the specified key in the read-only dictionary.</returns>
     IResourceStore IReadOnlyDictionary<string, IResourceStore>.this[string key] => _store[key];
 
+    /// <summary>
+    /// Determines whether the read-only dictionary contains an element that has the specified key.
+    /// </summary>
+    /// <typeparam name="string">        Type of the string.</typeparam>
+    /// <typeparam name="IResourceStore">Type of the resource store.</typeparam>
+    /// <param name="key">The key to locate.</param>
+    /// <returns>
+    /// <see langword="true" /> if the read-only dictionary contains an element that has the
+    /// specified key; otherwise, <see langword="false" />.
+    /// </returns>
     bool IReadOnlyDictionary<string, IResourceStore>.ContainsKey(string key) => _store.ContainsKey(key);
 
+    /// <summary>Gets the value that is associated with the specified key.</summary>
+    /// <typeparam name="string">        Type of the string.</typeparam>
+    /// <typeparam name="IResourceStore">Type of the resource store.</typeparam>
+    /// <param name="key">  The key to locate.</param>
+    /// <param name="value">[out] When this method returns, the value associated with the specified
+    ///  key, if the key is found; otherwise, the default value for the type of the <paramref name="value" />
+    ///  parameter. This parameter is passed uninitialized.</param>
+    /// <returns>
+    /// <see langword="true" /> if the object that implements the <see cref="T:System.Collections.Generic.IReadOnlyDictionary`2" />
+    /// interface contains an element that has the specified key; otherwise, <see langword="false" />.
+    /// </returns>
     bool IReadOnlyDictionary<string, IResourceStore>.TryGetValue(string key, out IResourceStore value)
     {
         bool result = _store.TryGetValue(key, out IVersionedResourceStore? rStore);
@@ -267,9 +314,18 @@ public partial class VersionedFhirStore : IFhirStore
         return result;
     }
 
+    /// <summary>Returns an enumerator that iterates through the collection.</summary>
+    /// <typeparam name="string">         Type of the string.</typeparam>
+    /// <typeparam name="IResourceStore>">Type of the resource store></typeparam>
+    /// <returns>An enumerator that can be used to iterate through the collection.</returns>
     IEnumerator<KeyValuePair<string, IResourceStore>> IEnumerable<KeyValuePair<string, IResourceStore>>.GetEnumerator() =>
         _store.Select(kvp => new KeyValuePair<string, IResourceStore>(kvp.Key, kvp.Value)).GetEnumerator();
 
+    /// <summary>Returns an enumerator that iterates through a collection.</summary>
+    /// <returns>
+    /// An <see cref="T:System.Collections.IEnumerator" /> object that can be used to iterate through
+    /// the collection.
+    /// </returns>
     IEnumerator IEnumerable.GetEnumerator() =>
         _store.Select(kvp => new KeyValuePair<string, IResourceStore>(kvp.Key, kvp.Value)).GetEnumerator();
 
@@ -282,9 +338,12 @@ public partial class VersionedFhirStore : IFhirStore
     {
         string c = resourceType + "." + name;
 
-        if (!_compiledSearchParameters.ContainsKey(c))
+        lock (_spLockObject)
         {
-            _compiledSearchParameters.Add(c, _compiler.Compile(expression));
+            if (!_compiledSearchParameters.ContainsKey(c))
+            {
+                _ = _compiledSearchParameters.TryAdd(c, _compiler.Compile(expression));
+            }
         }
 
         return _compiledSearchParameters[c];
@@ -960,9 +1019,13 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         string c = resourceType + "." + spDefinition.Name;
-        if (_compiledSearchParameters.ContainsKey(c))
+
+        lock (_spLockObject)
         {
-            _compiledSearchParameters.Remove(c);
+            if (_compiledSearchParameters.ContainsKey(c))
+            {
+                _ = _compiledSearchParameters.TryRemove(c, out _);
+            }
         }
 
         _capabilitiesAreStale = true;
@@ -982,9 +1045,13 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         string c = resourceType + "." + name;
-        if (_compiledSearchParameters.ContainsKey(c))
+
+        lock (_spLockObject)
         {
-            _compiledSearchParameters.Remove(c);
+            if (_compiledSearchParameters.ContainsKey(c))
+            {
+                _ = _compiledSearchParameters.TryRemove(c, out _);
+            }
         }
 
         _capabilitiesAreStale = true;
@@ -1050,7 +1117,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
         else
         {
-            _topics.Add(topic.Url, topic);
+            _ = _topics.TryAdd(topic.Url, topic);
         }
 
         // check for no resource triggers
@@ -1243,7 +1310,7 @@ public partial class VersionedFhirStore : IFhirStore
             rs.RemoveExecutableSubscription(subscription.TopicUrl, subscription.Id);
         }
 
-        _subscriptions.Remove(subscription.Id);
+        _ = _subscriptions.TryRemove(subscription.Id, out _);
 
         RegisterSubscriptionsChanged(subscription, true);
 
@@ -1266,7 +1333,7 @@ public partial class VersionedFhirStore : IFhirStore
         else
         {
             priorState = "off";
-            _subscriptions.Add(subscription.Id, subscription);
+            _ = _subscriptions.TryAdd(subscription.Id, subscription);
         }
 
         // check to see if we have this topic

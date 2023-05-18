@@ -1,9 +1,9 @@
-﻿// <copyright file="FhirStoreTestsR5Resource.cs" company="Microsoft Corporation">
+﻿// <copyright file="FhirStoreTestsR4Resource.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-extern alias storeR5;
+extern alias storeR4;
 
 using FhirStore.Models;
 using FhirStore.Storage;
@@ -11,123 +11,80 @@ using fhir.candle.Tests.Models;
 using FluentAssertions;
 using System.Text.Json;
 using Xunit.Abstractions;
-using storeR5::FhirStore.Models;
-using storeR5::FhirStore.Storage;
+using storeR4::FhirStore.Models;
+using storeR4::FhirStore.Storage;
 
 namespace fhir.candle.Tests;
 
-/// <summary>Unit tests FhirStore Patient / search functionality.</summary>
-public class FhirStoreTestsR5Resource : IDisposable
+/// <summary>Unit tests for FHIR R4.</summary>
+public class R4Tests
 {
     /// <summary>The FHIR store.</summary>
-    private static IFhirStore _store;
+    internal IFhirStore _store;
 
     /// <summary>(Immutable) The configuration.</summary>
-    private static readonly TenantConfiguration _config = new()
-    {
-        FhirVersion = TenantConfiguration.SupportedFhirVersions.R4B,
-        ControllerName = "r5",
-        BaseUrl = "http://localhost/fhir/r5",
-    };
+    internal readonly TenantConfiguration _config;
 
+    /// <summary>(Immutable) The total number of patients.</summary>
+    internal const int _patientCount = 5;
+
+    /// <summary>(Immutable) The number of patients coded as male.</summary>
+    internal const int _patientsMale = 3;
+
+    /// <summary>(Immutable) The number of patients coded as female.</summary>
+    internal const int _patientsFemale = 1;
+
+    /// <summary>(Immutable) The total number of observations.</summary>
+    internal const int _observationCount = 6;
+
+    /// <summary>(Immutable) The number of observations that are vital signs.</summary>
+    internal const int _observationsVitalSigns = 3;
+
+    /// <summary>(Immutable) The number of observations with the subject 'example'.</summary>
+    internal const int _observationsWithSubjectExample = 4;
+
+    /// <summary>Initializes a new instance of the <see cref="R4Tests"/> class.</summary>
+    public R4Tests()
+    {
+        string path = Path.GetRelativePath(Directory.GetCurrentDirectory(), "data/r4");
+        DirectoryInfo? loadDirectory = null;
+
+        if (Directory.Exists(path))
+        {
+            loadDirectory = new DirectoryInfo(path);
+        }
+
+        _config = new()
+        {
+            FhirVersion = TenantConfiguration.SupportedFhirVersions.R4,
+            ControllerName = "r4",
+            BaseUrl = "http://localhost/fhir/r4",
+            LoadDirectory = loadDirectory,
+        };
+
+        _store = new VersionedFhirStore();
+        _store.Init(_config);
+    }
+}
+
+/// <summary>Test R4 patient looped.</summary>
+public class R4TestsPatientLooped : IClassFixture<R4Tests>
+{
     /// <summary>(Immutable) The test output helper.</summary>
     private readonly ITestOutputHelper _testOutputHelper;
 
-    /// <summary>(Immutable) The total number of patients.</summary>
-    private const int _patientCount = 5;
-
-    /// <summary>(Immutable) The number of patients coded as male.</summary>
-    private const int _patientsMale = 3;
-
-    /// <summary>(Immutable) The number of patients coded as female.</summary>
-    private const int _patientsFemale = 1;
-
-    /// <summary>(Immutable) The total number of observations.</summary>
-    private const int _observationCount = 6;
-
-    /// <summary>(Immutable) The number of observations that are vital signs.</summary>
-    private const int _observationsVitalSigns = 3;
-
-    /// <summary>(Immutable) The number of observations with the subject 'example'.</summary>
-    private const int _observationsWithSubjectExample = 4;
-
-    /// <summary>(Immutable) Number of encounters.</summary>
-    private const int _encounterCount = 1;
-
-    /// <summary>(Immutable) Number of subscription topics.</summary>
-    private const int _subscriptionTopicCount = 1;
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R4Tests _fixture;
 
     /// <summary>
-    /// Initializes static members of the fhir-candle.Tests.FhirStoreTestsR4BPatient class.
+    /// Initializes a new instance of the <see cref="R4TestsPatientLooped"/> class.
     /// </summary>
-    static FhirStoreTestsR5Resource()
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
+    public R4TestsPatientLooped(R4Tests fixture, ITestOutputHelper testOutputHelper)
     {
-        _store = new VersionedFhirStore();
-        _store.Init(_config);
-
-        string path = Path.GetRelativePath(Directory.GetCurrentDirectory(), "data/r4b");
-        LoadTestJsons(path, "Patient");
-        LoadTestJsons(path, "Observation");
-        LoadTestJsons(path, "Encounter");
-        //LoadTestJsons(path, "SubscriptionTopic");
-    }
-
-    /// <summary>Loads for resource.</summary>
-    /// <param name="path">    Full pathname of the file.</param>
-    /// <param name="resource">The resource.</param>
-    private static void LoadTestJsons(string path, string resource)
-    {
-        string lower = resource.ToLowerInvariant();
-
-        foreach (string filename in Directory.EnumerateFiles(path, $"{lower}-*.json", SearchOption.TopDirectoryOnly))
-        {
-            _ = _store.InstanceCreate(
-                resource,
-                File.ReadAllText(filename),
-                "application/fhir+json",
-                "application/fhir+json",
-                string.Empty,
-                true,
-                out _,
-                out _,
-                out _,
-                out _,
-                out _);
-        }
-
-        foreach (string filename in Directory.EnumerateFiles(path, $"searchparameter-{lower}*.json", SearchOption.TopDirectoryOnly))
-        {
-            _ = _store.InstanceCreate(
-                "SearchParameter",
-                File.ReadAllText(filename),
-                "application/fhir+json",
-                "application/fhir+json",
-                string.Empty,
-                true,
-                out _,
-                out _,
-                out _,
-                out _,
-                out _);
-        }
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="FhirStoreTestsR4B"/> class.
-    /// </summary>
-    /// <param name="testOutputHelper">The test output helper.</param>
-    public FhirStoreTestsR5Resource(ITestOutputHelper testOutputHelper)
-    {
+        _fixture = fixture;
         _testOutputHelper = testOutputHelper;
-    }
-
-    /// <summary>
-    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
-    /// resources.
-    /// </summary>
-    public void Dispose()
-    {
-        // cleanup
     }
 
     [Theory]
@@ -138,13 +95,32 @@ public class FhirStoreTestsR5Resource : IDisposable
 
         for (int i = 0; i < loopCount; i++)
         {
-            _store.TypeSearch("Patient", search, "application/fhir+json", out string bundle, out string outcome);
+            _fixture._store.TypeSearch("Patient", search, "application/fhir+json", out string bundle, out string outcome);
             bundle.Should().NotBeNullOrEmpty();
         }
     }
+}
+
+/// <summary>Test R4 Observation searches.</summary>
+public class R4TestsObservation : IClassFixture<R4Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R4Tests _fixture;
+
+    /// <summary>Initializes a new instance of the <see cref="R4TestsObservation"/> class.</summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">The test output helper.</param>
+    public R4TestsObservation(R4Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
 
     [Theory]
-    [InlineData("_id:not=example", (_observationCount - 1))]
+    [InlineData("_id:not=example", (R4Tests._observationCount - 1))]
     [InlineData("_id=AnIdThatDoesNotExist", 0)]
     [InlineData("_id=example", 1)]
     [InlineData("_id=example&_include=Observation:patient", 1, 2)]
@@ -161,26 +137,26 @@ public class FhirStoreTestsR5Resource : IDisposable
     [InlineData("value-quantity=gt185|http://unitsofmeasure.org|[lb_av]", 0)]
     [InlineData("value-quantity=gt185||[lb_av]", 0)]
     [InlineData("value-quantity=gt185||lbs", 0)]
-    [InlineData("value-quantity=84.1|http://unitsofmeasure.org|[kg]", 0)]       // test unit conversion
+    [InlineData("value-quantity=84.1|http://unitsofmeasure.org|[kg]", 0)]       // TODO: test unit conversion
     [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|265201", 1)]
     [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|cL/s", 1)]
     [InlineData("value-quantity=820|urn:iso:std:iso:11073:10101|cl/s", 1)]
     [InlineData("value-quantity=820||265201", 1)]
     [InlineData("value-quantity=820||cL/s", 1)]
-    [InlineData("subject=Patient/example", _observationsWithSubjectExample)]
+    [InlineData("subject=Patient/example", R4Tests._observationsWithSubjectExample)]
     [InlineData("subject=Patient/UnknownPatientId", 0)]
-    [InlineData("subject=example", _observationsWithSubjectExample)]
+    [InlineData("subject=example", R4Tests._observationsWithSubjectExample)]
     [InlineData("code=http://loinc.org|9272-6", 1)]
     [InlineData("code=http://snomed.info/sct|169895004", 1)]
     [InlineData("code=http://snomed.info/sct|9272-6", 0)]
-    [InlineData("_profile=http://hl7.org/fhir/StructureDefinition/vitalsigns", _observationsVitalSigns)]
-    [InlineData("_profile:missing=true", (_observationCount - _observationsVitalSigns))]
-    [InlineData("_profile:missing=false", _observationsVitalSigns)]
+    [InlineData("_profile=http://hl7.org/fhir/StructureDefinition/vitalsigns", R4Tests._observationsVitalSigns)]
+    [InlineData("_profile:missing=true", (R4Tests._observationCount - R4Tests._observationsVitalSigns))]
+    [InlineData("_profile:missing=false", R4Tests._observationsVitalSigns)]
     public void ObservationSearch(string search, int matchCount, int? entryCount = null)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
-        _store.TypeSearch("Observation", search, "application/fhir+json", out string bundle, out _);
+        _fixture._store.TypeSearch("Observation", search, "application/fhir+json", out string bundle, out _);
 
         bundle.Should().NotBeNullOrEmpty();
 
@@ -195,12 +171,31 @@ public class FhirStoreTestsR5Resource : IDisposable
 
         //_testOutputHelper.WriteLine(bundle);
     }
+}
+
+/// <summary>Test R4 Patient searches.</summary>
+public class R4TestsPatient : IClassFixture<R4Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R4Tests _fixture;
+
+    /// <summary>Initializes a new instance of the <see cref="R4TestsPatient"/> class.</summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">The test output helper.</param>
+    public R4TestsPatient(R4Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
 
     [Theory]
-    [InlineData("_id:not=example", (_patientCount - 1))]
+    [InlineData("_id:not=example", (R4Tests._patientCount - 1))]
     [InlineData("_id=AnIdThatDoesNotExist", 0)]
     [InlineData("_id=example", 1)]
-    [InlineData("_id=example&_revinclude=Observation:patient", 1, (_observationsWithSubjectExample + 1))]
+    [InlineData("_id=example&_revinclude=Observation:patient", 1, (R4Tests._observationsWithSubjectExample + 1))]
     [InlineData("name=peter", 1)]
     [InlineData("name=not-present,another-not-present", 0)]
     [InlineData("name=peter,not-present", 1)]
@@ -210,7 +205,7 @@ public class FhirStoreTestsR5Resource : IDisposable
     [InlineData("name:exact=Peter", 1)]
     [InlineData("name:exact=peter", 0)]
     [InlineData("name:exact=Peterish", 0)]
-    [InlineData("_profile:missing=true", _patientCount)]
+    [InlineData("_profile:missing=true", R4Tests._patientCount)]
     [InlineData("_profile:missing=false", 0)]
     [InlineData("multiplebirth=3", 1)]
     [InlineData("multiplebirth=le3", 1)]
@@ -219,15 +214,15 @@ public class FhirStoreTestsR5Resource : IDisposable
     [InlineData("birthdate=1982-01", 1)]
     [InlineData("birthdate=1982", 2)]
     [InlineData("gender=InvalidValue", 0)]
-    [InlineData("gender=male", _patientsMale)]
-    [InlineData("gender=female", _patientsFemale)]
-    [InlineData("gender=male,female", (_patientsMale + _patientsFemale))]
-    [InlineData("name-use=official", _patientCount)]
+    [InlineData("gender=male", R4Tests._patientsMale)]
+    [InlineData("gender=female", R4Tests._patientsFemale)]
+    [InlineData("gender=male,female", (R4Tests._patientsMale + R4Tests._patientsFemale))]
+    [InlineData("name-use=official", R4Tests._patientCount)]
     [InlineData("name-use=invalid-name-use", 0)]
     [InlineData("identifier=urn:oid:1.2.36.146.595.217.0.1|12345", 1)]
     [InlineData("identifier=|12345", 1)]
     [InlineData("identifier=urn:oid:1.2.36.146.595.217.0.1|ValueThatDoesNotExist", 0)]
-    [InlineData("active=true", _patientCount)]
+    [InlineData("active=true", R4Tests._patientCount)]
     [InlineData("active=false", 0)]
     [InlineData("active=garbage", 0)]
     [InlineData("telecom=phone|(03) 5555 6473", 1)]
@@ -240,7 +235,7 @@ public class FhirStoreTestsR5Resource : IDisposable
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
-        _store.TypeSearch("Patient", search, "application/fhir+json", out string bundle, out _);
+        _fixture._store.TypeSearch("Patient", search, "application/fhir+json", out string bundle, out _);
 
         bundle.Should().NotBeNullOrEmpty();
 

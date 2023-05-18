@@ -36,7 +36,10 @@ public class ResourceStore<T> : IVersionedResourceStore
     private bool _hasDisposed = false;
 
     /// <summary>The resource store.</summary>
-    private Dictionary<string, T> _resourceStore = new();
+    private readonly ConcurrentDictionary<string, T> _resourceStore = new();
+
+    /// <summary>The lock object.</summary>
+    private object _lockObject = new();
 
     /// <summary>Occurs when On Changed.</summary>
     public event EventHandler<EventArgs>? OnChanged;
@@ -62,16 +65,41 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>The supported reverse includes.</summary>
     private string[] _supportedRevIncludes = Array.Empty<string>();
 
+    /// <summary>Gets the keys.</summary>
+    /// <typeparam name="string">  Type of the string.</typeparam>
+    /// <typeparam name="Resource">Type of the resource.</typeparam>
     IEnumerable<string> IReadOnlyDictionary<string, Resource>.Keys => _resourceStore.Keys;
 
+    /// <summary>Gets the values.</summary>
+    /// <typeparam name="string">  Type of the string.</typeparam>
+    /// <typeparam name="Resource">Type of the resource.</typeparam>
     IEnumerable<Resource> IReadOnlyDictionary<string, Resource>.Values => _resourceStore.Values;
 
+    /// <summary>Gets the number of. </summary>
+    /// <typeparam name="string">   Type of the string.</typeparam>
+    /// <typeparam name="Resource>">Type of the resource></typeparam>
     int IReadOnlyCollection<KeyValuePair<string, Resource>>.Count => _resourceStore.Count;
 
+    /// <summary>Indexer to get items within this collection using array index syntax.</summary>
+    /// <typeparam name="string">  Type of the string.</typeparam>
+    /// <typeparam name="Resource">Type of the resource.</typeparam>
+    /// <param name="key">The key.</param>
+    /// <returns>The indexed item.</returns>
     Resource IReadOnlyDictionary<string, Resource>.this[string key] => _resourceStore[key];
 
+    /// <summary>Query if 'key' contains key.</summary>
+    /// <typeparam name="string">  Type of the string.</typeparam>
+    /// <typeparam name="Resource">Type of the resource.</typeparam>
+    /// <param name="key">The key.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     bool IReadOnlyDictionary<string, Resource>.ContainsKey(string key) => _resourceStore.ContainsKey(key);
 
+    /// <summary>Attempts to get value a Resource from the given string.</summary>
+    /// <typeparam name="string">  Type of the string.</typeparam>
+    /// <typeparam name="Resource">Type of the resource.</typeparam>
+    /// <param name="key">  The key.</param>
+    /// <param name="value">[out] The value.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     bool IReadOnlyDictionary<string, Resource>.TryGetValue(string key, out Resource value)
     {
         bool result = _resourceStore.TryGetValue(key, out T? tVal);
@@ -79,23 +107,53 @@ public class ResourceStore<T> : IVersionedResourceStore
         return result;
     }
 
+    /// <summary>Gets the enumerator.</summary>
+    /// <typeparam name="string">   Type of the string.</typeparam>
+    /// <typeparam name="Resource>">Type of the resource></typeparam>
+    /// <returns>The enumerator.</returns>
     IEnumerator<KeyValuePair<string, Resource>> IEnumerable<KeyValuePair<string, Resource>>.GetEnumerator() =>
             _resourceStore.Select(kvp => new KeyValuePair<string, Resource>(kvp.Key, kvp.Value)).GetEnumerator();
 
+    /// <summary>Gets the enumerator.</summary>
+    /// <returns>The enumerator.</returns>
     IEnumerator IEnumerable.GetEnumerator() =>
             _resourceStore.Select(kvp => new KeyValuePair<string, Resource>(kvp.Key, kvp.Value)).GetEnumerator();
 
-
+    /// <summary>Gets the keys.</summary>
+    /// <typeparam name="string">Type of the string.</typeparam>
+    /// <typeparam name="object">Type of the object.</typeparam>
     IEnumerable<string> IReadOnlyDictionary<string, object>.Keys => _resourceStore.Keys;
 
+    /// <summary>Gets the values.</summary>
+    /// <typeparam name="string">Type of the string.</typeparam>
+    /// <typeparam name="object">Type of the object.</typeparam>
     IEnumerable<object> IReadOnlyDictionary<string, object>.Values => _resourceStore.Values;
 
+    /// <summary>Gets the number of. </summary>
+    /// <typeparam name="string"> Type of the string.</typeparam>
+    /// <typeparam name="object>">Type of the object></typeparam>
     int IReadOnlyCollection<KeyValuePair<string, object>>.Count => _resourceStore.Count;
 
+    /// <summary>Indexer to get items within this collection using array index syntax.</summary>
+    /// <typeparam name="string">Type of the string.</typeparam>
+    /// <typeparam name="object">Type of the object.</typeparam>
+    /// <param name="key">The key.</param>
+    /// <returns>The indexed item.</returns>
     object IReadOnlyDictionary<string, object>.this[string key] => _resourceStore[key];
 
+    /// <summary>Query if 'key' contains key.</summary>
+    /// <typeparam name="string">Type of the string.</typeparam>
+    /// <typeparam name="object">Type of the object.</typeparam>
+    /// <param name="key">The key.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     bool IReadOnlyDictionary<string, object>.ContainsKey(string key) => _resourceStore.ContainsKey(key);
 
+    /// <summary>Attempts to get value an object from the given string.</summary>
+    /// <typeparam name="string">Type of the string.</typeparam>
+    /// <typeparam name="object">Type of the object.</typeparam>
+    /// <param name="key">  The key.</param>
+    /// <param name="value">[out] The value.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     bool IReadOnlyDictionary<string, object>.TryGetValue(string key, out object value)
     {
         bool result = _resourceStore.TryGetValue(key, out T? tVal);
@@ -103,12 +161,15 @@ public class ResourceStore<T> : IVersionedResourceStore
         return result;
     }
 
+    /// <summary>Gets the enumerator.</summary>
+    /// <typeparam name="string"> Type of the string.</typeparam>
+    /// <typeparam name="object>">Type of the object></typeparam>
+    /// <returns>The enumerator.</returns>
     IEnumerator<KeyValuePair<string, object>> IEnumerable<KeyValuePair<string, object>>.GetEnumerator() =>
         _resourceStore.Select(kvp => new KeyValuePair<string, object>(kvp.Key, kvp.Value)).GetEnumerator();
 
-
     /// <summary>
-    /// Initializes a new instance of the FhirStore.Storage.ResourceStore&lt;T&gt; class.
+    /// Initializes a new instance of the <see cref="ResourceStore{T}"/> class.
     /// </summary>
     /// <param name="fhirStore">   The FHIR store.</param>
     /// <param name="searchTester">The search tester.</param>
@@ -158,25 +219,31 @@ public class ResourceStore<T> : IVersionedResourceStore
             source.Id = Guid.NewGuid().ToString();
         }
 
-        if (_resourceStore.ContainsKey(source.Id))
+        lock (_lockObject)
         {
-            return null;
+            if (_resourceStore.ContainsKey(source.Id))
+            {
+                return null;
+            }
+
+            if (source is not T)
+            {
+                return null;
+            }
+
+            if (source.Meta == null)
+            {
+                source.Meta = new Meta();
+            }
+
+            source.Meta.VersionId = "1";
+            source.Meta.LastUpdated = DateTimeOffset.UtcNow;
+
+            if (!_resourceStore.TryAdd(source.Id, (T)source))
+            {
+                return null;
+            }
         }
-
-        if (source is not T)
-        {
-            return null;
-        }
-
-        if (source.Meta == null)
-        {
-            source.Meta = new Meta();
-        }
-
-        source.Meta.VersionId = "1";
-        source.Meta.LastUpdated = DateTimeOffset.UtcNow;
-
-        _resourceStore.Add(source.Id, (T)source);
 
         TestCreateAgainstSubscriptions((T)source);
 
@@ -188,12 +255,12 @@ public class ResourceStore<T> : IVersionedResourceStore
 
             case "SubscriptionTopic":
                 // TODO: should fail the request if this fails
-                _ = TryProcessSubscriptionTopic((object)source);
+                _ = TryProcessSubscriptionTopic(source);
                 break;
 
             case "Subscription":
                 // TODO: should fail the request if this fails
-                _ = TryProcessSubscription((object)source);
+                _ = TryProcessSubscription(source);
                 break;
         }
 
@@ -221,34 +288,37 @@ public class ResourceStore<T> : IVersionedResourceStore
             source.Meta = new Meta();
         }
 
-        Resource? previous;
+        T? previous;
 
-        if (!_resourceStore.ContainsKey(source.Id))
+        lock (_lockObject)
         {
-            if (allowCreate)
+            if (!_resourceStore.ContainsKey(source.Id))
             {
-                source.Meta.VersionId = "1";
-                previous = null;
+                if (allowCreate)
+                {
+                    source.Meta.VersionId = "1";
+                    previous = null;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            else if (int.TryParse(_resourceStore[source.Id].Meta?.VersionId ?? string.Empty, out int version))
+            {
+                source.Meta.VersionId = (version + 1).ToString();
+                previous = _resourceStore[source.Id];
             }
             else
             {
-                return null;
+                source.Meta.VersionId = "1";
+                previous = _resourceStore[source.Id];
             }
-        }
-        else if (int.TryParse(_resourceStore[source.Id].Meta?.VersionId ?? string.Empty, out int version))
-        {
-            source.Meta.VersionId = (version + 1).ToString();
-            previous = _resourceStore[source.Id];
-        }
-        else
-        {
-            source.Meta.VersionId = "1";
-            previous = _resourceStore[source.Id];
-        }
 
-        source.Meta.LastUpdated = DateTimeOffset.UtcNow;
+            source.Meta.LastUpdated = DateTimeOffset.UtcNow;
 
-        _resourceStore[source.Id] = (T)source;
+            _resourceStore[source.Id] = (T)source;
+        }
 
         if (previous == null)
         {
@@ -256,7 +326,7 @@ public class ResourceStore<T> : IVersionedResourceStore
         }
         else
         {
-            TestUpdateAgainstSubscriptions((T)source, (T)previous);
+            TestUpdateAgainstSubscriptions((T)source, previous);
         }
 
         switch (source.TypeName)
@@ -267,12 +337,12 @@ public class ResourceStore<T> : IVersionedResourceStore
 
             case "SubscriptionTopic":
                 // TODO: should fail the request if this fails
-                _ = TryProcessSubscriptionTopic((object)source);
+                _ = TryProcessSubscriptionTopic(source);
                 break;
 
             case "Subscription":
                 // TODO: should fail the request if this fails
-                _ = TryProcessSubscription((object)source);
+                _ = TryProcessSubscription(source);
                 break;
         }
 
@@ -294,15 +364,24 @@ public class ResourceStore<T> : IVersionedResourceStore
             return null;
         }
 
-        Resource previous = _resourceStore[id];
-        _ = _resourceStore.Remove(id);
+        T? previous;
 
-        TestDeleteAgainstSubscriptions((T)previous);
+        lock (_lockObject)
+        {
+            _ = _resourceStore.TryRemove(id, out previous);
+        }
+
+        if (previous == null)
+        {
+            return null;
+        }
+
+        TestDeleteAgainstSubscriptions(previous);
 
         switch (previous.TypeName)
         {
             case "SearchParameter":
-                RemoveExecutableSearchParameter((SearchParameter)previous);
+                RemoveExecutableSearchParameter((SearchParameter)(Resource)previous);
                 break;
 
             case "SubscriptionTopic":
@@ -314,8 +393,8 @@ public class ResourceStore<T> : IVersionedResourceStore
                 // TODO: should fail the request if this fails
                 _ = TryRemoveSubscription(previous);
                 break;
-
         }
+
 
         return previous;
     }
@@ -796,82 +875,19 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// </returns>
     public IEnumerable<Resource> TypeSearch(IEnumerable<ParsedSearchParameter> parameters)
     {
-        foreach (T resource in _resourceStore.Values)
+        lock (_lockObject)
         {
-            ITypedElement r = resource.ToTypedElement();
-
-            if (_searchTester.TestForMatch(r, parameters, out IEnumerable<ParsedSearchParameter> _, out IEnumerable<ParsedSearchParameter> _))
+            foreach (T resource in _resourceStore.Values)
             {
-                yield return resource;
+                ITypedElement r = resource.ToTypedElement();
+
+                if (_searchTester.TestForMatch(r, parameters, out IEnumerable<ParsedSearchParameter> _, out IEnumerable<ParsedSearchParameter> _))
+                {
+                    yield return resource;
+                }
             }
         }
-
-        //foreach (ParsedSearchParameter parameter in parameters)
-        //{
-        //    if (string.IsNullOrEmpty(parameter.SelectExpression))
-        //    {
-        //        // TODO: special processing - likely need to change ParsedSearchParameter to contain the compiled test function
-        //        continue;
-        //    }
-
-        //    //// direct resolve
-        //    //// avg: 0.7 ms
-        //    //return _resourceStore.Values.Where(r => r.Id.Equals(parameter.Value, StringComparison.OrdinalIgnoreCase));
-
-        //    //// direct resolve
-        //    //// avg: 0.7 ms
-        //    //return _resourceStore.Values.Where(r => r.Id.Contains(parameter.Value, StringComparison.OrdinalIgnoreCase));
-
-
-        //    //// Need to sort out if we can actually do all the modifiers in FHIRPath (case-sensitivity)
-        //    //// using the FHIRPath POCO evaluator
-        //    //// avg: 1.0 ms
-        //    //string exp = $"Resource.id = '{parameter.Value}'";
-        //    //return _resourceStore.Values.Where(r => r.IsTrue(exp));
-
-        //    //// avg: 1.0 ms
-        //    //string exp = $"Resource.id.lower().contains('{parameter.Value}')";
-        //    //return _resourceStore.Values.Where(r => r.IsTrue(exp));
-
-        //    return _resourceStore.Values.Where(r => TestSearchParameter(r, parameter));
-
-        //    //if (!_fpExpressions.ContainsKey(parameter.Expression))
-        //    //{
-        //    //    //string exp = parameter.Expression.Replace("Resource.", "%resource.");
-
-
-        //    //    _fpExpressions.TryAdd(parameter.Expression, _compiler.Compile(parameter.Expression));
-        //    //}
-
-
-        //    //// this ends up recompiling every time *and* passing in a var, didn't bother to finish the code
-        //    //foreach (T resource in _resourceStore.Values)
-        //    //{
-        //    //    SymbolTable symbolTable = new SymbolTable(FhirPathCompiler.DefaultSymbolTable);
-        //    //    symbolTable.AddVar("value", parameter.Value);
-
-        //    //    ITypedElement typedElement = resource.ToTypedElement();
-        //    //    FhirEvaluationContext ctx = new FhirEvaluationContext(typedElement, typedElement);
-
-
-
-        //    //    //if (_fpExpressions[parameter.Expression].Evaluate(resource).Any())
-        //    //    //{
-        //    //    //    return resource;
-        //    //    //}
-        //    //}
-        //}
-
-        //return Array.Empty<T>();
-
-        //if (!_fpExpressions.ContainsKey(query))
-        //{
-        //    _fpExpressions.TryAdd(query, _compiler.Compile(query));
-        //}
-
-        //return _resourceStore.Values.Where(r => _fpExpressions[query].Predicate(r));
     }
-
 
     /// <summary>State has changed.</summary>
     public void StateHasChanged()

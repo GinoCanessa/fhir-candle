@@ -114,7 +114,7 @@ public class FhirStoreTests : IDisposable
             FhirVersion = TenantConfiguration.SupportedFhirVersions.R5,
             ControllerName = "r5",
             BaseUrl = "http://localhost/fhir/r5",
-            LoadDirectory = new DirectoryInfo("/Users/ginocanessa/git/fhir-candle/src/fhir-candle.Tests/data/r5"),
+            LoadDirectory = new DirectoryInfo(Path.Combine(Directory.GetCurrentDirectory(), "data", "r5")),
         };
 
         IFhirStore fhirStore = new storeR5::FhirStore.Storage.VersionedFhirStore();

@@ -38,6 +38,9 @@ public class ParsedResultParameters
     /// <summary>Gets or sets the reverse inclusion search parameter definitions, keyed by resource.</summary>
     public Dictionary<string, List<ModelInfo.SearchParamDefinition>> ReverseInclusions { get; set; } = new();
 
+    /// <summary>The applied query string.</summary>
+    private string _appliedQueryString = string.Empty;
+
     /// <summary>
     /// Initializes a new instance of the FhirStore.Models.ParsedResultParameters class.
     /// </summary>
@@ -46,6 +49,13 @@ public class ParsedResultParameters
     public ParsedResultParameters(string queryString, VersionedFhirStore store)
     {
         Parse(queryString, store);
+    }
+
+    /// <summary>Gets applied query string.</summary>
+    /// <returns>The applied query string.</returns>
+    public string GetAppliedQueryString()
+    {
+        return _appliedQueryString;
     }
 
     /// <summary>Enumerates parse in this collection.</summary>
@@ -57,6 +67,8 @@ public class ParsedResultParameters
         {
             return;
         }
+
+        List<string> applied = new();
 
         System.Collections.Specialized.NameValueCollection query = System.Web.HttpUtility.ParseQueryString(queryString);
         foreach (string key in query)
@@ -132,6 +144,7 @@ public class ParsedResultParameters
                         }
 
                         Inclusions[components[0]].Add(spDefinition);
+                        applied.Add(key + "=" + value);
                     }
                     break;
 
@@ -161,6 +174,7 @@ public class ParsedResultParameters
                         }
 
                         IterativeInclusions[components[0]].Add(spDefinition.Expression);
+                        applied.Add(key + "=" + value);
                     }
                     break;
 
@@ -213,6 +227,7 @@ public class ParsedResultParameters
                         }
 
                         ReverseInclusions[components[0]].Add(spDefinition);
+                        applied.Add(key + "=" + value);
                     }
                     break;
 
@@ -229,6 +244,7 @@ public class ParsedResultParameters
                     break;
             }
         }
-    }
 
+        _appliedQueryString = string.Join('&', applied);
+    }
 }

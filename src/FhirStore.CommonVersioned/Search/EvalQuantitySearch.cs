@@ -64,6 +64,11 @@ public static class EvalQuantitySearch
         // traverse values and possibly prefixes
         for (int i = 0; i < sp.ValueDecimals.Length; i++)
         {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
             // TODO: right now only compare if units match - should instead test for unit class matches and do conversion
             if (!UnitsMatch(
                     q.System ?? string.Empty,

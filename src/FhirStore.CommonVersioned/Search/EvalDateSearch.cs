@@ -134,6 +134,11 @@ public static class EvalDateSearch
         // traverse values and prefixes
         for (int i = 0; i < sp.ValueDateStarts.Length; i++)
         {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
             // either grab the prefix or default to equality (number default prefix is equality)
             SearchPrefixCodes prefix =
                 ((sp.Prefixes?.Length ?? 0) > i)
@@ -217,5 +222,4 @@ public static class EvalDateSearch
         // if we did not find a match, this test failed
         return false;
     }
-
 }

@@ -42,7 +42,20 @@ public static class EvalTokenSearch
             return false;
         }
 
-        return sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.Values[i].Equals(value, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests a token search value against string-type nodes, using exact matching (case-sensitive), modified to 'not'.</summary>
@@ -59,7 +72,22 @@ public static class EvalTokenSearch
             return true;
         }
 
-        return !sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.Values[i].Equals(value, StringComparison.Ordinal))
+            {
+                // not is inverted
+                return false;
+            }
+        }
+
+        // not is inverted
+        return true;
     }
 
     /// <summary>Tests token against bool.</summary>
@@ -75,19 +103,35 @@ public static class EvalTokenSearch
 
         bool value = (bool)valueNode.Value;
 
-        if (sp.ValueBools != null)
+        if (sp.ValueBools?.Any() ?? false)
         {
-            if (sp.ValueBools.Contains(value))
+            for (int i = 0; i < sp.ValueBools.Length; i++)
             {
-                return true;
+                if (sp.IgnoredValueFlags[i])
+                {
+                    continue;
+                }
+
+                if (sp.ValueBools[i] == value)
+                {
+                    return true;
+                }
             }
         }
-        else                    // boolean values that got missed during search parameter parsing
+        else
         {
-            if ((value && sp.Values.Any(v => v.StartsWith("t", StringComparison.OrdinalIgnoreCase))) ||
-                (!value && sp.Values.Any(v => v.StartsWith("f", StringComparison.OrdinalIgnoreCase))))
+            for (int i = 0; i < sp.Values.Length; i++)
             {
-                return true;
+                if (sp.IgnoredValueFlags[i])
+                {
+                    continue;
+                }
+
+                if ((value && sp.Values[i].StartsWith("t", StringComparison.OrdinalIgnoreCase)) ||
+                    (!value && sp.Values[i].StartsWith("f", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
             }
         }
 
@@ -108,23 +152,42 @@ public static class EvalTokenSearch
 
         bool value = (bool)valueNode.Value;
 
-        if (sp.ValueBools != null)
+        if (sp.ValueBools?.Any() ?? false)
         {
-            if (!sp.ValueBools.Contains(value))
+            for (int i = 0; i < sp.ValueBools.Length; i++)
             {
-                return true;
+                if (sp.IgnoredValueFlags[i])
+                {
+                    continue;
+                }
+
+                if (sp.ValueBools[i] == value)
+                {
+                    // not is inverted
+                    return false;
+                }
             }
         }
-        else                    // boolean values that got missed during search parameter parsing
+        else
         {
-            if ((!value && sp.Values.Any(v => v.StartsWith("t", StringComparison.OrdinalIgnoreCase))) ||
-                (value && sp.Values.Any(v => v.StartsWith("f", StringComparison.OrdinalIgnoreCase))))
+            for (int i = 0; i < sp.Values.Length; i++)
             {
-                return true;
+                if (sp.IgnoredValueFlags[i])
+                {
+                    continue;
+                }
+
+                if ((value && sp.Values[i].StartsWith("t", StringComparison.OrdinalIgnoreCase)) ||
+                    (!value && sp.Values[i].StartsWith("f", StringComparison.OrdinalIgnoreCase)))
+                {
+                    // not is inverted
+                    return false;
+                }
             }
         }
 
-        return false;
+        // not is inverted
+        return true;
     }
 
     /// <summary>Tests token against code and coding types.</summary>
@@ -196,9 +259,17 @@ public static class EvalTokenSearch
                 break;
         }
 
-        if (sp.ValueFhirCodes.Any(v => CompareCodeWithSystem(valueSystem, valueCode, v.System ?? string.Empty, v.Value)))
+        for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
         {
-            return true;
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (CompareCodeWithSystem(valueSystem, valueCode, sp.ValueFhirCodes[i].System ?? string.Empty, sp.ValueFhirCodes[i].Value))
+            {
+                return true;
+            }
         }
 
         return false;
@@ -227,13 +298,21 @@ public static class EvalTokenSearch
                     {
                         foreach (Hl7.Fhir.Model.Coding c in cc.Coding)
                         {
-                            if (sp.ValueFhirCodes.Any(v => CompareCodeWithSystem(
-                                    c.System ?? string.Empty,
-                                    c.Code ?? string.Empty,
-                                    v.System ?? string.Empty,
-                                    v.Value)))
+                            for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
                             {
-                                return true;
+                                if (sp.IgnoredValueFlags[i])
+                                {
+                                    continue;
+                                }
+
+                                if (CompareCodeWithSystem(
+                                        c.System ?? string.Empty,
+                                        c.Code ?? string.Empty,
+                                        sp.ValueFhirCodes[i].System ?? string.Empty,
+                                        sp.ValueFhirCodes[i].Value))
+                                {
+                                    return true;
+                                }
                             }
                         }
                     }
@@ -336,11 +415,21 @@ public static class EvalTokenSearch
                 break;
         }
 
-        if (sp.ValueFhirCodes.Any(v => CompareCodeWithSystem(valueSystem, valueCode, v.System ?? string.Empty, v.Value)))
+        for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
         {
-            return false;
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (CompareCodeWithSystem(valueSystem, valueCode, sp.ValueFhirCodes[i].System ?? string.Empty, sp.ValueFhirCodes[i].Value))
+            {
+                // not is inverted
+                return false;
+            }
         }
 
+        // not is inverted
         return true;
     }
 }

@@ -33,8 +33,6 @@ public class SearchTester
     public bool TestForMatch(
         ITypedElement resource,
         IEnumerable<ParsedSearchParameter> searchParameters,
-        out IEnumerable<ParsedSearchParameter> appliedParameters,
-        out IEnumerable<ParsedSearchParameter> ignoredParameters,
         FhirEvaluationContext? fpContext = null)
     {
         if (resource == null)
@@ -44,13 +42,8 @@ public class SearchTester
 
         if (!searchParameters.Any())
         {
-            appliedParameters = Array.Empty<ParsedSearchParameter>();
-            ignoredParameters = Array.Empty<ParsedSearchParameter>();
             return true;
         }
-
-        List<ParsedSearchParameter> applied = new();
-        List<ParsedSearchParameter> ignored = new();
 
         if (fpContext == null)
         {
@@ -60,17 +53,20 @@ public class SearchTester
 
         foreach (ParsedSearchParameter sp in searchParameters)
         {
+            if (sp.IgnoredParameter)
+            {
+                continue;
+            }
+
             if (sp.ParamType == SearchParamType.Composite)
             {
                 // TODO: Firely is missing composite definitions, need to either load the packages myself or submit fixes
-                ignored.Add(sp);
+                //ignored.Add(sp);
                 continue;
 
 #pragma warning disable CS0162 // Unreachable code detected
                 if (sp.CompositeComponents == null)
                 {
-                    // TODO: need to figure out how we got here
-                    ignored.Add(sp);
                     continue;
                 }
 
@@ -78,17 +74,11 @@ public class SearchTester
                 if (TestForMatch(
                         resource,
                         searchParameters,
-                        out _,
-                        out _,
                         fpContext))
                 {
-                    applied.Add(sp);
                     continue;
                 }
 
-                ignored.Add(sp);
-                appliedParameters = applied;
-                ignoredParameters = ignored;
                 return false;
 #pragma warning restore CS0162 // Unreachable code detected
             }
@@ -96,7 +86,6 @@ public class SearchTester
             if (sp.CompiledExpression == null)
             {
                 // TODO: Handle non-trivial search parameters
-                ignored.Add(sp);
                 continue;
             }
 
@@ -104,11 +93,8 @@ public class SearchTester
             if ((!string.IsNullOrEmpty(sp.ModifierLiteral)) &&
                 (!IsModifierValidForType(sp.Modifier, sp.ParamType)))
             {
-                ignored.Add(sp);
                 continue;
             }
-
-            applied.Add(sp);
 
             IEnumerable<ITypedElement> extracted = sp.CompiledExpression.Invoke(resource, fpContext);
 
@@ -121,8 +107,6 @@ public class SearchTester
                     continue;
                 }
 
-                appliedParameters = applied;
-                ignoredParameters = ignored;
                 return false;
             }
 
@@ -586,16 +570,11 @@ public class SearchTester
             if (!found)
             {
                 // no matches in any extracted value means a parameter did NOT match
-                appliedParameters = applied;
-                ignoredParameters = ignored;
                 return false;
             }
         }
 
         // succesfully matching all parameters means this resource is a match
-
-        appliedParameters = applied;
-        ignoredParameters = ignored;
         return true;
     }
 

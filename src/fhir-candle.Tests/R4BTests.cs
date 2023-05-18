@@ -169,6 +169,15 @@ public class R4BTestsObservation : IClassFixture<R4BTests>
             results!.Entries.Should().HaveCount((int)entryCount);
         }
 
+        results!.Links.Should().NotBeNullOrEmpty();
+        string selfLink = results!.Links!.Where(l => l.Relation.Equals("self"))?.Select(l => l.Url).First() ?? string.Empty;
+        selfLink.Should().NotBeNullOrEmpty();
+        selfLink.Should().StartWith(_fixture._config.BaseUrl + "/Observation?");
+        foreach (string searchPart in search.Split('&'))
+        {
+            selfLink.Should().Contain(searchPart);
+        }
+
         //_testOutputHelper.WriteLine(bundle);
     }
 }
@@ -246,6 +255,15 @@ public class R4BTestsPatient : IClassFixture<R4BTests>
         if (entryCount != null)
         {
             results!.Entries.Should().HaveCount((int)entryCount);
+        }
+
+        results!.Links.Should().NotBeNullOrEmpty();
+        string selfLink = results!.Links!.Where(l => l.Relation.Equals("self"))?.Select(l => l.Url).First() ?? string.Empty;
+        selfLink.Should().NotBeNullOrEmpty();
+        selfLink.Should().StartWith(_fixture._config.BaseUrl + "/Patient?");
+        foreach (string searchPart in search.Split('&'))
+        {
+            selfLink.Should().Contain(searchPart);
         }
 
         //_testOutputHelper.WriteLine(bundle);

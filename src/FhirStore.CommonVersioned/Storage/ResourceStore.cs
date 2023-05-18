@@ -579,7 +579,7 @@ public class ResourceStore<T> : IVersionedResourceStore
                         continue;
                     }
 
-                    if (_searchTester.TestForMatch(currentTE, filters, out _, out _, fpContext))
+                    if (_searchTester.TestForMatch(currentTE, filters, fpContext))
                     {
                         notifiedSubscriptions.Add(subscriptionId);
 
@@ -881,7 +881,7 @@ public class ResourceStore<T> : IVersionedResourceStore
             {
                 ITypedElement r = resource.ToTypedElement();
 
-                if (_searchTester.TestForMatch(r, parameters, out IEnumerable<ParsedSearchParameter> _, out IEnumerable<ParsedSearchParameter> _))
+                if (_searchTester.TestForMatch(r, parameters))
                 {
                     yield return resource;
                 }

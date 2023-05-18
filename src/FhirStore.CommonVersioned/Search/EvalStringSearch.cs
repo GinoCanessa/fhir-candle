@@ -6,6 +6,7 @@
 using FhirStore.Models;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
+using Newtonsoft.Json.Linq;
 using static fhir.candle.Search.SearchDefinitions;
 
 namespace fhir.candle.Search;
@@ -26,7 +27,20 @@ public static class EvalStringSearch
             return false;
         }
 
-        return sp.Values.Any(v => value.StartsWith(v, StringComparison.OrdinalIgnoreCase));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.Values[i].StartsWith(value, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests a string search value against string-type nodes, using contains & case-insensitive.</summary>
@@ -42,7 +56,20 @@ public static class EvalStringSearch
             return false;
         }
 
-        return sp.Values.Any(v => value.Contains(v, StringComparison.OrdinalIgnoreCase));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.Values[i].Contains(value, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests a string search value against string-type nodes, using exact matching (equality & case-sensitive).</summary>
@@ -58,7 +85,20 @@ public static class EvalStringSearch
             return false;
         }
 
-        return sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.Values[i].Equals(value, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests a string search value against a human name (family, given, or text), using starts-with & case-insensitive.</summary>
@@ -74,10 +114,24 @@ public static class EvalStringSearch
 
         Hl7.Fhir.Model.HumanName hn = valueNode.ToPoco<HumanName>();
 
-        return sp.Values.Any(v => 
-            (hn.Family?.StartsWith(v, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (hn.Given?.Any(gn => gn.StartsWith(v, StringComparison.OrdinalIgnoreCase)) ?? false) ||
-            (hn.Text?.StartsWith(v, StringComparison.OrdinalIgnoreCase) ?? false));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            string v = sp.Values[i];
+
+            if ((hn.Family?.StartsWith(v, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (hn.Given?.Any(gn => gn.StartsWith(v, StringComparison.OrdinalIgnoreCase)) ?? false) ||
+                (hn.Text?.StartsWith(v, StringComparison.OrdinalIgnoreCase) ?? false))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests a string search value against a human name (family, given, or text), using contains & case-insensitive.</summary>
@@ -93,10 +147,24 @@ public static class EvalStringSearch
 
         Hl7.Fhir.Model.HumanName hn = valueNode.ToPoco<HumanName>();
 
-        return sp.Values.Any(v =>
-            (hn.Family?.Contains(v, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (hn.Given?.Any(gn => gn.Contains(v, StringComparison.OrdinalIgnoreCase)) ?? false) ||
-            (hn.Text?.Contains(v, StringComparison.OrdinalIgnoreCase) ?? false));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            string v = sp.Values[i];
+
+            if ((hn.Family?.Contains(v, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (hn.Given?.Any(gn => gn.Contains(v, StringComparison.OrdinalIgnoreCase)) ?? false) ||
+                (hn.Text?.Contains(v, StringComparison.OrdinalIgnoreCase) ?? false))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests a string search value against a human name (family, given, or text), using exact matching (case-sensitive).</summary>
@@ -112,9 +180,23 @@ public static class EvalStringSearch
 
         Hl7.Fhir.Model.HumanName hn = valueNode.ToPoco<HumanName>();
 
-        return sp.Values.Any(v =>
-            (hn.Family?.Equals(v, StringComparison.Ordinal) ?? false) ||
-            (hn.Given?.Any(gn => gn.Equals(v, StringComparison.Ordinal)) ?? false) ||
-            (hn.Text?.Equals(v, StringComparison.Ordinal) ?? false));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            string v = sp.Values[i];
+
+            if ((hn.Family?.Equals(v, StringComparison.Ordinal) ?? false) ||
+                (hn.Given?.Any(gn => gn.Equals(v, StringComparison.Ordinal)) ?? false) ||
+                (hn.Text?.Equals(v, StringComparison.Ordinal) ?? false))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

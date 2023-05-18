@@ -51,6 +51,11 @@ public static class EvalNumberSearch
         // traverse values and possibly prefixes
         for (int i = 0; i < sp.ValueInts.Length; i++)
         {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
             // either grab the prefix or default to equality (number default prefix is equality)
             SearchPrefixCodes prefix =
                 ((sp.Prefixes?.Length ?? 0) > i)
@@ -150,6 +155,11 @@ public static class EvalNumberSearch
         // traverse values and possibly prefixes
         for (int i = 0; i < sp.ValueDecimals.Length; i++)
         {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
             // either grab the prefix or default to equality (number default prefix is equality)
             SearchPrefixCodes prefix =
                 ((sp.Prefixes?.Length ?? 0) > i)

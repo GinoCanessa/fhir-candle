@@ -25,7 +25,20 @@ public static class EvalUriSearch
             return false;
         }
 
-        return sp.Values.Any(v => value.Equals(v, StringComparison.Ordinal));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.Values[i].Equals(value, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests uri values against OIDs.</summary>
@@ -43,12 +56,38 @@ public static class EvalUriSearch
 
         if (value.StartsWith("urn:oid:", StringComparison.Ordinal))
         {
-            return sp.Values.Any(v => v.Equals(value, StringComparison.OrdinalIgnoreCase) ||
-                                    ("urn:oid:" + v).Equals(value, StringComparison.OrdinalIgnoreCase));
+            for (int i = 0; i < sp.Values.Length; i++)
+            {
+                if (sp.IgnoredValueFlags[i])
+                {
+                    continue;
+                }
+
+                if (sp.Values[i].Equals(value, StringComparison.OrdinalIgnoreCase) ||
+                    ("urn:oid:" + sp.Values[i]).Equals(value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        return sp.Values.Any(v => v.Equals(value, StringComparison.OrdinalIgnoreCase) ||
-                                v.Equals("urn:oid:" + value, StringComparison.OrdinalIgnoreCase));
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.Values[i].Equals(value, StringComparison.OrdinalIgnoreCase) ||
+                sp.Values[i].Equals("urn:oid:" + value, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests uri values against UUIDs.</summary>
@@ -66,12 +105,37 @@ public static class EvalUriSearch
 
         if (value.StartsWith("urn:uuid:", StringComparison.Ordinal))
         {
-            return sp.Values.Any(v => v.Equals(value, StringComparison.OrdinalIgnoreCase) ||
-                                    ("urn:uuid:" + v).Equals(value, StringComparison.OrdinalIgnoreCase));
+            for (int i = 0; i < sp.Values.Length; i++)
+            {
+                if (sp.IgnoredValueFlags[i])
+                {
+                    continue;
+                }
+
+                if (sp.Values[i].Equals(value, StringComparison.OrdinalIgnoreCase) ||
+                    ("urn:uuid:" + sp.Values[i]).Equals(value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        return sp.Values.Any(v => v.Equals(value, StringComparison.OrdinalIgnoreCase) ||
-                                v.Equals("urn:uuid:" + value, StringComparison.OrdinalIgnoreCase));
-    }
+        for (int i = 0; i < sp.Values.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
 
+            if (sp.Values[i].Equals(value, StringComparison.OrdinalIgnoreCase) ||
+                sp.Values[i].Equals("urn:uuid:" + value, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

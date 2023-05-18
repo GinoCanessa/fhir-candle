@@ -44,36 +44,43 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The compiler.</summary>
     private static FhirPathCompiler _compiler = null!;
 
+    /// <summary>The JSON parser.</summary>
     FhirJsonPocoDeserializer _jsonParser = new(new FhirJsonPocoDeserializerSettings()
     {
         DisableBase64Decoding = false,
     });
 
+    /// <summary>The JSON serializer for full resources.</summary>
     FhirJsonPocoSerializer _jsonSerializerFull = new(new FhirJsonPocoSerializerSettings()
     {
         SummaryFilter = null,
     });
 
+    /// <summary>The JSON serializer for summary=data.</summary>
     FhirJsonPocoSerializer _jsonSerializerData = new(new FhirJsonPocoSerializerSettings()
     {
         SummaryFilter = SerializationFilter.ForText(),
     });
 
+    /// <summary>The JSON serializer for summary=text.</summary>
     FhirJsonPocoSerializer _jsonSerializerText = new(new FhirJsonPocoSerializerSettings()
     {
         SummaryFilter = SerializationFilter.ForData(),
     });
 
+    /// <summary>The JSON serializer for summary=true.</summary>
     FhirJsonPocoSerializer _jsonSerializerSummary = new(new FhirJsonPocoSerializerSettings()
     {
         SummaryFilter = SerializationFilter.ForSummary(),
     });
 
+    /// <summary>The XML parser.</summary>
     FhirXmlPocoDeserializer _xmlParser = new(new FhirXmlPocoDeserializerSettings()
     {
         DisableBase64Decoding = false,
     });
 
+    /// <summary>The XML serializer.</summary>
     FhirXmlPocoSerializer _xmlSerializer = new();
 
     /// <summary>The store.</summary>
@@ -1472,11 +1479,33 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.UnsupportedMediaType;
         }
 
+        string selfLink = $"{_config.BaseUrl}/{resourceType}";
+        string selfSearchParams = string.Join('&', parameters.Where(p => !p.IgnoredParameter).Select(p => p.GetAppliedQueryString()));
+        string selfResultParams = resultParameters.GetAppliedQueryString();
+
+        if (!string.IsNullOrEmpty(selfSearchParams))
+        {
+            selfLink = selfLink + "?" + selfSearchParams;
+        }
+
+        if (!string.IsNullOrEmpty(selfResultParams))
+        {
+            selfLink = selfLink + (selfLink.Contains('?') ? '&' : '?') + selfResultParams;
+        }
+
         // create our bundle for results
         Bundle bundle = new Bundle
         {
             Type = Bundle.BundleType.Searchset,
             Total = results.Count(),
+            Link = new()
+            {
+                new Bundle.LinkComponent()
+                {
+                    Relation = "self",
+                    Url = selfLink,
+                }
+            },
         };
 
         // TODO: check for a sort and apply to results

@@ -14,6 +14,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using static fhir.candle.Search.SearchDefinitions;
+using Newtonsoft.Json.Linq;
 
 namespace FhirStore.Models;
 
@@ -112,7 +113,7 @@ public class ParsedSearchParameter
         /// <summary>Allow filtering of types in searches that are performed across multiple resource types (e.g., searches across the server root).</summary>
         { "_type", new() { Name = "_type", Type = SearchParamType.Token } },
     };
-    
+
     /// <summary>A segmented reference.</summary>
     public record struct SegmentedReference(
         string ResourceType,
@@ -126,6 +127,12 @@ public class ParsedSearchParameter
 
     /// <summary>Gets or sets the values.</summary>
     public required string[] Values { get; set; }
+
+    /// <summary>Gets or sets the applied value flags.</summary>
+    public bool[] IgnoredValueFlags { get; set; } = Array.Empty<bool>();
+
+    /// <summary>Gets or sets a value indicating whether this parameter has been ignored.</summary>
+    public bool IgnoredParameter { get; set; } = false;
 
     /// <summary>Gets or sets the composite components.</summary>
     public ParsedSearchParameter[]? CompositeComponents { get; set; }
@@ -183,21 +190,30 @@ public class ParsedSearchParameter
     public ParsedSearchParameter(
         VersionedFhirStore store,
         IVersionedResourceStore resourceStore,
-        string name, 
+        string name,
         string modifierLiteral,
         SearchModifierCodes modifierCode,
         string value,
-        ModelInfo.SearchParamDefinition spd)
+        ModelInfo.SearchParamDefinition? spd)
     {
         Name = name;
         Modifier = modifierCode;
         ModifierLiteral = modifierLiteral;
-        ParamType = spd.Type;
-        SelectExpression = spd.Expression ?? string.Empty;
-        if (!string.IsNullOrEmpty(SelectExpression))
+
+        if ((spd == null) ||
+            string.IsNullOrEmpty(spd.Expression))
         {
-            CompiledExpression = store.GetCompiledSearchParameter(spd.Resource ?? string.Empty, name, SelectExpression);
+            ParamType = spd?.Type ?? SearchParamType.Special;
+            SelectExpression = string.Empty;
+            CompiledExpression = null;
+            Values = Array.Empty<string>();
+            IgnoredParameter = true;
+            return;
         }
+
+        ParamType = spd.Type;
+        SelectExpression = spd.Expression;
+        CompiledExpression = store.GetCompiledSearchParameter(spd.Resource ?? string.Empty, name, SelectExpression);
 
         if (spd.Type == SearchParamType.Composite)
         {
@@ -212,12 +228,76 @@ public class ParsedSearchParameter
             return;
         }
 
-        ExtractValues(value, spd, out List<SearchPrefixCodes?> prefixes, out List<string> values);
+        if (string.IsNullOrEmpty(value))
+        {
+            Values = Array.Empty<string>();
+            IgnoredParameter = true;
+            return;
+        }
 
-        Prefixes = prefixes.ToArray();
-        Values = values.ToArray();
+        // parse the value string into prefixes and values
+        ExtractValues(value, spd);
 
-        ProcessTypedValues(value, spd, values);
+        if (Values == null)
+        {
+            Values = Array.Empty<string>();
+        }
+
+        // by default, assume all values are applied (will be updated during typed parsing)
+        IgnoredValueFlags = Enumerable.Repeat(false, Values.Length).ToArray<bool>();
+
+        ProcessTypedValues(value, spd);
+
+        // check for no valid values to apply
+        if (IgnoredValueFlags.Any() && IgnoredValueFlags.All(x => x))
+        {
+            IgnoredParameter = true;
+        }
+    }
+
+    /// <summary>Gets applied query string.</summary>
+    /// <returns>The applied query string.</returns>
+    public string GetAppliedQueryString()
+    {
+        if (IgnoredParameter)
+        {
+            return string.Empty;
+        }
+
+        System.Text.StringBuilder sb = new();
+        for (int i = 0; i < Values.Length; i++)
+        {
+            if (IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sb.Length == 0)
+            {
+                sb.Append(Name);
+
+                if (Modifier != SearchModifierCodes.None)
+                {
+                    sb.Append(':');
+                    sb.Append(ModifierLiteral);
+                }
+
+                sb.Append("=");
+            }
+            else
+            {
+                sb.Append(',');
+            }
+
+            if ((Prefixes.Length > i) && (Prefixes[i] != null))
+            {
+                sb.Append(Prefixes[i]!.ToLiteral() ?? string.Empty);
+            }
+
+            sb.Append(Values[i]);
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>Extracts the composite parameters.</summary>
@@ -233,7 +313,6 @@ public class ParsedSearchParameter
     {
         cpValues = new();
         List<string> compositeValues = new();
-
 
         // TODO: no point finishing this until it is in the SDK
         //string[] split = value.Split('$');
@@ -271,18 +350,14 @@ public class ParsedSearchParameter
     }
 
     /// <summary>Extracts the values from a query parameter string.</summary>
-    /// <param name="value">   The value.</param>
-    /// <param name="spd">     The search parameter definition.</param>
-    /// <param name="prefixes">[out] The prefix.</param>
-    /// <param name="values">  [out] The values.</param>
+    /// <param name="value">The value.</param>
+    /// <param name="spd">  The search parameter definition.</param>
     private void ExtractValues(
         string value,
-        ModelInfo.SearchParamDefinition spd,
-        out List<SearchPrefixCodes?> prefixes,
-        out List<string> values)
+        ModelInfo.SearchParamDefinition spd)
     {
-        prefixes = new();
-        values = new();
+        List<SearchPrefixCodes?> prefixes = new();
+        List<string> values = new();
 
         // parse parameter string, looking for multi-value
         int index = 0;
@@ -350,28 +425,42 @@ public class ParsedSearchParameter
             default:
                 break;
         }
+
+        // update our object with parsed values
+        Prefixes = prefixes.ToArray();
+        Values = values.ToArray();
     }
 
-    /// <summary>Process the typed values.</summary>
-    /// <param name="value"> The value.</param>
-    /// <param name="spd">   The search parameter definition.</param>
-    /// <param name="values">The values.</param>
-    private void ProcessTypedValues(string value, ModelInfo.SearchParamDefinition spd, List<string> values)
+    /// <summary>
+    /// Process the typed values and flag any values that fail expected parsing as unapplied.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <param name="spd">  The search parameter definition.</param>
+    private void ProcessTypedValues(string value, ModelInfo.SearchParamDefinition spd)
     {
+        if (!(Values?.Any() ?? false))
+        {
+            return;
+        }
+
         // parse value types that require additional conversion
         switch (spd!.Type)
         {
             case SearchParamType.Date:
                 {
-                    ValueDateStarts = new DateTimeOffset[values.Count];
-                    ValueDateEnds = new DateTimeOffset[values.Count];
+                    ValueDateStarts = new DateTimeOffset[Values.Length];
+                    ValueDateEnds = new DateTimeOffset[Values.Length];
 
-                    for (int i = 0; i < values.Count; i++)
+                    for (int i = 0; i < Values.Length; i++)
                     {
-                        if (TryParseDateString(values[i], out DateTimeOffset start, out DateTimeOffset end))
+                        if (TryParseDateString(Values[i], out DateTimeOffset start, out DateTimeOffset end))
                         {
                             ValueDateStarts[i] = start;
                             ValueDateEnds[i] = end;
+                        }
+                        else
+                        {
+                            IgnoredValueFlags[i] = true;
                         }
                     }
                 }
@@ -383,26 +472,34 @@ public class ParsedSearchParameter
                     if (value.Contains('.') || value.Contains("e-", StringComparison.OrdinalIgnoreCase))
                     {
                         // use decimal
-                        ValueDecimals = new decimal[values.Count];
+                        ValueDecimals = new decimal[Values.Length];
 
-                        for (int i = 0; i < values.Count; i++)
+                        for (int i = 0; i < Values.Length; i++)
                         {
-                            if (decimal.TryParse(values[i], out decimal val))
+                            if (decimal.TryParse(Values[i], out decimal val))
                             {
                                 ValueDecimals[i] = val;
+                            }
+                            else
+                            {
+                                IgnoredValueFlags[i] = true;
                             }
                         }
                     }
                     else
                     {
                         // use longs
-                        ValueInts = new long[values.Count];
+                        ValueInts = new long[Values.Length];
 
-                        for (int i = 0; i < values.Count; i++)
+                        for (int i = 0; i < Values.Length; i++)
                         {
-                            if (long.TryParse(values[i], out long val))
+                            if (long.TryParse(Values[i], out long val))
                             {
                                 ValueInts[i] = val;
+                            }
+                            else
+                            {
+                                IgnoredValueFlags[i] = true;
                             }
                         }
                     }
@@ -412,13 +509,13 @@ public class ParsedSearchParameter
             case SearchParamType.Quantity:
                 {
                     // use decimal for values
-                    ValueDecimals = new decimal[values.Count];
-                    ValueFhirCodes = new Hl7.Fhir.ElementModel.Types.Code[values.Count];
+                    ValueDecimals = new decimal[Values.Length];
+                    ValueFhirCodes = new Hl7.Fhir.ElementModel.Types.Code[Values.Length];
 
                     // traverse values
-                    for (int i = 0; i < values.Count; i++)
+                    for (int i = 0; i < Values.Length; i++)
                     {
-                        string[] components = values[i].Split('|', StringSplitOptions.RemoveEmptyEntries);
+                        string[] components = Values[i].Split('|', StringSplitOptions.RemoveEmptyEntries);
 
                         // value is always first
                         if (decimal.TryParse(components[0], out decimal val))
@@ -442,6 +539,11 @@ public class ParsedSearchParameter
                             case 3:
                                 ValueFhirCodes[i] = new(components[1], components[2]);
                                 break;
+
+                            // unknown parsing result
+                            default:
+                                IgnoredValueFlags[i] = true;
+                                break;
                         }
                     }
                 }
@@ -450,24 +552,24 @@ public class ParsedSearchParameter
             case SearchParamType.Token:
                 {
                     // check for boolean tokens
-                    if (values.All(v => v.Equals("true", StringComparison.OrdinalIgnoreCase) || v.Equals("false", StringComparison.OrdinalIgnoreCase)))
+                    if (Values.All(v => v.Equals("true", StringComparison.OrdinalIgnoreCase) || v.Equals("false", StringComparison.OrdinalIgnoreCase)))
                     {
-                        ValueBools = new bool[values.Count];
+                        ValueBools = new bool[Values.Length];
 
                         // traverse values
-                        for (int i = 0; i < values.Count; i++)
+                        for (int i = 0; i < Values.Length; i++)
                         {
-                            _ = bool.TryParse(values[i], out ValueBools[i]);
+                            _ = bool.TryParse(Values[i], out ValueBools[i]);
                         }
                     }
 
                     // tokens always represent a code and system
-                    ValueFhirCodes = new Hl7.Fhir.ElementModel.Types.Code[values.Count];
+                    ValueFhirCodes = new Hl7.Fhir.ElementModel.Types.Code[Values.Length];
 
                     // traverse values
-                    for (int i = 0; i < values.Count; i++)
+                    for (int i = 0; i < Values.Length; i++)
                     {
-                        string[] components = values[i].Split('|');
+                        string[] components = Values[i].Split('|');
 
                         if (components.Length == 1)
                         {
@@ -483,12 +585,15 @@ public class ParsedSearchParameter
 
             case SearchParamType.Reference:
                 {
-                    ValueReferences = new SegmentedReference[values.Count];
+                    ValueReferences = new SegmentedReference[Values.Length];
 
                     // traverse values
-                    for (int i = 0; i < values.Count; i++)
+                    for (int i = 0; i < Values.Length; i++)
                     {
-                        _ = TryParseReference(value, out ValueReferences[i]);
+                        if (!TryParseReference(value, out ValueReferences[i]))
+                        {
+                            IgnoredValueFlags[i] = true;
+                        }
                     }
                 }
                 break;
@@ -498,6 +603,14 @@ public class ParsedSearchParameter
                 //case SearchParamType.Composite:
                 //case SearchParamType.Uri:
                 //case SearchParamType.Special:
+                //default:
+                //    //{
+                //    //    for (int i = 0; i < _values.Length; i++)
+                //    //    {
+                //    //        AppliedValueFlags[i] = true;
+                //    //    }
+                //    //}
+                //    break;
         }
     }
 
@@ -523,12 +636,6 @@ public class ParsedSearchParameter
         foreach (string key in query)
         {
             if (string.IsNullOrWhiteSpace(key))
-            {
-                continue;
-            }
-
-            string? value = query[key];
-            if (string.IsNullOrWhiteSpace(value))
             {
                 continue;
             }
@@ -573,6 +680,8 @@ public class ParsedSearchParameter
                 }
             }
 
+            string? value = query[key];
+
             // TODO: check for resourceType modifier (need to match resources in the store)
 
             ModelInfo.SearchParamDefinition? spd = null;
@@ -590,18 +699,13 @@ public class ParsedSearchParameter
                 continue;
             }
 
-            if (string.IsNullOrEmpty(spd?.Expression))
-            {
-                throw new Exception($"Cannot process parameter without an expression: {spd?.Name ?? sp}");
-            }
-
             yield return new ParsedSearchParameter(
                 store,
                 resourceStore,
                 sp,
                 modifierLiteral,
                 modifierCode,
-                value,
+                value ?? string.Empty,
                 spd);
 
             //yield return new ParsedSearchParameter

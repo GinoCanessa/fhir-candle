@@ -27,6 +27,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Search\SearchTester.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\IVersionedResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Storage\FhirStore.cs" />
   </ItemGroup>
 </Project>

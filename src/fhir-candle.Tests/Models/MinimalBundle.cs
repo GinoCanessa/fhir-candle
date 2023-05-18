@@ -30,6 +30,18 @@ public class MinimalBundle
         public MinimalSearch? Search { get; set; } = null;
     }
 
+    /// <summary>A minimal link.</summary>
+    public class MinimalLink
+    {
+        /// <summary>Gets or sets the relation.</summary>
+        [JsonPropertyName("relation")]
+        public string Relation { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets URL of the document.</summary>
+        [JsonPropertyName("url")]
+        public string Url { get; set; } = string.Empty;
+    }
+
     /// <summary>Gets or sets the type of the bundle.</summary>
     [JsonPropertyName("type")]
     public string BundleType { get; set; } = string.Empty;
@@ -38,8 +50,11 @@ public class MinimalBundle
     [JsonPropertyName("total")]
     public int Total { get; set; } = -1;
 
+    /// <summary>Gets or sets the links.</summary>
+    [JsonPropertyName("link")]
+    public IEnumerable<MinimalLink>? Links { get; set; } = null;
+
     /// <summary>Gets or sets the entries.</summary>
     [JsonPropertyName("entry")]
     public IEnumerable<MinimalEntry>? Entries { get; set; } = null;
-
 }

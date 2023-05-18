@@ -86,7 +86,20 @@ public static class EvalReferenceSearch
             return false;
         }
 
-        return sp.ValueReferences.Any(s => CompareRefsCommon(r, s));
+        for (int i = 0; i < sp.ValueReferences.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (CompareRefsCommon(r, sp.ValueReferences[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests references against OIDs.</summary>
@@ -109,7 +122,20 @@ public static class EvalReferenceSearch
             return false;
         }
 
-        return sp.ValueReferences.Any(s => CompareRefsOid(r, s));
+        for (int i = 0; i < sp.ValueReferences.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (CompareRefsOid(r, sp.ValueReferences[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 
@@ -133,7 +159,20 @@ public static class EvalReferenceSearch
             return false;
         }
 
-        return sp.ValueReferences.Any(s => CompareRefsUuid(r, s));
+        for (int i = 0; i < sp.ValueReferences.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (CompareRefsUuid(r, sp.ValueReferences[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Tests reference against primitive url types (canonical, uri, url).</summary>
@@ -162,11 +201,39 @@ public static class EvalReferenceSearch
             string cv = value.Substring(index + 1);
             string cu = value.Substring(0, index);
 
-            return sp.ValueReferences.Any(s => 
-                s.Url.Equals(cu, StringComparison.Ordinal) && 
-                (string.IsNullOrEmpty(s.CanonicalVersion) || s.CanonicalVersion.Equals(cv, StringComparison.Ordinal)));
+
+            for (int i = 0; i < sp.ValueReferences.Length; i++)
+            {
+                if (sp.IgnoredValueFlags[i])
+                {
+                    continue;
+                }
+
+                ParsedSearchParameter.SegmentedReference s = sp.ValueReferences[i];
+
+                if (s.Url.Equals(cu, StringComparison.Ordinal) &&
+                    (string.IsNullOrEmpty(s.CanonicalVersion) || s.CanonicalVersion.Equals(cv, StringComparison.Ordinal)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        return sp.ValueReferences.Any(s => s.Url.Equals(value, StringComparison.Ordinal));
+        for (int i = 0; i < sp.ValueReferences.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (sp.ValueReferences[i].Url.Equals(value, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

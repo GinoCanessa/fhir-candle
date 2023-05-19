@@ -23,6 +23,23 @@ namespace fhir.candle.Tests;
 /// <summary>Unit tests core FhirStore functionality.</summary>
 public class FhirStoreTests
 {
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> TestConfigurations => new List<object[]>
+    {
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R4,
+        },
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R4B,
+        },
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R5,
+        },
+    };
+
     /// <summary>(Immutable) The configuration for FHIR R4.</summary>
     internal readonly TenantConfiguration _configR4;
 
@@ -115,21 +132,7 @@ public class MetadataJson : IClassFixture<FhirStoreTests>
     private readonly ITestOutputHelper _testOutputHelper;
 
     /// <summary>Gets the configurations.</summary>
-    public static IEnumerable<object[]> Configurations => new List<object[]>
-    {
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R4,
-        },
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R4B,
-        },
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R5,
-        },
-    };
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
 
     /// <summary>(Immutable) The fixture.</summary>
     private readonly FhirStoreTests _fixture;
@@ -177,21 +180,7 @@ public class MetadataXml : IClassFixture<FhirStoreTests>
     private readonly ITestOutputHelper _testOutputHelper;
 
     /// <summary>Gets the configurations.</summary>
-    public static IEnumerable<object[]> Configurations => new List<object[]>
-    {
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R4,
-        },
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R4B,
-        },
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R5,
-        },
-    };
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
 
     /// <summary>(Immutable) The fixture.</summary>
     private readonly FhirStoreTests _fixture;
@@ -238,21 +227,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
     private readonly ITestOutputHelper _testOutputHelper;
 
     /// <summary>Gets the configurations.</summary>
-    public static IEnumerable<object[]> Configurations => new List<object[]>
-    {
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R4,
-        },
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R4B,
-        },
-        new object[]
-        {
-            TenantConfiguration.SupportedFhirVersions.R5,
-        },
-    };
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
 
     private const string _resourceType = "Patient";
     private const string _id = "common";
@@ -367,5 +342,102 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             out lastModified);
 
         sc.Should().Be(HttpStatusCode.NotFound);
+    }
+}
+
+/// <summary>Ensure that storing a Patient in the Observation endpoint fails.</summary>
+public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    private const string _resourceType1 = "Patient";
+    private const string _resourceType2 = "Observation";
+    private const string _id = "common";
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly FhirStoreTests _fixture;
+
+    public TestResourceWrongLocation(FhirStoreTests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void ResourceWrongLocation(TenantConfiguration.SupportedFhirVersions version)
+    {
+        string json = "{\"resourceType\":\"" + _resourceType1 + "\",\"id\":\"" + _id + "\",\"language\":\"en\"}";
+
+        IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
+
+        string serializedResource, serializedOutcome, eTag, lastModified, location;
+
+        HttpStatusCode sc = fhirStore.InstanceCreate(
+            _resourceType2,
+            json,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        sc.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+}
+
+/// <summary>Ensure that storing resources with invalid data fails.</summary>
+public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    private const string _resourceType = "Patient";
+    private const string _id = "invalid";
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly FhirStoreTests _fixture;
+
+    public TestResourceInvalidElement(FhirStoreTests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void ResourceWrongLocation(TenantConfiguration.SupportedFhirVersions version)
+    {
+        string json = "{\"resourceType\":\"" + _resourceType + "\",\"id\":\"" + _id + "\",\"garbage\":true}";
+
+        IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
+
+        string serializedResource, serializedOutcome, eTag, lastModified, location;
+
+        HttpStatusCode sc = fhirStore.InstanceCreate(
+            _resourceType,
+            json,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        sc.Should().Be(HttpStatusCode.BadRequest);
     }
 }

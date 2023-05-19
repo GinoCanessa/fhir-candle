@@ -58,6 +58,61 @@ public class SearchTester
                 continue;
             }
 
+            // for reverse chaining, we nest the search instead of evaluating it here
+            if (sp.ReverseChainedParameterLink != null)
+            {
+                continue;
+                //// loop over any extracted values and check the resource store for matches
+                //foreach (ITypedElement node in extracted)
+                //{
+                //    if ((node == null) ||
+                //        (node.InstanceType != "Reference"))
+                //    {
+                //        continue;
+                //    }
+
+                //    ResourceReference r = node.ToPoco<ResourceReference>();
+
+                //    ITypedElement? resolved = FhirStore.Resolve(r.Reference);
+
+                //    if (resolved == null)
+                //    {
+                //        continue;
+                //    }
+
+                //    FhirEvaluationContext chainedContext = new FhirEvaluationContext(resolved.ToScopedNode());
+                //    chainedContext.ElementResolver = FhirStore.Resolve;
+
+                //    string rt = resolved.InstanceType.ToString();
+
+                //    if (sp.ChainedParameters.ContainsKey(rt))
+                //    {
+                //        found = TestForMatch(resolved, new[] { sp.ChainedParameters[rt] }, chainedContext);
+                //    }
+                //    else if (sp.ChainedParameters.ContainsKey("Resource"))
+                //    {
+                //        found = TestForMatch(resolved, new[] { sp.ChainedParameters["Resource"] }, chainedContext);
+                //    }
+
+                //    if (found)
+                //    {
+                //        break;
+                //    }
+
+                //    //foreach (ParsedSearchParameter chained in sp.ChainedParameters)
+                //    //{
+                //    //    TestForMatch(resolved, new[] { chained }, chainedContext);
+                //    //}
+                //}
+
+                //if (!found)
+                //{
+                //    return false;
+                //}
+
+                //continue;
+            }
+
             if (sp.ParamType == SearchParamType.Composite)
             {
                 // TODO: Firely is missing composite definitions, need to either load the packages myself or submit fixes
@@ -116,7 +171,6 @@ public class SearchTester
             if (sp.ChainedParameters?.Any() ?? false)
             {
                 // loop over any extracted values and test them against the chained parameters
-
                 foreach (ITypedElement node in extracted)
                 {
                     if ((node == null) ||
@@ -152,11 +206,6 @@ public class SearchTester
                     {
                         break;
                     }
-
-                    //foreach (ParsedSearchParameter chained in sp.ChainedParameters)
-                    //{
-                    //    TestForMatch(resolved, new[] { chained }, chainedContext);
-                    //}
                 }
 
                 if (!found)

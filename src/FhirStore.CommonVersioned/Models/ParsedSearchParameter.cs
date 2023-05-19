@@ -138,11 +138,12 @@ public class ParsedSearchParameter
     /// <summary>Gets or sets a value indicating whether this parameter has been ignored.</summary>
     public bool IgnoredParameter { get; set; } = false;
 
-    /// <summary>Gets or sets the chained parameter type filter (if present).</summary>
-    public string ChainedParameterTypeFilter { get; set; } = string.Empty;
-
     /// <summary>Gets or sets the chained parameter.</summary>
     public Dictionary<string, ParsedSearchParameter>? ChainedParameters { get; set; } = null;
+
+    public ParsedSearchParameter? ReverseChainedParameterLink { get; set; } = null;
+
+    public ParsedSearchParameter? ReverseChainedParameterFilter { get; set; } = null;
 
     /// <summary>Gets or sets the composite components.</summary>
     public ParsedSearchParameter[]? CompositeComponents { get; set; } = null;
@@ -287,6 +288,31 @@ public class ParsedSearchParameter
         Modifier = parseResult.ModifierCode;
         ModifierLiteral = parseResult.ModifierLiteral;
 
+        // check for reverse chained parameters - short circuit the constructor logic
+        if ((parseResult.ReverseLinkKey != null) &&
+            (parseResult.ReverseLinkFilter != null))
+        {
+            ReverseChainedParameterLink = new ParsedSearchParameter(
+                store,
+                (IVersionedResourceStore)((IFhirStore)store)[parseResult.ReverseLinkKey.ResourceType],
+                parseResult.ReverseLinkKey,
+                string.Empty);
+            ReverseChainedParameterLink.IgnoredParameter = false;
+
+            ReverseChainedParameterFilter = new ParsedSearchParameter(
+                store,
+                (IVersionedResourceStore)((IFhirStore)store)[parseResult.ReverseLinkFilter.ResourceType],
+                parseResult.ReverseLinkFilter,
+                value);
+
+            ParamType = SearchParamType.Special;
+            SelectExpression = string.Empty;
+            CompiledExpression = null;
+            Values = Array.Empty<string>();
+            IgnoredParameter = false;
+            return;
+        }
+
         if ((parseResult.SearchParameterDefinition == null) ||
             string.IsNullOrEmpty(parseResult.SearchParameterDefinition.Expression))
         {
@@ -318,14 +344,9 @@ public class ParsedSearchParameter
             return;
         }
 
+        // check for chained parameters - short circuit the constructor logic
         if (parseResult.ChainedKeys != null)
         {
-            //ChainedParameters = parseResult.ChainedKeys.Select(ck => new ParsedSearchParameter(
-            //    store,
-            //    (IVersionedResourceStore)((IFhirStore)store)[ck.ResourceType],
-            //    ck,
-            //    value)).ToArray();
-
             ChainedParameters = new();
             foreach (SearchKeyParseResult ck in parseResult.ChainedKeys)
             {
@@ -790,82 +811,6 @@ public class ParsedSearchParameter
                 query[key] ?? string.Empty);
 
             continue;
-
-            //if (key.Contains('.'))
-            //{
-            //    // TODO: handle chaining
-            //    // subject.name=peter
-            //    // subject:Patient.name=peter
-            //    // general-practitioner.name=Joe&general-practitioner.address-state=MN
-            //    // general-practitioner:Practitioner.name=Joe&general-practitioner:Practitioner.address-state=MN
-            //    // _has:Observation:patient:code=1234-5
-            //    // _has:Observation:patient:_has:AuditEvent:entity:agent=MyUserId
-            //    // patient._has:Group:member:_id=102
-
-            //}
-
-            //string[] keyComponents = key.Split(':');
-
-            //string sp = keyComponents[0];
-
-            //if (keyComponents.Length > 2)
-            //{
-            //    if (!keyComponents.Any(kc => kc.Equals("_has")))
-            //    {
-            //        // TODO: need to fail query, not throw
-            //        throw new Exception($"too many modifiers: {key}");
-            //    }
-
-            //    // TODO: handle reverse chaining (_has contains additional ':')
-            //}
-
-            //// check for modifiers (SearchModifierCodes)
-            //string modifierLiteral = string.Empty;
-            //SearchModifierCodes modifierCode = SearchModifierCodes.None;
-
-            //if (keyComponents.Length == 2)
-            //{
-            //    modifierLiteral = keyComponents[1];
-            //    if (!Enum.TryParse(modifierLiteral, true, out modifierCode))
-            //    {
-            //        // TODO: need to fail query, not throw
-            //        throw new Exception($"unknown modifier: {modifierLiteral}");
-            //    }
-            //}
-
-            //// check for search result parameters, which are not search parameters
-            //if (ParsedResultParameters.SearchResultParameters.Contains(sp))
-            //{
-            //    continue;
-            //}
-
-            //// TODO: check for resourceType modifier (need to match resources in the store)
-
-            //ModelInfo.SearchParamDefinition? spd = null;
-
-            //if (_allResourceParameters.ContainsKey(sp))
-            //{
-            //    spd = _allResourceParameters[sp];
-            //}
-
-            //if ((spd == null) &&
-            //    (!resourceStore.TryGetSearchParamDefinition(sp, out spd)))
-            //{
-            //    // no definition found
-            //    Console.WriteLine($"Unable to resolve search parameter: {sp} in resource store");
-            //    continue;
-            //}
-
-            //yield return new ParsedSearchParameter(
-            //    store,
-            //    resourceStore,
-            //    sp,
-            //    modifierLiteral,
-            //    modifierCode,
-            //    query[key] ?? string.Empty,
-            //    spd);
-
-            //continue;
         }
     }
 
@@ -876,13 +821,17 @@ public class ParsedSearchParameter
     /// <param name="ModifierCode">             The modifier code.</param>
     /// <param name="SearchParameterDefinition">The search parameter definition.</param>
     /// <param name="ChainedKeys">              The chained keys.</param>
+    /// <param name="ReverseLinkKey">           The reverse link key.</param>
+    /// <param name="ReverseLinkFilter">        A filter specifying the reverse link.</param>
     private record SearchKeyParseResult(
         string ResourceType,
         string SearchParameterName,
         string ModifierLiteral,
         SearchModifierCodes ModifierCode,
         ModelInfo.SearchParamDefinition? SearchParameterDefinition,
-        SearchKeyParseResult[]? ChainedKeys);
+        SearchKeyParseResult[]? ChainedKeys,
+        SearchKeyParseResult? ReverseLinkKey,
+        SearchKeyParseResult? ReverseLinkFilter);
 
     /// <summary>
     /// Attempts to parse a key from the given data, returning a default value rather than throwing
@@ -925,18 +874,78 @@ public class ParsedSearchParameter
         {
             spName = key.Substring(0, colonIndex);
             chainedKey = string.Empty;
-            //chainedResult = null;
 
             // TODO: sort out reverse chaining
             if (spName.Equals("_has", StringComparison.Ordinal))
             {
-                return null;
+                string[] revComponents = key.Substring(colonIndex + 1).Split(':', '.');
+                if (revComponents.Length < 2)
+                {
+                    // ignore this parameter
+                    return null;
+                }
+
+                string revResourceName = revComponents[0];
+                string revLinkParamName = revComponents[1];
+
+                if (!store.ContainsKey(revResourceName))
+                {
+                    // ignore this parameter
+                    return null;
+                }
+
+                ModelInfo.SearchParamDefinition? linkDefinition;
+
+                if (_allResourceParameters.ContainsKey(revLinkParamName))
+                {
+                    linkDefinition = _allResourceParameters[revLinkParamName];
+                }
+                else if (!((IVersionedResourceStore)store[revResourceName]).TryGetSearchParamDefinition(revLinkParamName, out linkDefinition))
+                {
+                    // no definition found
+                    Console.WriteLine($"Unable to resolve _has link: {revResourceName}:{revLinkParamName} -> {resourceType}");
+                    return null;
+                }
+
+                SearchKeyParseResult? reverseLinkKey = new SearchKeyParseResult(
+                    revResourceName,
+                    revLinkParamName,
+                    string.Empty,
+                    SearchModifierCodes.None,
+                    linkDefinition,
+                    null,
+                    null,
+                    null);
+
+                int contintuationStart = colonIndex + 1 + revResourceName.Length + revLinkParamName.Length + 2;
+
+                if (contintuationStart >= key.Length)
+                {
+                    Console.WriteLine($"Unable to parse _has parameter: {key}");
+                    return null;
+                }
+
+                SearchKeyParseResult? reverseLinkFilter = TryParseKey(
+                    key.Substring(contintuationStart),
+                    store,
+                    (IVersionedResourceStore)store[revResourceName],
+                    revResourceName);
+
+                return new SearchKeyParseResult(
+                    resourceType,
+                    spName,
+                    string.Empty,
+                    SearchModifierCodes.None,
+                    null,
+                    null,
+                    reverseLinkKey,
+                    reverseLinkFilter);
             }
 
             modifierLiteral = key.Substring(colonIndex + 1);
 
             // check for being a resource name
-            if (((IReadOnlyDictionary<string, object>)resourceStore).ContainsKey(modifierLiteral))
+            if (store.ContainsKey(modifierLiteral))
             {
                 modifierCode = SearchModifierCodes.ResourceType;
             }
@@ -961,6 +970,73 @@ public class ParsedSearchParameter
         else if (colonIndex < dotIndex)
         {
             spName = key.Substring(0, colonIndex);
+
+            // TODO: sort out reverse chaining
+            if (spName.Equals("_has", StringComparison.Ordinal))
+            {
+                string[] revComponents = key.Substring(colonIndex + 1).Split(':', '.');
+                if (revComponents.Length < 2)
+                {
+                    // ignore this parameter
+                    return null;
+                }
+
+                string revResourceName = revComponents[0];
+                string revLinkParamName = revComponents[1];
+
+                if (!store.ContainsKey(revResourceName))
+                {
+                    // ignore this parameter
+                    return null;
+                }
+
+                ModelInfo.SearchParamDefinition? linkDefinition;
+
+                if (_allResourceParameters.ContainsKey(revLinkParamName))
+                {
+                    linkDefinition = _allResourceParameters[revLinkParamName];
+                }
+                else if (!((IVersionedResourceStore)store[revResourceName]).TryGetSearchParamDefinition(revLinkParamName, out linkDefinition))
+                {
+                    // no definition found
+                    Console.WriteLine($"Unable to resolve _has link: {revResourceName}:{revLinkParamName} -> {resourceType}");
+                    return null;
+                }
+
+                SearchKeyParseResult? reverseLinkKey = new SearchKeyParseResult(
+                    revResourceName,
+                    revLinkParamName,
+                    string.Empty,
+                    SearchModifierCodes.None,
+                    linkDefinition,
+                    null,
+                    null,
+                    null);
+
+                int contintuationStart = colonIndex + 1 + revResourceName.Length + revLinkParamName.Length + 2;
+
+                if (contintuationStart >= key.Length)
+                {
+                    Console.WriteLine($"Unable to parse _has parameter: {key}");
+                    return null;
+                }
+
+                SearchKeyParseResult? reverseLinkFilter = TryParseKey(
+                    key.Substring(contintuationStart),
+                    store,
+                    (IVersionedResourceStore)store[revResourceName],
+                    revResourceName);
+
+                return new SearchKeyParseResult(
+                    resourceType,
+                    spName,
+                    string.Empty,
+                    SearchModifierCodes.None,
+                    null,
+                    null,
+                    reverseLinkKey,
+                    reverseLinkFilter);
+            }
             modifierLiteral = key.Substring(colonIndex + 1, dotIndex - colonIndex - 1);
 
             // only allow a resource filter here
@@ -985,13 +1061,13 @@ public class ParsedSearchParameter
             //chainedResult = TryParseKey(key.Substring(dotIndex + 1), resourceStore);
         }
 
-        // subject.name=peter
-        // subject:Patient.name=peter
-        // general-practitioner.name=Joe&general-practitioner.address-state=MN
-        // general-practitioner:Practitioner.name=Joe&general-practitioner:Practitioner.address-state=MN
-        // _has:Observation:patient:code=1234-5
-        // _has:Observation:patient:_has:AuditEvent:entity:agent=MyUserId
-        // patient._has:Group:member:_id=102
+        // Observation?subject.name=peter
+        // Observation?subject:Patient.name=peter
+        // Patient?general-practitioner.name=Joe&general-practitioner.address-state=MN
+        // Patient?general-practitioner:Practitioner.name=Joe&general-practitioner:Practitioner.address-state=MN
+        // Patient?_has:Observation:patient:code=1234-5
+        // Patient?_has:Observation:patient:_has:AuditEvent:entity:agent=MyUserId
+        // Encounter?patient._has:Group:member:_id=102
 
         // check for search result parameters, which are not search parameters
         if (ParsedResultParameters.SearchResultParameters.Contains(spName))
@@ -1070,7 +1146,9 @@ public class ParsedSearchParameter
             modifierLiteral,
             modifierCode,
             spDefinition,
-            chainedResults);
+            chainedResults,
+            null,
+            null);
     }
 
     /// <summary>Parse reference common.</summary>

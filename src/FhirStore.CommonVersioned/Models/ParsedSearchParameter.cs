@@ -15,6 +15,7 @@ using System.Globalization;
 using System.Linq;
 using static fhir.candle.Search.SearchDefinitions;
 using Newtonsoft.Json.Linq;
+using System.Runtime.Versioning;
 
 namespace FhirStore.Models;
 
@@ -122,6 +123,9 @@ public class ParsedSearchParameter
         string CanonicalVersion,
         string Url);
 
+    /// <summary>Gets or sets the type of the resource.</summary>
+    public string ResourceType { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the name.</summary>
     public required string Name { get; set; }
 
@@ -134,26 +138,32 @@ public class ParsedSearchParameter
     /// <summary>Gets or sets a value indicating whether this parameter has been ignored.</summary>
     public bool IgnoredParameter { get; set; } = false;
 
+    /// <summary>Gets or sets the chained parameter type filter (if present).</summary>
+    public string ChainedParameterTypeFilter { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the chained parameter.</summary>
+    public Dictionary<string, ParsedSearchParameter>? ChainedParameters { get; set; } = null;
+
     /// <summary>Gets or sets the composite components.</summary>
-    public ParsedSearchParameter[]? CompositeComponents { get; set; }
+    public ParsedSearchParameter[]? CompositeComponents { get; set; } = null;
 
     /// <summary>Gets or sets the date starts.</summary>
-    public DateTimeOffset[]? ValueDateStarts { get; set; }
+    public DateTimeOffset[]? ValueDateStarts { get; set; } = null;
 
     /// <summary>Gets or sets the date ends.</summary>
-    public DateTimeOffset[]? ValueDateEnds { get; set; }
+    public DateTimeOffset[]? ValueDateEnds { get; set; } = null;
 
     /// <summary>Gets or sets the values for integer types.</summary>
-    public long[]? ValueInts { get; set; }
+    public long[]? ValueInts { get; set; } = null;
 
     /// <summary>Gets or sets the values for decimal types.</summary>
-    public decimal[]? ValueDecimals { get; set; }
+    public decimal[]? ValueDecimals { get; set; } = null;
 
     /// <summary>Gets or sets the value FHIR codes.</summary>
     public Hl7.Fhir.ElementModel.Types.Code[]? ValueFhirCodes { get; set; }
 
     /// <summary>Gets or sets the value bools.</summary>
-    public bool[]? ValueBools { get; set; }
+    public bool[]? ValueBools { get; set; } = null;
 
     /// <summary>Gets or sets the value references.</summary>
     public SegmentedReference[]? ValueReferences { get; set; }
@@ -181,6 +191,7 @@ public class ParsedSearchParameter
     /// </summary>
     /// <param name="store">          The FHIR store.</param>
     /// <param name="resourceStore">  The resource store.</param>
+    /// <param name="resourceType">   Type of the resource.</param>
     /// <param name="name">           The search parameter name.</param>
     /// <param name="modifierLiteral">The search modifier literal.</param>
     /// <param name="modifierCode">   The search modifier code.</param>
@@ -190,6 +201,7 @@ public class ParsedSearchParameter
     public ParsedSearchParameter(
         VersionedFhirStore store,
         IVersionedResourceStore resourceStore,
+        string resourceType,
         string name,
         string modifierLiteral,
         SearchModifierCodes modifierCode,
@@ -197,6 +209,7 @@ public class ParsedSearchParameter
         ModelInfo.SearchParamDefinition? spd)
     {
         Name = name;
+        ResourceType = resourceType;
         Modifier = modifierCode;
         ModifierLiteral = modifierLiteral;
 
@@ -255,6 +268,108 @@ public class ParsedSearchParameter
         }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ParsedSearchParameter"/> class.
+    /// </summary>
+    /// <param name="store">        The FHIR store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="parseResult">  The parse result.</param>
+    /// <param name="value">        The http-paramter value string.</param>
+    [SetsRequiredMembers]
+    private ParsedSearchParameter(
+        VersionedFhirStore store,
+        IVersionedResourceStore resourceStore,
+        SearchKeyParseResult parseResult,
+        string value)
+    {
+        Name = parseResult.SearchParameterName;
+        ResourceType = parseResult.ResourceType;
+        Modifier = parseResult.ModifierCode;
+        ModifierLiteral = parseResult.ModifierLiteral;
+
+        if ((parseResult.SearchParameterDefinition == null) ||
+            string.IsNullOrEmpty(parseResult.SearchParameterDefinition.Expression))
+        {
+            ParamType = parseResult.SearchParameterDefinition?.Type ?? SearchParamType.Special;
+            SelectExpression = string.Empty;
+            CompiledExpression = null;
+            Values = Array.Empty<string>();
+            IgnoredParameter = true;
+            return;
+        }
+
+        ParamType = parseResult.SearchParameterDefinition.Type;
+        SelectExpression = parseResult.SearchParameterDefinition.Expression;
+        CompiledExpression = store.GetCompiledSearchParameter(
+            parseResult.SearchParameterDefinition.Resource ?? string.Empty,
+            parseResult.SearchParameterName,
+            SelectExpression);
+
+        if (parseResult.SearchParameterDefinition.Type == SearchParamType.Composite)
+        {
+            ExtractCompositeParams(store, resourceStore, value, out List<ParsedSearchParameter> cpValues);
+
+            CompositeComponents = cpValues.ToArray();
+
+            // we do not want to run composite parameters through the normal parsing logic
+            Prefixes = Array.Empty<SearchPrefixCodes?>();
+            Values = Array.Empty<string>();
+
+            return;
+        }
+
+        if (parseResult.ChainedKeys != null)
+        {
+            //ChainedParameters = parseResult.ChainedKeys.Select(ck => new ParsedSearchParameter(
+            //    store,
+            //    (IVersionedResourceStore)((IFhirStore)store)[ck.ResourceType],
+            //    ck,
+            //    value)).ToArray();
+
+            ChainedParameters = new();
+            foreach (SearchKeyParseResult ck in parseResult.ChainedKeys)
+            {
+                ChainedParameters.Add(
+                    ck.ResourceType,
+                    new ParsedSearchParameter(
+                        store,
+                        (IVersionedResourceStore)((IFhirStore)store)[ck.ResourceType],
+                        ck,
+                        value));
+            }
+
+            // when chaining, we do not want to parse the value - it is handled at the last link in the chain
+            Values = Array.Empty<string>();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(value))
+        {
+            Values = Array.Empty<string>();
+            IgnoredParameter = true;
+            return;
+        }
+
+        // parse the value string into prefixes and values
+        ExtractValues(value, parseResult.SearchParameterDefinition);
+
+        if (Values == null)
+        {
+            Values = Array.Empty<string>();
+        }
+
+        // by default, assume all values are applied (will be updated during typed parsing)
+        IgnoredValueFlags = Enumerable.Repeat(false, Values.Length).ToArray<bool>();
+
+        ProcessTypedValues(value, parseResult.SearchParameterDefinition);
+
+        // check for no valid values to apply
+        if (IgnoredValueFlags.Any() && IgnoredValueFlags.All(x => x))
+        {
+            IgnoredParameter = true;
+        }
+    }
+
     /// <summary>Gets applied query string.</summary>
     /// <returns>The applied query string.</returns>
     public string GetAppliedQueryString()
@@ -265,6 +380,25 @@ public class ParsedSearchParameter
         }
 
         System.Text.StringBuilder sb = new();
+
+        // nest into chained parameters
+        if (ChainedParameters?.Any() ?? false)
+        {
+            sb.Append(Name);
+
+            if (Modifier != SearchModifierCodes.None)
+            {
+                sb.Append(':');
+                sb.Append(ModifierLiteral);
+            }
+
+            sb.Append('.');
+            sb.Append(ChainedParameters.First().Value.GetAppliedQueryString());
+
+            return sb.ToString();
+        }
+
+        // iterate across values 
         for (int i = 0; i < Values.Length; i++)
         {
             if (IgnoredValueFlags[i])
@@ -615,17 +749,18 @@ public class ParsedSearchParameter
     }
 
     /// <summary>Enumerates parse in this collection.</summary>
-    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
     /// <param name="queryString">  The query string.</param>
     /// <param name="store">        The FHIR store.</param>
     /// <param name="resourceStore">The resource store.</param>
+    /// <param name="resourceType"> Type of the resource.</param>
     /// <returns>
     /// An enumerator that allows foreach to be used to process parse in this collection.
     /// </returns>
     public static IEnumerable<ParsedSearchParameter> Parse(
         string queryString,
         VersionedFhirStore store,
-        IVersionedResourceStore resourceStore)
+        IVersionedResourceStore resourceStore,
+        string resourceType)
     {
         if (string.IsNullOrWhiteSpace(queryString))
         {
@@ -640,87 +775,302 @@ public class ParsedSearchParameter
                 continue;
             }
 
-            if (key.Contains('.'))
+            SearchKeyParseResult? parseResult = TryParseKey(key, store, resourceStore, resourceType);
+
+            if (parseResult == null)
             {
-                // TODO: handle chaining
-            }
-
-            // check for search result parameters, which are not search parameters
-            if (ParsedResultParameters.SearchResultParameters.Contains(key))
-            {
-                continue;
-            }
-
-            string[] keyComponents = key.Split(':');
-
-            string sp = keyComponents[0];
-
-            if (keyComponents.Length > 2)
-            {
-                if (!keyComponents.Any(kc => kc.Equals("_has")))
-                {
-                    // TODO: need to fail query, not throw
-                    throw new Exception($"too many modifiers: {key}");
-                }
-
-                // TODO: handle reverse chaining (_has contains additional ':')
-            }
-
-            // check for modifiers (SearchModifierCodes)
-            string modifierLiteral = string.Empty;
-            SearchModifierCodes modifierCode = SearchModifierCodes.None;
-
-            if (keyComponents.Length == 2)
-            {
-                modifierLiteral = keyComponents[1];
-                if (!Enum.TryParse(modifierLiteral, true, out modifierCode))
-                {
-                    // TODO: need to fail query, not throw
-                    throw new Exception($"unknown modifier: {modifierLiteral}");
-                }
-            }
-
-            string? value = query[key];
-
-            // TODO: check for resourceType modifier (need to match resources in the store)
-
-            ModelInfo.SearchParamDefinition? spd = null;
-
-            if (_allResourceParameters.ContainsKey(sp))
-            {
-                spd = _allResourceParameters[sp];
-            }
-
-            if ((spd == null) &&
-                (!resourceStore.TryGetSearchParamDefinition(sp, out spd)))
-            {
-                // no definition found
-                Console.WriteLine($"Unable to resolve search parameter: {sp} in resource store");
+                Console.WriteLine($"Failed to parse search parameter: {key}");
                 continue;
             }
 
             yield return new ParsedSearchParameter(
                 store,
                 resourceStore,
-                sp,
-                modifierLiteral,
-                modifierCode,
-                value ?? string.Empty,
-                spd);
-
-            //yield return new ParsedSearchParameter
-            //{
-            //    Name = sp,
-            //    ParamType = spd.Type,
-            //    ModifierLiteral = modifierLiteral,
-            //    Modifier = modifierCode,
-            //    Prefixes = prefixes.ToArray(),
-            //    SelectExpression = spd.Expression ?? string.Empty,
-            //    Values = values.ToArray(),
-            //};
+                parseResult,
+                query[key] ?? string.Empty);
 
             continue;
+
+            //if (key.Contains('.'))
+            //{
+            //    // TODO: handle chaining
+            //    // subject.name=peter
+            //    // subject:Patient.name=peter
+            //    // general-practitioner.name=Joe&general-practitioner.address-state=MN
+            //    // general-practitioner:Practitioner.name=Joe&general-practitioner:Practitioner.address-state=MN
+            //    // _has:Observation:patient:code=1234-5
+            //    // _has:Observation:patient:_has:AuditEvent:entity:agent=MyUserId
+            //    // patient._has:Group:member:_id=102
+
+            //}
+
+            //string[] keyComponents = key.Split(':');
+
+            //string sp = keyComponents[0];
+
+            //if (keyComponents.Length > 2)
+            //{
+            //    if (!keyComponents.Any(kc => kc.Equals("_has")))
+            //    {
+            //        // TODO: need to fail query, not throw
+            //        throw new Exception($"too many modifiers: {key}");
+            //    }
+
+            //    // TODO: handle reverse chaining (_has contains additional ':')
+            //}
+
+            //// check for modifiers (SearchModifierCodes)
+            //string modifierLiteral = string.Empty;
+            //SearchModifierCodes modifierCode = SearchModifierCodes.None;
+
+            //if (keyComponents.Length == 2)
+            //{
+            //    modifierLiteral = keyComponents[1];
+            //    if (!Enum.TryParse(modifierLiteral, true, out modifierCode))
+            //    {
+            //        // TODO: need to fail query, not throw
+            //        throw new Exception($"unknown modifier: {modifierLiteral}");
+            //    }
+            //}
+
+            //// check for search result parameters, which are not search parameters
+            //if (ParsedResultParameters.SearchResultParameters.Contains(sp))
+            //{
+            //    continue;
+            //}
+
+            //// TODO: check for resourceType modifier (need to match resources in the store)
+
+            //ModelInfo.SearchParamDefinition? spd = null;
+
+            //if (_allResourceParameters.ContainsKey(sp))
+            //{
+            //    spd = _allResourceParameters[sp];
+            //}
+
+            //if ((spd == null) &&
+            //    (!resourceStore.TryGetSearchParamDefinition(sp, out spd)))
+            //{
+            //    // no definition found
+            //    Console.WriteLine($"Unable to resolve search parameter: {sp} in resource store");
+            //    continue;
+            //}
+
+            //yield return new ParsedSearchParameter(
+            //    store,
+            //    resourceStore,
+            //    sp,
+            //    modifierLiteral,
+            //    modifierCode,
+            //    query[key] ?? string.Empty,
+            //    spd);
+
+            //continue;
         }
+    }
+
+    /// <summary>Encapsulates the result of a search key parse.</summary>
+    /// <param name="ResourceType">             Type of the resource.</param>
+    /// <param name="SearchParameterName">      Name of the search parameter.</param>
+    /// <param name="ModifierLiteral">          The modifier literal.</param>
+    /// <param name="ModifierCode">             The modifier code.</param>
+    /// <param name="SearchParameterDefinition">The search parameter definition.</param>
+    /// <param name="ChainedKeys">              The chained keys.</param>
+    private record SearchKeyParseResult(
+        string ResourceType,
+        string SearchParameterName,
+        string ModifierLiteral,
+        SearchModifierCodes ModifierCode,
+        ModelInfo.SearchParamDefinition? SearchParameterDefinition,
+        SearchKeyParseResult[]? ChainedKeys);
+
+    /// <summary>
+    /// Attempts to parse a key from the given data, returning a default value rather than throwing
+    /// an exception if it fails.
+    /// </summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="key">          The key.</param>
+    /// <param name="store">        The FHIR store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="resourceType"> Type of the resource.</param>
+    /// <returns>A SearchKeyParseResult?</returns>
+    private static SearchKeyParseResult? TryParseKey(
+        string key,
+        IFhirStore store,
+        IVersionedResourceStore resourceStore,
+        string resourceType)
+    {
+        string spName;
+        string modifierLiteral;
+        SearchModifierCodes modifierCode;
+        ModelInfo.SearchParamDefinition? spDefinition;
+        string chainedKey;
+        SearchKeyParseResult[]? chainedResults;
+
+        int colonIndex = key.IndexOf(':');
+        int dotIndex = key.IndexOf('.');
+
+        // check for no modifier and no chaining
+        if ((colonIndex == -1) && (dotIndex == -1))
+        {
+            spName = key;
+            modifierLiteral = string.Empty;
+            modifierCode = SearchModifierCodes.None;
+            chainedKey = string.Empty;
+            //chainedResult = null;
+        }
+
+        // check for modifier and no chaining
+        else if ((colonIndex != -1) && (dotIndex == -1))
+        {
+            spName = key.Substring(0, colonIndex);
+            chainedKey = string.Empty;
+            //chainedResult = null;
+
+            // TODO: sort out reverse chaining
+            if (spName.Equals("_has", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            modifierLiteral = key.Substring(colonIndex + 1);
+
+            // check for being a resource name
+            if (((IReadOnlyDictionary<string, object>)resourceStore).ContainsKey(modifierLiteral))
+            {
+                modifierCode = SearchModifierCodes.ResourceType;
+            }
+            else if (!Enum.TryParse(modifierLiteral, true, out modifierCode))
+            {
+                // TODO: need to fail query
+                throw new Exception($"unknown modifier in query: {modifierLiteral} ({key})");
+            }
+        }
+
+        // check for chaining and no modifier
+        else if ((colonIndex == -1) && (dotIndex != -1))
+        {
+            spName = key.Substring(0, dotIndex);
+            modifierLiteral = string.Empty;
+            modifierCode = SearchModifierCodes.None;
+            chainedKey = key.Substring(dotIndex + 1);
+            //chainedResult = TryParseKey(key.Substring(dotIndex + 1), resourceStore);
+        }
+
+        // check for type filter followed by chain
+        else if (colonIndex < dotIndex)
+        {
+            spName = key.Substring(0, colonIndex);
+            modifierLiteral = key.Substring(colonIndex + 1, dotIndex - colonIndex - 1);
+
+            // only allow a resource filter here
+            if (!store.ContainsKey(modifierLiteral))
+            {
+                // TODO: need to fail query
+                throw new Exception($"unacceptalbe modifier used in chaining query: {modifierLiteral} ({key})");
+            }
+
+            modifierCode = SearchModifierCodes.ResourceType;
+            chainedKey = key.Substring(dotIndex + 1);
+            //chainedResult = TryParseKey(key.Substring(dotIndex + 1), resourceStore);
+        }
+
+        // check for chain first
+        else
+        {
+            spName = key.Substring(0, dotIndex);
+            modifierLiteral = string.Empty;
+            modifierCode = SearchModifierCodes.None;
+            chainedKey = key.Substring(dotIndex + 1);
+            //chainedResult = TryParseKey(key.Substring(dotIndex + 1), resourceStore);
+        }
+
+        // subject.name=peter
+        // subject:Patient.name=peter
+        // general-practitioner.name=Joe&general-practitioner.address-state=MN
+        // general-practitioner:Practitioner.name=Joe&general-practitioner:Practitioner.address-state=MN
+        // _has:Observation:patient:code=1234-5
+        // _has:Observation:patient:_has:AuditEvent:entity:agent=MyUserId
+        // patient._has:Group:member:_id=102
+
+        // check for search result parameters, which are not search parameters
+        if (ParsedResultParameters.SearchResultParameters.Contains(spName))
+        {
+            return null;
+        }
+
+        if (_allResourceParameters.ContainsKey(spName))
+        {
+            spDefinition = _allResourceParameters[spName];
+        }
+        else if (!resourceStore.TryGetSearchParamDefinition(spName, out spDefinition))
+        {
+            // no definition found
+            Console.WriteLine($"Unable to resolve search parameter: {spName} in resource store");
+            return null;
+        }
+         
+        if (string.IsNullOrEmpty(chainedKey))
+        {
+            chainedResults = null;
+        }
+        else
+        {
+            List<SearchKeyParseResult> perResourceChains = new();
+
+            if ((modifierCode == SearchModifierCodes.ResourceType) &&
+                store.ContainsKey(modifierLiteral))
+            {
+                SearchKeyParseResult? res = TryParseKey(
+                    chainedKey, 
+                    store, 
+                    (IVersionedResourceStore)store[modifierLiteral],
+                    modifierLiteral);
+
+                if (res != null)
+                {
+                    perResourceChains.Add(res);
+                }
+            }
+            else if (spDefinition?.Target?.Any() ?? false)
+            {
+                foreach (ResourceType rt in spDefinition.Target)
+                {
+                    string rtName = rt.ToString();
+
+                    if (store.ContainsKey(rtName))
+                    {
+                        SearchKeyParseResult? res = TryParseKey(
+                            chainedKey, 
+                            store, 
+                            (IVersionedResourceStore)store[rtName],
+                            rtName);
+
+                        if (res != null)
+                        {
+                            perResourceChains.Add(res);
+                        }
+                    }
+                }
+            }
+
+            if (perResourceChains.Any())
+            {
+                chainedResults = perResourceChains.ToArray();
+            }
+            else
+            {
+                chainedResults = null;
+            }
+        }
+
+        return new SearchKeyParseResult(
+            resourceType,
+            spName,
+            modifierLiteral,
+            modifierCode,
+            spDefinition,
+            chainedResults);
     }
 
     /// <summary>Parse reference common.</summary>

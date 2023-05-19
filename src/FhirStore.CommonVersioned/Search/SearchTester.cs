@@ -112,6 +112,61 @@ public class SearchTester
 
             bool found = false;
 
+            // for chaining, we nest the search instead of evaluating it here
+            if (sp.ChainedParameters?.Any() ?? false)
+            {
+                // loop over any extracted values and test them against the chained parameters
+
+                foreach (ITypedElement node in extracted)
+                {
+                    if ((node == null) ||
+                        (node.InstanceType != "Reference"))
+                    {
+                        continue;
+                    }
+
+                    ResourceReference r = node.ToPoco<ResourceReference>();
+
+                    ITypedElement? resolved = FhirStore.Resolve(r.Reference);
+
+                    if (resolved == null)
+                    {
+                        continue;
+                    }
+
+                    FhirEvaluationContext chainedContext = new FhirEvaluationContext(resolved.ToScopedNode());
+                    chainedContext.ElementResolver = FhirStore.Resolve;
+
+                    string rt = resolved.InstanceType.ToString();
+
+                    if (sp.ChainedParameters.ContainsKey(rt))
+                    {
+                        found = TestForMatch(resolved, new[] { sp.ChainedParameters[rt] }, chainedContext);
+                    }
+                    else if (sp.ChainedParameters.ContainsKey("Resource"))
+                    {
+                        found = TestForMatch(resolved, new[] { sp.ChainedParameters["Resource"] }, chainedContext);
+                    }
+
+                    if (found)
+                    {
+                        break;
+                    }
+
+                    //foreach (ParsedSearchParameter chained in sp.ChainedParameters)
+                    //{
+                    //    TestForMatch(resolved, new[] { chained }, chainedContext);
+                    //}
+                }
+
+                if (!found)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
             foreach (ITypedElement resultNode in extracted)
             {
                 // all types evaluate missing the same way

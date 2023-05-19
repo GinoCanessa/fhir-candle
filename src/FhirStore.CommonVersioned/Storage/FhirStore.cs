@@ -1381,6 +1381,8 @@ public partial class VersionedFhirStore : IFhirStore
 
                 foreach (ParsedSubscription.SubscriptionFilter filter in subscription.Filters[key])
                 {
+                    // TODO: check support for chained parameters in filters
+
                     // TODO: validate this is working for generic parameters (e.g., _id)
 
                     // TODO: support inline-defined parameters
@@ -1404,6 +1406,7 @@ public partial class VersionedFhirStore : IFhirStore
                     ParsedSearchParameter sp = new(
                         this,
                         rs,
+                        key.Equals("*") ? "Resource" : key,
                         filter.Name,
                         filter.Modifier,
                         modifierCode,
@@ -1460,7 +1463,8 @@ public partial class VersionedFhirStore : IFhirStore
         IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(
             queryString,
             this,
-            _store[resourceType]);
+            _store[resourceType],
+            resourceType);
 
         // execute search
         IEnumerable<Resource>? results = _store[resourceType].TypeSearch(parameters);
@@ -1583,6 +1587,7 @@ public partial class VersionedFhirStore : IFhirStore
                     new ParsedSearchParameter(
                         this,
                         _store[reverseResourceType],
+                        reverseResourceType,
                         sp.Name!, 
                         string.Empty,
                         SearchModifierCodes.None,

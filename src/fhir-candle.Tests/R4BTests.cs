@@ -152,6 +152,11 @@ public class R4BTestsObservation : IClassFixture<R4BTests>
     [InlineData("_profile=http://hl7.org/fhir/StructureDefinition/vitalsigns", R4BTests._observationsVitalSigns)]
     [InlineData("_profile:missing=true", (R4BTests._observationCount - R4BTests._observationsVitalSigns))]
     [InlineData("_profile:missing=false", R4BTests._observationsVitalSigns)]
+    [InlineData("subject.name=peter", R4BTests._observationsWithSubjectExample)]
+    [InlineData("subject:Patient.name=peter", R4BTests._observationsWithSubjectExample)]
+    [InlineData("subject._id=example", R4BTests._observationsWithSubjectExample)]
+    [InlineData("subject:Patient._id=example", R4BTests._observationsWithSubjectExample)]
+    [InlineData("subject._id=example&_include=Observation:patient", R4BTests._observationsWithSubjectExample, R4BTests._observationsWithSubjectExample + 1)]
     public void ObservationSearch(string search, int matchCount, int? entryCount = null)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");

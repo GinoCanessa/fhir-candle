@@ -49,6 +49,9 @@
   </Target>
 	
   <ItemGroup>
+    <None Remove="data\common\" />
+  </ItemGroup>
+  <ItemGroup>
     <None Update="data\r4\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -58,6 +61,12 @@
     <None Update="data\r5\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="data\common\patient-example.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="data\common\" />
+  </ItemGroup>
 </Project>

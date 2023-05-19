@@ -854,12 +854,12 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to read resource: {resourceType}/{id}");
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource: {resourceType}/{id} not found");
             serializedOutcome = SerializeFhir(oo, destFormat);
 
             eTag = string.Empty;
             lastModified = string.Empty;
-            return HttpStatusCode.UnsupportedMediaType;
+            return HttpStatusCode.NotFound;
         }
 
         serializedResource = SerializeFhir(stored, destFormat, SummaryType.False);

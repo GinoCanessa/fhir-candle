@@ -11,8 +11,11 @@ using fhir.candle.Tests.Models;
 using FhirStore.Models;
 using FhirStore.Storage;
 using FluentAssertions;
+using Hl7.Fhir.Model;
 using System.Net;
+using System.Security.AccessControl;
 using System.Text.Json;
+using System.Xml.Linq;
 using Xunit.Abstractions;
 
 namespace fhir.candle.Tests;
@@ -106,7 +109,7 @@ public class FhirStoreTests
 }
 
 /// <summary>A metadata test.</summary>
-public class MetadataTest : IClassFixture<FhirStoreTests>
+public class MetadataJson : IClassFixture<FhirStoreTests>
 {
     /// <summary>(Immutable) The test output helper.</summary>
     private readonly ITestOutputHelper _testOutputHelper;
@@ -131,7 +134,7 @@ public class MetadataTest : IClassFixture<FhirStoreTests>
     /// <summary>(Immutable) The fixture.</summary>
     private readonly FhirStoreTests _fixture;
 
-    public MetadataTest(FhirStoreTests fixture, ITestOutputHelper testOutputHelper)
+    public MetadataJson(FhirStoreTests fixture, ITestOutputHelper testOutputHelper)
     {
         _fixture = fixture;
         _testOutputHelper = testOutputHelper;
@@ -147,8 +150,8 @@ public class MetadataTest : IClassFixture<FhirStoreTests>
             "application/fhir+json",
             out string serializedResource,
             out string serializedOutcome,
-            out string eTag,
-            out string lastModified);
+            out _,
+            out _);
 
         scRead.Should().Be(HttpStatusCode.OK);
         serializedResource.Should().NotBeNullOrEmpty();
@@ -164,5 +167,205 @@ public class MetadataTest : IClassFixture<FhirStoreTests>
         rest.Resources.Should().NotBeNullOrEmpty();
         int resourceCount = rest.Resources!.Count();
         resourceCount.Should().Be(_fixture._expectedRestResources[version]);
+    }
+}
+
+/// <summary>A metadata test.</summary>
+public class MetadataXml : IClassFixture<FhirStoreTests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => new List<object[]>
+    {
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R4,
+        },
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R4B,
+        },
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R5,
+        },
+    };
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly FhirStoreTests _fixture;
+
+    public MetadataXml(FhirStoreTests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void GetMetadata(TenantConfiguration.SupportedFhirVersions version)
+    {
+        IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
+
+        HttpStatusCode scRead = fhirStore.GetMetadata(
+            "application/fhir+xml",
+            out string serializedResource,
+            out string serializedOutcome,
+            out _,
+            out _);
+
+        scRead.Should().Be(HttpStatusCode.OK);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+
+        using (MemoryStream ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(serializedResource)))
+        {
+            XElement parsed = XElement.Load(ms);
+
+            parsed.Should().NotBeNull();
+
+            int resourceCount = parsed.Descendants("{http://hl7.org/fhir}resource").Count();
+            resourceCount.Should().Be(_fixture._expectedRestResources[version]);
+        }
+    }
+}
+
+/// <summary>Create, read, update, and delete a Patient.</summary>
+public class TestPatientCRUD : IClassFixture<FhirStoreTests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => new List<object[]>
+    {
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R4,
+        },
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R4B,
+        },
+        new object[]
+        {
+            TenantConfiguration.SupportedFhirVersions.R5,
+        },
+    };
+
+    private const string _resourceType = "Patient";
+    private const string _id = "common";
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly FhirStoreTests _fixture;
+
+    public TestPatientCRUD(FhirStoreTests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void PatientCRUD(TenantConfiguration.SupportedFhirVersions version)
+    {
+        string json1 = "{\"resourceType\":\"" + _resourceType + "\",\"id\":\"" + _id + "\",\"language\":\"en\"}";
+        string json2 = "{\"resourceType\":\"" + _resourceType + "\",\"id\":\"" + _id + "\",\"language\":\"en-US\"}";
+
+        IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
+
+        string serializedResource, serializedOutcome, eTag, lastModified, location;
+
+        HttpStatusCode sc = fhirStore.InstanceCreate(
+            _resourceType,
+            json1,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        location.Should().Contain(_resourceType);
+
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().EndWith(_resourceType + "/" + _id);
+
+        sc = fhirStore.InstanceRead(
+            _resourceType,
+            _id,
+            "application/fhir+json",
+            string.Empty,
+            eTag,
+            lastModified,
+            string.Empty,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        location.Should().EndWith(_resourceType + "/" + _id);
+
+        sc = fhirStore.InstanceUpdate(
+            _resourceType,
+            _id,
+            json2,
+            "application/fhir+json",
+            "application/fhir+json",
+            string.Empty,
+            string.Empty,
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        location.Should().Contain(_resourceType);
+
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"2\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().EndWith(_resourceType + "/" + _id);
+
+        sc = fhirStore.InstanceDelete(
+            _resourceType,
+            _id,
+            "application/fhir+json",
+            string.Empty,
+            out serializedResource,
+            out serializedOutcome);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        location.Should().Contain(_resourceType);
+
+        sc = fhirStore.InstanceRead(
+            _resourceType,
+            _id,
+            "application/fhir+json",
+            string.Empty,
+            eTag,
+            lastModified,
+            string.Empty,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified);
+
+        sc.Should().Be(HttpStatusCode.NotFound);
     }
 }

@@ -16,6 +16,7 @@ using Xunit.Abstractions;
 using storeR5::FhirStore.Models;
 using storeR5::FhirStore.Storage;
 using Hl7.Fhir.Model;
+using fhircandle.Tests.Models;
 
 namespace fhir.candle.Tests;
 
@@ -365,6 +366,7 @@ public class FhirStoreTestsR5: IDisposable
             out lastModified,
             out location);
 
+
         string notification = fhirStore.SerializeSubscriptionEvents(
             "encounter-create-interaction",
             Array.Empty<long>(),
@@ -375,7 +377,14 @@ public class FhirStoreTestsR5: IDisposable
         MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(notification);
 
         results.Should().NotBeNull();
-        results!.Entries.Should().HaveCount(2);
+
+        results!.Entries.Should().NotBeEmpty();
+        results!.Entries!.First().Resource.Should().NotBeNull();
+
+        MinimalStatus? status = JsonSerializer.Deserialize<MinimalStatus>(results!.Entries!.First().Resource!.ToString() ?? string.Empty);
+
+        status.Should().NotBeNull();
+        status!.EventsSinceSubscriptionStart.Should().Be("1");
 
         //_testOutputHelper.WriteLine(bundle);
     }
@@ -471,7 +480,15 @@ public class FhirStoreTestsR5: IDisposable
         results = JsonSerializer.Deserialize<MinimalBundle>(notification);
 
         results.Should().NotBeNull();
-        results!.Entries.Should().HaveCount(2);
+
+        results!.Entries.Should().NotBeEmpty();
+        results!.Entries!.First().Resource.Should().NotBeNull();
+
+        MinimalStatus? status = JsonSerializer.Deserialize<MinimalStatus>(results!.Entries!.First().Resource!.ToString() ?? string.Empty);
+
+        status.Should().NotBeNull();
+        status!.EventsSinceSubscriptionStart.Should().Be("1");
+
 
         //_testOutputHelper.WriteLine(bundle);
     }
@@ -567,7 +584,15 @@ public class FhirStoreTestsR5: IDisposable
         results = JsonSerializer.Deserialize<MinimalBundle>(notification);
 
         results.Should().NotBeNull();
-        results!.Entries.Should().HaveCount(2);
+
+        results!.Entries.Should().NotBeEmpty();
+        results!.Entries!.First().Resource.Should().NotBeNull();
+
+        MinimalStatus? status = JsonSerializer.Deserialize<MinimalStatus>(results!.Entries!.First().Resource!.ToString() ?? string.Empty);
+
+        status.Should().NotBeNull();
+        status!.EventsSinceSubscriptionStart.Should().Be("1");
+
 
         //_testOutputHelper.WriteLine(bundle);
     }

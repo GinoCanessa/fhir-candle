@@ -28,6 +28,12 @@ public class MinimalBundle
         /// <summary>Gets or sets the search.</summary>
         [JsonPropertyName("search")]
         public MinimalSearch? Search { get; set; } = null;
+
+        /// <summary>
+        /// Gets or sets the resource.
+        /// </summary>
+        [JsonPropertyName("resource")]
+        public object? Resource { get; set; } = null;
     }
 
     /// <summary>A minimal link.</summary>

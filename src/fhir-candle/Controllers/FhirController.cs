@@ -159,7 +159,7 @@ public class FhirController : ControllerBase
     }
 
     [HttpGet, Route("{store}/{resourceName}/{id}")]
-    public async Task GetResourceInstance(
+    public async Task GetResourceInstanceOrOperation(
         [FromRoute] string store,
         [FromRoute] string resourceName,
         [FromRoute] string id,
@@ -175,27 +175,48 @@ public class FhirController : ControllerBase
 
         format = GetMimeType(format, Request);
 
-        HttpStatusCode sc = _fhirStoreManager[store].InstanceRead(
-            resourceName,
-            id,
-            format,
-            summary ?? string.Empty,
-            string.Empty,
-            string.Empty,
-            string.Empty,
-            out string resource,
-            out string outcome,
-            out string eTag,
-            out string lastModified);
+        HttpStatusCode sc;
+        string resource, outcome, eTag, lastModified;
 
-        if (!string.IsNullOrEmpty(eTag))
+        if (id[0] == '$')
         {
-            Response.Headers.Add(HeaderNames.ETag, eTag);
+            // operation
+            sc = _fhirStoreManager[store].TypeOperation(
+                resourceName,
+                id,
+                Request.QueryString.ToString(),
+                string.Empty,
+                string.Empty,
+                format,
+                out resource,
+                out outcome);
         }
-
-        if (!string.IsNullOrEmpty(lastModified))
+        else
         {
-            Response.Headers.Add(HeaderNames.LastModified, lastModified);
+            // read instance
+
+            sc = _fhirStoreManager[store].InstanceRead(
+                resourceName,
+                id,
+                format,
+                summary ?? string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                out resource,
+                out outcome,
+                out eTag,
+                out lastModified);
+
+            if (!string.IsNullOrEmpty(eTag))
+            {
+                Response.Headers.Add(HeaderNames.ETag, eTag);
+            }
+
+            if (!string.IsNullOrEmpty(lastModified))
+            {
+                Response.Headers.Add(HeaderNames.LastModified, lastModified);
+            }
         }
 
         Response.ContentType = format;

@@ -1590,6 +1590,19 @@ public partial class VersionedFhirStore : IFhirStore
         return true;
     }
 
+    public HttpStatusCode TypeOperation(
+        string resoruceType,
+        string operationName,
+        string queryString,
+        string content,
+        string sourceFormat,
+        string destFormat,
+        out string serializedResource,
+        out string serializedOutcome)
+    {
+        throw new NotImplementedException();
+    }
+
     /// <summary>Type search.</summary>
     /// <param name="resourceType">     Type of the resource.</param>
     /// <param name="queryString">      The query string.</param>
@@ -1683,20 +1696,20 @@ public partial class VersionedFhirStore : IFhirStore
 
         foreach (Resource resource in results)
         {
-            string id = $"{resource.TypeName}/{resource.Id}";
+            string relativeUrl = $"{resource.TypeName}/{resource.Id}";
 
-            if (addedIds.Contains(id))
+            if (addedIds.Contains(relativeUrl))
             {
                 // promote to match
-                bundle.FindEntry(new ResourceReference(id)).First().Search.Mode = Bundle.SearchEntryMode.Match;
+                bundle.FindEntry(new ResourceReference(relativeUrl)).First().Search.Mode = Bundle.SearchEntryMode.Match;
             }
             else
             {
                 // add the matched result to the bundle
-                bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{id}", Bundle.SearchEntryMode.Match);
+                bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{relativeUrl}", Bundle.SearchEntryMode.Match);
 
                 // track we have added this id
-                addedIds.Add(id);
+                addedIds.Add(relativeUrl);
             }
 
             // add any incuded resources
@@ -1725,12 +1738,6 @@ public partial class VersionedFhirStore : IFhirStore
         ParsedResultParameters resultParameters,
         HashSet<string> addedIds)
     {
-        // check for include directives
-        if (!resultParameters.Inclusions.ContainsKey(focus.TypeName))
-        {
-            return Array.Empty<Resource>();
-        }
-
         List<Resource> inclusions = new();
 
         string matchId = $"{focus.TypeName}/{focus.Id}";

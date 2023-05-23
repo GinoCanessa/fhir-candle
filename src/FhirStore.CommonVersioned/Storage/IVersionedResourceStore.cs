@@ -82,8 +82,12 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
 
     /// <summary>Sets executable subscription information.</summary>
     /// <param name="url">             URL of the resource.</param>
-    /// <param name="compiledTriggers">The compiled triggers.</param>
-    void SetExecutableSubscriptionTopic(string url, List<CompiledExpression> compiledTriggers);
+    /// 
+    void SetExecutableSubscriptionTopic(
+        string url,
+        IEnumerable<ExecutableSubscriptionInfo.InteractionOnlyTrigger> interactionTriggers,
+        IEnumerable<ExecutableSubscriptionInfo.CompiledFhirPathTrigger> fhirpathTriggers,
+        IEnumerable<ExecutableSubscriptionInfo.CompiledQueryTrigger> queryTriggers);
 
     /// <summary>Removes the executable subscription information described by topicUrl.</summary>
     /// <param name="topicUrl">URL of the topic.</param>

@@ -100,7 +100,7 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>The subscription topic converter.</summary>
     private static TopicConverter _topicConverter = new();
-
+    
     /// <summary>The subscription converter.</summary>
     private static SubscriptionConverter _subscriptionConverter = new();
 
@@ -122,6 +122,9 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>(Immutable) Identifier for the capability statement.</summary>
     private const string _capabilityStatementId = "metadata";
+
+    private bool _inLoad = false;
+    private Dictionary<string, List<object>>? _loadResourcesToReprocess = null;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VersionedFhirStore"/> class.
@@ -205,6 +208,9 @@ public partial class VersionedFhirStore : IFhirStore
         // check for a load directory
         if (config.LoadDirectory != null)
         {
+            _loadResourcesToReprocess = new();
+            _inLoad = true;
+
             string serializedResource, serializedOutcome, eTag, lastModified, location;
             HttpStatusCode sc;
 
@@ -248,6 +254,29 @@ public partial class VersionedFhirStore : IFhirStore
 
                 Console.WriteLine($"{config.ControllerName} <<< {sc}: {file.FullName}");
             }
+
+            _inLoad = false;
+
+            // reload any subscriptions in case they loaded before topics
+            if (_loadResourcesToReprocess.Any())
+            {
+                foreach ((string key, List<object> list) in _loadResourcesToReprocess)
+                {
+                    switch (key)
+                    {
+                        case "Subscription":
+                            {
+                                foreach (object sub in list)
+                                {
+                                    _ = SetExecutableSubscription((ParsedSubscription)sub);
+                                }
+                            }
+                            break;
+                    }
+                }
+            }
+
+            _loadResourcesToReprocess = null;
         }
     }
 
@@ -1145,6 +1174,8 @@ public partial class VersionedFhirStore : IFhirStore
         // loop over all resources to account for a topic changing resources
         foreach ((string resourceName, IVersionedResourceStore rs) in _store)
         {
+            bool executesOnResource = false;
+
             if (!topic.ResourceTriggers.ContainsKey(resourceName))
             {
                 if (priorExisted)
@@ -1154,12 +1185,15 @@ public partial class VersionedFhirStore : IFhirStore
                 continue;
             }
 
-            List<CompiledExpression> compiledTriggers = new();
+            List<ExecutableSubscriptionInfo.InteractionOnlyTrigger> interactionTriggers = new();
+            List<ExecutableSubscriptionInfo.CompiledFhirPathTrigger> fhirPathTriggers = new();
+            List<ExecutableSubscriptionInfo.CompiledQueryTrigger> queryTriggers = new();
 
             string[] keys = new string[3] { resourceName, "*", "Resource" };
 
             foreach (string key in keys)
             {
+                // TODO: Make sure to reduce full resource URI down to stub (e.g., not http://hl7.org/fhir/StructureDefinition/Patient)
                 if (!topic.ResourceTriggers.ContainsKey(key))
                 {
                     continue;
@@ -1167,6 +1201,18 @@ public partial class VersionedFhirStore : IFhirStore
 
                 foreach (ParsedSubscriptionTopic.ResourceTrigger rt in topic.ResourceTriggers[key])
                 {
+                    bool onCreate = rt.OnCreate;
+                    bool onUpdate = rt.OnUpdate;
+                    bool onDelete = rt.OnDelete;
+
+                    // not filled out means trigger on any
+                    if ((!onCreate) && (!onUpdate) && (!onDelete))
+                    {
+                        onCreate = true;
+                        onUpdate = true;
+                        onDelete = true;
+                    }
+
                     // prefer FHIRPath if present
                     if (!string.IsNullOrEmpty(rt.FhirPathCritiera))
                     {
@@ -1180,19 +1226,84 @@ public partial class VersionedFhirStore : IFhirStore
                             fpc = fpc.Replace(matchValue, $"'{FhirPathVariableResolver._fhirPathPrefix}{matchValue.Substring(1)}'.resolve()");
                         }
 
-                        compiledTriggers.Add(_compiler.Compile(fpc));
+                        fhirPathTriggers.Add(new(
+                            onCreate,
+                            onUpdate,
+                            onDelete,
+                            _compiler.Compile(fpc)));
 
                         canExecute = true;
+                        executesOnResource = true;
+
+                        continue;
                     }
 
-                    // TODO: add support for query-based criteria
+                    // for query-based criteria
+                    if ((!string.IsNullOrEmpty(rt.QueryPrevious)) || (!string.IsNullOrEmpty(rt.QueryCurrent)))
+                    {
+                        IEnumerable<ParsedSearchParameter> previousTest;
+                        IEnumerable<ParsedSearchParameter> currentTest;
+
+                        if (string.IsNullOrEmpty(rt.QueryPrevious))
+                        {
+                            previousTest = Array.Empty<ParsedSearchParameter>();
+                        }
+                        else
+                        {
+                            previousTest = ParsedSearchParameter.Parse(rt.QueryPrevious, this, rs, resourceName);
+                        }
+
+                        if (string.IsNullOrEmpty(rt.QueryCurrent))
+                        {
+                            currentTest = Array.Empty<ParsedSearchParameter>();
+                        }
+                        else
+                        {
+                            currentTest = ParsedSearchParameter.Parse(rt.QueryCurrent, this, rs, resourceName);
+                        }
+
+                        queryTriggers.Add(new(
+                            onCreate,
+                            onUpdate,
+                            onDelete,
+                            previousTest,
+                            rt.CreateAutoFail,
+                            rt.CreateAutoPass,
+                            currentTest,
+                            rt.DeleteAutoFail,
+                            rt.DeleteAutoPass,
+                            rt.RequireBothQueries));
+
+                        canExecute = true;
+                        executesOnResource = true;
+
+                        continue;
+                    }
+
+                    // add triggers that do not have inherint filters beyond interactions
+                    if (onCreate || onUpdate || onDelete)
+                    {
+                        interactionTriggers.Add(new(
+                            onCreate,
+                            onUpdate,
+                            onDelete));
+
+                        canExecute = true;
+                        executesOnResource = true;
+
+                        continue;
+                    }
                 }
 
                 // either update or remove this topic from this resource
-                if (compiledTriggers.Any())
+                if (executesOnResource)
                 {
                     // update the executable definition for the current resource
-                    rs.SetExecutableSubscriptionTopic(topic.Url, compiledTriggers);
+                    rs.SetExecutableSubscriptionTopic(
+                        topic.Url,
+                        interactionTriggers,
+                        fhirPathTriggers,
+                        queryTriggers);
                 }
                 else
                 {
@@ -1346,6 +1457,16 @@ public partial class VersionedFhirStore : IFhirStore
         // check to see if we have this topic
         if (!_topics.ContainsKey(subscription.TopicUrl))
         {
+            if (_inLoad)
+            {
+                if (!_loadResourcesToReprocess!.ContainsKey("Subscription"))
+                {
+                    _loadResourcesToReprocess.Add("Subscription", new());
+                }
+
+                _loadResourcesToReprocess["Subscription"].Add(subscription);
+            }
+
             return false;
         }
 

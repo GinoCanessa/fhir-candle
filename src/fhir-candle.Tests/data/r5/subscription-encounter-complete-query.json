@@ -1,10 +1,10 @@
 {
   "resourceType": "Subscription",
-  "id": "example",
-  "name": "Example",
+  "id": "encounter-complete-query",
+  "name": "EncounterCompleteQuery",
   "status": "active",
-  "topic": "http://example.org/FHIR/R5/SubscriptionTopic/example",
-  "reason": "Example subscription for example topic",
+  "topic": "http://example.org/FHIR/R5/SubscriptionTopic/encounter-complete-query",
+  "reason": "Test subscription for encounter completion using query triggers",
   "filterBy": [
     {
       "filterParameter": "patient",

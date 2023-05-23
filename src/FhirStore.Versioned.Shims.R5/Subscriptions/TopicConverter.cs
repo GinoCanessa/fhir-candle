@@ -53,6 +53,8 @@ public class TopicConverter
                     (rt.QueryCriteria?.ResultForCreate ?? Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestFails) == Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestPasses,
                     (rt.QueryCriteria?.ResultForCreate ?? Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestPasses) == Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestFails,
                     rt.QueryCriteria?.Current ?? string.Empty,
+                    (rt.QueryCriteria?.ResultForDelete ?? Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestFails) == Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestPasses,
+                    (rt.QueryCriteria?.ResultForDelete ?? Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestPasses) == Hl7.Fhir.Model.SubscriptionTopic.CriteriaNotExistsBehavior.TestFails,
                     (rt.QueryCriteria?.RequireBoth ?? false) == true,
                     rt.FhirPathCriteria ?? string.Empty));
             }

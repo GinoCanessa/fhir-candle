@@ -28,6 +28,8 @@ public class ParsedSubscriptionTopic
         bool CreateAutoPass,
         bool CreateAutoFail,
         string QueryCurrent,
+        bool DeleteAutoPass,
+        bool DeleteAutoFail,
         bool RequireBothQueries,
         string FhirPathCritiera);
 

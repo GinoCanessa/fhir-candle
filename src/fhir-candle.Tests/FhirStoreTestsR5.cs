@@ -193,7 +193,7 @@ public class FhirStoreTestsR5: IDisposable
     }
 
     [Theory]
-    [FileData("data/r5/subscriptiontopic-encounter-example.json")]
+    [FileData("data/r5/subscriptiontopic-encounter-create-interaction.json")]
     public void SubscriptionTopicCreateRead(string json)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
@@ -217,11 +217,11 @@ public class FhirStoreTestsR5: IDisposable
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
         lastModified.Should().NotBeNullOrEmpty();
-        location.Should().EndWith("SubscriptionTopic/encounter-example");
+        location.Should().EndWith("SubscriptionTopic/encounter-create-interaction");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             "SubscriptionTopic",
-            "encounter-example",
+            "encounter-create-interaction",
             "application/fhir+json",
             string.Empty,
             eTag,
@@ -236,14 +236,14 @@ public class FhirStoreTestsR5: IDisposable
         serializedResource.Should().NotBeNullOrEmpty();
         serializedOutcome.Should().NotBeNullOrEmpty();
         eTag.Should().Be("W/\"1\"");
-        location.Should().EndWith("SubscriptionTopic/encounter-example");
+        location.Should().EndWith("SubscriptionTopic/encounter-create-interaction");
         //_testOutputHelper.WriteLine(bundle);
     }
 
     [Theory]
     [FileData(
-        "data/r5/subscriptiontopic-encounter-example.json",
-        "data/r5/subscription-encounter-example.json",
+        "data/r5/subscriptiontopic-encounter-complete-fhirpath.json",
+        "data/r5/subscription-encounter-complete-fhirpath.json",
         "data/r5/patient-example.json",
         "data/r5/encounter-virtual-planned.json")]
     public void SubscriptionNotTriggered(string topicJson, string subscriptionJson, string patientJson, string encounterJson)
@@ -296,7 +296,7 @@ public class FhirStoreTestsR5: IDisposable
             out location);
 
         string notification = fhirStore.SerializeSubscriptionEvents(
-            "example",
+            "encounter-complete-fhirpath",
             new long[1] { 1 },
             "notification-event");
 
@@ -312,10 +312,10 @@ public class FhirStoreTestsR5: IDisposable
 
     [Theory]
     [FileData(
-        "data/r5/subscriptiontopic-encounter-example.json",
-        "data/r5/subscription-encounter-example.json",
+        "data/r5/subscriptiontopic-encounter-create-interaction.json",
+        "data/r5/subscription-encounter-create-interaction.json",
         "data/r5/patient-example.json",
-        "data/r5/encounter-virtual-completed.json")]
+        "data/r5/encounter-virtual-planned.json")]
     public void SubscriptionTriggeredCreate(string topicJson, string subscriptionJson, string patientJson, string encounterJson)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
@@ -366,7 +366,7 @@ public class FhirStoreTestsR5: IDisposable
             out location);
 
         string notification = fhirStore.SerializeSubscriptionEvents(
-            "example",
+            "encounter-create-interaction",
             Array.Empty<long>(),
             "notification-event");
 
@@ -383,11 +383,11 @@ public class FhirStoreTestsR5: IDisposable
 
     [Theory]
     [FileData(
-        "data/r5/subscriptiontopic-encounter-example.json",
-        "data/r5/subscription-encounter-example.json",
+        "data/r5/subscriptiontopic-encounter-complete-fhirpath.json",
+        "data/r5/subscription-encounter-complete-fhirpath.json",
         "data/r5/patient-example.json",
         "data/r5/encounter-virtual-in-progress.json")]
-    public void SubscriptionTriggeredUpdate(string topicJson, string subscriptionJson, string patientJson, string encounterJson)
+    public void SubscriptionTriggeredUpdateFhirpath(string topicJson, string subscriptionJson, string patientJson, string encounterJson)
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
@@ -437,7 +437,7 @@ public class FhirStoreTestsR5: IDisposable
             out location);
 
         string notification = fhirStore.SerializeSubscriptionEvents(
-            "example",
+            "encounter-complete-fhirpath",
             Array.Empty<long>(),
             "notification-event");
 
@@ -462,7 +462,103 @@ public class FhirStoreTestsR5: IDisposable
             out location);
 
         notification = fhirStore.SerializeSubscriptionEvents(
-            "example",
+            "encounter-complete-fhirpath",
+            Array.Empty<long>(),
+            "notification-event");
+
+        notification.Should().NotBeEmpty();
+
+        results = JsonSerializer.Deserialize<MinimalBundle>(notification);
+
+        results.Should().NotBeNull();
+        results!.Entries.Should().HaveCount(2);
+
+        //_testOutputHelper.WriteLine(bundle);
+    }
+
+
+    [Theory]
+    [FileData(
+        "data/r5/subscriptiontopic-encounter-complete-query.json",
+        "data/r5/subscription-encounter-complete-query.json",
+        "data/r5/patient-example.json",
+        "data/r5/encounter-virtual-in-progress.json")]
+    public void SubscriptionTriggeredUpdateQuery(string topicJson, string subscriptionJson, string patientJson, string encounterJson)
+    {
+        //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
+
+        IFhirStore fhirStore = new VersionedFhirStore();
+        fhirStore.Init(_config);
+
+        string serializedResource, serializedOutcome, eTag, lastModified, location;
+
+        DoCreate(
+            "SubscriptionTopic",
+            topicJson,
+            fhirStore,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        DoCreate(
+            "Subscription",
+            subscriptionJson,
+            fhirStore,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        DoCreate(
+            "Patient",
+            patientJson,
+            fhirStore,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        DoCreate(
+            "Encounter",
+            encounterJson,
+            fhirStore,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        string notification = fhirStore.SerializeSubscriptionEvents(
+            "encounter-complete-query",
+            Array.Empty<long>(),
+            "notification-event");
+
+        notification.Should().NotBeEmpty();
+
+        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(notification);
+
+        results.Should().NotBeNull();
+        results!.Entries.Should().HaveCount(1);
+
+        encounterJson = encounterJson.Replace("in-progress", "completed");
+
+        DoUpdate(
+            "Encounter",
+            "virtual-in-progress",
+            encounterJson,
+            fhirStore,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        notification = fhirStore.SerializeSubscriptionEvents(
+            "encounter-complete-query",
             Array.Empty<long>(),
             "notification-event");
 

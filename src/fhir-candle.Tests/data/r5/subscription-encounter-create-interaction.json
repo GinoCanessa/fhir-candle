@@ -1,0 +1,29 @@
+{
+  "resourceType": "Subscription",
+  "id": "encounter-create-interaction",
+  "name": "EncounterCreateInteraction",
+  "status": "active",
+  "topic": "http://example.org/FHIR/R5/SubscriptionTopic/encounter-create-interaction",
+  "reason": "Test subscription for encounter create using interaction",
+  "filterBy": [
+    {
+      "filterParameter": "patient",
+      "value": "Patient/example"
+    }
+  ],
+  "channelType": {
+    "code": "rest-hook"
+  },
+  "endpoint": "https://example.org/Endpoints/P123",
+  "parameter": [
+    {
+      "name": "Authorization",
+      "value": "Bearer secret-token-abc-123"
+    }
+  ],
+  "heartbeatPeriod": 600,
+  "timeout": 5,
+  "contentType": "application/fhir+json",
+  "content": "id-only",
+  "maxCount": 100
+}

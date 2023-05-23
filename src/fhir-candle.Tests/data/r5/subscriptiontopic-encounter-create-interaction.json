@@ -1,33 +1,19 @@
 {
   "resourceType": "SubscriptionTopic",
-  "id": "encounter-example",
-  "url": "http://example.org/FHIR/R5/SubscriptionTopic/example",
-  "identifier": [
-    {
-      "system": "urn:ietf:rfc:3986",
-      "value": "urn:uuid:1caa02ba-051b-4602-8856-65921748ae76"
-    }
-  ],
+  "id": "encounter-create-interaction",
+  "url": "http://example.org/FHIR/R5/SubscriptionTopic/encounter-create-interaction",
   "version": "1.0.0-beta.1",
   "title": "example",
   "status": "draft",
   "date": "2019-01-01",
-  "description": "Example topic for completed encounters",
+  "description": "Example topic for all created encounters",
   "resourceTrigger": [
     {
-      "description": "An Encounter has been completed",
+      "description": "An Encounter has been created",
       "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
       "supportedInteraction": [
-        "update"
-      ],
-      "queryCriteria": {
-        "previous": "status:not=completed",
-        "resultForCreate": "test-passes",
-        "current": "status=completed",
-        "resultForDelete": "test-fails",
-        "requireBoth": true
-      },
-      "fhirPathCriteria": "(%previous.empty() | (%previous.status != 'completed')) and (%current.status = 'completed')"
+        "create"
+      ]
     }
   ],
   "canFilterBy": [

@@ -22,6 +22,24 @@ public class SearchTester
     /// <summary>Gets or sets the store.</summary>
     public required VersionedFhirStore FhirStore { get; init; }
 
+    // Build a hashset of ids that pass reverse chaining critiera
+    //public HashSet<string> BuildReverseChainIds(IEnumerable<ParsedSearchParameter> searchParameters)
+    //{
+    //    HashSet<string> reverseChainIds = new();
+
+    //    // loop over search parameters to build reverse chain parameters
+    //    foreach (ParsedSearchParameter sp in searchParameters)
+    //    {
+    //        // for reverse chaining, we nest the search instead of evaluating it here
+    //        if (sp.ReverseChainedParameterLink == null)
+    //        {
+    //            continue;
+    //        }
+
+    //        // 
+    //    }
+    //}
+
     /// <summary>Tests a resource against parsed search parameters for matching.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="resource">         The resource.</param>
@@ -50,6 +68,8 @@ public class SearchTester
             fpContext = new FhirEvaluationContext(resource.ToScopedNode());
             fpContext.ElementResolver = FhirStore.Resolve;
         }
+
+
 
         foreach (ParsedSearchParameter sp in searchParameters)
         {

@@ -292,7 +292,7 @@ public partial class VersionedFhirStore : IFhirStore
             IFhirOperation? fhirOp = (IFhirOperation?)Activator.CreateInstance(opType);
 
             if ((fhirOp == null) ||
-                (!fhirOp.FhirVersions.Contains(_config.FhirVersion)))
+                (!fhirOp.CanonicalByFhirVersion.ContainsKey(_config.FhirVersion)))
             {
                 continue;
             }
@@ -2324,7 +2324,7 @@ public partial class VersionedFhirStore : IFhirStore
                     .Select(o => new CapabilityStatement.OperationComponent()
                     {
                         Name = o.OperationName,
-                        Definition = o.OperationCanonical,
+                        Definition = o.CanonicalByFhirVersion[_config.FhirVersion],
                     }).ToList(),
             //Compartment = new(),
         };
@@ -2378,7 +2378,7 @@ public partial class VersionedFhirStore : IFhirStore
                     .Select(o => new CapabilityStatement.OperationComponent()
                     {
                         Name = o.OperationName,
-                        Definition = o.OperationCanonical,
+                        Definition = o.CanonicalByFhirVersion[_config.FhirVersion],
                     }).ToList(),
             };
 

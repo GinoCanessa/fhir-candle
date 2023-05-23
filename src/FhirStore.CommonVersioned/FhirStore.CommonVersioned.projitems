@@ -29,7 +29,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\IFhirOperation.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Operations\R5SubscriptionStatus.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionStatus.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionEvents.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Operations\" />

@@ -5,18 +5,19 @@ using Hl7.Fhir.Model;
 
 namespace FhirStore.Operations;
 
-public class R5SubscriptionStatus : IFhirOperation
+public class OpSubscriptionStatus : IFhirOperation
 {
-	public R5SubscriptionStatus()
+	public OpSubscriptionStatus()
 	{
 	}
 
     public string OperationName => "$status";
-    public string OperationCanonical => "http://hl7.org/fhir/OperationDefinition/Subscription-status";
 
-    public HashSet<FhirStore.Models.TenantConfiguration.SupportedFhirVersions> FhirVersions => new()
+    public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
-        FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5,
+        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
+        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
+        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-status" },
     };
 
     public bool AllowGet => true;

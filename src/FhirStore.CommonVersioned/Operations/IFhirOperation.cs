@@ -6,9 +6,8 @@ namespace FhirStore.Operations;
 public interface IFhirOperation
 {
     string OperationName { get; }
-    string OperationCanonical { get; }
 
-    HashSet<FhirStore.Models.TenantConfiguration.SupportedFhirVersions> FhirVersions { get; }
+    Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion { get; }
 
     bool AllowGet { get; }
     bool AllowPost { get; }

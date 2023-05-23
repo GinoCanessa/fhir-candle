@@ -105,6 +105,26 @@ public class SubscriptionConverter
         return true;
     }
 
+    public Hl7.Fhir.Model.Resource StatusForSubscription(
+        ParsedSubscription subscription,
+        string notificationType,
+        string baseUrl)
+    {
+        if (!Enum.TryParse(subscription.CurrentStatus, out SubscriptionStatusCodes statusCode))
+        {
+            statusCode = SubscriptionStatusCodes.Active;
+        }
+
+        return new Hl7.Fhir.Model.SubscriptionStatus()
+        {
+            Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
+            Topic = subscription.TopicUrl,
+            EventsSinceSubscriptionStart = subscription.CurrentEventCount,
+            Status = statusCode,
+            Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
+        };
+    }
+
     /// <summary>
     /// Serialize one or more subscription events into the desired format and content level.
     /// </summary>

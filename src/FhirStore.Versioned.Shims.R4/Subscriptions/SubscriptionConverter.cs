@@ -215,6 +215,43 @@ public class SubscriptionConverter
         return true;
     }
 
+    public Hl7.Fhir.Model.Resource StatusForSubscription(
+        ParsedSubscription subscription,
+        string notificationType,
+        string baseUrl)
+    {
+        return new Hl7.Fhir.Model.Parameters()
+        {
+            Parameter = new()
+            {
+                new()
+                {
+                    Name = "subscription",
+                    Value = new FhirString(baseUrl + "/Subscription/" + subscription.Id)
+                },
+                new()
+                {
+                    Name = "topic",
+                    Value = new Canonical(subscription.TopicUrl),
+                },
+                new()
+                {
+                    Name = "status",
+                    Value = new Code(subscription.CurrentStatus)
+                },
+                new()
+                {
+                    Name = "type",
+                    Value = new Code(notificationType),
+                },
+                new()
+                {
+                    Name = "events-since-subscription-start",
+                    Value = new FhirString(subscription.CurrentEventCount.ToString())
+                },
+            },
+        };
+    }
 
     public string SerializeSubscriptionEvents(
         ParsedSubscription subscription,
@@ -245,7 +282,7 @@ public class SubscriptionConverter
                 new()
                 {
                     Name = "subscription",
-                    Value = new FhirString("Subscription/" + subscription.Id)
+                    Value = new FhirString(baseUrl + "/Subscription/" + subscription.Id)
                 },
                 new()
                 {

@@ -6,6 +6,7 @@
 using FhirStore.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using static Hl7.Fhir.Model.VerificationResult;
 
 namespace FhirStore.Versioned.Shims.Subscriptions;
 
@@ -212,6 +213,26 @@ public class SubscriptionConverter
         }
 
         return true;
+    }
+
+    public Hl7.Fhir.Model.Resource StatusForSubscription(
+        ParsedSubscription subscription,
+        string notificationType,
+        string baseUrl)
+    {
+        if (!Enum.TryParse(subscription.CurrentStatus, out SubscriptionStatusCodes statusCode))
+        {
+            statusCode = SubscriptionStatusCodes.Active;
+        }
+
+        return new Hl7.Fhir.Model.SubscriptionStatus()
+        {
+            Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
+            Topic = subscription.TopicUrl,
+            EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
+            Status = statusCode,
+            Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
+        };
     }
 
     /// <summary>Serialize subscription events.</summary>

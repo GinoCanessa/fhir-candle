@@ -27,6 +27,11 @@
     <Compile Include="$(MSBuildThisFileDirectory)Search\SearchTester.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\IVersionedResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Storage\FhirStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Operations\IFhirOperation.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Operations\R5SubscriptionStatus.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Operations\" />
   </ItemGroup>
 </Project>

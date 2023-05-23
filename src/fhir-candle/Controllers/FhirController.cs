@@ -6,6 +6,7 @@
 using System.Net;
 using fhir.candle.Services;
 using FhirStore.Storage;
+using Hl7.Fhir.Rest;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc;
@@ -194,7 +195,6 @@ public class FhirController : ControllerBase
         else
         {
             // read instance
-
             sc = _fhirStoreManager[store].InstanceRead(
                 resourceName,
                 id,
@@ -225,6 +225,206 @@ public class FhirController : ControllerBase
         if (!string.IsNullOrEmpty(resource))
         {
             await Response.WriteAsync(resource);
+        }
+        else if (!string.IsNullOrEmpty(outcome))
+        {
+            await Response.WriteAsync(outcome);
+        }
+    }
+
+    [HttpGet, Route("{store}/{resourceName}/{id}/{opName}")]
+    public async Task GetInstanceOperation(
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromRoute] string id,
+        [FromRoute] string opName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, Request);
+
+        HttpStatusCode sc;
+        string resource, outcome;
+
+        if (opName[0] != '$')
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        // operation
+        sc = _fhirStoreManager[store].InstanceOperation(
+            resourceName,
+            opName,
+            id,
+            Request.QueryString.ToString(),
+            string.Empty,
+            string.Empty,
+            format,
+            out resource,
+            out outcome);
+
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
+
+        if (!string.IsNullOrEmpty(resource))
+        {
+            await Response.WriteAsync(resource);
+        }
+        else if (!string.IsNullOrEmpty(outcome))
+        {
+            await Response.WriteAsync(outcome);
+        }
+    }
+
+    [HttpPost, Route("{store}/{resourceName}/{id}/{opName}")]
+    [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    public async Task PostInstanceOperation(
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromRoute] string id,
+        [FromRoute] string opName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, Request);
+
+        HttpStatusCode sc;
+        string resource, outcome;
+
+        if (opName[0] != '$')
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+
+                // operation
+                sc = _fhirStoreManager[store].InstanceOperation(
+                    resourceName,
+                    opName,
+                    id,
+                    Request.QueryString.ToString(),
+                    content,
+                    format,
+                    format,
+                    out resource,
+                    out outcome);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"PostInstanceOperation <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
+
+        if (!string.IsNullOrEmpty(resource))
+        {
+            await Response.WriteAsync(resource);
+        }
+        else if (!string.IsNullOrEmpty(outcome))
+        {
+            await Response.WriteAsync(outcome);
+        }
+    }
+
+    [HttpPost, Route("{store}/{resourceName}/{opName}")]
+    [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    public async Task PostTypeOperation(
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromRoute] string opName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, Request);
+
+        HttpStatusCode sc;
+        string resource, outcome;
+
+        if (opName[0] != '$')
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+
+                // operation
+                sc = _fhirStoreManager[store].TypeOperation(
+                    resourceName,
+                    opName,
+                    Request.QueryString.ToString(),
+                    content,
+                    format,
+                    format,
+                    out resource,
+                    out outcome);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"PostTypeOperation <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
+
+        if (!string.IsNullOrEmpty(resource))
+        {
+            await Response.WriteAsync(resource);
+        }
+        else if (!string.IsNullOrEmpty(outcome))
+        {
+            await Response.WriteAsync(outcome);
         }
     }
 

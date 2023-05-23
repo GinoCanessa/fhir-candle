@@ -156,7 +156,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedOutcome);
 
     public HttpStatusCode TypeOperation(
-        string resoruceType,
+        string resourceType,
         string operationName,
         string queryString,
         string content,
@@ -165,6 +165,16 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedResource,
         out string serializedOutcome);
 
+    public HttpStatusCode InstanceOperation(
+        string resourceType,
+        string operationName,
+        string instanceId,
+        string queryString,
+        string content,
+        string sourceFormat,
+        string destFormat,
+        out string serializedResource,
+        out string serializedOutcome);
 
     /// <summary>
     /// Serialize one or more subscription events into the desired format and content level.

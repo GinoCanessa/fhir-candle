@@ -23,6 +23,7 @@ using Hl7.Fhir.Language.Debugging;
 using static fhir.candle.Search.SearchDefinitions;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Reflection.Metadata;
 
 namespace FhirStore.Storage;
 
@@ -1188,17 +1189,21 @@ public partial class VersionedFhirStore : IFhirStore
             List<ExecutableSubscriptionInfo.InteractionOnlyTrigger> interactionTriggers = new();
             List<ExecutableSubscriptionInfo.CompiledFhirPathTrigger> fhirPathTriggers = new();
             List<ExecutableSubscriptionInfo.CompiledQueryTrigger> queryTriggers = new();
+            ParsedResultParameters? resultParameters = null;
+
 
             string[] keys = new string[3] { resourceName, "*", "Resource" };
 
             foreach (string key in keys)
             {
                 // TODO: Make sure to reduce full resource URI down to stub (e.g., not http://hl7.org/fhir/StructureDefinition/Patient)
+                // TODO: Need to check event triggers once they are added
                 if (!topic.ResourceTriggers.ContainsKey(key))
                 {
                     continue;
                 }
 
+                // build our trigger definitions
                 foreach (ParsedSubscriptionTopic.ResourceTrigger rt in topic.ResourceTriggers[key])
                 {
                     bool onCreate = rt.OnCreate;
@@ -1295,6 +1300,44 @@ public partial class VersionedFhirStore : IFhirStore
                     }
                 }
 
+                // build our inclusions
+                if (topic.NotificationShapes.ContainsKey(key) &&
+                    topic.NotificationShapes[key].Any())
+                {
+                    string includes = string.Empty;
+                    string reverseIncludes = string.Empty;
+
+                    // TODO: use first matching shape for now
+                    ParsedSubscriptionTopic.NotificationShape shape = topic.NotificationShapes[key].First();
+
+                    if (shape.Includes?.Any() ?? false)
+                    {
+                        includes = string.Join('&', shape.Includes);
+                    }
+
+                    if (shape.ReverseIncludes?.Any() ?? false)
+                    {
+                        reverseIncludes = string.Join('&', shape.ReverseIncludes);
+                    }
+
+                    if (string.IsNullOrEmpty(includes) && string.IsNullOrEmpty(reverseIncludes))
+                    {
+                        resultParameters = null;
+                    }
+                    else if (string.IsNullOrEmpty(includes))
+                    {
+                        resultParameters = new(reverseIncludes, this);
+                    }
+                    else if (string.IsNullOrEmpty(reverseIncludes))
+                    {
+                        resultParameters = new(includes, this);
+                    }
+                    else
+                    {
+                        resultParameters = new(includes + "&" + reverseIncludes, this);
+                    }
+                }
+
                 // either update or remove this topic from this resource
                 if (executesOnResource)
                 {
@@ -1303,7 +1346,8 @@ public partial class VersionedFhirStore : IFhirStore
                         topic.Url,
                         interactionTriggers,
                         fhirPathTriggers,
-                        queryTriggers);
+                        queryTriggers,
+                        resultParameters);
                 }
                 else
                 {
@@ -1676,23 +1720,20 @@ public partial class VersionedFhirStore : IFhirStore
 
     }
 
-    /// <summary>Adds a reverse inclusions.</summary>
-    /// <param name="bundle">          The bundle.</param>
-    /// <param name="resource">        [out] The resource.</param>
-    /// <param name="resultParameters">Options for controlling the result.</param>
-    /// <param name="addedIds">        List of identifiers for the added.</param>
-    private void AddReverseInclusions(
-        Bundle bundle,
-        Resource resource,
+    internal IEnumerable<Resource> ResolveReverseInclusions(
+        Resource focus,
         ParsedResultParameters resultParameters,
         HashSet<string> addedIds)
     {
-        if (!resultParameters.ReverseInclusions.Any())
+        // check for include directives
+        if (!resultParameters.Inclusions.ContainsKey(focus.TypeName))
         {
-            return;
+            return Array.Empty<Resource>();
         }
 
-        string matchId = $"{resource.TypeName}/{resource.Id}";
+        List<Resource> inclusions = new();
+
+        string matchId = $"{focus.TypeName}/{focus.Id}";
 
         foreach ((string reverseResourceType, List<ModelInfo.SearchParamDefinition> sps) in resultParameters.ReverseInclusions)
         {
@@ -1709,7 +1750,7 @@ public partial class VersionedFhirStore : IFhirStore
                         this,
                         _store[reverseResourceType],
                         reverseResourceType,
-                        sp.Name!, 
+                        sp.Name!,
                         string.Empty,
                         SearchModifierCodes.None,
                         matchId,
@@ -1727,8 +1768,8 @@ public partial class VersionedFhirStore : IFhirStore
 
                         if (!addedIds.Contains(id))
                         {
-                            // add the result to the bundle
-                            bundle.AddSearchEntry(resource, $"{_config.BaseUrl}/{id}", Bundle.SearchEntryMode.Include);
+                            // add the result to the list
+                            inclusions.Add(revIncludeRes);
 
                             // track we have added this id
                             addedIds.Add(id);
@@ -1737,38 +1778,68 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
         }
+
+        return inclusions;
     }
 
-    /// <summary>Adds the inclusions.</summary>
+    /// <summary>Adds a reverse inclusions.</summary>
     /// <param name="bundle">          The bundle.</param>
     /// <param name="resource">        [out] The resource.</param>
     /// <param name="resultParameters">Options for controlling the result.</param>
     /// <param name="addedIds">        List of identifiers for the added.</param>
-    private void AddInclusions(
+    private void AddReverseInclusions(
         Bundle bundle,
         Resource resource,
         ParsedResultParameters resultParameters,
         HashSet<string> addedIds)
     {
-        // check for include directives
-        if (!resultParameters.Inclusions.ContainsKey(resource.TypeName))
+        if (!resultParameters.ReverseInclusions.Any())
         {
             return;
         }
 
-        ITypedElement r = resource.ToTypedElement();
+        IEnumerable<Resource> reverseInclusions = ResolveReverseInclusions(resource, resultParameters, addedIds);
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(r.ToScopedNode());
-        fpContext.ElementResolver = Resolve;
+        foreach (Resource inclusion in reverseInclusions)
+        {
+            // add the matched result to the bundle
+            bundle.AddSearchEntry(inclusion, $"{_config.BaseUrl}/{resource.TypeName}/{resource.Id}", Bundle.SearchEntryMode.Include);
+        }
+    }
 
-        foreach (ModelInfo.SearchParamDefinition sp in resultParameters.Inclusions[resource.TypeName])
+    internal IEnumerable<Resource> ResolveInclusions(
+        Resource focus,
+        ITypedElement focusTE,
+        ParsedResultParameters resultParameters,
+        HashSet<string> addedIds,
+        FhirEvaluationContext? fpContext)
+    {
+        // check for include directives
+        if (!resultParameters.Inclusions.ContainsKey(focus.TypeName))
+        {
+            return Array.Empty<Resource>();
+        }
+
+        if (fpContext == null)
+        {
+            fpContext = new FhirEvaluationContext(focusTE.ToScopedNode());
+            fpContext.ElementResolver = Resolve;
+        }
+
+        List<Resource> inclusions = new();
+
+        foreach (ModelInfo.SearchParamDefinition sp in resultParameters.Inclusions[focus.TypeName])
         {
             if (string.IsNullOrEmpty(sp.Expression))
             {
                 continue;
             }
 
-            IEnumerable<ITypedElement> extracted = GetCompiledSearchParameter(resource.TypeName, sp.Name ?? string.Empty, sp.Expression).Invoke(r, fpContext);
+            IEnumerable<ITypedElement> extracted = GetCompiledSearchParameter(
+                focus.TypeName,
+                sp.Name ?? string.Empty,
+                sp.Expression)
+                .Invoke(focusTE, fpContext);
 
             if (!extracted.Any())
             {
@@ -1798,7 +1869,7 @@ public partial class VersionedFhirStore : IFhirStore
                         // verify this is a valid target type
                         ResourceType? rt = ModelInfo.FhirTypeNameToResourceType(resolved.TypeName);
 
-                        if (rt == null || 
+                        if (rt == null ||
                             !sp.Target.Contains(rt.Value))
                         {
                             continue;
@@ -1811,13 +1882,46 @@ public partial class VersionedFhirStore : IFhirStore
                         continue;
                     }
 
-                    // add the matched result to the bundle
-                    bundle.AddSearchEntry(resolved, $"{_config.BaseUrl}/{includedId}", Bundle.SearchEntryMode.Include);
+                    // add the matched result
+                    inclusions.Add(resolved);
 
                     // track we have added this id
                     addedIds.Add(includedId);
                 }
             }
+        }
+
+        return inclusions;
+    }
+
+    /// <summary>Adds the inclusions.</summary>
+    /// <param name="bundle">          The bundle.</param>
+    /// <param name="resource">        [out] The resource.</param>
+    /// <param name="resultParameters">Options for controlling the result.</param>
+    /// <param name="addedIds">        List of identifiers for the added.</param>
+    private void AddInclusions(
+        Bundle bundle,
+        Resource resource,
+        ParsedResultParameters resultParameters,
+        HashSet<string> addedIds)
+    {
+        // check for include directives
+        if (!resultParameters.Inclusions.ContainsKey(resource.TypeName))
+        {
+            return;
+        }
+
+        ITypedElement resourceTE = resource.ToTypedElement();
+
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(resourceTE.ToScopedNode());
+        fpContext.ElementResolver = Resolve;
+
+        IEnumerable<Resource> inclusions = ResolveInclusions(resource, resourceTE, resultParameters, addedIds, fpContext);
+
+        foreach (Resource inclusion in inclusions)
+        {
+            // add the matched result to the bundle
+            bundle.AddSearchEntry(inclusion, $"{_config.BaseUrl}/{resource.TypeName}/{resource.Id}", Bundle.SearchEntryMode.Include);
         }
     }
 

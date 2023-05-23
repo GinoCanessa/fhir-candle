@@ -53,4 +53,6 @@ public class ExecutableSubscriptionInfo
 
     /// <summary>Gets or sets the subscription filters, by subscription id.</summary>
     public Dictionary<string, List<ParsedSearchParameter>> FiltersBySubscription { get; set; } = new();
+
+    public ParsedResultParameters? AdditionalContext { get; set; } = null;
 }

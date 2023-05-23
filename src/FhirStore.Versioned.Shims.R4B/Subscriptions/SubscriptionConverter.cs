@@ -251,7 +251,7 @@ public class SubscriptionConverter
         // create our status resource
         SubscriptionStatus status = new()
         {
-            Subscription = new ResourceReference("Subscription/" + subscription.Id),
+            Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
             Topic = subscription.TopicUrl,
             EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
             Status = statusCode,
@@ -317,9 +317,9 @@ public class SubscriptionConverter
             status.NotificationEvent.Add(new()
             {
                 EventNumber = eventNumber.ToString(),
-                Focus = new ResourceReference(relativeUrl),
+                Focus = new ResourceReference(baseUrl + "/" + relativeUrl),
                 AdditionalContext = (se.AdditionalContext?.Any() ?? false)
-                    ? se.AdditionalContext.Select(o => new ResourceReference($"{((Resource)o).TypeName}/{((Resource)o).Id}")).ToList()
+                    ? se.AdditionalContext.Select(o => new ResourceReference($"{baseUrl}/{((Resource)o).TypeName}/{((Resource)o).Id}")).ToList()
                     : new List<ResourceReference>(),
                 Timestamp = se.Timestamp,
             });
@@ -327,13 +327,16 @@ public class SubscriptionConverter
             // add the focus to our bundle
             if (!addedResources.Contains(relativeUrl))
             {
-                bundle.Entry.Add(new Bundle.EntryComponent()
-                {
-                    FullUrl = baseUrl + "/" + relativeUrl,
-                    Resource = isFullResource ? r : null,
-                });
-
                 addedResources.Add(relativeUrl);
+
+                if (isFullResource)
+                {
+                    bundle.Entry.Add(new Bundle.EntryComponent()
+                    {
+                        FullUrl = baseUrl + "/" + relativeUrl,
+                        Resource = r,
+                    });
+                }
             }
 
             // add any additional context
@@ -346,13 +349,16 @@ public class SubscriptionConverter
 
                     if (!addedResources.Contains(acrRelative))
                     {
-                        bundle.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = baseUrl + "/" + acrRelative,
-                            Resource = isFullResource ? acr : null,
-                        });
-
                         addedResources.Add(acrRelative);
+
+                        if (isFullResource)
+                        {
+                            bundle.Entry.Add(new Bundle.EntryComponent()
+                            {
+                                FullUrl = baseUrl + "/" + acrRelative,
+                                Resource = acr,
+                            });
+                        }
                     }
                 }
             }

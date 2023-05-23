@@ -486,13 +486,15 @@ public class ResourceStore<T> : IVersionedResourceStore
         string url,
         IEnumerable<ExecutableSubscriptionInfo.InteractionOnlyTrigger> interactionTriggers,
         IEnumerable<ExecutableSubscriptionInfo.CompiledFhirPathTrigger> fhirpathTriggers,
-        IEnumerable<ExecutableSubscriptionInfo.CompiledQueryTrigger> queryTriggers)
+        IEnumerable<ExecutableSubscriptionInfo.CompiledQueryTrigger> queryTriggers,
+        ParsedResultParameters? resultParameters)
     {
         if (_executableSubscriptions.ContainsKey(url))
         {
             _executableSubscriptions[url].InteractionTriggers = interactionTriggers;
             _executableSubscriptions[url].FhirPathTriggers = fhirpathTriggers;
             _executableSubscriptions[url].QueryTriggers = queryTriggers;
+            _executableSubscriptions[url].AdditionalContext = resultParameters;
         }
         else
         {
@@ -502,6 +504,7 @@ public class ResourceStore<T> : IVersionedResourceStore
                 InteractionTriggers = interactionTriggers,
                 FhirPathTriggers = fhirpathTriggers,
                 QueryTriggers = queryTriggers,
+                AdditionalContext = resultParameters,
             });
         }
     }
@@ -565,7 +568,7 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <param name="fpContext">The FHIRPath evaluation context.</param>
     private void PerformSubscriptionTest(
         T? current,
-        ITypedElement currentTE,
+        ITypedElement? currentTE,
         T? previous,
         ITypedElement? previousTE,
         FhirEvaluationContext fpContext,
@@ -754,9 +757,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
         }
 
+        Resource focus = current ?? previous!;
+        ITypedElement focusTE = currentTE ?? previousTE!;
+
         // traverse the list of matched topics to test against subscription filters
         foreach (string topicUrl in matchedTopics)
         {
+            ParsedResultParameters? additions = _executableSubscriptions[topicUrl].AdditionalContext;
+
             foreach ((string subscriptionId, List<ParsedSearchParameter> filters) in _executableSubscriptions[topicUrl].FiltersBySubscription)
             {
                 // don't trigger twice on multiple passing filters
@@ -766,19 +774,47 @@ public class ResourceStore<T> : IVersionedResourceStore
                 }
 
                 if ((!filters.Any()) ||
-                    (_searchTester.TestForMatch(currentTE, filters, fpContext)))
+                    (_searchTester.TestForMatch(focusTE, filters, fpContext)))
                 {
                     notifiedSubscriptions.Add(subscriptionId);
 
-                    // TODO: resolve additional context
+                    List<object> additionalContext = new();
+
+                    if (additions != null)
+                    {
+                        HashSet<string> addedIds = new();
+                        addedIds.Add($"{focus.TypeName}/{focus.Id}");
+
+                        IEnumerable<Resource> inclusions = _store.ResolveInclusions(
+                            focus,
+                            focusTE,
+                            additions,
+                            addedIds,
+                            fpContext);
+
+                        if (inclusions.Any())
+                        {
+                            additionalContext.AddRange(inclusions);
+                        }
+
+                        IEnumerable<Resource> reverses = _store.ResolveReverseInclusions(
+                            focus,
+                            additions,
+                            addedIds);
+
+                        if (reverses.Any())
+                        {
+                            additionalContext.AddRange(reverses);
+                        }
+                    }    
 
                     SubscriptionEvent subEvent = new()
                     {
                         SubscriptionId = subscriptionId,
                         TopicUrl = topicUrl,
                         EventNumber = _store.GetSubscriptionEventCount(subscriptionId, true),
-                        Focus = current ?? previous!,
-                        AdditionalContext = null,
+                        Focus = focus,
+                        AdditionalContext = additionalContext.AsEnumerable<object>(),
                     };
 
                     _store.RegisterEvent(subscriptionId, subEvent);

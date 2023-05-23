@@ -87,7 +87,8 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
         string url,
         IEnumerable<ExecutableSubscriptionInfo.InteractionOnlyTrigger> interactionTriggers,
         IEnumerable<ExecutableSubscriptionInfo.CompiledFhirPathTrigger> fhirpathTriggers,
-        IEnumerable<ExecutableSubscriptionInfo.CompiledQueryTrigger> queryTriggers);
+        IEnumerable<ExecutableSubscriptionInfo.CompiledQueryTrigger> queryTriggers,
+        ParsedResultParameters? resultParameters);
 
     /// <summary>Removes the executable subscription information described by topicUrl.</summary>
     /// <param name="topicUrl">URL of the topic.</param>

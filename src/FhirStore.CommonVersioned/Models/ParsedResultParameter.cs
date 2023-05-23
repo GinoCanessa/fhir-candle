@@ -100,81 +100,87 @@ public class ParsedResultParameters
 
                 case "_include":
                     {
-                        string[] components = value.Split(':');
-
-                        ResourceType? rt = null;
-
-                        switch (components.Length)
+                        foreach (string val in value.Split(','))
                         {
-                            // _include=[resource]:[parameter]
-                            case 2:
-                                break;
+                            string[] components = val.Split(':');
 
-                            // _include=[resource]:[parameter]:[targetType]
-                            case 3:
-                                rt = ModelInfo.FhirTypeNameToResourceType(components[2]);
-                                break;
+                            ResourceType? rt = null;
 
-                            // invalid / unknown
-                            default:
+                            switch (components.Length)
+                            {
+                                // _include=[resource]:[parameter]
+                                case 2:
+                                    break;
+
+                                // _include=[resource]:[parameter]:[targetType]
+                                case 3:
+                                    rt = ModelInfo.FhirTypeNameToResourceType(components[2]);
+                                    break;
+
+                                // invalid / unknown
+                                default:
+                                    continue;
+                            }
+
+                            if ((!store.TryGetSearchParamDefinition(components[0], components[1], out ModelInfo.SearchParamDefinition? spDefinition)) ||
+                                (spDefinition == null))
+                            {
                                 continue;
-                        }
+                            }
 
-                        if ((!store.TryGetSearchParamDefinition(components[0], components[1], out ModelInfo.SearchParamDefinition? spDefinition)) ||
-                            (spDefinition == null))
-                        {
-                            continue;
-                        }
+                            if (string.IsNullOrWhiteSpace(spDefinition.Expression))
+                            {
+                                continue;
+                            }
 
-                        if (string.IsNullOrWhiteSpace(spDefinition.Expression))
-                        {
-                            continue;
-                        }
+                            if (!Inclusions.ContainsKey(components[0]))
+                            {
+                                Inclusions.Add(components[0], new());
+                            }
 
-                        if (!Inclusions.ContainsKey(components[0]))
-                        {
-                            Inclusions.Add(components[0], new());
-                        }
+                            // if we have a third component, it's a resource type
+                            if (rt != null)
+                            {
+                                // override the default allowed targets to only the one specified
+                                spDefinition = spDefinition.CloneWith(new ResourceType[] { (ResourceType)rt });
+                            }
 
-                        // if we have a third component, it's a resource type
-                        if (rt != null)
-                        {
-                            // override the default allowed targets to only the one specified
-                            spDefinition = spDefinition.CloneWith(new ResourceType[] { (ResourceType)rt });
+                            Inclusions[components[0]].Add(spDefinition);
+                            applied.Add(key + "=" + value);
                         }
-
-                        Inclusions[components[0]].Add(spDefinition);
-                        applied.Add(key + "=" + value);
                     }
                     break;
 
                 case "_include:iterate":
                     {
-                        string[] components = value.Split(':');
-
-                        if (components.Length != 2)
+                        foreach (string val in value.Split(','))
                         {
-                            continue;
-                        }
+                            string[] components = val.Split(':');
 
-                        if ((!store.TryGetSearchParamDefinition(components[0], components[1], out ModelInfo.SearchParamDefinition? spDefinition)) ||
-                            (spDefinition == null))
-                        {
-                            continue;
-                        }
+                            if (components.Length != 2)
+                            {
+                                continue;
+                            }
 
-                        if (string.IsNullOrWhiteSpace(spDefinition.Expression))
-                        {
-                            continue;
-                        }
+                            if ((!store.TryGetSearchParamDefinition(components[0], components[1], out ModelInfo.SearchParamDefinition? spDefinition)) ||
+                                (spDefinition == null))
+                            {
+                                continue;
+                            }
 
-                        if (!IterativeInclusions.ContainsKey(components[0]))
-                        {
-                            IterativeInclusions.Add(components[0], new());
-                        }
+                            if (string.IsNullOrWhiteSpace(spDefinition.Expression))
+                            {
+                                continue;
+                            }
 
-                        IterativeInclusions[components[0]].Add(spDefinition.Expression);
-                        applied.Add(key + "=" + value);
+                            if (!IterativeInclusions.ContainsKey(components[0]))
+                            {
+                                IterativeInclusions.Add(components[0], new());
+                            }
+
+                            IterativeInclusions[components[0]].Add(spDefinition.Expression);
+                            applied.Add(key + "=" + value);
+                        }
                     }
                     break;
 
@@ -183,51 +189,55 @@ public class ParsedResultParameters
 
                 case "_revinclude":
                     {
-                        string[] components = value.Split(':');
-
-                        ResourceType? rt = null;
-
-                        switch (components.Length)
+                        foreach (string val in value.Split(','))
                         {
-                            // _revinclude=[resource]:[parameter]
-                            case 2:
-                                break;
 
-                            // _revinclude=[resource]:[parameter]:[targetType]
-                            case 3:
-                                rt = ModelInfo.FhirTypeNameToResourceType(components[2]);
-                                break;
+                            string[] components = val.Split(':');
 
-                            // invalid / unknown
-                            default:
+                            ResourceType? rt = null;
+
+                            switch (components.Length)
+                            {
+                                // _revinclude=[resource]:[parameter]
+                                case 2:
+                                    break;
+
+                                // _revinclude=[resource]:[parameter]:[targetType]
+                                case 3:
+                                    rt = ModelInfo.FhirTypeNameToResourceType(components[2]);
+                                    break;
+
+                                // invalid / unknown
+                                default:
+                                    continue;
+                            }
+
+                            if ((!store.TryGetSearchParamDefinition(components[0], components[1], out ModelInfo.SearchParamDefinition? spDefinition)) ||
+                                (spDefinition == null))
+                            {
                                 continue;
-                        }
+                            }
 
-                        if ((!store.TryGetSearchParamDefinition(components[0], components[1], out ModelInfo.SearchParamDefinition? spDefinition)) ||
-                            (spDefinition == null))
-                        {
-                            continue;
-                        }
+                            if (string.IsNullOrWhiteSpace(spDefinition.Expression))
+                            {
+                                continue;
+                            }
 
-                        if (string.IsNullOrWhiteSpace(spDefinition.Expression))
-                        {
-                            continue;
-                        }
+                            // if we have a third component, it's a resource type
+                            if (rt != null)
+                            {
+                                // override the default allowed targets to only the one specified
+                                spDefinition = spDefinition.CloneWith(new ResourceType[] { (ResourceType)rt });
+                            }
 
-                        // if we have a third component, it's a resource type
-                        if (rt != null)
-                        {
-                            // override the default allowed targets to only the one specified
-                            spDefinition = spDefinition.CloneWith(new ResourceType[] { (ResourceType)rt });
-                        }
+                            if (!ReverseInclusions.ContainsKey(components[0]))
+                            {
+                                ReverseInclusions.Add(components[0], new());
+                            }
 
-                        if (!ReverseInclusions.ContainsKey(components[0]))
-                        {
-                            ReverseInclusions.Add(components[0], new());
+                            ReverseInclusions[components[0]].Add(spDefinition);
+                            applied.Add(key + "=" + value);
                         }
-
-                        ReverseInclusions[components[0]].Add(spDefinition);
-                        applied.Add(key + "=" + value);
                     }
                     break;
 

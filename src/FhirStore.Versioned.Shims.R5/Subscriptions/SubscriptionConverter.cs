@@ -12,32 +12,6 @@ namespace FhirStore.Versioned.Shims.Subscriptions;
 /// <summary>A subscription format converter.</summary>
 public class SubscriptionConverter
 {
-    private FhirJsonParser _jsonParser = new(new ParserSettings()
-    {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
-    });
-
-    private FhirJsonSerializationSettings _jsonSerializerSettings = new()
-    {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
-
-    private FhirXmlParser _xmlParser = new(new ParserSettings()
-    {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
-    });
-
-    private FhirXmlSerializationSettings _xmlSerializerSettings = new()
-    {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
-
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
     /// <param name="common">      [out] The common.</param>
@@ -126,20 +100,18 @@ public class SubscriptionConverter
     }
 
     /// <summary>
-    /// Serialize one or more subscription events into the desired format and content level.
+    /// Build a bundle of subscription events into the desired format and content level.
     /// </summary>
     /// <param name="subscription">    The subscription the events belong to.</param>
     /// <param name="eventNumbers">    One or more event numbers to include.</param>
     /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
-    /// <param name="contentType">     Override for the content type specified in the subscription.</param>
     /// <param name="contentLevel">    Override for the content level specified in the subscription.</param>
     /// <returns></returns>
-    public string SerializeSubscriptionEvents(
+    public Bundle? BundleForSubscriptionEvents(
         ParsedSubscription subscription,
         IEnumerable<long> eventNumbers,
         string notificationType,
         string baseUrl,
-        string contentType = "",
         string contentLevel = "")
     {
         if (string.IsNullOrEmpty(contentLevel))
@@ -279,20 +251,6 @@ public class SubscriptionConverter
         // set our status information in our bundle
         bundle.Entry[0].Resource = status;
 
-        // serialize our bundle
-        switch (contentType)
-        {
-            case "xml":
-            case "fhir+xml":
-            case "application/xml":
-            case "application/fhir+xml":
-                return bundle.ToXml(_xmlSerializerSettings);
-
-            // default to JSON
-            case "application/json":
-            case "application/fhir+json":
-            default:
-                return bundle.ToJson(_jsonSerializerSettings);
-        }
+        return bundle;
     }
 }

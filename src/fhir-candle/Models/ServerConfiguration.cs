@@ -20,6 +20,9 @@ public class ServerConfiguration
     /// <summary>Gets or sets a value indicating whether to not load the GUI.</summary>
     public bool NoGui { get; set; } = false;
 
+    /// <summary>Gets or sets the default index page.</summary>
+    public string DefaultIndexPage { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the pathname of the source directory.</summary>
     public string? SourceDirectory { get; set; } = null;
 

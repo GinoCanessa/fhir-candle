@@ -65,6 +65,11 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<bool>("No_Gui", false),
             "Run without loading the GUI");
 
+        Option<string> optDefaultPage = new(
+            name:  "--default-page",
+            getDefaultValue: () => "index-candle",
+            "Default index page to route to");
+
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
@@ -131,6 +136,7 @@ public static partial class Program
             optListenPort,
             optMaxResourceCount,
             optNoGui,
+            optDefaultPage,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -155,6 +161,7 @@ public static partial class Program
                 ListenPort = context.ParseResult.GetValueForOption(optListenPort) ?? _defaultListenPort,
                 MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
                 NoGui = context.ParseResult.GetValueForOption(optNoGui) ?? false,
+                DefaultIndexPage = context.ParseResult.GetValueForOption(optDefaultPage) ?? string.Empty,
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -227,6 +234,11 @@ public static partial class Program
                 });
                 builder.Services.AddServerSideBlazor();
                 builder.Services.AddMudServices();
+
+                // set our default UI page
+                Pages.Index.RootPage = string.IsNullOrEmpty(config.DefaultIndexPage)
+                    ? "/index-subscriptions"
+                    : "/" + config.DefaultIndexPage;
             }
 
             string localUrl = $"http://localhost:{config.ListenPort}";

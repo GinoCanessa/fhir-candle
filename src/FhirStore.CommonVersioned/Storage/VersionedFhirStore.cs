@@ -21,6 +21,7 @@ using static fhir.candle.Search.SearchDefinitions;
 using System.Collections;
 using System.Collections.Concurrent;
 using FhirStore.Operations;
+using System.Net.Mime;
 
 namespace FhirStore.Storage;
 
@@ -1552,18 +1553,63 @@ public partial class VersionedFhirStore : IFhirStore
     {
         if (_subscriptions.ContainsKey(subscriptionId))
         {
-            return _subscriptionConverter.SerializeSubscriptionEvents(
+            Bundle? bundle = _subscriptionConverter.BundleForSubscriptionEvents(
                 _subscriptions[subscriptionId],
                 eventNumbers,
                 notificationType,
                 _config.BaseUrl,
-                contentType,
                 contentLevel);
+
+            if (bundle == null)
+            {
+                return string.Empty;
+            }
+
+            string serialized = SerializeFhir(
+                bundle,
+                string.IsNullOrEmpty(contentType) ? _subscriptions[subscriptionId].ContentType : contentType,
+                SummaryType.False);
+
+            return serialized;
         }
 
         return string.Empty;
     }
 
+    /// <summary>Bundle for subscription events.</summary>
+    /// <param name="subscriptionId">  Identifier for the subscription.</param>
+    /// <param name="eventNumbers">    One or more event numbers to include.</param>
+    /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
+    /// <param name="contentLevel">    (Optional) Override for the content level specified in the
+    ///  subscription.</param>
+    /// <returns>A Bundle?</returns>
+    public Bundle? BundleForSubscriptionEvents(
+        string subscriptionId,
+        IEnumerable<long> eventNumbers,
+        string notificationType,
+        string contentLevel = "")
+    {
+        if (_subscriptions.ContainsKey(subscriptionId))
+        {
+            Bundle? bundle = _subscriptionConverter.BundleForSubscriptionEvents(
+                _subscriptions[subscriptionId],
+                eventNumbers,
+                notificationType,
+                _config.BaseUrl,
+                contentLevel);
+
+            return bundle;
+        }
+
+        return null;
+    }
+
+    
+
+    /// <summary>Status for subscription.</summary>
+    /// <param name="subscriptionId">  Identifier for the subscription.</param>
+    /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
+    /// <returns>A Hl7.Fhir.Model.Resource?</returns>
     public Hl7.Fhir.Model.Resource? StatusForSubscription(
         string subscriptionId,
         string notificationType)
@@ -1713,6 +1759,127 @@ public partial class VersionedFhirStore : IFhirStore
         return true;
     }
 
+    public HttpStatusCode SystemOperation(
+    string operationName,
+    string queryString,
+    string content,
+    string sourceFormat,
+    string destFormat,
+    out string serializedResource,
+    out string serializedOutcome)
+    {
+        if (!_operations.ContainsKey(operationName))
+        {
+            serializedResource = string.Empty;
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            return HttpStatusCode.NotFound;
+        }
+
+        IFhirOperation op = _operations[operationName];
+
+        if (!op.AllowSystemLevel)
+        {
+            serializedResource = string.Empty;
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow system-level execution.");
+            serializedOutcome = SerializeFhir(oo, destFormat);
+
+            return HttpStatusCode.BadRequest;
+        }
+
+        Resource? r = null;
+
+        if (!string.IsNullOrEmpty(content))
+        {
+            object parsed;
+
+            switch (sourceFormat)
+            {
+                case "json":
+                case "fhir+json":
+                case "application/json":
+                case "application/fhir+json":
+                    try
+                    {
+                        parsed = _jsonParser.DeserializeResource(content);
+                    }
+                    catch (Exception ex)
+                    {
+                        serializedResource = string.Empty;
+
+                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"JSON Parse failed: {ex.Message}");
+                        serializedOutcome = SerializeFhir(oo, destFormat);
+
+                        return HttpStatusCode.BadRequest;
+                    }
+                    break;
+
+                case "xml":
+                case "fhir+xml":
+                case "application/xml":
+                case "application/fhir+xml":
+                    try
+                    {
+                        parsed = _xmlParser.DeserializeResource(content);
+                    }
+                    catch (Exception ex)
+                    {
+                        serializedResource = string.Empty;
+
+                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"XML Parse failed: {ex.Message}");
+                        serializedOutcome = SerializeFhir(oo, destFormat);
+
+                        return HttpStatusCode.BadRequest;
+                    }
+                    break;
+
+                default:
+                    {
+                        serializedResource = string.Empty;
+
+                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.UnsupportedMediaType, "Unsupported media type");
+                        serializedOutcome = SerializeFhir(oo, destFormat);
+
+                        return HttpStatusCode.UnsupportedMediaType;
+                    }
+            }
+
+            if ((parsed != null) && (parsed is Resource))
+            {
+                r = (Resource)parsed;
+            }
+        }
+
+        HttpStatusCode sc = op.DoOperation(
+            this,
+            string.Empty,
+            null,
+            string.Empty,
+            queryString,
+            r,
+            out Resource? responseResource,
+            out OperationOutcome? responseOutcome,
+            out _);
+
+        serializedResource = (responseResource == null) ? string.Empty : SerializeFhir(responseResource, destFormat, SummaryType.False);
+
+        OperationOutcome outcome = (responseOutcome == null) ? BuildOutcomeForRequest(sc, $"System Operation {operationName} complete") : responseOutcome;
+        serializedOutcome = SerializeFhir(outcome, destFormat);
+
+        return sc;
+    }
+
+    /// <summary>Perform a FHIR Type-level operation.</summary>
+    /// <param name="resourceType">      Type of the resource.</param>
+    /// <param name="operationName">     Name of the operation.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode TypeOperation(
         string resourceType,
         string operationName,
@@ -1843,6 +2010,17 @@ public partial class VersionedFhirStore : IFhirStore
         return sc;
     }
 
+    /// <summary>Performa FHIR Instance-level operation.</summary>
+    /// <param name="resourceType">      Type of the resource.</param>
+    /// <param name="operationName">     Name of the operation.</param>
+    /// <param name="id">                [out] The identifier.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceOperation(
         string resourceType,
         string operationName,

@@ -31,32 +31,6 @@ public class SubscriptionConverter
     /// <summary>(Immutable) URL of the content.</summary>
     private const string _contentUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content";
 
-    private FhirJsonParser _jsonParser = new(new ParserSettings()
-    {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
-    });
-
-    private FhirJsonSerializationSettings _jsonSerializerSettings = new()
-    {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
-
-    private FhirXmlParser _xmlParser = new(new ParserSettings()
-    {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
-    });
-
-    private FhirXmlSerializationSettings _xmlSerializerSettings = new()
-    {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
-
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
     /// <param name="common">      [out] The common.</param>
@@ -235,7 +209,7 @@ public class SubscriptionConverter
         };
     }
 
-    /// <summary>Serialize subscription events.</summary>
+    /// Build a bundle of subscription events into the desired format and content level.
     /// <param name="subscription">    The subscription.</param>
     /// <param name="eventNumbers">    The event numbers.</param>
     /// <param name="notificationType">Type of the notification.</param>
@@ -243,12 +217,11 @@ public class SubscriptionConverter
     /// <param name="contentType">     (Optional) Type of the content.</param>
     /// <param name="contentLevel">    (Optional) The content level.</param>
     /// <returns>A string.</returns>
-    public string SerializeSubscriptionEvents(
+    public Bundle? BundleForSubscriptionEvents(
         ParsedSubscription subscription,
         IEnumerable<long> eventNumbers,
         string notificationType,
         string baseUrl,
-        string contentType = "",
         string contentLevel = "")
     {
         if (string.IsNullOrEmpty(contentLevel))
@@ -388,20 +361,6 @@ public class SubscriptionConverter
         // set our status information in our bundle
         bundle.Entry[0].Resource = status;
 
-        // serialize our bundle
-        switch (contentType)
-        {
-            case "xml":
-            case "fhir+xml":
-            case "application/xml":
-            case "application/fhir+xml":
-                return bundle.ToXml(_xmlSerializerSettings);
-
-            // default to JSON
-            case "application/json":
-            case "application/fhir+json":
-            default:
-                return bundle.ToJson(_jsonSerializerSettings);
-        }
+        return bundle;
     }
 }

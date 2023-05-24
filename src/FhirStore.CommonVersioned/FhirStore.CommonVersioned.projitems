@@ -16,6 +16,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Models\FhirPathVariableResolver.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ParsedResultParameter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ParsedSearchParameter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionHook.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\EvalDateSearch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\EvalNumberSearch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\EvalQuantitySearch.cs" />
@@ -31,8 +32,5 @@
     <Compile Include="$(MSBuildThisFileDirectory)Operations\IFhirOperation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionStatus.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionEvents.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Operations\" />
   </ItemGroup>
 </Project>

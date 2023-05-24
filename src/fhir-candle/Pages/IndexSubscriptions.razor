@@ -1,0 +1,126 @@
+﻿@page "/index-subscriptions"
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+@inject ServerConfiguration ServerConfig
+
+@implements IDisposable
+
+<MudAlert Severity="Severity.Warning">
+    This is an open FHIR endpoint for development, testing, and educational purposes only.
+    Uploading real patient data is strictly prohibited.
+</MudAlert>
+
+<MudPaper Class="pa-4 ma-2" Square="true">
+    <MudText Typo="Typo.h6">Subscriptions Reference Implementation</MudText>
+    <MudText Typo="Typo.body1">
+        This software is a reference implementation for Topic-Based FHIR Subscriptions.
+        It currently implements functionality across several FHIR versions:
+        <MudList>
+            <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
+                FHIR <MudLink Href="https://hl7.org/fhir/R5" Target="_" Underline="Underline.Always">R5</MudLink>
+                via the <MudLink Href="http://hl7.org/fhir/R5/subscriptions.html" Target="_" Underline="Underline.Always">Subscriptions Framework</MudLink>
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
+                FHIR <MudLink Href="https://hl7.org/fhir/R4B" Target="_" Underline="Underline.Always">R4B</MudLink>
+                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html">Backport IG</MudLink>
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
+                FHIR <MudLink Href="https://hl7.org/fhir/R4" Target="_" Underline="Underline.Always">R4</MudLink>
+                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html">Backport IG</MudLink>
+            </MudListItem>
+        </MudList>
+    </MudText>
+    <MudText Typo="Typo.body1">
+        This system currently exposes the following FHIR endpoints:
+        <MudList Clickable="true">
+            @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
+            {
+                <MudListItem Icon="@Icons.Material.Filled.ViewInAr" OnClick="@(() => NavToFhirStore(kvp.Key))">
+                    @kvp.Value.Config.BaseUrl (FHIR @kvp.Value.Config.FhirVersion)
+                </MudListItem>
+            }
+        </MudList>
+    </MudText>
+    <MudText Typo="Typo.body1">
+        Each endpoint will always have the following resources:
+        <MudList>
+            <MudListItem><code>Patient</code>: <code>example</code></MudListItem>
+            <MudListItem>
+                <code>SubscriptionTopic</code>: <code>code-example</code>
+                with Canonical: <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>
+            </MudListItem>
+        </MudList>
+    </MudText>
+    <MudText Typo="Typo.body1">
+        Each endpoint also exposes a system-level operation, <code>$subscription-hook</code> which
+        can be used as an endpoint for receiving subscription notifications.
+    </MudText>
+    <MudText Typo="Typo.body1">
+        Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
+        For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
+        the notifications and be visible in this system, but not actually send the notification to the
+        endpoint.
+    </MudText>
+</MudPaper>
+<MudPaper Class="pa-16 ma-2" Square="true">
+    <MudText Typo="Typo.h6">Useful Links</MudText>
+    <MudSimpleTable>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Link</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>GitHub Repository for this software</td>
+                <td><MudLink Href="https://github.com/GinoCanessa/fhir-candle" Target="_" Underline="Underline.Always">github.com</MudLink></td>
+            </tr>
+            <tr>
+                <td>FHIR R5 Subscriptions Framework</td>
+                <td><MudLink Href="https://hl7.org/fhir/R5/subscriptions.html" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
+            </tr>
+            <tr>
+                <td>FHIR R4/R4B Subscriptions Backport IG</td>
+                <td><MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
+            </tr>
+            <tr>
+                <td>FHIR R4B Specification</td>
+                <td><MudLink Href="https://hl7.org/fhir/R4B/" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
+            </tr>
+            <tr>
+                <td>FHIR R4 Specification</td>
+                <td><MudLink Href="https://hl7.org/fhir/R4/" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
+            </tr>
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        NavTracker?.NotifyNav("Subscriptions RI", "", 0);
+    }
+
+    private void NavToFhirStore(string name)
+    {
+        NavigationManager.NavigateTo($"/store?storeName={name}");
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+    }
+
+}

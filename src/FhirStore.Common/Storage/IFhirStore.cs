@@ -155,6 +155,35 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedBundle,
         out string serializedOutcome);
 
+    /// <summary>System operation.</summary>
+    /// <param name="operationName">     Name of the operation.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    public HttpStatusCode SystemOperation(
+        string operationName,
+        string queryString,
+        string content,
+        string sourceFormat,
+        string destFormat,
+        out string serializedResource,
+        out string serializedOutcome);
+
+
+    /// <summary>Type operation.</summary>
+    /// <param name="resourceType">      Type of the resource.</param>
+    /// <param name="operationName">     Name of the operation.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode TypeOperation(
         string resourceType,
         string operationName,
@@ -165,6 +194,17 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedResource,
         out string serializedOutcome);
 
+    /// <summary>Instance operation.</summary>
+    /// <param name="resourceType">      Type of the resource.</param>
+    /// <param name="operationName">     Name of the operation.</param>
+    /// <param name="instanceId">        Identifier for the instance.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceOperation(
         string resourceType,
         string operationName,

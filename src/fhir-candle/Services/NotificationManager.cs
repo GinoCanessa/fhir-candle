@@ -365,6 +365,11 @@ public class NotificationManager : INotificationManager
             destination = destination.Substring(7).Trim();
         }
 
+        if (destination.Contains("example.org", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         // send the request to the endpoint
         try
         {

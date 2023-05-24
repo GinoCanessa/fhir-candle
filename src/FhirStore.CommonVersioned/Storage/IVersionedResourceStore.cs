@@ -113,5 +113,4 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <param name="topicUrl">URL of the topic.</param>
     /// <param name="id">      The subscription id.</param>
     void RemoveExecutableSubscription(string topicUrl, string id);
-
 }

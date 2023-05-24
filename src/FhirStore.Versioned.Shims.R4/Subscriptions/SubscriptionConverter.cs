@@ -31,32 +31,6 @@ public class SubscriptionConverter
     /// <summary>(Immutable) URL of the content.</summary>
     private const string _contentUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content";
 
-    private FhirJsonParser _jsonParser = new(new ParserSettings()
-    {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
-    });
-
-    private FhirJsonSerializationSettings _jsonSerializerSettings = new()
-    {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
-
-    private FhirXmlParser _xmlParser = new(new ParserSettings()
-    {
-        AcceptUnknownMembers = true,
-        AllowUnrecognizedEnums = true,
-    });
-
-    private FhirXmlSerializationSettings _xmlSerializerSettings = new()
-    {
-        AppendNewLine = false,
-        Pretty = false,
-        IgnoreUnknownElements = true,
-    };
-
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
     /// <param name="common">      [out] The common.</param>
@@ -215,6 +189,11 @@ public class SubscriptionConverter
         return true;
     }
 
+    /// <summary>Status for subscription.</summary>
+    /// <param name="subscription">    The subscription.</param>
+    /// <param name="notificationType">Type of the notification.</param>
+    /// <param name="baseUrl">         URL of the base.</param>
+    /// <returns>A Hl7.Fhir.Model.Resource.</returns>
     public Hl7.Fhir.Model.Resource StatusForSubscription(
         ParsedSubscription subscription,
         string notificationType,
@@ -253,12 +232,19 @@ public class SubscriptionConverter
         };
     }
 
-    public string SerializeSubscriptionEvents(
+    /// <summary>
+    /// Build a bundle of subscription events into the desired format and content level.
+    /// </summary>
+    /// <param name="subscription">    The subscription the events belong to.</param>
+    /// <param name="eventNumbers">    One or more event numbers to include.</param>
+    /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
+    /// <param name="contentLevel">    Override for the content level specified in the subscription.</param>
+    /// <returns></returns>
+    public Bundle? BundleForSubscriptionEvents(
         ParsedSubscription subscription,
         IEnumerable<long> eventNumbers,
         string notificationType,
         string baseUrl,
-        string contentType = "",
         string contentLevel = "")
     {
         if (string.IsNullOrEmpty(contentLevel))

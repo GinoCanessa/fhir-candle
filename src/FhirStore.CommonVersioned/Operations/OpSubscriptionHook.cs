@@ -1,40 +1,46 @@
-﻿// <copyright file="IFhirOperation.cs" company="Microsoft Corporation">
+﻿// <copyright file="OpSubscriptionHook.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Operations;
 using System.Net;
 
-namespace FhirStore.Operations;
+namespace FhirStore.CommonVersioned.Operations;
 
-/// <summary>Interface for executalbe FHIR operations.</summary>
-public interface IFhirOperation
+/// <summary>An operation subscription hook.</summary>
+public class OpSubscriptionHook : IFhirOperation
 {
     /// <summary>Gets the name of the operation.</summary>
-    string OperationName { get; }
+    public string OperationName => "$subscription-hook";
 
     /// <summary>Gets the canonical by FHIR version.</summary>
-    Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion { get; }
+    public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
+    {
+        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+    };
 
     /// <summary>Gets a value indicating whether we allow get.</summary>
-    bool AllowGet { get; }
+    public bool AllowGet => true;
 
     /// <summary>Gets a value indicating whether we allow post.</summary>
-    bool AllowPost { get; }
+    public bool AllowPost => true;
 
     /// <summary>Gets a value indicating whether we allow system level.</summary>
-    bool AllowSystemLevel { get; }
+    public bool AllowSystemLevel => true;
 
     /// <summary>Gets a value indicating whether we allow resource level.</summary>
-    bool AllowResourceLevel { get; }
+    public bool AllowResourceLevel => false;
 
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
-    bool AllowInstanceLevel { get; }
+    public bool AllowInstanceLevel => false;
 
     /// <summary>Gets the supported resources.</summary>
-    HashSet<string> SupportedResources { get; }
+    public HashSet<string> SupportedResources => new();
 
-    /// <summary>Executes the operation operation.</summary>
+    /// <summary>Executes the system $subscription-hook operation.</summary>
     /// <param name="store">           The store.</param>
     /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
@@ -54,6 +60,8 @@ public interface IFhirOperation
         Hl7.Fhir.Model.Resource? bodyResource,
         out Hl7.Fhir.Model.Resource? responseResource,
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation);
+        out string contentLocation)
+    {
+        throw new NotImplementedException();
+    }
 }
-

@@ -17,10 +17,12 @@ Note: items are unsorted within their priorities
 [] IG Package Loading
 [] Server-level search
 [] Feature/module definitions for selective loading
+[] Story for easier loading of 'default' pages (e.g., listing)
 [] Persistent 'unsubscribe' list
 [] Finish search evaluators (missing modifier combinations)
 [] Save/restore points
 [] History support
+[] `$subscription-hook` operation (system-level)
 
 ## Mid Priority
 [] SMART support

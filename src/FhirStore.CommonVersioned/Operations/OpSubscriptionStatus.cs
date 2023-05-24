@@ -1,18 +1,21 @@
-﻿using System;
+﻿// <copyright file="OpSubscriptionStatus.cs" company="Microsoft Corporation">
+//     Copyright (c) Microsoft Corporation. All rights reserved.
+//     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
+// </copyright>
+
 using System.Net;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
 
 namespace FhirStore.Operations;
 
+/// <summary>The FHIR Subscription status operation.</summary>
 public class OpSubscriptionStatus : IFhirOperation
 {
-	public OpSubscriptionStatus()
-	{
-	}
-
+    /// <summary>Gets the name of the operation.</summary>
     public string OperationName => "$status";
 
+    /// <summary>Gets the canonical by FHIR version.</summary>
     public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
@@ -20,17 +23,38 @@ public class OpSubscriptionStatus : IFhirOperation
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-status" },
     };
 
+    /// <summary>Gets a value indicating whether we allow get.</summary>
     public bool AllowGet => true;
+
+    /// <summary>Gets a value indicating whether we allow post.</summary>
     public bool AllowPost => true;
+
+    /// <summary>Gets a value indicating whether we allow system level.</summary>
     public bool AllowSystemLevel => false;
+
+    /// <summary>Gets a value indicating whether we allow resource level.</summary>
     public bool AllowResourceLevel => true;
+
+    /// <summary>Gets a value indicating whether we allow instance level.</summary>
     public bool AllowInstanceLevel => true;
 
+    /// <summary>Gets the supported resources.</summary>
     public HashSet<string> SupportedResources => new()
     {
         "Subscription"
     };
 
+    /// <summary>Executes the Subscription/$status operation.</summary>
+    /// <param name="store">           The store.</param>
+    /// <param name="resourceType">    Type of the resource.</param>
+    /// <param name="resourceStore">   The resource store.</param>
+    /// <param name="instanceId">      Identifier for the instance.</param>
+    /// <param name="queryString">     The query string.</param>
+    /// <param name="bodyResource">    The body resource.</param>
+    /// <param name="responseResource">[out] The response resource.</param>
+    /// <param name="responseOutcome"> [out] The response outcome.</param>
+    /// <param name="contentLocation"> [out] The content location.</param>
+    /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
         Storage.VersionedFhirStore store,
         string resourceType,

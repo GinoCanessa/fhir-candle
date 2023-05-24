@@ -10,6 +10,34 @@ fhir-candle is a small in-memory FHIR server that can be used for testing and de
 
 # To-Do
 
+Note: items are unsorted within their priorities
+
+## High priority
+[] Reverse chaining (`_has`)
+[] IG Package Loading
+[] Server-level search
+[] Feature/module definitions for selective loading
+[] Persistent 'unsubscribe' list
+[] Finish search evaluators (missing modifier combinations)
+[] Save/restore points
+[] History support
+
+## Mid Priority
+[] SMART support
+[] Batch / transaction support
+[] Proxy header support
+[] Conditional interaction support (e.g., `conditional-update`)
+[] OpenAPI generation
+[] Compartments
+[] Contained resources
+
+## The long tail
+[] Non-terminology validation
+[] Link to terminiology server for full validation
+[] `_filter` support
+[] In-line definitions for named queries
+[] GraphQL support
+[] FHIR Messaging support
 
 ## More Information
 

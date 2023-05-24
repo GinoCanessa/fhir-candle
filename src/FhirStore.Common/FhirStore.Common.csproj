@@ -8,8 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Operations\**" />
+    <EmbeddedResource Remove="Operations\**" />
+    <None Remove="Operations\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Storage\" />
-    <Folder Include="Operations\" />
   </ItemGroup>
 
   <ItemGroup>

@@ -25,15 +25,22 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     Hl7.Fhir.Model.Resource? InstanceCreate(Hl7.Fhir.Model.Resource source, bool allowExistingId);
 
     /// <summary>Update a specific instance of a resource.</summary>
-    /// <param name="source">     [out] The resource.</param>
-    /// <param name="allowCreate">True to allow, false to suppress the create.</param>
+    /// <param name="source">            [out] The resource.</param>
+    /// <param name="allowCreate">       True to allow, false to suppress the create.</param>
+    /// <param name="protectedResources">The protected resources.</param>
     /// <returns>The updated resource, or null if it could not be performed.</returns>
-    Hl7.Fhir.Model.Resource? InstanceUpdate(Hl7.Fhir.Model.Resource source, bool allowCreate);
+    Hl7.Fhir.Model.Resource? InstanceUpdate(
+        Hl7.Fhir.Model.Resource source, 
+        bool allowCreate,
+        HashSet<string> protectedResources);
 
     /// <summary>Instance delete.</summary>
-    /// <param name="id">[out] The identifier.</param>
+    /// <param name="id">                [out] The identifier.</param>
+    /// <param name="protectedResources">The protected resources.</param>
     /// <returns>The deleted resource or null.</returns>
-    Hl7.Fhir.Model.Resource? InstanceDelete(string id);
+    Hl7.Fhir.Model.Resource? InstanceDelete(
+        string id,
+        HashSet<string> protectedResources);
 
     /// <summary>Performs a type search in this resource store.</summary>
     /// <param name="parameters">The query.</param>
@@ -57,7 +64,9 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <param name="name">        The name.</param>
     /// <param name="spDefinition">[out] The sp definition.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryGetSearchParamDefinition(string name, out Hl7.Fhir.Model.ModelInfo.SearchParamDefinition? spDefinition);
+    bool TryGetSearchParamDefinition(
+        string name, 
+        out Hl7.Fhir.Model.ModelInfo.SearchParamDefinition? spDefinition);
 
     /// <summary>Gets the search parameter definitions known by this store</summary>
     /// <returns>

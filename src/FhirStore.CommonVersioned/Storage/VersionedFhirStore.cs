@@ -14,16 +14,12 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Support;
 using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
-using System.Linq.Expressions;
 using System.Net;
-using System.Xml.Linq;
 using FhirStore.Versioned.Shims.Subscriptions;
 using System.Text.RegularExpressions;
-using Hl7.Fhir.Language.Debugging;
 using static fhir.candle.Search.SearchDefinitions;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Reflection.Metadata;
 using FhirStore.Operations;
 
 namespace FhirStore.Storage;
@@ -125,10 +121,29 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>(Immutable) Identifier for the capability statement.</summary>
     private const string _capabilityStatementId = "metadata";
 
+    /// <summary>The operations supported by this server, by name.</summary>
     private Dictionary<string, IFhirOperation> _operations = new();
 
+    /// <summary>True while the store is loading initial content.</summary>
     private bool _inLoad = false;
-    private Dictionary<string, List<object>>? _loadResourcesToReprocess = null;
+
+    /// <summary>Items to reprocess after a load completes.</summary>
+    private Dictionary<string, List<object>>? _loadReprocess = null;
+
+    /// <summary>Number of maximum resources.</summary>
+    private int _maxResourceCount = 0;
+
+    /// <summary>Queue of identifiers of resources (used for max resource cleaning).</summary>
+    private ConcurrentQueue<string> _resourceQ = new();
+
+    /// <summary>True if this store has protected content.</summary>
+    private bool _hasProtected = false;
+
+    /// <summary>List of identifiers for the protected.</summary>
+    private HashSet<string> _protectedResources = new();
+
+    /// <summary>The storage capacity timer.</summary>
+    private System.Threading.Timer? _capacityMonitor = null;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VersionedFhirStore"/> class.
@@ -165,6 +180,7 @@ public partial class VersionedFhirStore : IFhirStore
 
         Type rsType = typeof(ResourceStore<>);
 
+        // traverse known resource types to create individual resource stores
         foreach ((string tn, Type t) in ModelInfo.FhirTypeToCsType)
         {
             // skip non-resources
@@ -198,6 +214,7 @@ public partial class VersionedFhirStore : IFhirStore
             }
         }
 
+        // create executable versions of known search parameters
         foreach (ModelInfo.SearchParamDefinition spDefinition in ModelInfo.SearchParameters)
         {
             if (spDefinition.Resource != null)
@@ -212,7 +229,8 @@ public partial class VersionedFhirStore : IFhirStore
         // check for a load directory
         if (config.LoadDirectory != null)
         {
-            _loadResourcesToReprocess = new();
+            _hasProtected = config.ProtectLoadedContent;
+            _loadReprocess = new();
             _inLoad = true;
 
             string serializedResource, serializedOutcome, eTag, lastModified, location;
@@ -262,9 +280,9 @@ public partial class VersionedFhirStore : IFhirStore
             _inLoad = false;
 
             // reload any subscriptions in case they loaded before topics
-            if (_loadResourcesToReprocess.Any())
+            if (_loadReprocess.Any())
             {
-                foreach ((string key, List<object> list) in _loadResourcesToReprocess)
+                foreach ((string key, List<object> list) in _loadReprocess)
                 {
                     switch (key)
                     {
@@ -280,7 +298,7 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
 
-            _loadResourcesToReprocess = null;
+            _loadReprocess = null;
         }
 
         // load operations for this fhir version
@@ -301,6 +319,17 @@ public partial class VersionedFhirStore : IFhirStore
             {
                 _operations.Add(fhirOp.OperationName, fhirOp);
             }
+        }
+
+        // create a timer to check max resource count if we are monitoring that
+        _maxResourceCount = config.MaxResourceCount;
+        if (_maxResourceCount > 0)
+        {
+            _capacityMonitor = new System.Threading.Timer(
+                CheckMaxResources,
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(30));
         }
     }
 
@@ -407,6 +436,53 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         return _compiledSearchParameters[c];
+    }
+
+
+    /// <summary>Check and send heartbeats.</summary>
+    /// <param name="state">The state.</param>
+    private void CheckMaxResources(object? state)
+    {
+        if (_resourceQ.Count <= _maxResourceCount)
+        {
+            return;
+        }
+
+        int numberToRemove = _resourceQ.Count - _maxResourceCount;
+
+        for (int i = 0; i < numberToRemove; i++)
+        {
+            if (_resourceQ.TryDequeue(out string? id) &&
+                (!string.IsNullOrEmpty(id)))
+            {
+                string[] components = id.Split('/');
+
+                switch (components.Length)
+                {
+                    // resource and id
+                    case 2:
+                        {
+                            if (_store.ContainsKey(components[0]))
+                            {
+                                _store[components[0]].InstanceDelete(components[1], _protectedResources);
+                            }
+                        }
+                        break;
+
+                    // TODO: handle versioned resources
+                    // resource, id, and version
+                    case 3:
+                        {
+                            if (_store.ContainsKey(components[0]))
+                            {
+                                _store[components[0]].InstanceDelete(components[1], _protectedResources);
+                            }
+                        }
+                        break;
+
+                }
+            }
+        }
     }
 
     /// <summary>Attempts to resolve an ITypedElement from the given string.</summary>
@@ -781,6 +857,15 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.InternalServerError;
         }
 
+        if (_inLoad && _hasProtected)
+        {
+            _protectedResources.Add(resourceType + "/" + r.Id);
+        }
+        else if (_maxResourceCount != 0)
+        {
+            _resourceQ.Enqueue(resourceType + "/" + r.Id + "/" + stored.Meta.VersionId);
+        }
+
         serializedResource = SerializeFhir(stored, destFormat, SummaryType.False);
         OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
         serializedOutcome = SerializeFhir(sucessOutcome, destFormat);
@@ -820,7 +905,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         // attempt delete
-        Resource? deleted = _store[resourceType].InstanceDelete(id);
+        Resource? deleted = _store[resourceType].InstanceDelete(id, _protectedResources);
 
         if (deleted == null)
         {
@@ -1040,7 +1125,7 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.UnprocessableEntity;
         }
 
-        Resource? updated = _store[resourceType].InstanceUpdate(r, allowCreate);
+        Resource? updated = _store[resourceType].InstanceUpdate(r, allowCreate, _protectedResources);
 
         if (updated == null)
         {
@@ -1541,12 +1626,12 @@ public partial class VersionedFhirStore : IFhirStore
         {
             if (_inLoad)
             {
-                if (!_loadResourcesToReprocess!.ContainsKey("Subscription"))
+                if (!_loadReprocess!.ContainsKey("Subscription"))
                 {
-                    _loadResourcesToReprocess.Add("Subscription", new());
+                    _loadReprocess.Add("Subscription", new());
                 }
 
-                _loadResourcesToReprocess["Subscription"].Add(subscription);
+                _loadReprocess["Subscription"].Add(subscription);
             }
 
             return false;
@@ -2390,11 +2475,9 @@ public partial class VersionedFhirStore : IFhirStore
         cs.Rest.Add(restComponent);
 
         // update our current capabilities
-        _store["CapabilityStatement"].InstanceUpdate(cs, true);
+        _store["CapabilityStatement"].InstanceUpdate(cs, true, _protectedResources);
         _capabilitiesAreStale = false;
     }
-
-
 
     /// <summary>State has changed.</summary>
     public void StateHasChanged()
@@ -2406,7 +2489,6 @@ public partial class VersionedFhirStore : IFhirStore
             handler(this, new());
         }
     }
-
 
     /// <summary>FHIR resource store on changed.</summary>
     /// <param name="sender">The sender.</param>
@@ -2427,9 +2509,10 @@ public partial class VersionedFhirStore : IFhirStore
     {
         if (!_hasDisposed)
         {
+            // dispose managed state (managed objects)
             if (disposing)
             {
-                // TODO: dispose managed state (managed objects)
+                _capacityMonitor?.Dispose();
 
                 foreach (IResourceStore rs in _store.Values)
                 {
@@ -2437,8 +2520,6 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
 
-            // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-            // TODO: set large fields to null
             _hasDisposed = true;
         }
     }

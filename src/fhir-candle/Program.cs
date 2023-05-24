@@ -55,15 +55,25 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<int>("Listen_Port", _defaultListenPort),
             "Listen port for the server");
 
+        Option<int?> optMaxResourceCount = new(
+            aliases: new[] { "--max-resources", "-m" },
+            getDefaultValue: () => null,
+            "Maximum number of resources allowed per tenant.");
+
         Option<bool?> optNoGui = new(
             name: "--no-gui",
             getDefaultValue: () => configuration.GetValue<bool>("No_Gui", false),
             "Run without loading the GUI");
 
-        Option<DirectoryInfo?> optSourceDirectory = new(
+        Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
             "FHIR Contents to load, either in this directory or by subdirectories named per tenant");
+
+        Option<bool?> optProtectLoadedContent = new(
+            name: "--protect-source",
+            getDefaultValue: () => null,
+            "If any loaded FHIR contents cannot be altered.");
 
         Option<List<string>> optTenantsR4 = new(
             name: "--r4",
@@ -119,8 +129,10 @@ public static partial class Program
         {
             optPublicUrl,
             optListenPort,
+            optMaxResourceCount,
             optNoGui,
             optSourceDirectory,
+            optProtectLoadedContent,
             optTenantsR4,
             optTenantsR4B,
             optTenantsR5,
@@ -141,8 +153,10 @@ public static partial class Program
             {
                 PublicUrl = context.ParseResult.GetValueForOption(optPublicUrl) ?? string.Empty,
                 ListenPort = context.ParseResult.GetValueForOption(optListenPort) ?? _defaultListenPort,
+                MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
                 NoGui = context.ParseResult.GetValueForOption(optNoGui) ?? false,
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
+                ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
                 TenantsR4B = context.ParseResult.GetValueForOption(optTenantsR4B) ?? new(),
                 TenantsR5 = context.ParseResult.GetValueForOption(optTenantsR5) ?? new(),
@@ -272,6 +286,8 @@ public static partial class Program
                 FhirVersion = TenantConfiguration.SupportedFhirVersions.R4,
                 ControllerName = tenant,
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
+                ProtectLoadedContent = config.ProtectLoadedContent,
+                MaxResourceCount = config.MaxResourceCount,
             });
         }
 
@@ -282,6 +298,8 @@ public static partial class Program
                 FhirVersion = TenantConfiguration.SupportedFhirVersions.R4B,
                 ControllerName = tenant,
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
+                ProtectLoadedContent = config.ProtectLoadedContent,
+                MaxResourceCount = config.MaxResourceCount,
             });
         }
 
@@ -292,16 +310,28 @@ public static partial class Program
                 FhirVersion = TenantConfiguration.SupportedFhirVersions.R5,
                 ControllerName = tenant,
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
+                ProtectLoadedContent = config.ProtectLoadedContent,
+                MaxResourceCount = config.MaxResourceCount,
             });
         }
 
         DirectoryInfo? loadDir = null;
 
-        if (config.SourceDirectory != null)
+        if (!string.IsNullOrEmpty(config.SourceDirectory))
         {
-            if (config.SourceDirectory.Exists)
+            if (Path.IsPathRooted(config.SourceDirectory) &&
+                Directory.Exists(config.SourceDirectory))
             {
-                loadDir = config.SourceDirectory;
+                loadDir = new DirectoryInfo(config.SourceDirectory);
+            }
+            else
+            {
+                string relativeDir = FindRelativeDir(config.SourceDirectory, false);
+
+                if (!string.IsNullOrEmpty(relativeDir))
+                {
+                    loadDir = new DirectoryInfo(relativeDir);
+                }
             }
         }
 
@@ -324,5 +354,39 @@ public static partial class Program
 
         return tenants;
     }
+
+    /// <summary>Searches for the FHIR specification directory.</summary>
+    /// <exception cref="DirectoryNotFoundException">Thrown when the requested directory is not
+    ///  present.</exception>
+    /// <param name="dirName">       The name of the directory we are searching for.</param>
+    /// <param name="thowIfNotFound">(Optional) True to thow if not found.</param>
+    /// <returns>The found FHIR directory.</returns>
+    public static string FindRelativeDir(
+        string dirName,
+        bool thowIfNotFound = true)
+    {
+        string currentDir = Path.GetDirectoryName(AppContext.BaseDirectory) ?? string.Empty;
+        string testDir = Path.Combine(currentDir, dirName);
+
+        while (!Directory.Exists(testDir))
+        {
+            currentDir = Path.GetFullPath(Path.Combine(currentDir, ".."));
+
+            if (currentDir == Path.GetPathRoot(currentDir))
+            {
+                if (thowIfNotFound)
+                {
+                    throw new DirectoryNotFoundException($"Could not find directory {dirName}!");
+                }
+
+                return string.Empty;
+            }
+
+            testDir = Path.Combine(currentDir, dirName);
+        }
+
+        return testDir;
+    }
+
 
 }

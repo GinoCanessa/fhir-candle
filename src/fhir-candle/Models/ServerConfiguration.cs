@@ -14,14 +14,17 @@ public class ServerConfiguration
     /// <summary>Gets or sets the listen port.</summary>
     public required int ListenPort { get; set; }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether to not load the GUI.
-    /// </summary>
+    /// <summary>Gets or sets the number of maximum resources.</summary>
+    public int MaxResourceCount { get; set; } = 0;
+
+    /// <summary>Gets or sets a value indicating whether to not load the GUI.</summary>
     public bool NoGui { get; set; } = false;
 
     /// <summary>Gets or sets the pathname of the source directory.</summary>
-    public DirectoryInfo? SourceDirectory { get; set; } = null;
+    public string? SourceDirectory { get; set; } = null;
 
+    /// <summary>Gets or sets the protect loaded content.</summary>
+    public bool ProtectLoadedContent { get; set; } = false;
 
     /// <summary>Gets or sets the FHIR R4 tenants.</summary>
     public List<string> TenantsR4 { get; set; } = new();
@@ -31,7 +34,6 @@ public class ServerConfiguration
 
     /// <summary>Gets or sets the FHIR R5 tenants.</summary>
     public List<string> TenantsR5 { get; set; } = new();
-
 
     /// <summary>Gets or sets the zulip email.</summary>
     public string ZulipEmail { get; set; } = string.Empty;

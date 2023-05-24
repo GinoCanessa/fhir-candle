@@ -269,10 +269,11 @@ public class ResourceStore<T> : IVersionedResourceStore
     }
 
     /// <summary>Update a specific instance of a resource.</summary>
-    /// <param name="source">     [out] The resource.</param>
-    /// <param name="allowCreate">True to allow, false to suppress the create.</param>
+    /// <param name="source">            [out] The resource.</param>
+    /// <param name="allowCreate">       True to allow, false to suppress the create.</param>
+    /// <param name="protectedResources">The protected resources.</param>
     /// <returns>The updated resource, or null if it could not be performed.</returns>
-    public Resource? InstanceUpdate(Resource source, bool allowCreate)
+    public Resource? InstanceUpdate(Resource source, bool allowCreate, HashSet<string> protectedResources)
     {
         if (string.IsNullOrEmpty(source?.Id))
         {
@@ -287,6 +288,11 @@ public class ResourceStore<T> : IVersionedResourceStore
         if (source.Meta == null)
         {
             source.Meta = new Meta();
+        }
+
+        if (protectedResources.Any() && protectedResources.Contains(_resourceName + "/" + source.Id))
+        {
+            return null;
         }
 
         T? previous;
@@ -351,9 +357,10 @@ public class ResourceStore<T> : IVersionedResourceStore
     }
 
     /// <summary>Instance delete.</summary>
-    /// <param name="id">[out] The identifier.</param>
+    /// <param name="id">                [out] The identifier.</param>
+    /// <param name="protectedResources">The protected resources.</param>
     /// <returns>The deleted resource or null.</returns>
-    public Resource? InstanceDelete(string id)
+    public Resource? InstanceDelete(string id, HashSet<string> protectedResources)
     {
         if (string.IsNullOrEmpty(id))
         {
@@ -361,6 +368,11 @@ public class ResourceStore<T> : IVersionedResourceStore
         }
 
         if (!_resourceStore.ContainsKey(id))
+        {
+            return null;
+        }
+
+        if (protectedResources.Any() && protectedResources.Contains(_resourceName + "/" + id))
         {
             return null;
         }

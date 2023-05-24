@@ -69,8 +69,6 @@ public class SearchTester
             fpContext.ElementResolver = FhirStore.Resolve;
         }
 
-
-
         foreach (ParsedSearchParameter sp in searchParameters)
         {
             if (sp.IgnoredParameter)
@@ -78,60 +76,61 @@ public class SearchTester
                 continue;
             }
 
-            // for reverse chaining, we nest the search instead of evaluating it here
-            if (sp.ReverseChainedParameterLink != null)
-            {
-                continue;
-                //// loop over any extracted values and check the resource store for matches
-                //foreach (ITypedElement node in extracted)
-                //{
-                //    if ((node == null) ||
-                //        (node.InstanceType != "Reference"))
-                //    {
-                //        continue;
-                //    }
+            // TODO: finish reverse chaining
+            //    // for reverse chaining, we nest the search instead of evaluating it here
+            //    if (sp.ReverseChainedParameterLink != null)
+            //    {
+            //        continue;
+            //        //// loop over any extracted values and check the resource store for matches
+            //        //foreach (ITypedElement node in extracted)
+            //        //{
+            //        //    if ((node == null) ||
+            //        //        (node.InstanceType != "Reference"))
+            //        //    {
+            //        //        continue;
+            //        //    }
 
-                //    ResourceReference r = node.ToPoco<ResourceReference>();
+            //        //    ResourceReference r = node.ToPoco<ResourceReference>();
 
-                //    ITypedElement? resolved = FhirStore.Resolve(r.Reference);
+            //        //    ITypedElement? resolved = FhirStore.Resolve(r.Reference);
 
-                //    if (resolved == null)
-                //    {
-                //        continue;
-                //    }
+            //        //    if (resolved == null)
+            //        //    {
+            //        //        continue;
+            //        //    }
 
-                //    FhirEvaluationContext chainedContext = new FhirEvaluationContext(resolved.ToScopedNode());
-                //    chainedContext.ElementResolver = FhirStore.Resolve;
+            //        //    FhirEvaluationContext chainedContext = new FhirEvaluationContext(resolved.ToScopedNode());
+            //        //    chainedContext.ElementResolver = FhirStore.Resolve;
 
-                //    string rt = resolved.InstanceType.ToString();
+            //        //    string rt = resolved.InstanceType.ToString();
 
-                //    if (sp.ChainedParameters.ContainsKey(rt))
-                //    {
-                //        found = TestForMatch(resolved, new[] { sp.ChainedParameters[rt] }, chainedContext);
-                //    }
-                //    else if (sp.ChainedParameters.ContainsKey("Resource"))
-                //    {
-                //        found = TestForMatch(resolved, new[] { sp.ChainedParameters["Resource"] }, chainedContext);
-                //    }
+            //        //    if (sp.ChainedParameters.ContainsKey(rt))
+            //        //    {
+            //        //        found = TestForMatch(resolved, new[] { sp.ChainedParameters[rt] }, chainedContext);
+            //        //    }
+            //        //    else if (sp.ChainedParameters.ContainsKey("Resource"))
+            //        //    {
+            //        //        found = TestForMatch(resolved, new[] { sp.ChainedParameters["Resource"] }, chainedContext);
+            //        //    }
 
-                //    if (found)
-                //    {
-                //        break;
-                //    }
+            //        //    if (found)
+            //        //    {
+            //        //        break;
+            //        //    }
 
-                //    //foreach (ParsedSearchParameter chained in sp.ChainedParameters)
-                //    //{
-                //    //    TestForMatch(resolved, new[] { chained }, chainedContext);
-                //    //}
-                //}
+            //        //    //foreach (ParsedSearchParameter chained in sp.ChainedParameters)
+            //        //    //{
+            //        //    //    TestForMatch(resolved, new[] { chained }, chainedContext);
+            //        //    //}
+            //        //}
 
-                //if (!found)
-                //{
-                //    return false;
-                //}
+            //        //if (!found)
+            //        //{
+            //        //    return false;
+            //        //}
 
-                //continue;
-            }
+            //        //continue;
+            //    }
 
             if (sp.ParamType == SearchParamType.Composite)
             {

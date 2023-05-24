@@ -51,4 +51,10 @@ public class TenantConfiguration
 
     /// <summary>Gets or sets the pathname of the load directory.</summary>
     public System.IO.DirectoryInfo? LoadDirectory { get; set; } = null;
+
+    /// <summary>Gets or sets the protect loaded content.</summary>
+    public bool ProtectLoadedContent { get; set; } = false;
+
+    /// <summary>Gets or sets the number of maximum resources.</summary>
+    public int MaxResourceCount { get; set; } = 0;
 }

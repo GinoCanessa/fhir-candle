@@ -8,7 +8,6 @@
   "profiles": {
     "candle": {
       "commandName": "Project",
-      "commandLineArgs": "",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

@@ -17,12 +17,17 @@ Note: items are unsorted within their priorities
 [] IG Package Loading
 [] Server-level search
 [] Feature/module definitions for selective loading
+    Build interfaces for Hosted Services, etc.
+    Add module tag to Operation, etc.
+    Conditional loading based on discovery within types
 [] Story for easier loading of 'default' pages (e.g., listing)
 [] Persistent 'unsubscribe' list
 [] Finish search evaluators (missing modifier combinations)
 [] Save/restore points
 [] History support
 [] `$subscription-hook` operation (system-level)
+[] `_pretty` support
+[] Resource display / edit in UI
 
 ## Mid Priority
 [] SMART support

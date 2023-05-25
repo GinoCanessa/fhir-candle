@@ -11,7 +11,7 @@
     @foreach (ParsedSubscription sub in _store?.CurrentSubscriptions ?? Array.Empty<ParsedSubscription>())
     {
     <MudItem>
-        <MudBadge Content="@sub.GeneratedEvents.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
+        <MudBadge Content="@sub.GeneratedEvents.Count()" Color="@ColorForStatus(sub.CurrentStatus)" Overlap="true" Class="mx-6 my-4">
             <MudCard Outlined="true">
                 <MudCardContent>
                     <MudField Label="Subscription">Subscription/@sub.Id</MudField>
@@ -21,6 +21,10 @@
                     @if (sub.GeneratedEvents.Any())
                     {
                         <MudField Label="Latest">@HeaderFor(sub.GeneratedEvents.Last().Value)</MudField>
+                    }
+                    @if (sub.NotificationErrors.Any())
+                    {
+                        <MudField Label="Error" Error="true">@sub.NotificationErrors.Last()</MudField>
                     }
                 </MudCardContent>
             </MudCard>
@@ -88,6 +92,26 @@
         }
     }
 
+    private Color ColorForStatus(string status)
+    {
+        switch (status)
+        {
+            case "requested":
+                return Color.Info;
+
+            case "active":
+                return Color.Primary;
+
+            case "error":
+                return Color.Error;
+
+            case "off":
+                return Color.Dark;
+        }
+
+        return Color.Primary;
+    }
+
     private string HeaderFor(SubscriptionEvent subEvent)
     {
         return $"{subEvent.EventNumber}: {subEvent.Timestamp.ToLocalTime().ToString("u")}...";
@@ -129,5 +153,5 @@
             _store.OnChanged -= Store_OnChanged;
         }
     }
-}
+    }
 

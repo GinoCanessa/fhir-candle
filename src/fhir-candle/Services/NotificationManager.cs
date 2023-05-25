@@ -231,7 +231,7 @@ public class NotificationManager : INotificationManager
                 (response.StatusCode != System.Net.HttpStatusCode.NoContent))
             {
                 // failure
-                e.Subscription.RegisterError($"POST to {e.Subscription.Endpoint} failed: {response.StatusCode}");
+                e.Subscription.RegisterError($"REST POST to {e.Subscription.Endpoint} failed: {response.StatusCode}");
                 return false;
             }
 
@@ -253,7 +253,7 @@ public class NotificationManager : INotificationManager
         }
         catch (Exception ex)
         {
-            e.Subscription.RegisterError($"POST {e.NotificationType} to {e.Subscription.Endpoint} failed: {ex.Message}");
+            e.Subscription.RegisterError($"REST POST {e.NotificationType} to {e.Subscription.Endpoint} failed: {ex.Message}");
             return false;
         }
         finally

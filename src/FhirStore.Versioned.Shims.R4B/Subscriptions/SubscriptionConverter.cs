@@ -6,12 +6,10 @@
 using FhirStore.Extensions;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using static Hl7.Fhir.Model.VerificationResult;
 
 namespace FhirStore.Versioned.Shims.Subscriptions;
 
-/// <summary>A subscription format converter.</summary>
+/// <summary>A FHIR R4B subscription format converter.</summary>
 public class SubscriptionConverter
 {
     /// <summary>(Immutable) URL of the filter criteria.</summary>
@@ -194,7 +192,8 @@ public class SubscriptionConverter
 
     /// <summary>Attempts to parse a ParsedSubscriptionStatus from the given object.</summary>
     /// <param name="subscriptionStatus">The subscription.</param>
-    /// <param name="common">      [out] The common.</param>
+    /// <param name="bundleId">          Identifier for the bundle.</param>
+    /// <param name="common">            [out] The common.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryParse(object subscriptionStatus, string bundleId, out ParsedSubscriptionStatus common)
     {
@@ -205,9 +204,45 @@ public class SubscriptionConverter
             return false;
         }
 
+        List<string> errors = new();
+        if (status.Error.Any())
+        {
+            foreach (CodeableConcept error in status.Error)
+            {
+                if (!(error.Coding?.Any() ?? false))
+                {
+                    continue;
+                }
+
+                foreach (Coding coding in error.Coding)
+                {
+                    errors.Add(coding.DebuggerDisplay);
+                }
+            }
+        }
+
+        List<ParsedSubscriptionStatus.ParsedNotificationEvent> notificationEvents = new();
+        if (status.NotificationEvent?.Any() ?? false)
+        {
+            foreach (Hl7.Fhir.Model.SubscriptionStatus.NotificationEventComponent notificationEvent in status.NotificationEvent)
+            {
+                notificationEvents.Add(new()
+                {
+                    Id = notificationEvent.ElementId ?? string.Empty,
+                    EventNumber = long.TryParse(notificationEvent.EventNumber, out long en)
+                        ? en
+                        : null,
+                    Timestamp = notificationEvent.Timestamp,
+                    FocusReference = notificationEvent.Focus?.Reference ?? string.Empty,
+                    AdditionalContextReferences = notificationEvent.AdditionalContext?.Select(ac => ac.Reference) ?? Array.Empty<string>(),
+                });
+            }
+        }
+
         common = new()
         {
             LocalBundleId = status.Id,
+            OriginalBundleId = bundleId,
             SubscriptionReference = status.Subscription?.Reference ?? string.Empty,
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
             Status = status.Status?.ToString() ?? string.Empty,
@@ -219,27 +254,22 @@ public class SubscriptionConverter
                 long.TryParse(status.EventsSinceSubscriptionStart, out long count)
                 ? count
                 : null,
-            NotificationEvents = status.NotificationEvent?.Any() ?? false
-                ? status.NotificationEvent.Select(n => new ParsedSubscriptionStatus.ParsedNotificationEvent()
-                {
-                    Id = n.ElementId ?? string.Empty,
-                    EventNumber = long.TryParse(n.EventNumber, out long en)
-                        ? en
-                        : null,
-                    Timestamp = n.Timestamp,
-                    FocusReference = n.Focus?.Reference ?? string.Empty,
-                    AdditionalContextReferences = n.AdditionalContext?.Select(ac => ac.Reference) ?? Array.Empty<string>(),
-                })
-                : Array.Empty<ParsedSubscriptionStatus.ParsedNotificationEvent>(),
+            NotificationEvents = notificationEvents.ToArray(),
+            Errors = errors.ToArray(),
         };
 
         return true;
     }
 
-
+    /// <summary>Status for subscription.</summary>
+    /// <param name="subscription">    The subscription.</param>
+    /// <param name="notificationType">Type of the notification.</param>
+    /// <param name="baseUrl">         URL of the base.</param>
+    /// <returns>A Hl7.Fhir.Model.Resource.</returns>
     public Hl7.Fhir.Model.Resource StatusForSubscription(
         ParsedSubscription subscription,
         string notificationType,
+        /// <summary>Gets the base url)</summary>
         string baseUrl)
     {
         if (!Enum.TryParse(subscription.CurrentStatus, out SubscriptionStatusCodes statusCode))
@@ -249,6 +279,7 @@ public class SubscriptionConverter
 
         return new Hl7.Fhir.Model.SubscriptionStatus()
         {
+            Id = Guid.NewGuid().ToString(),
             Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
             Topic = subscription.TopicUrl,
             EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
@@ -270,6 +301,7 @@ public class SubscriptionConverter
         IEnumerable<long> eventNumbers,
         string notificationType,
         string baseUrl,
+        /// <summary>The content level.</summary>
         string contentLevel = "")
     {
         if (string.IsNullOrEmpty(contentLevel))
@@ -291,18 +323,10 @@ public class SubscriptionConverter
         }
 
         // create our status resource
-        SubscriptionStatus status = new()
-        {
-            Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
-            Topic = subscription.TopicUrl,
-            EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
-            Status = statusCode,
-            Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
-            NotificationEvent = new(),
-        };
+        SubscriptionStatus status = (SubscriptionStatus)StatusForSubscription(subscription, notificationType, baseUrl);
 
         // add a status placeholder to the bundle
-        bundle.Entry.Add(new Bundle.EntryComponent());
+        bundle.AddResourceEntry(status, $"urn:uuid:{status.Id}");
 
         HashSet<string> addedResources = new();
 
@@ -406,9 +430,8 @@ public class SubscriptionConverter
             }
         }
 
-        // set our status information in our bundle
+        // update the status information in our bundle
         bundle.Entry[0].Resource = status;
-        bundle.Entry[0].FullUrl = $"urn:uuid:{Guid.NewGuid().ToString()}";
 
         return bundle;
     }

@@ -338,7 +338,7 @@ public class FhirController : ControllerBase
     //    }
     //}
 
-    [HttpGet, Route("{store}/{resourceName}/{id}/{opName}")]
+    [HttpGet, Route("{store}/{resourceName}/{id}/${opName}")]
     public async Task GetInstanceOperation(
         [FromRoute] string store,
         [FromRoute] string resourceName,
@@ -360,16 +360,10 @@ public class FhirController : ControllerBase
         HttpStatusCode sc;
         string resource, outcome;
 
-        if (opName[0] != '$')
-        {
-            Response.StatusCode = 404;
-            return;
-        }
-
         // operation
         sc = _fhirStoreManager[store].InstanceOperation(
             resourceName,
-            opName,
+            "$" + opName,
             id,
             Request.QueryString.ToString(),
             string.Empty,

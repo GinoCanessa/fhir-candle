@@ -1979,7 +1979,7 @@ public partial class VersionedFhirStore : IFhirStore
         if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(resourceType)))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow type-level execution on {resourceType}.");
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
             serializedOutcome = SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
@@ -2120,10 +2120,10 @@ public partial class VersionedFhirStore : IFhirStore
 
         IFhirOperation op = _operations[operationName];
 
-        if (!op.AllowResourceLevel)
+        if (!op.AllowInstanceLevel)
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow type-level execution.");
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow instance-level execution.");
             serializedOutcome = SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
@@ -2132,7 +2132,7 @@ public partial class VersionedFhirStore : IFhirStore
         if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(resourceType)))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow type-level execution on {resourceType}.");
+            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
             serializedOutcome = SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;

@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\VersionedShims.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Subscriptions\ConverterUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Subscriptions\SubscriptionConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Subscriptions\TopicConverter.cs" />
   </ItemGroup>

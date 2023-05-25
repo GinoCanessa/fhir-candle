@@ -193,7 +193,7 @@ public class OpSubscriptionStatus : IFhirOperation
 
         foreach ((string id, Hl7.Fhir.Model.Resource r) in subscriptionStatuses)
         {
-            bundle.AddSearchEntry(r, prefix + id, Bundle.SearchEntryMode.Match);
+            bundle.AddSearchEntry(r, $"urn:uuid:{r.Id}", Bundle.SearchEntryMode.Match);
         }
 
         responseResource = bundle;

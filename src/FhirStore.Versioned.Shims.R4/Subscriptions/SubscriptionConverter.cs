@@ -7,31 +7,30 @@ using System.Globalization;
 using FhirStore.Extensions;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using static Hl7.Fhir.Model.Subscription;
+using static FhirStore.Versioned.Shims.Subscriptions.ConverterUtils;
 
 namespace FhirStore.Versioned.Shims.Subscriptions;
 
-/// <summary>A subscription format converter.</summary>
+/// <summary>A FHIR R4 subscription format converter.</summary>
 public class SubscriptionConverter
 {
-    /// <summary>(Immutable) URL of the filter criteria.</summary>
-    private const string _filterCriteriaUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-filter-criteria";
+    /// <summary>(Immutable) Backport filter criteria.</summary>
+    private const string _filterCriteria = "backport-filter-criteria";
 
-    /// <summary>(Immutable) URL of the heartbeat period.</summary>
-    private const string _heartbeatPeriodUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-heartbeat-period";
+    /// <summary>(Immutable) Backport heartbeat period.</summary>
+    private const string _heartbeatPeriod = "backport-heartbeat-period";
 
-    /// <summary>(Immutable) URL of the timeout.</summary>
-    private const string _timeoutUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-timeout";
+    /// <summary>(Immutable) Backport timeout.</summary>
+    private const string _timeout = "backport-timeout";
 
-    /// <summary>(Immutable) URL of the maximum count.</summary>
-    private const string _maxCountUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-max-count";
+    /// <summary>(Immutable) Backport maximum count.</summary>
+    private const string _maxCount = "backport-max-count";
 
-    /// <summary>(Immutable) URL of the channel type.</summary>
-    private const string _channelTypeUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-channel-type";
+    /// <summary>(Immutable) Backport channel type.</summary>
+    private const string _channelType = "backport-channel-type";
 
-    /// <summary>(Immutable) URL of the content.</summary>
-    private const string _contentUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content";
+    /// <summary>(Immutable) Backport content.</summary>
+    private const string _content = "backport-payload-content";
 
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
@@ -60,48 +59,48 @@ public class SubscriptionConverter
             ContentType = sub.Channel.Payload?.ToString() ?? string.Empty,
         };
 
-        // check for extended information
-        IEnumerable<Hl7.Fhir.Model.Extension>? exts;
+        Hl7.Fhir.Model.Extension? ext;
+        IEnumerable<Hl7.Fhir.Model.Extension> exts;
+        Dictionary<string, List<Hl7.Fhir.Model.DataType>> parsedExts;
+        Dictionary<string, List<List<Hl7.Fhir.Model.Extension>>> nested;
+        string stringVal;
 
-        exts = sub.Channel.Extension?.Where(e => e.Url.Equals(_heartbeatPeriodUrl));
-        if (exts?.Any() ?? false)
+        // parse channel extensions
+        ParseExtensions(sub.Channel.Extension, out parsedExts, out nested);
+
+        if ((!string.IsNullOrEmpty(stringVal = GetString(parsedExts, _heartbeatPeriod))) &&
+            int.TryParse(stringVal, out int heartbeat))
         {
-            if (int.TryParse(exts.First().Value.ToString(), out int heartbeat))
-            {
-                common.HeartbeatSeconds = heartbeat;
-            }
+            common.HeartbeatSeconds = heartbeat;
         }
 
-        exts = sub.Channel.Extension?.Where(e => e.Url.Equals(_timeoutUrl));
-        if (exts?.Any() ?? false)
+        if ((!string.IsNullOrEmpty(stringVal = GetString(parsedExts, _timeout))) &&
+            int.TryParse(stringVal, out int timeout))
         {
-            if (int.TryParse(exts.First().Value.ToString(), out int timeout))
-            {
-                common.TimeoutSeconds = timeout;
-            }
+            common.TimeoutSeconds = timeout;
         }
 
-        exts = sub.Channel.Extension?.Where(e => e.Url.Equals(_maxCountUrl));
-        if (exts?.Any() ?? false)
+        if ((!string.IsNullOrEmpty(stringVal = GetString(parsedExts, _maxCount))) &&
+            int.TryParse(stringVal, out int maxCount))
         {
-            if (int.TryParse(exts.First().Value.ToString(), out int maxCount))
-            {
-                common.MaxEventsPerNotification = maxCount;
-            }
+            common.MaxEventsPerNotification = maxCount;
         }
 
-        exts = sub.Channel.TypeElement?.Extension?.Where(e => e.Url.Equals(_channelTypeUrl));
-        if (exts?.Any() ?? false)
+        ext = sub.Channel.TypeElement.GetExtension(_urlBackport + _channelType);
+        if ((ext != null) &&
+            (ext.Value != null) &&
+            (ext.Value is Hl7.Fhir.Model.Coding coding))
         {
-            Hl7.Fhir.Model.Coding c = (Hl7.Fhir.Model.Coding)exts.First().Value;
-            common.ChannelSystem = c.System;
-            common.ChannelCode = c.Code;
+            common.ChannelSystem = coding.System;
+            common.ChannelCode = coding.Code;
         }
 
-        exts = sub.Channel.PayloadElement?.Extension?.Where(e => e.Url.Equals(_contentUrl));
-        if (exts?.Any() ?? false)
+        ext = sub.Channel.PayloadElement.GetExtension(_urlBackport + _content);
+        if ((ext != null) &&
+            (ext.Value != null) &&
+            (ext.Value is Hl7.Fhir.Model.Code code))
         {
-            common.ContentLevel = exts.First().Value.ToString() ?? string.Empty;
+            common.ContentLevel = code.Value;
         }
 
         // add parameters
@@ -130,11 +129,10 @@ public class SubscriptionConverter
 
                 common.Parameters[key].Add(value.ToString());
             }
-
         }
 
         // add filters
-        exts = sub.CriteriaElement?.Extension?.Where(e => e.Url.Equals(_filterCriteriaUrl)) ?? null;
+        exts = sub.CriteriaElement.GetExtensions(_urlBackport + _filterCriteria);
         if (exts?.Any() ?? false)
         {
             foreach (string criteria in exts.Select(e => e.Value.ToString() ?? string.Empty))
@@ -193,65 +191,39 @@ public class SubscriptionConverter
         return true;
     }
 
-    private string GetPVal(Hl7.Fhir.Model.Parameters param, string name)
+    /// <summary>Gets the not events in this collection.</summary>
+    /// <param name="status">The status.</param>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process the not events in this collection.
+    /// </returns>
+    private IEnumerable<ParsedSubscriptionStatus.ParsedNotificationEvent> GetNotEvents(
+        Dictionary<string, List<List<Hl7.Fhir.Model.Parameters.ParameterComponent>>> nested)
     {
-        Parameters.ParameterComponent? pc = param.Parameter.First(p => p.Name.Equals(name, StringComparison.Ordinal));
-
-        if (pc == null)
-        {
-            return string.Empty;
-        }
-
-        switch (pc.Value)
-        {
-            case ResourceReference valRef:
-                return valRef.Reference?.ToString() ?? string.Empty;
-        }
-
-        return pc.Value.ToString() ?? string.Empty;
-    }
-
-    private string GetPVal(Hl7.Fhir.Model.Parameters.ParameterComponent pc, string name)
-    {
-        if (pc == null)
-        {
-            return string.Empty;
-        }
-
-        switch (pc.Value)
-        {
-            case ResourceReference valRef:
-                return valRef.Reference?.ToString() ?? string.Empty;
-        }
-
-        return pc.Value.ToString() ?? string.Empty;
-    }
-
-    private IEnumerable<ParsedSubscriptionStatus.ParsedNotificationEvent> GetNotEvents(Parameters status)
-    {
-        if (!(status.Parameter?.Any(p => p.Name.Equals("notification-event", StringComparison.Ordinal)) ?? false))
+        if (!nested.ContainsKey("notification-event"))
         {
             return Array.Empty<ParsedSubscriptionStatus.ParsedNotificationEvent>();
         }
 
         List<ParsedSubscriptionStatus.ParsedNotificationEvent> eventList = new();
 
-        foreach (Parameters.ParameterComponent pc in status.Parameter.Where(p => p.Name.Equals("notification-event", StringComparison.Ordinal)))
+        foreach (List<Hl7.Fhir.Model.Parameters.ParameterComponent> notEventParams in nested["notification-event"])
         {
+            ParseParameters(
+                notEventParams,
+                out Dictionary<string, List<Hl7.Fhir.Model.DataType>> values,
+                out _);
+
             eventList.Add(new ParsedSubscriptionStatus.ParsedNotificationEvent()
             {
                 Id = string.Empty,
-                EventNumber = long.TryParse(GetPVal(pc, "event-number"), out long en)
+                EventNumber = long.TryParse(GetString(values, "event-number"), out long en)
                             ? en
                             : null,
-                Timestamp = DateTimeOffset.TryParse(GetPVal(pc, "timestamp"), null, DateTimeStyles.RoundtripKind, out DateTimeOffset dt)
+                Timestamp = DateTimeOffset.TryParse(GetString(values, "timestamp"), null, DateTimeStyles.RoundtripKind, out DateTimeOffset dt)
                             ? dt
                             : null,
-                FocusReference = GetPVal(pc, "focus"),
-                AdditionalContextReferences =
-                            pc.Part.Where(np => np.Name.Equals("additional-context"))
-                            .Select(ac => (ac.Value as ResourceReference)?.Reference ?? string.Empty)
-                            ?? Array.Empty<string>(),
+                FocusReference = GetString(values, "focus"),
+                AdditionalContextReferences = GetStrings(values, "additional-context"),
             });
         }
 
@@ -260,7 +232,8 @@ public class SubscriptionConverter
 
     /// <summary>Attempts to parse a ParsedSubscriptionStatus from the given object.</summary>
     /// <param name="subscriptionStatus">The subscription.</param>
-    /// <param name="common">      [out] The common.</param>
+    /// <param name="bundleId">          Identifier for the bundle.</param>
+    /// <param name="common">            [out] The common.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryParse(object subscriptionStatus, string bundleId, out ParsedSubscriptionStatus common)
     {
@@ -271,20 +244,25 @@ public class SubscriptionConverter
             return false;
         }
 
+        ParseParameters(
+            status.Parameter,
+            out Dictionary<string, List<Hl7.Fhir.Model.DataType>> values,
+            out Dictionary<string, List<List<Hl7.Fhir.Model.Parameters.ParameterComponent>>> nested);
+
         common = new()
         {
             LocalBundleId = status.Id,
-            SubscriptionReference = GetPVal(status, "subscription"),
-            SubscriptionTopicCanonical = GetPVal(status, "topic"),
-            Status = GetPVal(status, "status"),
+            SubscriptionReference = GetString(values, "subscription"),
+            SubscriptionTopicCanonical = GetString(values, "topic"),
+            Status = GetString(values, "status"),
             NotificationType =
-                GetPVal(status, "type").TryFhirEnum(out ParsedSubscription.NotificationTypeCodes nt)
+                GetString(values, "type").TryFhirEnum(out ParsedSubscription.NotificationTypeCodes nt)
                 ? nt
                 : null,
-            EventsSinceSubscriptionStart = long.TryParse(GetPVal(status, "events-since-subscription-start"), out long count)
+            EventsSinceSubscriptionStart = long.TryParse(GetString(values, "events-since-subscription-start"), out long count)
                 ? count
                 : null,
-            NotificationEvents = GetNotEvents(status),
+            NotificationEvents = GetNotEvents(nested),
         };
 
         return true;
@@ -298,10 +276,12 @@ public class SubscriptionConverter
     public Hl7.Fhir.Model.Resource StatusForSubscription(
         ParsedSubscription subscription,
         string notificationType,
+        /// <summary>Gets the base url)</summary>
         string baseUrl)
     {
         return new Hl7.Fhir.Model.Parameters()
         {
+            Id = Guid.NewGuid().ToString(),
             Parameter = new()
             {
                 new()
@@ -346,6 +326,7 @@ public class SubscriptionConverter
         IEnumerable<long> eventNumbers,
         string notificationType,
         string baseUrl,
+        /// <summary>The content level.</summary>
         string contentLevel = "")
     {
         if (string.IsNullOrEmpty(contentLevel))
@@ -362,40 +343,10 @@ public class SubscriptionConverter
         };
 
         // create our status parameters
-        Parameters status = new()
-        {
-            Parameter = new()
-            {
-                new()
-                {
-                    Name = "subscription",
-                    Value = new FhirString(baseUrl + "/Subscription/" + subscription.Id)
-                },
-                new()
-                {
-                    Name = "topic",
-                    Value = new Canonical(subscription.TopicUrl),
-                },
-                new()
-                {
-                    Name = "status",
-                    Value = new Code(subscription.CurrentStatus)
-                },
-                new()
-                {
-                    Name = "type",
-                    Value = new Code(notificationType),
-                },
-                new()
-                {
-                    Name = "events-since-subscription-start",
-                    Value = new FhirString(subscription.CurrentEventCount.ToString())
-                },
-            },
-        };
+        Parameters status = (Parameters)StatusForSubscription(subscription, notificationType, baseUrl);
 
-        // add a status placeholder to the bundle
-        bundle.Entry.Add(new Bundle.EntryComponent());
+        // add our status to the bundle
+        bundle.AddResourceEntry(status, $"urn:uuid:{status.Id}");
 
         HashSet<string> addedResources = new();
 
@@ -493,16 +444,18 @@ public class SubscriptionConverter
                     }));
             }
 
-            // add the focus to our bundle
             if (!addedResources.Contains(relativeUrl))
             {
-                bundle.Entry.Add(new Bundle.EntryComponent()
-                {
-                    FullUrl = baseUrl + "/" + relativeUrl,
-                    Resource = isFullResource ? r : null,
-                });
-
                 addedResources.Add(relativeUrl);
+
+                if (isFullResource)
+                {
+                    bundle.Entry.Add(new Bundle.EntryComponent()
+                    {
+                        FullUrl = baseUrl + "/" + relativeUrl,
+                        Resource = isFullResource ? r : null,
+                    });
+                }
             }
 
             // add any additional context
@@ -515,21 +468,25 @@ public class SubscriptionConverter
 
                     if (!addedResources.Contains(acrRelative))
                     {
-                        bundle.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = baseUrl + "/" + acrRelative,
-                            Resource = isFullResource ? acr : null,
-                        });
-
                         addedResources.Add(acrRelative);
+
+                        if (isFullResource)
+                        {
+                            bundle.Entry.Add(new Bundle.EntryComponent()
+                            {
+                                FullUrl = baseUrl + "/" + acrRelative,
+                                Resource = isFullResource ? acr : null,
+                            });
+                        }
                     }
                 }
             }
+
+            status.Parameter.Add(ne);
         }
 
-        // set our status information in our bundle
+        // update the status information in our bundle
         bundle.Entry[0].Resource = status;
-        bundle.Entry[0].FullUrl = $"urn:uuid:{Guid.NewGuid().ToString()}";
 
         return bundle;
     }

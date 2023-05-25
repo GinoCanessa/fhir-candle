@@ -6,11 +6,10 @@
 using FhirStore.Extensions;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 
 namespace FhirStore.Versioned.Shims.Subscriptions;
 
-/// <summary>A subscription format converter.</summary>
+/// <summary>A FHIR R5 subscription format converter.</summary>
 public class SubscriptionConverter
 {
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
@@ -82,9 +81,10 @@ public class SubscriptionConverter
 
     /// <summary>Attempts to parse a ParsedSubscriptionStatus from the given object.</summary>
     /// <param name="subscriptionStatus">The subscription.</param>
-    /// <param name="common">      [out] The common.</param>
+    /// <param name="originalBundleId">  Identifier for the bundle.</param>
+    /// <param name="common">            [out] The common.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryParse(object subscriptionStatus, string bundleId, out ParsedSubscriptionStatus common)
+    public bool TryParse(object subscriptionStatus, string originalBundleId, out ParsedSubscriptionStatus common)
     {
         if ((subscriptionStatus == null) ||
             (subscriptionStatus is not Hl7.Fhir.Model.SubscriptionStatus status))
@@ -93,9 +93,43 @@ public class SubscriptionConverter
             return false;
         }
 
+        List<string> errors = new();
+        if (status.Error?.Any() ?? false)
+        {
+            foreach (CodeableConcept error in status.Error)
+            {
+                if (!(error.Coding?.Any() ?? false))
+                {
+                    continue;
+                }
+
+                foreach (Coding coding in error.Coding)
+                {
+                    errors.Add(coding.DebuggerDisplay);
+                }
+            }
+        }
+
+        List<ParsedSubscriptionStatus.ParsedNotificationEvent> notificationEvents = new();
+        if (status.NotificationEvent?.Any() ?? false)
+        {
+            foreach (Hl7.Fhir.Model.SubscriptionStatus.NotificationEventComponent notificationEvent in status.NotificationEvent)
+            {
+                notificationEvents.Add(new()
+                {
+                    Id = notificationEvent.ElementId ?? string.Empty,
+                    EventNumber = notificationEvent.EventNumber,
+                    Timestamp = notificationEvent.Timestamp,
+                    FocusReference = notificationEvent.Focus?.Reference ?? string.Empty,
+                    AdditionalContextReferences = notificationEvent.AdditionalContext?.Select(ac => ac.Reference) ?? Array.Empty<string>(),
+                });
+            }
+        }
+
         common = new()
         {
             LocalBundleId = status.Id,
+            OriginalBundleId = originalBundleId,
             SubscriptionReference = status.Subscription?.Reference ?? string.Empty,
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
             Status = status.Status?.ToString() ?? string.Empty,
@@ -104,22 +138,18 @@ public class SubscriptionConverter
                 ? nt
                 : null,
             EventsSinceSubscriptionStart = status.EventsSinceSubscriptionStart,
-            NotificationEvents = status.NotificationEvent?.Any() ?? false
-                ? status.NotificationEvent.Select(n => new ParsedSubscriptionStatus.ParsedNotificationEvent()
-                    {
-                        Id = n.ElementId ?? string.Empty,
-                        EventNumber = n.EventNumber,
-                        Timestamp = n.Timestamp,
-                        FocusReference = n.Focus?.Reference ?? string.Empty,
-                        AdditionalContextReferences = n.AdditionalContext?.Select(ac => ac.Reference) ?? Array.Empty<string>(),
-                    })
-                : Array.Empty<ParsedSubscriptionStatus.ParsedNotificationEvent>(),
+            NotificationEvents = notificationEvents.ToArray(),
+            Errors = errors.ToArray(),
         };
 
         return true;
     }
 
-
+    /// <summary>Status for subscription.</summary>
+    /// <param name="subscription">    The subscription.</param>
+    /// <param name="notificationType">Type of the notification.</param>
+    /// <param name="baseUrl">         URL of the base.</param>
+    /// <returns>A Hl7.Fhir.Model.Resource.</returns>
     public Hl7.Fhir.Model.Resource StatusForSubscription(
         ParsedSubscription subscription,
         string notificationType,
@@ -132,6 +162,7 @@ public class SubscriptionConverter
 
         return new Hl7.Fhir.Model.SubscriptionStatus()
         {
+            Id = Guid.NewGuid().ToString(),
             Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
             Topic = subscription.TopicUrl,
             EventsSinceSubscriptionStart = subscription.CurrentEventCount,
@@ -140,19 +171,19 @@ public class SubscriptionConverter
         };
     }
 
-    /// <summary>
-    /// Build a bundle of subscription events into the desired format and content level.
-    /// </summary>
-    /// <param name="subscription">    The subscription the events belong to.</param>
-    /// <param name="eventNumbers">    One or more event numbers to include.</param>
-    /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
-    /// <param name="contentLevel">    Override for the content level specified in the subscription.</param>
-    /// <returns></returns>
+    /// <summary>Bundle for subscription events.</summary>
+    /// <param name="subscription">    The subscription.</param>
+    /// <param name="eventNumbers">    The event numbers.</param>
+    /// <param name="notificationType">Type of the notification.</param>
+    /// <param name="baseUrl">         URL of the base.</param>
+    /// <param name="contentLevel">    (Optional) The content level.</param>
+    /// <returns>A Bundle?</returns>
     public Bundle? BundleForSubscriptionEvents(
         ParsedSubscription subscription,
         IEnumerable<long> eventNumbers,
         string notificationType,
         string baseUrl,
+        /// <summary>The content level.</summary>
         string contentLevel = "")
     {
         if (string.IsNullOrEmpty(contentLevel))
@@ -174,18 +205,10 @@ public class SubscriptionConverter
         }
 
         // create our status resource
-        SubscriptionStatus status = new()
-        {
-            Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
-            Topic = subscription.TopicUrl,
-            EventsSinceSubscriptionStart = subscription.CurrentEventCount,
-            Status = statusCode,
-            Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
-            NotificationEvent = new(),
-        };
+        SubscriptionStatus status = (SubscriptionStatus)StatusForSubscription(subscription, notificationType, baseUrl);
 
-        // add a status placeholder to the bundle
-        bundle.Entry.Add(new Bundle.EntryComponent());
+        // add our status to the bundle
+        bundle.AddResourceEntry(status, $"urn:uuid:{status.Id}");
 
         HashSet<string> addedResources = new();
 
@@ -289,7 +312,7 @@ public class SubscriptionConverter
             }
         }
 
-        // set our status information in our bundle
+        // update the status information in our bundle
         bundle.Entry[0].Resource = status;
 
         return bundle;

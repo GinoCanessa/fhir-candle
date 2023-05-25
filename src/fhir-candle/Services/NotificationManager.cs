@@ -342,6 +342,65 @@ public class NotificationManager : INotificationManager
         return true;
     }
 
+    /// <summary>Parse email mime.</summary>
+    /// <param name="mime">          The mime.</param>
+    /// <param name="messageMime">   [out] The message mime.</param>
+    /// <param name="attachmentMime">[out] The attachment mime.</param>
+    private void ParseEmailMime(string mime, out string messageMime, out string attachmentMime)
+    {
+        if (string.IsNullOrEmpty(mime))
+        {
+            messageMime = "text/plain";
+            attachmentMime = "application/fhir+json";
+            return;
+        }
+
+        string[] mimeComponents = mime.Split(';');
+
+        string message;
+        string attach;
+
+        if (mimeComponents.Length == 1)
+        {
+            message = mimeComponents[0].Trim();
+            attach = message;
+        }
+        else
+        {
+            message = mimeComponents[0].Trim();
+            attach = mimeComponents[1].Trim();
+        }
+
+        // single mime, determine if this is message or attachment
+        switch (message)
+        {
+            case "text/plain":
+            case "text/html":
+                messageMime = message;
+                break;
+
+            default:
+                messageMime = "text/plain";
+                break;
+        }
+
+        switch (attach)
+        {
+            default:
+            case "json":
+            case "application/json":
+            case "application/fhir+json":
+                attachmentMime = "application/fhir+json";
+                break;
+
+            case "xml":
+            case "application/xml":
+            case "application/fhir+xml":
+                attachmentMime = "application/fhir+xml";
+                break;
+        }
+    }
+
     /// <summary>Attempt to send a notification via Email.</summary>
     /// <param name="store">   The store.</param>
     /// <param name="e">       Subscription event information.</param>
@@ -381,7 +440,9 @@ public class NotificationManager : INotificationManager
                 long eventLo = e.NotificationEvents.Any() ? e.NotificationEvents.Min(ne => ne.EventNumber) : 0;
                 long eventHi = e.NotificationEvents.Any() ? e.NotificationEvents.Max(ne => ne.EventNumber) : 0;
 
-                string shortMime = e.Subscription.ContentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                ParseEmailMime(e.Subscription.ContentType, out string messageMime, out string attachmentMime);
+
+                string shortMime = attachmentMime.EndsWith("json", StringComparison.Ordinal)
                     ? "json"
                     : "xml";
 
@@ -390,17 +451,24 @@ public class NotificationManager : INotificationManager
                 message.To.Add(new MailboxAddress(destination, destination));
 
                 BodyBuilder bodyBuilder = new();
-                bodyBuilder.TextBody = BuildEmailMessage(store, e);
+                if (messageMime.Equals("text/html", StringComparison.Ordinal))
+                {
+                    bodyBuilder.HtmlBody = BuildEmailMessage(store, e);
+                }
+                else
+                {
+                    bodyBuilder.TextBody = BuildEmailMessage(store, e);
+                }
 
                 // no events included
-                if (eventLo == 0)
+                if (eventHi == 0)
                 {
                     message.Subject = $"Subscription {e.Subscription.Id} {e.NotificationType}";
 
                     bodyBuilder.Attachments.Add(
                         $"notifications-{e.NotificationType}.{shortMime}",
                         ms,
-                        ContentType.Parse(e.Subscription.ContentType));
+                        ContentType.Parse(attachmentMime));
                 }
 
                 // one event included
@@ -411,7 +479,7 @@ public class NotificationManager : INotificationManager
                     bodyBuilder.Attachments.Add(
                         $"notification-{eventLo}.{shortMime}",
                         ms,
-                        ContentType.Parse(e.Subscription.ContentType));
+                        ContentType.Parse(attachmentMime));
                 }
 
                 // multiple events included
@@ -422,7 +490,7 @@ public class NotificationManager : INotificationManager
                     bodyBuilder.Attachments.Add(
                         $"notifications-{eventLo}-{eventHi}.{shortMime}",
                         ms,
-                        ContentType.Parse(e.Subscription.ContentType));
+                        ContentType.Parse(attachmentMime));
                 }
 
                 message.Body = bodyBuilder.ToMessageBody();

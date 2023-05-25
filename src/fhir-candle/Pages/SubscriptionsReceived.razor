@@ -145,6 +145,8 @@
         if (_store != null)
         {
             _store.OnChanged -= Store_OnChanged;
+            _store.OnReceivedSubscriptionChanged -= Store_OnReceivedSubscriptionChanged;
+            _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
         }
     }
 }

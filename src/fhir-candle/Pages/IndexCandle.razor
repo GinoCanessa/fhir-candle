@@ -31,11 +31,18 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd>
-            <MudTooltip Text="Subscriptions">
-                <MudFab StartIcon="@Icons.Material.Filled.RssFeed"
-                        @onclick="() => NavToSubscriptions(context.Key)"
+            <MudTooltip Text="Local Subscriptions (Send)">
+                <MudFab StartIcon="@Icons.Material.Filled.North"
+                @onclick="() => NavToLocalSubscriptions(context.Key)"
                         Size="Size.Small" />
             </MudTooltip>
+
+            <MudTooltip Text="Received Notifications">
+                <MudFab StartIcon="@Icons.Material.Filled.South"
+                @onclick="() => NavToReceivedSubscriptions(context.Key)"
+                        Size="Size.Small" />
+            </MudTooltip>
+
 
             <MudTooltip Text="FHIR Store Contents">
                 <MudFab StartIcon="@Icons.Material.Filled.ViewInAr"
@@ -68,9 +75,18 @@
         NavigationManager.NavigateTo($"/store?storeName={name}");
     }
 
-    private void NavToSubscriptions(string name)
+    /// <summary>Navigation to local subscriptions.</summary>
+    /// <param name="name">The name.</param>
+    private void NavToLocalSubscriptions(string name)
     {
         NavigationManager.NavigateTo($"/store/ext/subscriptions-local?storeName={name}");
+    }
+
+    /// <summary>Navigation to received subscriptions.</summary>
+    /// <param name="name">The name.</param>
+    private void NavToReceivedSubscriptions(string name)
+    {
+        NavigationManager.NavigateTo($"/store/ext/subscriptions-received?storeName={name}");
     }
 
     /// <summary>

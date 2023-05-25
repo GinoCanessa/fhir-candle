@@ -158,6 +158,8 @@
         if (_store != null)
         {
             _store.OnChanged -= Store_OnChanged;
+            _store.OnSubscriptionSendEvent -= Store_OnSubscriptionSendEvent;
+            _store.OnSubscriptionsChanged -= Store_OnSubscriptionsChanged;
         }
     }
 }

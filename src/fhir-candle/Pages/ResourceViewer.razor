@@ -1,0 +1,154 @@
+﻿@page "/store/ext/resource-viewer"
+
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using BlazorMonaco
+@using BlazorMonaco.Editor
+
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject IFhirStoreManager StoreManager
+@inject ProtectedLocalStorage BrowserStore
+
+@implements IDisposable
+
+<PageTitle>Resource Editor</PageTitle>
+
+<MudStack>
+    <MudPaper>
+        <MudText>test</MudText>
+    </MudPaper>
+
+    <StandaloneCodeEditor @ref="_editor"
+        Id="resource-editor"
+        ConstructionOptions="ResourceConstructionOptions"
+        OnDidInit="EditorOnDidInit" />
+
+</MudStack>
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "storeName")]
+    public string StoreName { get; set; } = "";
+
+    /// <summary>Gets or sets the identifier of the resource.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "type")]
+    public string ResourceType { get; set; } = "";
+
+    /// <summary>Gets or sets the identifier of the resource.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "id")]
+    public string Id { get; set; } = "";
+
+    /// <summary>The FHIR store.</summary>
+    private IFhirStore _store = null!;
+
+    /// <summary>The editor.</summary>
+    private StandaloneCodeEditor? _editor = null;
+
+    /// <summary>Resource construction options.</summary>
+    /// <param name="editor">The editor.</param>
+    /// <returns>The StandaloneEditorConstructionOptions.</returns>
+    private StandaloneEditorConstructionOptions ResourceConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+            {
+                Language = "json",
+                Theme = "vs-dark",
+                GlyphMargin = false,
+                Value = "",
+            };
+    }
+
+    /// <summary>Editor on did initialize.</summary>
+    /// <returns>An asynchronous result.</returns>
+    private async Task EditorOnDidInit()
+    {
+        //await JS.InvokeVoidAsync("blazorMonaco.editor.setModelLanguage", "blazorMonaco.editor.getModel()", "json");
+        //await JS.InvokeVoidAsync("blazorMonaco.editor.setModelLanguage", _editor!.Id, "blazorMonaco.editor.getModel()", "json");
+
+        _ = _store.InstanceRead(
+            ResourceType,
+            Id,
+            "application/fhir+json",
+            string.Empty,
+            true,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            out string content,
+            out _,
+            out _,
+            out _);
+
+        _ = _editor?.SetValue(content);
+    }
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+        if (_store != null)
+        {
+        }
+
+        // notify of store root in case user clicked here directly
+        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+        NavTracker?.NotifyNav(
+            "Resource Editor",
+            $"/store/ext/resource-editor?storeName={StoreName}&type={ResourceType}&id={Id}",
+            2);
+
+        NavigationManager.LocationChanged += HandleLocationChanged;
+
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/store/ext/resource-editor", StringComparison.Ordinal))
+        {
+            if (_store != null)
+            {
+            }
+
+            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+            if (_store != null)
+            {
+            }
+
+            // notify of store root in case user clicked here directly
+            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+            NavTracker?.NotifyNav(
+                "Resource Editor",
+                $"/store/ext/resource-editor?storeName={StoreName}&type={ResourceType}&id={Id}",
+                2);
+        }
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+
+        if (_store != null)
+        {
+        }
+    }
+}
+

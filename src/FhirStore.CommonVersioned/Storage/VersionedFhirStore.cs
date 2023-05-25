@@ -40,8 +40,11 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>Occurs when On Changed.</summary>
     public event EventHandler<SubscriptionSendEventArgs>? OnSubscriptionSendEvent;
 
+    /// <summary>Occurs when a received subscription has changed.</summary>
+    public event EventHandler<ReceivedSubscriptionChangedEventArgs>? OnReceivedSubscriptionChanged;
+
     /// <summary>Occurs when On Changed.</summary>
-    public event EventHandler<SubscriptionReceiveEventArgs>? OnSubscriptionReceiveEvent;
+    public event EventHandler<ReceivedSubscriptionEventArgs>? OnReceivedSubscriptionEvent;
 
     /// <summary>The compiler.</summary>
     private static FhirPathCompiler _compiler = null!;
@@ -139,6 +142,12 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>Queue of identifiers of resources (used for max resource cleaning).</summary>
     private ConcurrentQueue<string> _resourceQ = new();
+
+    /// <summary>The received notifications.</summary>
+    private ConcurrentDictionary<string, List<ParsedSubscriptionStatus>> _receivedNotifications = new();
+
+    /// <summary>(Immutable) The received notification window ticks.</summary>
+    private static readonly long _receivedNotificationWindowTicks = TimeSpan.FromMinutes(10).Ticks;
 
     /// <summary>True if this store has protected content.</summary>
     private bool _hasProtected = false;
@@ -332,7 +341,7 @@ public partial class VersionedFhirStore : IFhirStore
         if (_maxResourceCount > 0)
         {
             _capacityMonitor = new System.Threading.Timer(
-                CheckMaxResources,
+                CheckUsage,
                 null,
                 TimeSpan.Zero,
                 TimeSpan.FromSeconds(30));
@@ -367,10 +376,13 @@ public partial class VersionedFhirStore : IFhirStore
     int IReadOnlyCollection<KeyValuePair<string, IResourceStore>>.Count => _store.Count;
 
     /// <summary>Gets the current topics.</summary>
-    IEnumerable<ParsedSubscriptionTopic> IFhirStore.CurrentTopics => _topics.Values;
+    public IEnumerable<ParsedSubscriptionTopic> CurrentTopics => _topics.Values;
 
     /// <summary>Gets the current subscriptions.</summary>
-    IEnumerable<ParsedSubscription> IFhirStore.CurrentSubscriptions => _subscriptions.Values;
+    public IEnumerable<ParsedSubscription> CurrentSubscriptions => _subscriptions.Values;
+
+    /// <summary>Gets the received notifications.</summary>
+    public IEnumerable<KeyValuePair<string, List<ParsedSubscriptionStatus>>> ReceivedNotifications => _receivedNotifications.AsEnumerable();
 
     /// <summary>Gets the element that has the specified key in the read-only dictionary.</summary>
     /// <typeparam name="string">        Type of the string.</typeparam>
@@ -444,12 +456,12 @@ public partial class VersionedFhirStore : IFhirStore
         return _compiledSearchParameters[c];
     }
 
-
-    /// <summary>Check and send heartbeats.</summary>
-    /// <param name="state">The state.</param>
-    private void CheckMaxResources(object? state)
+    /// <summary>Check resource usage.</summary>
+    private void CheckResourceUsage()
     {
-        if (_resourceQ.Count <= _maxResourceCount)
+        // check for total resources
+        if ((_maxResourceCount == 0) ||
+            (_resourceQ.Count <= _maxResourceCount))
         {
             return;
         }
@@ -485,10 +497,62 @@ public partial class VersionedFhirStore : IFhirStore
                             }
                         }
                         break;
-
                 }
             }
         }
+    }
+
+    /// <summary>Check received notification usage.</summary>
+    private void CheckReceivedNotificationUsage()
+    {
+        // check received notification usage
+        if (!_receivedNotifications.Any())
+        {
+            return;
+        }
+
+        List<string> idsToRemove = new();
+        long windowTicks = DateTimeOffset.Now.Ticks - _receivedNotificationWindowTicks;
+
+        foreach ((string id, List<ParsedSubscriptionStatus> notifications) in _receivedNotifications)
+        {
+            if (!notifications.Any())
+            {
+                idsToRemove.Add(id);
+                continue;
+            }
+
+            // check oldest notification
+            if (notifications.First().ProcessedDateTime.Ticks > windowTicks)
+            {
+                continue;
+            }
+
+            // remove all notifications that are too old
+            notifications.RemoveAll(n => n.ProcessedDateTime.Ticks < windowTicks);
+
+            if (notifications.Any())
+            {
+                RegisterReceivedSubscriptionChanged(id, notifications.Count, false);
+            }
+        }
+
+        if (idsToRemove.Any())
+        {
+            foreach (string id in idsToRemove)
+            {
+                _ = _receivedNotifications.TryRemove(id, out _);
+                RegisterReceivedSubscriptionChanged(id, 0, true);
+            }
+        }
+    }
+
+    /// <summary>Check and send heartbeats.</summary>
+    /// <param name="state">The state.</param>
+    private void CheckUsage(object? state)
+    {
+        CheckReceivedNotificationUsage();
+        CheckResourceUsage();
     }
 
     /// <summary>Attempts to resolve an ITypedElement from the given string.</summary>
@@ -1556,9 +1620,42 @@ public partial class VersionedFhirStore : IFhirStore
         //StateHasChanged();
     }
 
-    public void RegisterReceiveEvent(string bundleId, ParsedSubscriptionStatus status)
+    /// <summary>Registers the received subscription changed.</summary>
+    /// <param name="subscriptionReference">  The subscription reference.</param>
+    /// <param name="cachedNotificationCount">Number of cached notifications.</param>
+    /// <param name="removed">                True if removed.</param>
+    public void RegisterReceivedSubscriptionChanged(
+        string subscriptionReference,
+        int cachedNotificationCount,
+        bool removed)
     {
-        EventHandler<SubscriptionReceiveEventArgs>? handler = OnSubscriptionReceiveEvent;
+        EventHandler<ReceivedSubscriptionChangedEventArgs>? handler = OnReceivedSubscriptionChanged;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                Tenant = _config,
+                SubscriptionReference = subscriptionReference,
+                CurrentBundleCount = cachedNotificationCount,
+                Removed = removed,
+            });
+        }
+    }
+
+    /// <summary>Registers the received notification.</summary>
+    /// <param name="bundleId">Identifier for the bundle.</param>
+    /// <param name="status">  The parsed SubscriptionStatus information from the notification.</param>
+    public void RegisterReceivedNotification(string bundleId, ParsedSubscriptionStatus status)
+    {
+        if (!_receivedNotifications.ContainsKey(status.SubscriptionReference))
+        {
+            _ = _receivedNotifications.TryAdd(status.SubscriptionReference, new());
+        }
+
+        _receivedNotifications[status.SubscriptionReference].Add(status);
+
+        EventHandler<ReceivedSubscriptionEventArgs>? handler = OnReceivedSubscriptionEvent;
 
         if (handler != null)
         {
@@ -1569,7 +1666,6 @@ public partial class VersionedFhirStore : IFhirStore
                 Status = status,
             });
         }
-
     }
 
 

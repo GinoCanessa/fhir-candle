@@ -134,8 +134,8 @@ public class SubscriptionConverter
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
             Status = status.Status?.ToString() ?? string.Empty,
             NotificationType =
-                (status.Type?.ToString() ?? string.Empty).TryFhirEnum(out ParsedSubscription.NotificationTypeCodes nt)
-                ? nt
+                status.Type != null
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Type).ToFhirEnum<ParsedSubscription.NotificationTypeCodes>()
                 : null,
             EventsSinceSubscriptionStart = status.EventsSinceSubscriptionStart,
             NotificationEvents = notificationEvents.ToArray(),

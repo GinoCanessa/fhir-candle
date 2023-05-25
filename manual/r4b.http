@@ -1,0 +1,95 @@
+// Configuration
+@fhirUrl = http://localhost:5826/fhir/r4b
+@endpoint = http://localhost:5826/fhir/r4b/$subscription-hook
+@topic = http://example.org/FHIR/SubscriptionTopic/encounter-complete
+
+# @contentLevel = empty
+@contentLevel = id-only
+# @contentLevel = full-resource
+
+@format = application/fhir+json
+# @format = application/fhir+xml
+
+### POST Subscription
+# @name postRestHookSubscription
+POST {{fhirUrl}}/Subscription
+Accept: {{format}}
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "Subscription",
+  "status": "requested",
+  "reason": "Test subscription",
+  "criteria": "{{topic}}",
+  "_criteria": {
+      "extension": [
+          {
+              "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-filter-criteria",
+              "valueString": "Encounter?patient=Patient/example"
+          }
+      ]
+  },
+  "channel": {
+      "extension": [
+          {
+              "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-heartbeat-period",
+              "valueUnsignedInt": 86400
+          },
+          {
+              "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-timeout",
+              "valueUnsignedInt": 60
+          },
+          {
+              "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-max-count",
+              "valuePositiveInt": 20
+          }
+      ],
+      "type": "rest-hook",
+      "endpoint": "{{endpoint}}",
+      "payload": "{{format}}",
+      "_payload": {
+          "extension": [
+              {
+                  "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content",
+                  "valueCode": "{{contentLevel}}"
+              }
+          ]
+      }
+  }
+}
+
+### GET SubscriptionStatus
+GET {{fhirUrl}}/Subscription/{{postRestHookSubscription.response.body.$.id}}/$status
+Accept: {{format}}
+
+### GET SubscriptionEvents
+GET {{fhirUrl}}/Subscription/{{postRestHookSubscription.response.body.$.id}}/$events?content={{contentLevel}}
+Accept: {{format}}
+
+
+### POST finished Encounter
+# @name postCompleteEncounter
+POST {{fhirUrl}}/Encounter
+Accept: {{format}}
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "Encounter",
+  "status": "finished",
+  "class": {
+    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+    "code": "VR",
+    "display": "virtual"
+  },
+  "subject": {
+    "reference": "Patient/example"
+  }
+}
+
+### DELETE Encounter
+DELETE {{fhirUrl}}/Encounter/{{postCompleteEncounter.response.body.$.id}}
+Accept: {{format}}
+
+### GET Encounter
+GET {{fhirUrl}}/Encounter/{{postCompleteEncounter.response.body.$.id}}
+Accept: {{format}}

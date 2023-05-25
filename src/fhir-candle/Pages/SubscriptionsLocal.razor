@@ -1,11 +1,11 @@
-﻿@page "/store/ext/subscriptions"
+﻿@page "/store/ext/subscriptions-local"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
 
 @implements IDisposable
 
-<PageTitle>Subscription Dashboard</PageTitle>
+<PageTitle>Local Subscriptions</PageTitle>
 
 <MudGrid>
     @foreach (ParsedSubscription sub in _store?.CurrentSubscriptions ?? Array.Empty<ParsedSubscription>())
@@ -62,7 +62,7 @@
 
         // notify of store root in case user clicked here directly
         NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Subscriptions Dashboard", "/store/ext/subscriptions?storeName=" + StoreName, 2);
+        NavTracker?.NotifyNav($"Local Subscriptions", "/store/ext/subscriptions-local?storeName=" + StoreName, 2);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -70,12 +70,13 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-local", StringComparison.Ordinal))
         {
             if (_store != null)
             {
                 _store.OnChanged -= Store_OnChanged;
                 _store.OnSubscriptionSendEvent -= Store_OnSubscriptionSendEvent;
+                _store.OnSubscriptionsChanged -= Store_OnSubscriptionsChanged;
             }
 
             _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
@@ -84,14 +85,18 @@
             {
                 _store.OnChanged += Store_OnChanged;
                 _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
+                _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
             }
 
             // notify of store root in case user clicked here directly
             NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Subscriptions Dashboard", "/store/ext/subscriptions?storeName=" + StoreName, 2);
+            NavTracker?.NotifyNav($"Local Subscriptions", "/store/ext/subscriptions-local?storeName=" + StoreName, 2);
         }
     }
 
+    /// <summary>Color for status.</summary>
+    /// <param name="status">The status.</param>
+    /// <returns>A Color.</returns>
     private Color ColorForStatus(string status)
     {
         switch (status)
@@ -112,6 +117,9 @@
         return Color.Primary;
     }
 
+    /// <summary>Header for.</summary>
+    /// <param name="subEvent">The sub event.</param>
+    /// <returns>A string.</returns>
     private string HeaderFor(SubscriptionEvent subEvent)
     {
         return $"{subEvent.EventNumber}: {subEvent.Timestamp.ToLocalTime().ToString("u")}...";
@@ -141,7 +149,6 @@
         InvokeAsync(() => StateHasChanged());
     }
 
-
     /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
     /// resources.
@@ -153,5 +160,5 @@
             _store.OnChanged -= Store_OnChanged;
         }
     }
-    }
+}
 

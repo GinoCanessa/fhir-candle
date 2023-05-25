@@ -5,6 +5,7 @@
 
 namespace FhirStore.Models;
 
+/// <summary>A subscription event.</summary>
 public record class SubscriptionEvent
 {
     /// <summary>Gets or initializes the subscription id.</summary>

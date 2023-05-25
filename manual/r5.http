@@ -1,0 +1,170 @@
+// Configuration
+@fhirUrl = http://localhost:5826/fhir/r5
+@endpoint = http://localhost:5826/fhir/r5/$subscription-hook
+@topic = http://example.org/FHIR/SubscriptionTopic/encounter-complete
+
+# @contentLevel = empty
+@contentLevel = id-only
+# @contentLevel = full-resource
+
+@format = application/fhir+json
+# @format = application/fhir+xml
+
+
+### POST REST-Hook Subscription
+# @name postRestHookSubscription
+POST {{fhirUrl}}/Subscription
+Accept: {{format}}
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "Subscription",
+  "name": "Example",
+  "status": "requested",
+  "topic": "{{topic}}",
+  "reason": "Example subscription for example topic",
+  "filterBy": [
+    {
+      "filterParameter": "patient",
+      "value": "Patient/example"
+    }
+  ],
+  "channelType": {
+    "code": "rest-hook"
+  },
+  "endpoint": "{{endpoint}}",
+  "heartbeatPeriod": 600,
+  "timeout": 5,
+  "contentType": "{{format}}",
+  "content": "{{contentLevel}}",
+  "maxCount": 100
+}
+
+### GET SubscriptionStatus
+GET {{fhirUrl}}/Subscription/{{postRestHookSubscription.response.body.$.id}}/$status
+Accept: {{format}}
+
+### GET SubscriptionEvents
+GET {{fhirUrl}}/Subscription/{{postRestHookSubscription.response.body.$.id}}/$events?content={{contentLevel}}
+Accept: {{format}}
+
+
+### POST Complete Encounter
+# @name postCompleteEncounter
+POST {{fhirUrl}}/Encounter
+Accept: {{format}}
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "Encounter",
+  "status": "completed",
+  "class": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "VR",
+          "display": "virtual"
+        }
+      ]
+    }
+  ],
+  "subject": {
+    "reference": "Patient/example"
+  }
+}
+
+### DELETE Encounter
+DELETE {{fhirUrl}}/Encounter/{{postCompleteEncounter.response.body.$.id}}
+Accept: {{format}}
+
+### GET Encounter
+GET {{fhirUrl}}/Encounter/{{postCompleteEncounter.response.body.$.id}}
+Accept: {{format}}
+
+
+### POST Planned Encounter
+POST {{fhirUrl}}/Encounter
+Accept: {{format}}
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "Encounter",
+  "status": "planned",
+  "class": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "VR",
+          "display": "virtual"
+        }
+      ]
+    }
+  ],
+  "subject": {
+    "reference": "Patient/example"
+  }
+}
+
+### POST Zulip Subscription
+POST {{fhirUrl}}/Subscription
+Accept: {{format}}
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "Subscription",
+  "name": "Example",
+  "status": "requested",
+  "topic": "{{topic}}",
+  "reason": "Example subscription for example topic",
+  "filterBy": [
+    {
+      "filterParameter": "patient",
+      "value": "Patient/example"
+    }
+  ],
+  "channelType": {
+    "system": "http://ginoc.io/fhir/extensions/subscription-channel-type",
+    "code": "zulip"
+  },
+  "parameter": [
+    {
+      "name": "userId",
+      "value": "222054"
+    }
+  ],
+  "heartbeatPeriod": 600,
+  "timeout": 5,
+  "contentType": "{{format}}",
+  "content": "{{contentLevel}}",
+  "maxCount": 100
+}
+
+### POST Email Subscription
+POST {{fhirUrl}}/Subscription
+Accept: {{format}}
+Content-Type: application/fhir+json
+
+{
+  "resourceType": "Subscription",
+  "name": "Example",
+  "status": "requested",
+  "topic": "{{topic}}",
+  "reason": "Example subscription for example topic",
+  "filterBy": [
+    {
+      "filterParameter": "patient",
+      "value": "Patient/example"
+    }
+  ],
+  "channelType": {
+    "code": "email"
+  },
+  "endpoint": "mailto:will.not.send@example.org",
+  "heartbeatPeriod": 600,
+  "timeout": 5,
+  "contentType": "text/plain;attach={{format}}",
+  "content": "{{contentLevel}}",
+  "maxCount": 100
+}

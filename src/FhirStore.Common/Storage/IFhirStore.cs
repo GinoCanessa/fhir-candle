@@ -20,8 +20,11 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <summary>Occurs when on Subscription.</summary>
     event EventHandler<SubscriptionSendEventArgs>? OnSubscriptionSendEvent;
 
+    /// <summary>Occurs when a received subscription has changed.</summary>
+    event EventHandler<ReceivedSubscriptionChangedEventArgs>? OnReceivedSubscriptionChanged;
+
     /// <summary>Occurs when on Subscription.</summary>
-    event EventHandler<SubscriptionReceiveEventArgs>? OnSubscriptionReceiveEvent;
+    event EventHandler<ReceivedSubscriptionEventArgs>? OnReceivedSubscriptionEvent;
 
     /// <summary>State has changed.</summary>
     void StateHasChanged();
@@ -259,12 +262,20 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string contentType = "",
         string contentLevel = "");
 
+    /// <summary>Supports resource.</summary>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     bool SupportsResource(string resourceName);
 
     /// <summary>Gets the supported resources.</summary>
     IEnumerable<string> SupportedResources { get; }
 
+    /// <summary>Gets the current topics.</summary>
     IEnumerable<ParsedSubscriptionTopic> CurrentTopics { get; }
 
+    /// <summary>Gets the current subscriptions.</summary>
     IEnumerable<ParsedSubscription> CurrentSubscriptions { get; }
+
+    /// <summary>Gets the received notifications.</summary>
+    IEnumerable<KeyValuePair<string, List<ParsedSubscriptionStatus>>> ReceivedNotifications { get; }
 }

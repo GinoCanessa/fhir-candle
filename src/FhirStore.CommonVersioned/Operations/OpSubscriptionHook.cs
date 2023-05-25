@@ -95,7 +95,7 @@ public class OpSubscriptionHook : IFhirOperation
         ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(bundle, false);
 
         // register the notification received event
-        store.RegisterReceiveEvent(bundle.Id, status);
+        store.RegisterReceivedNotification(bundle.Id, status);
 
         responseResource = null;
         responseOutcome = store.BuildOutcomeForRequest(HttpStatusCode.OK, "Subscription Notification Received");

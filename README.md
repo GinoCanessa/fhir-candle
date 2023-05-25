@@ -1,5 +1,4 @@
 # fhir-candle
-
 When a small FHIR will do!
 
 fhir-candle is a small in-memory FHIR server that can be used for testing and development. It is NOT intended to be used for production workloads.
@@ -9,7 +8,6 @@ fhir-candle is a small in-memory FHIR server that can be used for testing and de
 
 
 # To-Do
-
 Note: items are unsorted within their priorities
 
 ## High priority
@@ -22,16 +20,17 @@ Note: items are unsorted within their priorities
     Conditional loading based on discovery within types
 [] Story for easier loading of 'default' pages (e.g., listing)
 [] Persistent 'unsubscribe' list
-[] Finish search evaluators (missing modifier combinations)
+[] Finish search evaluators (remaining modifier combinations)
 [] Save/restore points
 [] History support
-[] `$subscription-hook` operation (system-level)
 [] Resource display / edit in UI
+[] Subscription RI scenario/walkthrough
 
 ## Mid Priority
 [] SMART support
 [] Batch / transaction support
 [] Proxy header support
+[] Versioned Resource support
 [] Conditional interaction support (e.g., `conditional-update`)
 [] OpenAPI generation
 [] Compartments

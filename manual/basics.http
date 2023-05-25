@@ -1,0 +1,9 @@
+// Configuration
+# @fhirUrl = http://localhost:5826/fhir/r4
+# @fhirUrl = http://localhost:5826/fhir/r4b
+@fhirUrl = http://localhost:5826/fhir/r5
+
+### GET Metadata
+GET {{fhirUrl}}/metadata
+Accept: application/fhir+json
+

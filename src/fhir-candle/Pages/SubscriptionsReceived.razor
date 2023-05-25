@@ -1,0 +1,151 @@
+﻿@page "/store/ext/subscriptions-received"
+
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+
+@implements IDisposable
+
+<PageTitle>Received Notifications</PageTitle>
+
+<MudGrid>
+    @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store?.ReceivedNotifications ?? Array.Empty<KeyValuePair<string, List<ParsedSubscriptionStatus>>>())
+    {
+    <MudItem>
+        <MudBadge Content="@kvp.Value.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
+            <MudCard Outlined="true">
+                <MudCardContent>
+                    <MudField Label="Subscription">@kvp.Key</MudField>
+                    @if (kvp.Value.Any())
+                    {
+                        @foreach (ParsedSubscriptionStatus status in new ParsedSubscriptionStatus[] { kvp.Value.Last() })
+                        {
+                            <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
+                            <MudField Label="Local Bundle">Bundle/@status.LocalBundleId</MudField>
+                            <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
+                            <MudField Label="Type">@status.NotificationType</MudField>
+                            
+                            @if (status.NotificationEvents.Any())
+                            {
+                                <MudField Label="Focus">@status.NotificationEvents.First().FocusReference</MudField>
+                            }
+
+                            @if (status.Errors.Any())
+                            {
+                                <MudField Label="Error">@status.Errors.First()</MudField>
+                            }
+                        }
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudBadge>
+    </MudItem>
+    }
+</MudGrid>
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "storeName")]
+    public string StoreName { get; set; } = "";
+
+    private IFhirStore _store = null!;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+        if (_store != null)
+        {
+            _store.OnReceivedSubscriptionChanged += Store_OnReceivedSubscriptionChanged;
+            _store.OnReceivedSubscriptionEvent += Store_OnReceivedSubscriptionEvent;
+        }
+
+        // notify of store root in case user clicked here directly
+        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+        NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?storeName=" + StoreName, 2);
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-received", StringComparison.Ordinal))
+        {
+            if (_store != null)
+            {
+                _store.OnChanged -= Store_OnChanged;
+                _store.OnReceivedSubscriptionChanged -= Store_OnReceivedSubscriptionChanged;
+                _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
+            }
+
+            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+            if (_store != null)
+            {
+                _store.OnChanged += Store_OnChanged;
+                _store.OnReceivedSubscriptionChanged += Store_OnReceivedSubscriptionChanged;
+                _store.OnReceivedSubscriptionEvent += Store_OnReceivedSubscriptionEvent;
+            }
+
+            // notify of store root in case user clicked here directly
+            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+            NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?storeName=" + StoreName, 2);
+        }
+    }
+
+    /// <summary>Header for.</summary>
+    /// <param name="subEvent">The sub event.</param>
+    /// <returns>A string.</returns>
+    private string HeaderFor(SubscriptionEvent subEvent)
+    {
+        return $"{subEvent.EventNumber}: {subEvent.Timestamp.ToLocalTime().ToString("u")}...";
+    }
+
+    /// <summary>FHIR store on changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Event information.</param>
+    private void Store_OnChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    /// <summary>
+    /// Event handler. Called by Store for on received subscription changed events.
+    /// </summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Received subscription changed event information.</param>
+    private void Store_OnReceivedSubscriptionChanged(object? sender, ReceivedSubscriptionChangedEventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    /// <summary>Event handler. Called by Store for on received subscription events.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Received subscription event information.</param>
+    private void Store_OnReceivedSubscriptionEvent(object? sender, ReceivedSubscriptionEventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_store != null)
+        {
+            _store.OnChanged -= Store_OnChanged;
+        }
+    }
+}
+

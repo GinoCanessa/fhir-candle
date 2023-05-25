@@ -1644,6 +1644,9 @@ public partial class VersionedFhirStore : IFhirStore
         return null;
     }
 
+    /// <summary>Parse notification bundle.</summary>
+    /// <param name="bundle">The bundle.</param>
+    /// <returns>A ParsedSubscriptionStatus?</returns>
     public ParsedSubscriptionStatus? ParseNotificationBundle(
         Bundle bundle)
     {
@@ -2354,6 +2357,14 @@ public partial class VersionedFhirStore : IFhirStore
 
     }
 
+    /// <summary>Enumerates resolve reverse inclusions in this collection.</summary>
+    /// <param name="focus">           The focus.</param>
+    /// <param name="resultParameters">Options for controlling the result.</param>
+    /// <param name="addedIds">        List of identifiers for the added.</param>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process resolve reverse inclusions in this
+    /// collection.
+    /// </returns>
     internal IEnumerable<Resource> ResolveReverseInclusions(
         Resource focus,
         ParsedResultParameters resultParameters,
@@ -2435,6 +2446,15 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
+    /// <summary>Enumerates resolve inclusions in this collection.</summary>
+    /// <param name="focus">           The focus.</param>
+    /// <param name="focusTE">         The focus te.</param>
+    /// <param name="resultParameters">Options for controlling the result.</param>
+    /// <param name="addedIds">        List of identifiers for the added.</param>
+    /// <param name="fpContext">       The context.</param>
+    /// <returns>
+    /// An enumerator that allows foreach to be used to process resolve inclusions in this collection.
+    /// </returns>
     internal IEnumerable<Resource> ResolveInclusions(
         Resource focus,
         ITypedElement focusTE,
@@ -2675,7 +2695,7 @@ public partial class VersionedFhirStore : IFhirStore
                     new() { Code = CapabilityStatement.TypeRestfulInteraction.Update },
                     //new() { Code = Hl7.Fhir.Model.CapabilityStatement.TypeRestfulInteraction.Vread },
                 },
-                Versioning = CapabilityStatement.ResourceVersionPolicy.Versioned,
+                Versioning = CapabilityStatement.ResourceVersionPolicy.NoVersion,
                 //ReadHistory = true,
                 UpdateCreate = true,
                 //ConditionalCreate = true,
@@ -2701,7 +2721,12 @@ public partial class VersionedFhirStore : IFhirStore
                         Documentation = sp.Description,
                     }).ToList(),
                 Operation = _operations.Values
-                    .Where(o => (o.AllowInstanceLevel || o.AllowResourceLevel) && o.SupportedResources.Contains(resourceName))
+                    .Where(o => 
+                        (o.AllowInstanceLevel || o.AllowResourceLevel) && 
+                        ((!o.SupportedResources.Any()) || 
+                          o.SupportedResources.Contains(resourceName) || 
+                          o.SupportedResources.Contains("Resource") ||
+                          o.SupportedResources.Contains("DomainResource")))
                     .Select(o => new CapabilityStatement.OperationComponent()
                     {
                         Name = o.OperationName,

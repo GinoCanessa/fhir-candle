@@ -5,6 +5,7 @@
 
 using FhirStore.Models;
 using FhirStore.Operations;
+using FhirStore.Storage;
 using System.Net;
 
 namespace FhirStore.CommonVersioned.Operations;
@@ -30,10 +31,10 @@ public class OpSubscriptionHook : IFhirOperation
     public bool AllowPost => true;
 
     /// <summary>Gets a value indicating whether we allow system level.</summary>
-    public bool AllowSystemLevel => false;
+    public bool AllowSystemLevel => true;
 
     /// <summary>Gets a value indicating whether we allow resource level.</summary>
-    public bool AllowResourceLevel => true;
+    public bool AllowResourceLevel => false;
 
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
     public bool AllowInstanceLevel => false;
@@ -63,7 +64,7 @@ public class OpSubscriptionHook : IFhirOperation
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation)
     {
-        if ((resourceStore == null) ||
+        if ((store == null) ||
             (bodyResource == null) ||
             (!(bodyResource is Hl7.Fhir.Model.Bundle bundle)) ||
             (!bundle.Entry.Any()) ||
@@ -89,8 +90,9 @@ public class OpSubscriptionHook : IFhirOperation
 
         string originalId = bundle.Id;
 
+        // TODO: Clean up interfaces and types so we can avoid casts like this
         // store this bundle in our store
-        resourceStore.InstanceCreate(bundle, false);
+        ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(bundle, false);
 
         // register the notification received event
         store.RegisterReceiveEvent(bundle.Id, status);

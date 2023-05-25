@@ -108,6 +108,10 @@ public class FhirController : ControllerBase
                 {
                     await response.WriteAsync(resource);
                 }
+                else if (!string.IsNullOrEmpty(outcome))
+                {
+                    await response.WriteAsync(outcome);
+                }
                 break;
 
             case "return=OperationOutcome":
@@ -161,11 +165,11 @@ public class FhirController : ControllerBase
         }
     }
 
-    [HttpGet, Route("{store}/{resourceName}/{id}")]
-    public async Task GetResourceInstanceOrOperation(
+    [HttpGet, Route("{store}/{resourceName}/${opName}")]
+    public async Task GetTypeOperation(
         [FromRoute] string store,
         [FromRoute] string resourceName,
-        [FromRoute] string id,
+        [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
         [FromQuery(Name = "_pretty")] string? pretty)
@@ -179,50 +183,16 @@ public class FhirController : ControllerBase
 
         format = GetMimeType(format, Request);
 
-        HttpStatusCode sc;
-        string resource, outcome, eTag, lastModified;
-
-        if (id[0] == '$')
-        {
-            // operation
-            sc = _fhirStoreManager[store].TypeOperation(
-                resourceName,
-                id,
-                Request.QueryString.ToString(),
-                string.Empty,
-                string.Empty,
-                format,
-                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                out resource,
-                out outcome);
-        }
-        else
-        {
-            // read instance
-            sc = _fhirStoreManager[store].InstanceRead(
-                resourceName,
-                id,
-                format,
-                summary ?? string.Empty,
-                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                string.Empty,
-                string.Empty,
-                string.Empty,
-                out resource,
-                out outcome,
-                out eTag,
-                out lastModified);
-
-            if (!string.IsNullOrEmpty(eTag))
-            {
-                Response.Headers.Add(HeaderNames.ETag, eTag);
-            }
-
-            if (!string.IsNullOrEmpty(lastModified))
-            {
-                Response.Headers.Add(HeaderNames.LastModified, lastModified);
-            }
-        }
+        HttpStatusCode sc = _fhirStoreManager[store].TypeOperation(
+            resourceName,
+            "$" + opName,
+            Request.QueryString.ToString(),
+            string.Empty,
+            string.Empty,
+            format,
+            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            out string resource,
+            out string outcome);
 
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
@@ -236,6 +206,137 @@ public class FhirController : ControllerBase
             await Response.WriteAsync(outcome);
         }
     }
+
+    [HttpGet, Route("{store}/{resourceName}/{id}")]
+    public async Task GetResourceInstance(
+    [FromRoute] string store,
+    [FromRoute] string resourceName,
+    [FromRoute] string id,
+    [FromQuery(Name = "_format")] string? format,
+    [FromQuery(Name = "_summary")] string? summary,
+    [FromQuery(Name = "_pretty")] string? pretty)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, Request);
+
+        HttpStatusCode sc = _fhirStoreManager[store].InstanceRead(
+            resourceName,
+            id,
+            format,
+            summary ?? string.Empty,
+            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            out string resource,
+            out string outcome,
+            out string eTag,
+            out string lastModified);
+
+        if (!string.IsNullOrEmpty(eTag))
+        {
+            Response.Headers.Add(HeaderNames.ETag, eTag);
+        }
+
+        if (!string.IsNullOrEmpty(lastModified))
+        {
+            Response.Headers.Add(HeaderNames.LastModified, lastModified);
+        }
+ 
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
+
+        if (!string.IsNullOrEmpty(resource))
+        {
+            await Response.WriteAsync(resource);
+        }
+        else if (!string.IsNullOrEmpty(outcome))
+        {
+            await Response.WriteAsync(outcome);
+        }
+    }
+
+    //[HttpGet, Route("{store}/{resourceName}/{id}")]
+    //public async Task GetResourceInstanceOrOperation(
+    //    [FromRoute] string store,
+    //    [FromRoute] string resourceName,
+    //    [FromRoute] string id,
+    //    [FromQuery(Name = "_format")] string? format,
+    //    [FromQuery(Name = "_summary")] string? summary,
+    //    [FromQuery(Name = "_pretty")] string? pretty)
+    //{
+    //    if ((!_fhirStoreManager.ContainsKey(store)) ||
+    //        (!_fhirStoreManager[store].SupportsResource(resourceName)))
+    //    {
+    //        Response.StatusCode = 404;
+    //        return;
+    //    }
+
+    //    format = GetMimeType(format, Request);
+
+    //    HttpStatusCode sc;
+    //    string resource, outcome, eTag, lastModified;
+
+    //    if (id[0] == '$')
+    //    {
+    //        // operation
+    //        sc = _fhirStoreManager[store].TypeOperation(
+    //            resourceName,
+    //            id,
+    //            Request.QueryString.ToString(),
+    //            string.Empty,
+    //            string.Empty,
+    //            format,
+    //            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+    //            out resource,
+    //            out outcome);
+    //    }
+    //    else
+    //    {
+    //        // read instance
+    //        sc = _fhirStoreManager[store].InstanceRead(
+    //            resourceName,
+    //            id,
+    //            format,
+    //            summary ?? string.Empty,
+    //            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+    //            string.Empty,
+    //            string.Empty,
+    //            string.Empty,
+    //            out resource,
+    //            out outcome,
+    //            out eTag,
+    //            out lastModified);
+
+    //        if (!string.IsNullOrEmpty(eTag))
+    //        {
+    //            Response.Headers.Add(HeaderNames.ETag, eTag);
+    //        }
+
+    //        if (!string.IsNullOrEmpty(lastModified))
+    //        {
+    //            Response.Headers.Add(HeaderNames.LastModified, lastModified);
+    //        }
+    //    }
+
+    //    Response.ContentType = format;
+    //    Response.StatusCode = (int)sc;
+
+    //    if (!string.IsNullOrEmpty(resource))
+    //    {
+    //        await Response.WriteAsync(resource);
+    //    }
+    //    else if (!string.IsNullOrEmpty(outcome))
+    //    {
+    //        await Response.WriteAsync(outcome);
+    //    }
+    //}
 
     [HttpGet, Route("{store}/{resourceName}/{id}/{opName}")]
     public async Task GetInstanceOperation(
@@ -439,6 +540,70 @@ public class FhirController : ControllerBase
         }
     }
 
+
+    [HttpPost, Route("{store}/${opName}")]
+    [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    public async Task PostSystemOperation(
+        [FromRoute] string store,
+        [FromRoute] string opName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer)
+    {
+        if (!_fhirStoreManager.ContainsKey(store))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, HttpContext.Request);
+
+        // sanity check
+        if ((Request == null) || (Request.Body == null))
+        {
+            System.Console.WriteLine("PostResourceType <<< cannot process a POST without data!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+
+                // re-add the prefix $ character since it was stripped during routing
+
+                HttpStatusCode sc = _fhirStoreManager[store].SystemOperation(
+                        "$" + opName,
+                        Request.QueryString.ToString(),
+                        content,
+                        format,
+                        format,
+                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                        out string resource,
+                        out string outcome);
+ 
+                Response.ContentType = format;
+                Response.StatusCode = (int)sc;
+
+                await AddBody(Response, prefer, resource, outcome);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"PostSystemOperation <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+    }
+
     [HttpPost, Route("{store}/{resourceName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostResourceType(
@@ -472,33 +637,51 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
-                HttpStatusCode sc = _fhirStoreManager[store].InstanceCreate(
-                    resourceName,
-                    content,
-                    Request.ContentType ?? string.Empty,
-                    format,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    string.Empty,
-                    true,
-                    out string resource,
-                    out string outcome,
-                    out string eTag,
-                    out string lastModified,
-                    out string location);
+                HttpStatusCode sc;
+                string resource, outcome;
 
-                if (!string.IsNullOrEmpty(eTag))
+                if (resourceName[0] == '$')
                 {
-                    Response.Headers.Add(HeaderNames.ETag, eTag);
+                    sc = _fhirStoreManager[store].SystemOperation(
+                        resourceName,
+                        Request.QueryString.ToString(),
+                        string.Empty,
+                        string.Empty,
+                        format,
+                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                        out resource,
+                        out outcome);
                 }
-
-                if (!string.IsNullOrEmpty(lastModified))
+                else
                 {
-                    Response.Headers.Add(HeaderNames.LastModified, lastModified);
-                }
+                    sc = _fhirStoreManager[store].InstanceCreate(
+                        resourceName,
+                        content,
+                        Request.ContentType ?? string.Empty,
+                        format,
+                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                        string.Empty,
+                        true,
+                        out resource,
+                        out outcome,
+                        out string eTag,
+                        out string lastModified,
+                        out string location);
 
-                if (!string.IsNullOrEmpty(location))
-                {
-                    Response.Headers.Add(HeaderNames.Location, location);
+                    if (!string.IsNullOrEmpty(eTag))
+                    {
+                        Response.Headers.Add(HeaderNames.ETag, eTag);
+                    }
+
+                    if (!string.IsNullOrEmpty(lastModified))
+                    {
+                        Response.Headers.Add(HeaderNames.LastModified, lastModified);
+                    }
+
+                    if (!string.IsNullOrEmpty(location))
+                    {
+                        Response.Headers.Add(HeaderNames.Location, location);
+                    }
                 }
 
                 Response.ContentType = format;

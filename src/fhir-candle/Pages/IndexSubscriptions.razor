@@ -35,7 +35,19 @@
         <MudList Clickable="true">
             @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
             {
-                <MudListItem Icon="@Icons.Material.Filled.ViewInAr" OnClick="@(() => NavToFhirStore(kvp.Key))">
+                <MudListItem>
+                    <MudTooltip Text="Subscriptions">
+                        <MudFab StartIcon="@Icons.Material.Filled.RssFeed"
+                                @onclick="() => NavToSubscriptions(kvp.Key)"
+                                Size="Size.Small" />
+                    </MudTooltip>
+
+                    <MudTooltip Text="FHIR Store Contents">
+                        <MudFab StartIcon="@Icons.Material.Filled.ViewInAr"
+                                @onclick="() => NavToFhirStore(kvp.Key)"
+                                Size="Size.Small" />
+                    </MudTooltip>
+
                     @kvp.Value.Config.BaseUrl (FHIR @kvp.Value.Config.FhirVersion)
                 </MudListItem>
             }
@@ -52,8 +64,8 @@
         </MudList>
     </MudText>
     <MudText Typo="Typo.body1">
-        Each endpoint also exposes a resource-type-level operation, <code>Bundle/$subscription-hook</code> which
-        receives subscription notifications.
+        Each endpoint also exposes a system-level operation, <code>$subscription-hook</code> which
+        receives subscription notifications for that FHIR version.
     </MudText>
     <MudText Typo="Typo.body1">
         Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
@@ -113,6 +125,11 @@
     private void NavToFhirStore(string name)
     {
         NavigationManager.NavigateTo($"/store?storeName={name}");
+    }
+
+    private void NavToSubscriptions(string name)
+    {
+        NavigationManager.NavigateTo($"/store/ext/subscriptions?storeName={name}");
     }
 
     /// <summary>

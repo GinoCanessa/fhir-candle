@@ -52,7 +52,9 @@ public class SubscriptionConverter
             Id = sub.Id,
             TopicUrl = sub.Criteria,
             ChannelSystem = string.Empty,
-            ChannelCode = sub.Channel.Type.ToString()!,
+            ChannelCode = sub.Channel.Type == null
+                ? string.Empty
+                : Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Channel.Type),
             Endpoint = sub.Channel.Endpoint ?? string.Empty,
             ContentType = sub.Channel.Payload?.ToString() ?? string.Empty,
         };
@@ -278,7 +280,7 @@ public class SubscriptionConverter
         // create our notification bundle
         Bundle bundle = new()
         {
-            Type = Bundle.BundleType.SubscriptionNotification,
+            Type = Bundle.BundleType.History,
             Timestamp = DateTimeOffset.Now,
             Entry = new(),
         };
@@ -406,6 +408,7 @@ public class SubscriptionConverter
 
         // set our status information in our bundle
         bundle.Entry[0].Resource = status;
+        bundle.Entry[0].FullUrl = $"urn:uuid:{Guid.NewGuid().ToString()}";
 
         return bundle;
     }

@@ -16,13 +16,13 @@
         "update"
       ],
       "queryCriteria": {
-        "previous": "status:not=completed",
+        "previous": "status:not=finished",
         "resultForCreate": "test-passes",
-        "current": "status=completed",
+        "current": "status=finished",
         "resultForDelete": "test-fails",
         "requireBoth": true
       },
-      "fhirPathCriteria": "(%previous.empty() | (%previous.status != 'completed')) and (%current.status = 'completed')"
+      "fhirPathCriteria": "(%previous.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')"
     }
   ],
   "canFilterBy": [

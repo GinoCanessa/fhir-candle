@@ -7,7 +7,7 @@
   },
   {
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.version",
-    "valueString" : "1.0.0-fhir.r5"
+    "valueString" : "1.0.0-fhir.r4"
   },
   {
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.name",
@@ -49,7 +49,7 @@
     {
       "extension" : [{
         "url" : "previous",
-        "valueString" : "status:not=completed"
+        "valueString" : "status:not=finished"
       },
       {
         "url" : "resultForCreate",
@@ -57,7 +57,7 @@
       },
       {
         "url" : "current",
-        "valueString" : "status=completed"
+        "valueString" : "status=finished"
       },
       {
         "url" : "resultForDelete",
@@ -71,7 +71,7 @@
     },
     {
       "url" : "fhirPathCriteria",
-      "valueString" : "(%previous.empty() | (%previous.status != 'completed')) and (%current.status = 'completed')"
+      "valueString" : "(%previous.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')"
     }],
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.resourceTrigger"
   },

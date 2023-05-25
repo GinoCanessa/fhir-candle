@@ -53,7 +53,9 @@ public class SubscriptionConverter
             Id = sub.Id,
             TopicUrl = sub.Criteria,
             ChannelSystem = string.Empty,
-            ChannelCode = sub.Channel.Type.ToString()!,
+            ChannelCode = sub.Channel.Type == null
+                ? string.Empty
+                : Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Channel.Type),
             Endpoint = sub.Channel.Endpoint ?? string.Empty,
             ContentType = sub.Channel.Payload?.ToString() ?? string.Empty,
         };
@@ -354,7 +356,7 @@ public class SubscriptionConverter
         // create our notification bundle
         Bundle bundle = new()
         {
-            Type = Bundle.BundleType.SubscriptionNotification,
+            Type = Bundle.BundleType.History,
             Timestamp = DateTimeOffset.Now,
             Entry = new(),
         };
@@ -392,145 +394,143 @@ public class SubscriptionConverter
             },
         };
 
-        throw new NotImplementedException();
+        // add a status placeholder to the bundle
+        bundle.Entry.Add(new Bundle.EntryComponent());
 
-        //Parameters.ParameterComponent statusEventParam = new()
-        //{
-        //    Name = "notification-event",
-        //};
+        HashSet<string> addedResources = new();
 
+        bool isEmpty = contentLevel.Equals("empty", StringComparison.Ordinal);
+        bool isFullResource = contentLevel.Equals("full-resource", StringComparison.Ordinal);
 
-        //if (!Enum.TryParse(subscription.CurrentStatus, out SubscriptionStatusCodes statusCode))
-        //{
-        //    statusCode = SubscriptionStatusCodes.Active;
-        //}
+        // determine behavior of no event numbers
+        if (!eventNumbers.Any())
+        {
+            // query-event should send all
+            if (notificationType.Equals("query-event"))
+            {
+                eventNumbers = subscription.GeneratedEvents.Keys;
+            }
+            // others send the most recent if there is one
+            else if (subscription.GeneratedEvents.Any())
+            {
+                eventNumbers = new long[] { subscription.GeneratedEvents.Keys.Last() };
+            }
+            else
+            {
+                eventNumbers = Array.Empty<long>();
+            }
+        }
 
-        //// create our status resource
-        //SubscriptionStatus status = new()
-        //{
-        //    Subscription = new ResourceReference("Subscription/" + subscription.Id),
-        //    EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
-        //    Status = statusCode,
-        //Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
-        //    NotificationEvent = new(),
-        //};
+        // iterate over the events
+        foreach (long eventNumber in eventNumbers)
+        {
+            if (!subscription.GeneratedEvents.ContainsKey(eventNumber))
+            {
+                continue;
+            }
 
-        //// add a status placeholder to the bundle
-        //bundle.Entry.Add(new Bundle.EntryComponent());
+            SubscriptionEvent se = subscription.GeneratedEvents[eventNumber];
 
-        //HashSet<string> addedResources = new();
+            // check for empty notifications
+            if (isEmpty)
+            {
+                // add just this event number to our status
+                status.Parameter.Add(new()
+                {
+                    Name = "notification-event",
+                    Part = new()
+                    {
+                        new()
+                        {
+                            Name = "event-number",
+                            Value = new FhirString(eventNumber.ToString()),
+                        },
+                        new()
+                        {
+                            Name = "timestamp",
+                            Value = new Instant(se.Timestamp),
+                        }
+                    },
+                });
 
-        //bool isEmpty = contentLevel.Equals("empty", StringComparison.Ordinal);
-        //bool isFullResource = contentLevel.Equals("full-resource", StringComparison.Ordinal);
+                continue;
+            }
 
-        //// determine behavior of no event numbers
-        //if (!eventNumbers.Any())
-        //{
-        //    // query-event should send all
-        //    if (notificationType.Equals("query-event"))
-        //    {
-        //        eventNumbers = subscription.GeneratedEvents.Keys;
-        //    }
-        //    // others send the most recent if there is one
-        //    else if (subscription.GeneratedEvents.Any())
-        //    {
-        //        eventNumbers = new long[] { subscription.GeneratedEvents.Keys.Last() };
-        //    }
-        //    else
-        //    {
-        //        eventNumbers = Array.Empty<long>();
-        //    }
-        //}
+            Resource r = (Resource)se.Focus;
+            string relativeUrl = $"{r.TypeName}/{r.Id}";
 
-        //// iterate over the events
-        //foreach (long eventNumber in eventNumbers)
-        //{
-        //    if (!subscription.GeneratedEvents.ContainsKey(eventNumber))
-        //    {
-        //        continue;
-        //    }
+            // add this event to our status
+            Parameters.ParameterComponent ne = new()
+            {
+                Name = "notification-event",
+                Part = new()
+                {
+                    new()
+                    {
+                        Name = "event-number",
+                        Value = new FhirString(eventNumber.ToString()),
+                    },
+                    new()
+                    {
+                        Name = "timestamp",
+                        Value = new Instant(se.Timestamp),
+                    },
+                    new()
+                    {
+                        Name = "focus",
+                        Value = new ResourceReference(baseUrl + "/" + relativeUrl)
+                    }
+                },
+            };
 
-        //    SubscriptionEvent se = subscription.GeneratedEvents[eventNumber];
+            if (se.AdditionalContext?.Any() ?? false)
+            {
+                ne.Part.AddRange(
+                    se.AdditionalContext.Select(o => new Parameters.ParameterComponent()
+                    {
+                        Name = "additional-context",
+                        Value = new ResourceReference($"{((Resource)o).TypeName}/{((Resource)o).Id}"),
+                    }));
+            }
 
-        //    // check for empty notifications
-        //    if (isEmpty)
-        //    {
-        //        // add just this event number to our status
-        //        status.NotificationEvent.Add(new()
-        //        {
-        //            EventNumber = eventNumber.ToString(),
-        //            Timestamp = se.Timestamp,
-        //        });
+            // add the focus to our bundle
+            if (!addedResources.Contains(relativeUrl))
+            {
+                bundle.Entry.Add(new Bundle.EntryComponent()
+                {
+                    FullUrl = baseUrl + "/" + relativeUrl,
+                    Resource = isFullResource ? r : null,
+                });
 
-        //        // empty notifications do not contain bundle entries
-        //        continue;
-        //    }
+                addedResources.Add(relativeUrl);
+            }
 
-        //    Resource r = (Resource)se.Focus;
-        //    string relativeUrl = $"{r.TypeName}/{r.Id}";
+            // add any additional context
+            if (se.AdditionalContext?.Any() ?? false)
+            {
+                foreach (object ac in se.AdditionalContext)
+                {
+                    Resource acr = (Resource)ac;
+                    string acrRelative = $"{acr.TypeName}/{acr.Id}";
 
-        //    // add this event to our status
-        //    status.NotificationEvent.Add(new()
-        //    {
-        //        EventNumber = eventNumber.ToString(),
-        //        Focus = new ResourceReference(relativeUrl),
-        //        AdditionalContext = (se.AdditionalContext?.Any() ?? false)
-        //            ? se.AdditionalContext.Select(o => new ResourceReference($"{((Resource)o).TypeName}/{((Resource)o).Id}")).ToList()
-        //            : new List<ResourceReference>(),
-        //        Timestamp = se.Timestamp,
-        //    });
+                    if (!addedResources.Contains(acrRelative))
+                    {
+                        bundle.Entry.Add(new Bundle.EntryComponent()
+                        {
+                            FullUrl = baseUrl + "/" + acrRelative,
+                            Resource = isFullResource ? acr : null,
+                        });
 
-        //    // add the focus to our bundle
-        //    if (!addedResources.Contains(relativeUrl))
-        //    {
-        //        bundle.Entry.Add(new Bundle.EntryComponent()
-        //        {
-        //            FullUrl = baseUrl + "/" + relativeUrl,
-        //            Resource = isFullResource ? r : null,
-        //        });
+                        addedResources.Add(acrRelative);
+                    }
+                }
+            }
+        }
 
-        //        addedResources.Add(relativeUrl);
-        //    }
+        // set our status information in our bundle
+        bundle.Entry[0].Resource = status;
+        bundle.Entry[0].FullUrl = $"urn:uuid:{Guid.NewGuid().ToString()}";
 
-        //    // add any additional context
-        //    if (se.AdditionalContext?.Any() ?? false)
-        //    {
-        //        foreach (object ac in se.AdditionalContext)
-        //        {
-        //            Resource acr = (Resource)ac;
-        //            string acrRelative = $"{acr.TypeName}/{acr.Id}";
-
-        //            if (!addedResources.Contains(acrRelative))
-        //            {
-        //                bundle.Entry.Add(new Bundle.EntryComponent()
-        //                {
-        //                    FullUrl = baseUrl + "/" + acrRelative,
-        //                    Resource = isFullResource ? acr : null,
-        //                });
-
-        //                addedResources.Add(acrRelative);
-        //            }
-        //        }
-        //    }
-        //}
-
-        //// set our status information in our bundle
-        //bundle.Entry[0].Resource = status;
-
-        //// serialize our bundle
-        //switch (contentType)
-        //{
-        //    case "xml":
-        //    case "fhir+xml":
-        //    case "application/xml":
-        //    case "application/fhir+xml":
-        //        return bundle.ToXml(_xmlSerializerSettings);
-
-        //    // default to JSON
-        //    case "application/json":
-        //    case "application/fhir+json":
-        //    default:
-        //        return bundle.ToJson(_jsonSerializerSettings);
-        //}
+        return bundle;
     }
 }

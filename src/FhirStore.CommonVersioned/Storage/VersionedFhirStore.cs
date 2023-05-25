@@ -615,7 +615,9 @@ public partial class VersionedFhirStore : IFhirStore
                     {
                         Severity = OperationOutcome.IssueSeverity.Information,
                         Code = OperationOutcome.IssueType.Unknown,
-                        Diagnostics = $"Request processed successfully",
+                        Diagnostics = string.IsNullOrEmpty(message)
+                            ? "Request processed successfully"
+                            : message,
                     },
                 },
             };
@@ -630,7 +632,9 @@ public partial class VersionedFhirStore : IFhirStore
                 {
                     Severity = OperationOutcome.IssueSeverity.Error,
                     Code = OperationOutcome.IssueType.Unknown,
-                    Diagnostics = $"Request failed with status code {sc.ToString()}",
+                    Diagnostics = string.IsNullOrEmpty(message)
+                        ? $"Request failed with status code {sc.ToString()}"
+                        : message,
                 },
             },
         };

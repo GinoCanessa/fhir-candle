@@ -3,6 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using System.Globalization;
+using FhirStore.Extensions;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -185,6 +187,103 @@ public class SubscriptionConverter
                 }
             }
         }
+
+        return true;
+    }
+
+    private string GetPVal(Hl7.Fhir.Model.Parameters param, string name)
+    {
+        Parameters.ParameterComponent? pc = param.Parameter.First(p => p.Name.Equals(name, StringComparison.Ordinal));
+
+        if (pc == null)
+        {
+            return string.Empty;
+        }
+
+        switch (pc.Value)
+        {
+            case ResourceReference valRef:
+                return valRef.Reference?.ToString() ?? string.Empty;
+        }
+
+        return pc.Value.ToString() ?? string.Empty;
+    }
+
+    private string GetPVal(Hl7.Fhir.Model.Parameters.ParameterComponent pc, string name)
+    {
+        if (pc == null)
+        {
+            return string.Empty;
+        }
+
+        switch (pc.Value)
+        {
+            case ResourceReference valRef:
+                return valRef.Reference?.ToString() ?? string.Empty;
+        }
+
+        return pc.Value.ToString() ?? string.Empty;
+    }
+
+    private IEnumerable<ParsedSubscriptionStatus.ParsedNotificationEvent> GetNotEvents(Parameters status)
+    {
+        if (!(status.Parameter?.Any(p => p.Name.Equals("notification-event", StringComparison.Ordinal)) ?? false))
+        {
+            return Array.Empty<ParsedSubscriptionStatus.ParsedNotificationEvent>();
+        }
+
+        List<ParsedSubscriptionStatus.ParsedNotificationEvent> eventList = new();
+
+        foreach (Parameters.ParameterComponent pc in status.Parameter.Where(p => p.Name.Equals("notification-event", StringComparison.Ordinal)))
+        {
+            eventList.Add(new ParsedSubscriptionStatus.ParsedNotificationEvent()
+            {
+                Id = string.Empty,
+                EventNumber = long.TryParse(GetPVal(pc, "event-number"), out long en)
+                            ? en
+                            : null,
+                Timestamp = DateTimeOffset.TryParse(GetPVal(pc, "timestamp"), null, DateTimeStyles.RoundtripKind, out DateTimeOffset dt)
+                            ? dt
+                            : null,
+                FocusReference = GetPVal(pc, "focus"),
+                AdditionalContextReferences =
+                            pc.Part.Where(np => np.Name.Equals("additional-context"))
+                            .Select(ac => (ac.Value as ResourceReference)?.Reference ?? string.Empty)
+                            ?? Array.Empty<string>(),
+            });
+        }
+
+        return eventList.ToArray();
+    }
+
+    /// <summary>Attempts to parse a ParsedSubscriptionStatus from the given object.</summary>
+    /// <param name="subscriptionStatus">The subscription.</param>
+    /// <param name="common">      [out] The common.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryParse(object subscriptionStatus, string bundleId, out ParsedSubscriptionStatus common)
+    {
+        if ((subscriptionStatus == null) ||
+            (subscriptionStatus is not Hl7.Fhir.Model.Parameters status))
+        {
+            common = null!;
+            return false;
+        }
+
+        common = new()
+        {
+            LocalBundleId = status.Id,
+            SubscriptionReference = GetPVal(status, "subscription"),
+            SubscriptionTopicCanonical = GetPVal(status, "topic"),
+            Status = GetPVal(status, "status"),
+            NotificationType =
+                GetPVal(status, "type").TryFhirEnum(out ParsedSubscription.NotificationTypeCodes nt)
+                ? nt
+                : null,
+            EventsSinceSubscriptionStart = long.TryParse(GetPVal(status, "events-since-subscription-start"), out long count)
+                ? count
+                : null,
+            NotificationEvents = GetNotEvents(status),
+        };
 
         return true;
     }

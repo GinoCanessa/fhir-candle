@@ -101,7 +101,7 @@ public class R5TestsPatientLooped : IClassFixture<R5Tests>
 
         for (int i = 0; i < loopCount; i++)
         {
-            _fixture._store.TypeSearch("Patient", search, "application/fhir+json", out string bundle, out string outcome);
+            _fixture._store.TypeSearch("Patient", search, "application/fhir+json", string.Empty, false, out string bundle, out string outcome);
             bundle.Should().NotBeNullOrEmpty();
         }
     }
@@ -167,7 +167,7 @@ public class R5TestsObservation : IClassFixture<R5Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
-        _fixture._store.TypeSearch("Observation", search, "application/fhir+json", out string bundle, out _);
+        _fixture._store.TypeSearch("Observation", search, "application/fhir+json", string.Empty, false, out string bundle, out _);
 
         bundle.Should().NotBeNullOrEmpty();
 
@@ -256,7 +256,7 @@ public class R5TestsPatient : IClassFixture<R5Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
-        _fixture._store.TypeSearch("Patient", search, "application/fhir+json", out string bundle, out _);
+        _fixture._store.TypeSearch("Patient", search, "application/fhir+json", string.Empty, false, out string bundle, out _);
 
         bundle.Should().NotBeNullOrEmpty();
 

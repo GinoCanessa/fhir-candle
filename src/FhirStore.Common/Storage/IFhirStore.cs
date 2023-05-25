@@ -18,7 +18,10 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     event EventHandler<SubscriptionChangedEventArgs>? OnSubscriptionsChanged;
 
     /// <summary>Occurs when on Subscription.</summary>
-    event EventHandler<SubscriptionEventArgs>? OnSubscriptionEvent;
+    event EventHandler<SubscriptionSendEventArgs>? OnSubscriptionSendEvent;
+
+    /// <summary>Occurs when on Subscription.</summary>
+    event EventHandler<SubscriptionReceiveEventArgs>? OnSubscriptionReceiveEvent;
 
     /// <summary>State has changed.</summary>
     void StateHasChanged();
@@ -31,6 +34,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
 
     /// <summary>Gets the metadata for this store.</summary>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
@@ -38,6 +42,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <returns>The metadata.</returns>
     HttpStatusCode GetMetadata(
         string destFormat,
+        bool pretty,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
@@ -48,6 +53,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="summaryFlag">       The summary flag.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="ifMatch">           A match specifying if.</param>
     /// <param name="ifModifiedSince">   if modified since.</param>
     /// <param name="ifNoneMatch">       A match specifying if none.</param>
@@ -61,6 +67,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string id,
         string destFormat,
         string summaryFlag,
+        bool pretty,
         string ifMatch,
         string ifModifiedSince,
         string ifNoneMatch,
@@ -74,6 +81,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="ifNoneExist">       if none exist.</param>
     /// <param name="allowExistingId">   True to allow an existing id.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
@@ -87,6 +95,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string content,
         string sourceFormat,
         string destFormat,
+        bool pretty,
         string ifNoneExist,
         bool allowExistingId,
         out string serializedResource,
@@ -101,6 +110,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="ifMatch">           Criteria that must match to preform the update.</param>
     /// <param name="ifNoneMatch">       Criteria that must NOT match to preform the update.</param>
     /// <param name="allowCreate">       If the update should be allowed to create a new resource.</param>
@@ -116,6 +126,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string content,
         string sourceFormat,
         string destFormat,
+        bool pretty,
         string ifMatch,
         string ifNoneMatch,
         bool allowCreate,
@@ -129,6 +140,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="ifMatch">           A match specifying if.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
@@ -137,6 +149,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string resourceType,
         string id,
         string destFormat,
+        bool pretty,
         string ifMatch,
         out string serializedResource,
         out string serializedOutcome);
@@ -145,6 +158,8 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="resourceType">     Type of the resource.</param>
     /// <param name="queryString">      The query string.</param>
     /// <param name="destFormat">       Destination format.</param>
+    /// <param name="summaryFlag">      Summary-element filtering to apply.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedBundle"> [out] The serialized bundle.</param>
     /// <param name="serializedOutcome">[out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
@@ -152,6 +167,8 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string resourceType,
         string queryString,
         string destFormat,
+        string summaryFlag,
+        bool pretty,
         out string serializedBundle,
         out string serializedOutcome);
 
@@ -161,6 +178,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
@@ -170,6 +188,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string content,
         string sourceFormat,
         string destFormat,
+        bool pretty,
         out string serializedResource,
         out string serializedOutcome);
 
@@ -181,6 +200,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
@@ -191,6 +211,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string content,
         string sourceFormat,
         string destFormat,
+        bool pretty,
         out string serializedResource,
         out string serializedOutcome);
 
@@ -202,6 +223,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
@@ -213,6 +235,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string content,
         string sourceFormat,
         string destFormat,
+        bool pretty,
         out string serializedResource,
         out string serializedOutcome);
 
@@ -222,6 +245,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="subscriptionId">  The subscription id of the subscription the events belong to.</param>
     /// <param name="eventNumbers">    One or more event numbers to include.</param>
     /// <param name="notificationType">Type of notification (e.g., 'notification-event')</param>
+    /// <param name="pretty">          If the output should be 'pretty' formatted.</param>
     /// <param name="contentType">     (Optional) Override for the content type specified in the
     ///  subscription.</param>
     /// <param name="contentLevel">    (Optional) Override for the content level specified in the
@@ -231,6 +255,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string subscriptionId,
         IEnumerable<long> eventNumbers,
         string notificationType,
+        bool pretty,
         string contentType = "",
         string contentLevel = "");
 

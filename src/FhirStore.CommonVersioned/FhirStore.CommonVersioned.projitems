@@ -9,8 +9,6 @@
     <Import_RootNamespace>FhirStore.CommonVersioned</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)Extensions\FhirEnumExtensions.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Extensions\FhirLiteralAttribute.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\SearchParamDefinitionExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ExecutableSubscriptionInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\FhirPathVariableResolver.cs" />

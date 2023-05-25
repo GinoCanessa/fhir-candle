@@ -152,7 +152,7 @@ public class FhirStoreManager : IFhirStoreManager
             }
 
             _storesByController[name].Init(config);
-            //_storesByController[config.ControllerName].OnSubscriptionEvent += FhirStoreManager_OnSubscriptionEvent;
+            //_storesByController[config.ControllerName].OnSubscriptionSendEvent += FhirStoreManager_OnSubscriptionSendEvent;
         }
 
         return Task.CompletedTask;
@@ -184,7 +184,7 @@ public class FhirStoreManager : IFhirStoreManager
 
                 //foreach (IFhirStore store in _storesByController.Values)
                 //{
-                //    store.OnSubscriptionEvent -= FhirStoreManager_OnSubscriptionEvent;
+                //    store.OnSubscriptionSendEvent -= FhirStoreManager_OnSubscriptionSendEvent;
                 //}
             }
 

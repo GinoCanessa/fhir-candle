@@ -151,6 +151,7 @@ public class MetadataJson : IClassFixture<FhirStoreTests>
 
         HttpStatusCode scRead = fhirStore.GetMetadata(
             "application/fhir+json",
+            false,
             out string serializedResource,
             out string serializedOutcome,
             out _,
@@ -199,6 +200,7 @@ public class MetadataXml : IClassFixture<FhirStoreTests>
 
         HttpStatusCode scRead = fhirStore.GetMetadata(
             "application/fhir+xml",
+            false,
             out string serializedResource,
             out string serializedOutcome,
             out _,
@@ -257,6 +259,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             json1,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out serializedResource,
@@ -279,6 +282,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             _id,
             "application/fhir+json",
             string.Empty,
+            false,
             eTag,
             lastModified,
             string.Empty,
@@ -299,6 +303,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             json2,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             string.Empty,
             true,
@@ -321,6 +326,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             _resourceType,
             _id,
             "application/fhir+json",
+            false,
             string.Empty,
             out serializedResource,
             out serializedOutcome);
@@ -333,6 +339,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             _id,
             "application/fhir+json",
             string.Empty,
+            false,
             eTag,
             lastModified,
             string.Empty,
@@ -382,6 +389,7 @@ public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out serializedResource,
@@ -430,6 +438,7 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out serializedResource,

@@ -26,7 +26,6 @@ Note: items are unsorted within their priorities
 [] Save/restore points
 [] History support
 [] `$subscription-hook` operation (system-level)
-[] `_pretty` support
 [] Resource display / edit in UI
 
 ## Mid Priority

@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Extensions;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -78,6 +79,46 @@ public class SubscriptionConverter
 
         return true;
     }
+
+    /// <summary>Attempts to parse a ParsedSubscriptionStatus from the given object.</summary>
+    /// <param name="subscriptionStatus">The subscription.</param>
+    /// <param name="common">      [out] The common.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryParse(object subscriptionStatus, string bundleId, out ParsedSubscriptionStatus common)
+    {
+        if ((subscriptionStatus == null) ||
+            (subscriptionStatus is not Hl7.Fhir.Model.SubscriptionStatus status))
+        {
+            common = null!;
+            return false;
+        }
+
+        common = new()
+        {
+            LocalBundleId = status.Id,
+            SubscriptionReference = status.Subscription?.Reference ?? string.Empty,
+            SubscriptionTopicCanonical = status.Topic ?? string.Empty,
+            Status = status.Status?.ToString() ?? string.Empty,
+            NotificationType =
+                (status.Type?.ToString() ?? string.Empty).TryFhirEnum(out ParsedSubscription.NotificationTypeCodes nt)
+                ? nt
+                : null,
+            EventsSinceSubscriptionStart = status.EventsSinceSubscriptionStart,
+            NotificationEvents = status.NotificationEvent?.Any() ?? false
+                ? status.NotificationEvent.Select(n => new ParsedSubscriptionStatus.ParsedNotificationEvent()
+                    {
+                        Id = n.ElementId ?? string.Empty,
+                        EventNumber = n.EventNumber,
+                        Timestamp = n.Timestamp,
+                        FocusReference = n.Focus?.Reference ?? string.Empty,
+                        AdditionalContextReferences = n.AdditionalContext?.Select(ac => ac.Reference) ?? Array.Empty<string>(),
+                    })
+                : Array.Empty<ParsedSubscriptionStatus.ParsedNotificationEvent>(),
+        };
+
+        return true;
+    }
+
 
     public Hl7.Fhir.Model.Resource StatusForSubscription(
         ParsedSubscription subscription,

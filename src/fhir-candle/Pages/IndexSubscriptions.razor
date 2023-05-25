@@ -44,16 +44,16 @@
     <MudText Typo="Typo.body1">
         Each endpoint will always have the following resources:
         <MudList>
-            <MudListItem><code>Patient</code>: <code>example</code></MudListItem>
+            <MudListItem><code>Patient/example</code></MudListItem>
             <MudListItem>
-                <code>SubscriptionTopic</code>: <code>code-example</code>
+                <code>SubscriptionTopic/encounter-complete</code>
                 with Canonical: <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>
             </MudListItem>
         </MudList>
     </MudText>
     <MudText Typo="Typo.body1">
-        Each endpoint also exposes a system-level operation, <code>$subscription-hook</code> which
-        can be used as an endpoint for receiving subscription notifications.
+        Each endpoint also exposes a resource-type-level operation, <code>Bundle/$subscription-hook</code> which
+        receives subscription notifications.
     </MudText>
     <MudText Typo="Typo.body1">
         Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.

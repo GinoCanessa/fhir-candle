@@ -52,7 +52,7 @@
         if (_store != null)
         {
             _store.OnChanged += Store_OnChanged;
-            _store.OnSubscriptionEvent += Store_OnSubscriptionEvent;
+            _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
             _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
         }
 
@@ -71,7 +71,7 @@
             if (_store != null)
             {
                 _store.OnChanged -= Store_OnChanged;
-                _store.OnSubscriptionEvent -= Store_OnSubscriptionEvent;
+                _store.OnSubscriptionSendEvent -= Store_OnSubscriptionSendEvent;
             }
 
             _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
@@ -79,7 +79,7 @@
             if (_store != null)
             {
                 _store.OnChanged += Store_OnChanged;
-                _store.OnSubscriptionEvent += Store_OnSubscriptionEvent;
+                _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
             }
 
             // notify of store root in case user clicked here directly
@@ -104,7 +104,7 @@
     /// <summary>Event handler. Called by Store for on subscription events.</summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">     Subscription event information.</param>
-    private void Store_OnSubscriptionEvent(object? sender, SubscriptionEventArgs e)
+    private void Store_OnSubscriptionSendEvent(object? sender, SubscriptionSendEventArgs e)
     {
         InvokeAsync(() => StateHasChanged());
     }

@@ -250,6 +250,20 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         switch (source.TypeName)
         {
+            case "Basic":
+                {
+                    if ((source != null) &&
+                        (source is Hl7.Fhir.Model.Basic b) &&
+                        (b.Code?.Coding?.Any() ?? false) &&
+                        (b.Code.Coding.Any(c =>
+                            c.Code.Equals("SubscriptionTopic", StringComparison.Ordinal) &&
+                            c.System.Equals("http://hl7.org/fhir/fhir-types", StringComparison.Ordinal))))
+                    {
+                        _ = TryProcessSubscriptionTopic(source);
+                    }
+                }
+                break;
+
             case "SearchParameter":
                 SetExecutableSearchParameter((SearchParameter)source);
                 break;
@@ -829,7 +843,7 @@ public class ResourceStore<T> : IVersionedResourceStore
                         AdditionalContext = additionalContext.AsEnumerable<object>(),
                     };
 
-                    _store.RegisterEvent(subscriptionId, subEvent);
+                    _store.RegisterSendEvent(subscriptionId, subEvent);
                 }
             }
         }

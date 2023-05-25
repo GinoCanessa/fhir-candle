@@ -105,7 +105,7 @@ public class NotificationManager : INotificationManager
     /// <param name="store">The store.</param>
     /// <param name="e">    Subscription event information.</param>
     /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
-    private async Task<bool> TryNotify(IFhirStore store, SubscriptionEventArgs e)
+    private async Task<bool> TryNotify(IFhirStore store, SubscriptionSendEventArgs e)
     {
         string contents;
 
@@ -116,7 +116,8 @@ public class NotificationManager : INotificationManager
                     contents = store.SerializeSubscriptionEvents(
                                     e.Subscription.Id,
                                     Array.Empty<long>(),
-                                    "handshake");
+                                    "handshake",
+                                    false);
                 }
                 break;
 
@@ -125,7 +126,8 @@ public class NotificationManager : INotificationManager
                     contents = store.SerializeSubscriptionEvents(
                                     e.Subscription.Id,
                                     Array.Empty<long>(),
-                                    "heartbeat");
+                                    "heartbeat",
+                                    false);
                 }
                 break;
 
@@ -139,7 +141,8 @@ public class NotificationManager : INotificationManager
                     contents = store.SerializeSubscriptionEvents(
                                     e.Subscription.Id,
                                     e.NotificationEvents.Select(ne => ne.EventNumber),
-                                    "event-notification");
+                                    "event-notification",
+                                    false);
                 }
                 break;
 
@@ -181,7 +184,7 @@ public class NotificationManager : INotificationManager
     /// <returns>True if it succeeds, false if it fails.</returns>
     private async Task<bool> TryNotifyRestHook(
         IFhirStore store,
-        SubscriptionEventArgs e,
+        SubscriptionSendEventArgs e,
         string contents)
     {
         // auto-pass any notifications to example.org
@@ -271,7 +274,7 @@ public class NotificationManager : INotificationManager
     /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
     private async Task<bool> TryNotifyZulip(
         IFhirStore store,
-        SubscriptionEventArgs e,
+        SubscriptionSendEventArgs e,
         string contents)
     {
         string zulipSite = e.Subscription.Parameters.ContainsKey("site") ? e.Subscription.Parameters["site"].First() : _zulipUrl;
@@ -346,7 +349,7 @@ public class NotificationManager : INotificationManager
     /// <returns>An asynchronous result that yields true if it succeeds, false if it fails.</returns>
     private async Task<bool> TryNotifyEmail(
         IFhirStore store,
-        SubscriptionEventArgs e,
+        SubscriptionSendEventArgs e,
         string contents)
     {
         string from = e.Subscription.Parameters.ContainsKey("from") ? e.Subscription.Parameters["from"].First() : "FHIR Notification";
@@ -449,7 +452,7 @@ public class NotificationManager : INotificationManager
     /// <param name="e">       Subscription event information.</param>
     /// <param name="contents">Serialized contents of the notification.</param>
     /// <returns>A string.</returns>
-    private string BuildEmailMessage(IFhirStore store, SubscriptionEventArgs e)
+    private string BuildEmailMessage(IFhirStore store, SubscriptionSendEventArgs e)
     {
         // TODO: need to build a persistent opt-out
 
@@ -471,7 +474,7 @@ public class NotificationManager : INotificationManager
     /// <param name="e">       Subscription event information.</param>
     /// <param name="contents">Serialized contents of the notification.</param>
     /// <returns>A string.</returns>
-    private string BuildZulipMessage(IFhirStore store, SubscriptionEventArgs e, string contents)
+    private string BuildZulipMessage(IFhirStore store, SubscriptionSendEventArgs e, string contents)
     {
         // TODO: need to build a persistent opt-out
 
@@ -534,7 +537,7 @@ public class NotificationManager : INotificationManager
         {
             // register our event handlers
             store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
-            store.OnSubscriptionEvent += Store_OnSubscriptionEvent;
+            store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
         }
 
         // start our heartbeat timer
@@ -592,7 +595,7 @@ public class NotificationManager : INotificationManager
     /// <summary>Event handler. Called by Store for on subscription events.</summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">     Subscription event information.</param>
-    private void Store_OnSubscriptionEvent(object? sender, SubscriptionEventArgs e)
+    private void Store_OnSubscriptionSendEvent(object? sender, SubscriptionSendEventArgs e)
     {
         if (!_storeManager.ContainsKey(e.Tenant.ControllerName))
         {

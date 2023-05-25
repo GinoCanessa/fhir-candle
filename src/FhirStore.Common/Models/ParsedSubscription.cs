@@ -4,6 +4,7 @@
 // </copyright>
 
 using System.ComponentModel;
+using FhirStore.Extensions;
 
 namespace FhirStore.Models;
 
@@ -20,31 +21,35 @@ public class ParsedSubscription
         /// The status was generated as part of the setup or verification of a communications channel.
         /// (system: http://hl7.org/fhir/subscription-notification-type)
         /// </summary>
-        //[EnumLiteral("handshake", "http://hl7.org/fhir/subscription-notification-type"), Description("Handshake")]
+        [FhirLiteral("handshake")]
         Handshake,
+
         /// <summary>
         /// The status was generated to perform a heartbeat notification to the subscriber.
         /// (system: http://hl7.org/fhir/subscription-notification-type)
         /// </summary>
-        //[EnumLiteral("heartbeat", "http://hl7.org/fhir/subscription-notification-type"), Description("Heartbeat")]
+        [FhirLiteral("heartbeat")]
         Heartbeat,
+
         /// <summary>
         /// The status was generated for an event to the subscriber.
         /// (system: http://hl7.org/fhir/subscription-notification-type)
         /// </summary>
-        //[EnumLiteral("event-notification", "http://hl7.org/fhir/subscription-notification-type"), Description("Event Notification")]
+        [FhirLiteral("event-notification")]
         EventNotification,
+
         /// <summary>
         /// The status was generated in response to a status query/request.
         /// (system: http://hl7.org/fhir/subscription-notification-type)
         /// </summary>
-        //[EnumLiteral("query-status", "http://hl7.org/fhir/subscription-notification-type"), Description("Query Status")]
+        [FhirLiteral("query-status")]
         QueryStatus,
+
         /// <summary>
         /// The status was generated in response to an event query/request.
         /// (system: http://hl7.org/fhir/subscription-notification-type)
         /// </summary>
-        //[EnumLiteral("query-event", "http://hl7.org/fhir/subscription-notification-type"), Description("Query Event")]
+        [FhirLiteral("query-event")]
         QueryEvent,
     }
 

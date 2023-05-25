@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Models;
 using FhirStore.Operations;
 using System.Net;
 
@@ -29,10 +30,10 @@ public class OpSubscriptionHook : IFhirOperation
     public bool AllowPost => true;
 
     /// <summary>Gets a value indicating whether we allow system level.</summary>
-    public bool AllowSystemLevel => true;
+    public bool AllowSystemLevel => false;
 
     /// <summary>Gets a value indicating whether we allow resource level.</summary>
-    public bool AllowResourceLevel => false;
+    public bool AllowResourceLevel => true;
 
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
     public bool AllowInstanceLevel => false;
@@ -62,6 +63,41 @@ public class OpSubscriptionHook : IFhirOperation
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation)
     {
-        throw new NotImplementedException();
+        if ((resourceStore == null) ||
+            (bodyResource == null) ||
+            (!(bodyResource is Hl7.Fhir.Model.Bundle bundle)) ||
+            (!bundle.Entry.Any()) ||
+            (bundle.Entry.First().Resource == null))
+        {
+            responseResource = null;
+            responseOutcome = null;
+            contentLocation = string.Empty;
+
+            return HttpStatusCode.BadRequest;
+        }
+
+        ParsedSubscriptionStatus? status = store.ParseNotificationBundle(bundle);
+
+        if (status == null)
+        {
+            responseResource = null;
+            responseOutcome = null;
+            contentLocation = string.Empty;
+
+            return HttpStatusCode.BadRequest;
+        }
+
+        string originalId = bundle.Id;
+
+        // store this bundle in our store
+        resourceStore.InstanceCreate(bundle, false);
+
+        // register the notification received event
+        store.RegisterReceiveEvent(bundle.Id, status);
+
+        responseResource = null;
+        responseOutcome = store.BuildOutcomeForRequest(HttpStatusCode.OK, "Subscription Notification Received");
+        contentLocation = string.Empty;
+        return HttpStatusCode.OK;
     }
 }

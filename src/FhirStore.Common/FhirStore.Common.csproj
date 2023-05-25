@@ -11,10 +11,12 @@
     <Compile Remove="Operations\**" />
     <EmbeddedResource Remove="Operations\**" />
     <None Remove="Operations\**" />
+    <None Remove="Extensions\" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Storage\" />
+    <Folder Include="Extensions\" />
   </ItemGroup>
 
   <ItemGroup>

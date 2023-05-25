@@ -122,7 +122,8 @@ public class FhirController : ControllerBase
     [HttpGet, Route("{store}/metadata")]
     public async Task GetMetadata(
         [FromRoute] string store,
-        [FromQuery(Name = "_format")] string? format)
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty)
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
@@ -135,6 +136,7 @@ public class FhirController : ControllerBase
 
         HttpStatusCode sc = _fhirStoreManager[store].GetMetadata(
             format,
+            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string resource,
             out string outcome,
             out string eTag,
@@ -165,7 +167,8 @@ public class FhirController : ControllerBase
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromQuery(Name = "_pretty")] string? pretty)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -189,6 +192,7 @@ public class FhirController : ControllerBase
                 string.Empty,
                 string.Empty,
                 format,
+                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                 out resource,
                 out outcome);
         }
@@ -200,6 +204,7 @@ public class FhirController : ControllerBase
                 id,
                 format,
                 summary ?? string.Empty,
+                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                 string.Empty,
                 string.Empty,
                 string.Empty,
@@ -239,7 +244,8 @@ public class FhirController : ControllerBase
         [FromRoute] string id,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromQuery(Name = "_pretty")] string? pretty)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -268,6 +274,7 @@ public class FhirController : ControllerBase
             string.Empty,
             string.Empty,
             format,
+            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out resource,
             out outcome);
 
@@ -292,7 +299,8 @@ public class FhirController : ControllerBase
         [FromRoute] string id,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromQuery(Name = "_pretty")] string? pretty)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -328,6 +336,7 @@ public class FhirController : ControllerBase
                     content,
                     format,
                     format,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out resource,
                     out outcome);
             }
@@ -364,7 +373,8 @@ public class FhirController : ControllerBase
         [FromRoute] string resourceName,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromQuery(Name = "_pretty")] string? pretty)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -399,6 +409,7 @@ public class FhirController : ControllerBase
                     content,
                     format,
                     format,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out resource,
                     out outcome);
             }
@@ -434,6 +445,7 @@ public class FhirController : ControllerBase
         [FromRoute] string store,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
@@ -465,6 +477,7 @@ public class FhirController : ControllerBase
                     content,
                     Request.ContentType ?? string.Empty,
                     format,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     string.Empty,
                     true,
                     out string resource,
@@ -515,6 +528,7 @@ public class FhirController : ControllerBase
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
@@ -547,6 +561,7 @@ public class FhirController : ControllerBase
                     content,
                     HttpContext.Request.ContentType ?? string.Empty,
                     format,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     string.Empty,
                     string.Empty,
                     true,
@@ -596,6 +611,7 @@ public class FhirController : ControllerBase
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
@@ -611,6 +627,7 @@ public class FhirController : ControllerBase
             resourceName,
             id,
             format,
+            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             string.Empty,
             out string resource,
             out string outcome);
@@ -626,6 +643,7 @@ public class FhirController : ControllerBase
         [FromRoute] string store,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
         [FromQuery(Name = "_summary")] string? summary)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
@@ -641,6 +659,8 @@ public class FhirController : ControllerBase
             resourceName,
             Request.QueryString.ToString(),
             format,
+            summary ?? string.Empty,
+            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string results,
             out string outcome);
 
@@ -659,6 +679,7 @@ public class FhirController : ControllerBase
         [FromRoute] string store,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
         [FromQuery(Name = "_summary")] string? summary)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
@@ -689,6 +710,8 @@ public class FhirController : ControllerBase
                     resourceName,
                     content,
                     format,
+                    summary ?? string.Empty,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out string results,
                     out string outcome);
 

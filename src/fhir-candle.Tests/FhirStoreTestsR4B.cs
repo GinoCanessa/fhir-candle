@@ -65,6 +65,7 @@ public class FhirStoreTestsR4B: IDisposable
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out string serializedResource,
@@ -85,6 +86,7 @@ public class FhirStoreTestsR4B: IDisposable
             "Patient-multiplebirth",
             "application/fhir+json",
             string.Empty,
+            false,
             eTag,
             lastModified,
             string.Empty,
@@ -113,6 +115,7 @@ public class FhirStoreTestsR4B: IDisposable
         // read the metadata
         HttpStatusCode scRead = fhirStore.GetMetadata(
             "application/fhir+json",
+            false,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
@@ -149,6 +152,7 @@ public class FhirStoreTestsR4B: IDisposable
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out serializedResource,
@@ -160,6 +164,7 @@ public class FhirStoreTestsR4B: IDisposable
         // read the metadata again
         scRead = fhirStore.GetMetadata(
             "application/fhir+json",
+            false,
             out serializedResource,
             out serializedOutcome,
             out eTag,

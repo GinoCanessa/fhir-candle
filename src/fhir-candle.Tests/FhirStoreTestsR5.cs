@@ -68,6 +68,7 @@ public class FhirStoreTestsR5: IDisposable
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out string serializedResource,
@@ -88,6 +89,7 @@ public class FhirStoreTestsR5: IDisposable
             "Patient-multiplebirth",
             "application/fhir+json",
             string.Empty,
+            false,
             eTag,
             lastModified,
             string.Empty,
@@ -116,6 +118,7 @@ public class FhirStoreTestsR5: IDisposable
         // read the metadata
         HttpStatusCode scRead = fhirStore.GetMetadata(
             "application/fhir+json",
+            false,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
@@ -152,6 +155,7 @@ public class FhirStoreTestsR5: IDisposable
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out serializedResource,
@@ -163,6 +167,7 @@ public class FhirStoreTestsR5: IDisposable
         // read the metadata again
         scRead = fhirStore.GetMetadata(
             "application/fhir+json",
+            false,
             out serializedResource,
             out serializedOutcome,
             out eTag,
@@ -225,6 +230,7 @@ public class FhirStoreTestsR5: IDisposable
             "encounter-create-interaction",
             "application/fhir+json",
             string.Empty,
+            false,
             eTag,
             lastModified,
             string.Empty,
@@ -299,7 +305,8 @@ public class FhirStoreTestsR5: IDisposable
         string notification = fhirStore.SerializeSubscriptionEvents(
             "encounter-complete-fhirpath",
             new long[1] { 1 },
-            "notification-event");
+            "notification-event",
+            false);
 
         notification.Should().NotBeEmpty();
 
@@ -370,7 +377,8 @@ public class FhirStoreTestsR5: IDisposable
         string notification = fhirStore.SerializeSubscriptionEvents(
             "encounter-create-interaction",
             Array.Empty<long>(),
-            "notification-event");
+            "notification-event",
+            false);
 
         notification.Should().NotBeEmpty();
 
@@ -448,7 +456,8 @@ public class FhirStoreTestsR5: IDisposable
         string notification = fhirStore.SerializeSubscriptionEvents(
             "encounter-complete-fhirpath",
             Array.Empty<long>(),
-            "notification-event");
+            "notification-event",
+            false);
 
         notification.Should().NotBeEmpty();
 
@@ -473,7 +482,8 @@ public class FhirStoreTestsR5: IDisposable
         notification = fhirStore.SerializeSubscriptionEvents(
             "encounter-complete-fhirpath",
             Array.Empty<long>(),
-            "notification-event");
+            "notification-event",
+            false);
 
         notification.Should().NotBeEmpty();
 
@@ -552,7 +562,8 @@ public class FhirStoreTestsR5: IDisposable
         string notification = fhirStore.SerializeSubscriptionEvents(
             "encounter-complete-query",
             Array.Empty<long>(),
-            "notification-event");
+            "notification-event",
+            false);
 
         notification.Should().NotBeEmpty();
 
@@ -577,7 +588,8 @@ public class FhirStoreTestsR5: IDisposable
         notification = fhirStore.SerializeSubscriptionEvents(
             "encounter-complete-query",
             Array.Empty<long>(),
-            "notification-event");
+            "notification-event",
+            false);
 
         notification.Should().NotBeEmpty();
 
@@ -621,6 +633,7 @@ public class FhirStoreTestsR5: IDisposable
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             true,
             out serializedResource,
@@ -660,6 +673,7 @@ public class FhirStoreTestsR5: IDisposable
             json,
             "application/fhir+json",
             "application/fhir+json",
+            false,
             string.Empty,
             string.Empty,
             true,

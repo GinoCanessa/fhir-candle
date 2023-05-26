@@ -111,7 +111,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
         NavTracker?.NotifyNav(
             ResourceType,
             $"/store/resource-list?store={StoreName}&type={ResourceType}",
@@ -138,7 +138,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
             NavTracker?.NotifyNav(
                 ResourceType,
                 $"/store/resource-list?store={StoreName}&type={ResourceType}",

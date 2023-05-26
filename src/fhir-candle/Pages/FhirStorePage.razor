@@ -120,7 +120,7 @@
             TimeSpan.Zero,
             TimeSpan.FromSeconds(10));
 
-        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
     }
 
     /// <summary>Timer refresh.</summary>
@@ -159,7 +159,7 @@
                 _store.OnChanged += FhirStore_OnChanged;
             }
 
-            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
         }
     }
 

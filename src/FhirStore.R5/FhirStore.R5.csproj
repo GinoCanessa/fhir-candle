@@ -11,7 +11,7 @@
   <Import Project="..\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems" Label="Shared" />
 
   <ItemGroup>
-    <PackageReference Include="Hl7.Fhir.R5" Version="5.1.0" />
+    <PackageReference Include="Hl7.Fhir.R5" Version="5.2.0" />
   </ItemGroup>
 
   <ItemGroup>

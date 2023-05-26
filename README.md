@@ -22,7 +22,7 @@ Note: items are unsorted within their priorities
 [] Persistent 'unsubscribe' list
 [] Finish search evaluators (remaining modifier combinations)
 [] Save/restore points
-[] History support
+[] Versioned Resource support
 [] Resource display / edit in UI
 [] Subscription RI scenario/walkthrough
 [] Resource editor design improvements
@@ -31,19 +31,18 @@ Note: items are unsorted within their priorities
 [] SMART support
 [] Batch / transaction support
 [] Proxy header support
-[] Versioned Resource support
-[] Conditional interaction support (e.g., `conditional-update`)
+[] Conditional interaction support (e.g., `conditional-update`, `if-match`)
 [] OpenAPI generation
 [] Compartments
 [] Contained resources
+[] Subscription websocket support
 
 ## The long tail
 [] Non-terminology validation
 [] Link to terminiology server for full validation
 [] `_filter` support
-[] In-line definitions for named queries
+[] Runtime named queries
 [] GraphQL support
-[] FHIR Messaging support
 
 ## More Information
 

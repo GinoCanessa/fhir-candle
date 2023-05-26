@@ -774,7 +774,12 @@ public partial class VersionedFhirStore : IFhirStore
                             if (pretty)
                             {
                                 using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
+                                    { 
+                                        SkipValidation = true,
+                                        Indented = true,
+                                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                                    }))
                                 {
                                     _jsonSerializerFull.Serialize(instance, writer);
                                     writer.Flush();
@@ -788,7 +793,12 @@ public partial class VersionedFhirStore : IFhirStore
                             if (pretty)
                             {
                                 using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
+                                {
+                                    SkipValidation = true,
+                                    Indented = true,
+                                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                                }))
                                 {
                                     _jsonSerializerSummary.Serialize(instance, writer);
                                     writer.Flush();
@@ -802,7 +812,12 @@ public partial class VersionedFhirStore : IFhirStore
                             if (pretty)
                             {
                                 using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
+                                {
+                                    SkipValidation = true,
+                                    Indented = true,
+                                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                                }))
                                 {
                                     _jsonSerializerText.Serialize(instance, writer);
                                     writer.Flush();
@@ -816,7 +831,12 @@ public partial class VersionedFhirStore : IFhirStore
                             if (pretty)
                             {
                                 using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
+                                {
+                                    SkipValidation = true,
+                                    Indented = true,
+                                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                                }))
                                 {
                                     _jsonSerializerData.Serialize(instance, writer);
                                     writer.Flush();

@@ -25,6 +25,7 @@ Note: items are unsorted within their priorities
 [] History support
 [] Resource display / edit in UI
 [] Subscription RI scenario/walkthrough
+[] Resource editor design improvements
 
 ## Mid Priority
 [] SMART support

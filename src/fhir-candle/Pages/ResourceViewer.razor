@@ -1,4 +1,4 @@
-﻿@page "/store/ext/resource-viewer"
+﻿@page "/store/resource-viewer"
 
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using BlazorMonaco
@@ -15,12 +15,24 @@
 
 <MudStack>
     <MudPaper>
-        <MudText>test</MudText>
+        <MudGrid Spacing="2" Justify="Justify.FlexStart">
+            <MudItem xs="2">
+                <MudSelect T="ResourceFormatCodes"
+                           Label="Format"
+                           Value="@_resourceFormatCode"
+                           ValueChanged="@OnUserFormatChanged"
+                           FullWidth="false"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="@ResourceFormatCodes.JSON" />
+                    <MudSelectItem Value="@ResourceFormatCodes.XML" />
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
     </MudPaper>
 
     <StandaloneCodeEditor @ref="_editor"
         Id="resource-editor"
-        ConstructionOptions="ResourceConstructionOptions"
+        ConstructionOptions="ResourceConstructorOptions"
         OnDidInit="EditorOnDidInit" />
 
 </MudStack>
@@ -32,7 +44,7 @@
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
-    [SupplyParameterFromQuery(Name = "storeName")]
+    [SupplyParameterFromQuery(Name = "store")]
     public string StoreName { get; set; } = "";
 
     /// <summary>Gets or sets the identifier of the resource.</summary>
@@ -51,15 +63,25 @@
     /// <summary>The editor.</summary>
     private StandaloneCodeEditor? _editor = null;
 
+    /// <summary>Values that represent resource format codes.</summary>
+    private enum ResourceFormatCodes
+    {
+        JSON,
+        XML,
+    }
+
+    /// <summary>The resource format code.</summary>
+    private ResourceFormatCodes _resourceFormatCode { get; set; } = ResourceFormatCodes.JSON;
+
     /// <summary>Resource construction options.</summary>
     /// <param name="editor">The editor.</param>
     /// <returns>The StandaloneEditorConstructionOptions.</returns>
-    private StandaloneEditorConstructionOptions ResourceConstructionOptions(StandaloneCodeEditor editor)
+    private StandaloneEditorConstructionOptions ResourceConstructorOptions(StandaloneCodeEditor editor)
     {
         return new StandaloneEditorConstructionOptions
             {
                 Language = "json",
-                Theme = "vs-dark",
+                Theme = (NavTracker?.IsDarkMode ?? true) ? "vs-dark" : "vs-light",
                 GlyphMargin = false,
                 Value = "",
             };
@@ -69,13 +91,19 @@
     /// <returns>An asynchronous result.</returns>
     private async Task EditorOnDidInit()
     {
-        //await JS.InvokeVoidAsync("blazorMonaco.editor.setModelLanguage", "blazorMonaco.editor.getModel()", "json");
-        //await JS.InvokeVoidAsync("blazorMonaco.editor.setModelLanguage", _editor!.Id, "blazorMonaco.editor.getModel()", "json");
+        await UpdateTheme();
+        await JS.InvokeVoidAsync("setMonacoEditorResize", _editor!.Id);
+        await LoadResourceContent();
+    }
 
+    /// <summary>Loads resource content.</summary>
+    /// <returns>An asynchronous result.</returns>
+    private async Task LoadResourceContent()
+    {
         _ = _store.InstanceRead(
             ResourceType,
             Id,
-            "application/fhir+json",
+            (_resourceFormatCode == ResourceFormatCodes.JSON) ? "application/fhir+json" : "application/fhir+xml",
             string.Empty,
             true,
             string.Empty,
@@ -86,7 +114,53 @@
             out _,
             out _);
 
-        _ = _editor?.SetValue(content);
+        //await _editor!.SetValue(System.Text.RegularExpressions.Regex.Unescape(content));
+        await _editor!.SetValue(content);
+    }
+
+    /// <summary>Updates the theme.</summary>
+    /// <returns>An asynchronous result.</returns>
+    private async Task UpdateTheme()
+    {
+        if (_editor == null)
+        {
+            return;
+        }
+
+        // need to get the editor model uri
+        TextModel tm = await _editor.GetModel();
+        await JS.InvokeVoidAsync(
+            "blazorMonaco.editor.setTheme",
+            (NavTracker?.IsDarkMode ?? true) ? "vs-dark" : "vs-light");
+    }
+
+    /// <summary>Sets hightlight language.</summary>
+    private async Task SetHightlightLanguage()
+    {
+        if (_editor == null)
+        {
+            return;
+        }
+
+        // need to get the editor model uri
+        TextModel tm = await _editor.GetModel();
+        await JS.InvokeVoidAsync(
+            "blazorMonaco.editor.setModelLanguage",
+            tm.Uri,
+            (_resourceFormatCode == ResourceFormatCodes.JSON) ? "json" : "xml");
+    }
+
+    private void OnUserFormatChanged(ResourceFormatCodes format)
+    {
+        _resourceFormatCode = format;
+        UpdateContent();
+    }
+
+    /// <summary>Updates this object.</summary>
+    private void UpdateContent()
+    {
+        _ = SetHightlightLanguage();
+        _ = LoadResourceContent();
     }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
@@ -101,15 +175,28 @@
         {
         }
 
-        // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
-        NavTracker?.NotifyNav(
-            "Resource Editor",
-            $"/store/ext/resource-editor?storeName={StoreName}&type={ResourceType}&id={Id}",
-            2);
+        if (NavTracker != null)
+        {
+            NavTracker.OnThemeChanged += NavTracker_OnThemeChanged;
+
+            // notify of store root in case user clicked here directly
+            NavTracker.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+            NavTracker.NotifyNav(
+                ResourceType,
+                $"/store/resource-list?store={StoreName}&type={ResourceType}",
+                2);
+            NavTracker.NotifyNav(
+                Id,
+                $"/store/resource-editor?store={StoreName}&type={ResourceType}&id={Id}",
+                3);
+        }
 
         NavigationManager.LocationChanged += HandleLocationChanged;
+    }
 
+    private void NavTracker_OnThemeChanged(object? sender, EventArgs e)
+    {
+        _ = UpdateTheme();
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -117,7 +204,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/resource-editor", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/store/resource-editor", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -129,12 +216,19 @@
             {
             }
 
-            // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
-            NavTracker?.NotifyNav(
-                "Resource Editor",
-                $"/store/ext/resource-editor?storeName={StoreName}&type={ResourceType}&id={Id}",
-                2);
+            if (NavTracker != null)
+            {
+                // notify of store root in case user clicked here directly
+                NavTracker.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+                NavTracker.NotifyNav(
+                    ResourceType,
+                    $"/store/resource-list?store={StoreName}&type={ResourceType}",
+                    2);
+                NavTracker.NotifyNav(
+                    Id,
+                    $"/store/resource-editor?store={StoreName}&type={ResourceType}&id={Id}",
+                    3);
+            }
         }
     }
 
@@ -145,6 +239,11 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= HandleLocationChanged;
+
+        if (NavTracker != null)
+        {
+            NavTracker.OnThemeChanged -= NavTracker_OnThemeChanged;
+        }
 
         if (_store != null)
         {

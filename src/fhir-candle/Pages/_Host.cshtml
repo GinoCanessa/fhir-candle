@@ -36,6 +36,12 @@
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
 
+    <script type="text/javascript">
+        function setMonacoEditorResize(id) {
+            window.onresize = () => { blazorMonaco.editor.layout(id, 0); }
+        }
+    </script>
+
     <script src="_framework/blazor.server.js"></script>
 
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>

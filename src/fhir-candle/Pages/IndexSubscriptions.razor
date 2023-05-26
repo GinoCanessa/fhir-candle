@@ -22,11 +22,11 @@
             </MudListItem>
             <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
                 FHIR <MudLink Href="https://hl7.org/fhir/R4B" Target="_" Underline="Underline.Always">R4B</MudLink>
-                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html">Backport IG</MudLink>
+                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">Backport IG</MudLink>
             </MudListItem>
             <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
                 FHIR <MudLink Href="https://hl7.org/fhir/R4" Target="_" Underline="Underline.Always">R4</MudLink>
-                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html">Backport IG</MudLink>
+                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">Backport IG</MudLink>
             </MudListItem>
         </MudList>
     </MudText>
@@ -60,12 +60,41 @@
         </MudList>
     </MudText>
     <MudText Typo="Typo.body1">
-        Each endpoint will always have the following resources:
+        Each endpoint will always have the:
         <MudList>
-            <MudListItem><code>Patient/example</code></MudListItem>
             <MudListItem>
-                <code>SubscriptionTopic/encounter-complete</code>
-                with Canonical: <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>
+                A patient resource with id <code>example</code>:
+                <MudChipSet>
+                    @foreach (string storeName in @StoreManager.Keys.OrderBy(k => k))
+                    {
+                        <MudChip OnClick="@(() => NavToPatientExample(storeName))">
+                            @storeName/Patient/example
+                        </MudChip>
+                    }
+                </MudChipSet>
+            </MudListItem>
+
+            <MudListItem>
+                A Subscription Topic with id <code>encounter-complete</code>
+                and Canonical: <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>
+
+                <MudChipSet>
+                    @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
+                    {
+                        @if (kvp.Value.Config.FhirVersion == TenantConfiguration.SupportedFhirVersions.R4)
+                        {
+                            <MudChip OnClick="@(() => NavToTopicExample(kvp.Key, "Basic"))">
+                                @kvp.Key/Basic/encounter-complete
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip OnClick="@(() => NavToTopicExample(kvp.Key, "SubscriptionTopic"))">
+                                @kvp.Key/SubscriptionTopic/encounter-complete
+                            </MudChip>
+                        }
+                    }
+                </MudChipSet>
             </MudListItem>
         </MudList>
     </MudText>
@@ -132,21 +161,36 @@
     /// <param name="name">The name.</param>
     private void NavToFhirStore(string name)
     {
-        NavigationManager.NavigateTo($"/store?storeName={name}");
+        NavigationManager.NavigateTo($"/store?store={name}");
     }
 
     /// <summary>Navigation to local subscriptions.</summary>
     /// <param name="name">The name.</param>
     private void NavToLocalSubscriptions(string name)
     {
-        NavigationManager.NavigateTo($"/store/ext/subscriptions-local?storeName={name}");
+        NavigationManager.NavigateTo($"/store/ext/subscriptions-local?store={name}");
     }
 
     /// <summary>Navigation to received subscriptions.</summary>
     /// <param name="name">The name.</param>
     private void NavToReceivedSubscriptions(string name)
     {
-        NavigationManager.NavigateTo($"/store/ext/subscriptions-received?storeName={name}");
+        NavigationManager.NavigateTo($"/store/ext/subscriptions-received?store={name}");
+    }
+
+    /// <summary>Navigation to patient example.</summary>
+    /// <param name="name">The name.</param>
+    private void NavToPatientExample(string name)
+    {
+        NavigationManager.NavigateTo($"/store/resource-viewer?store={name}&type=Patient&id=example");
+    }
+
+    /// <summary>Navigation to subscription topic.</summary>
+    /// <param name="name">        The name.</param>
+    /// <param name="resourceType">Type of the resource.</param>
+    private void NavToTopicExample(string name, string resourceType)
+    {
+        NavigationManager.NavigateTo($"/store/resource-viewer?store={name}&type={resourceType}&id=encounter-complete");
     }
 
     /// <summary>

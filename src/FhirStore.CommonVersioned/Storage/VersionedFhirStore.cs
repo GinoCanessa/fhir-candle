@@ -21,7 +21,8 @@ using static fhir.candle.Search.SearchDefinitions;
 using System.Collections;
 using System.Collections.Concurrent;
 using FhirStore.Operations;
-using System.Net.Mime;
+using System.Text.Json;
+using System.Xml;
 
 namespace FhirStore.Storage;
 
@@ -748,6 +749,17 @@ public partial class VersionedFhirStore : IFhirStore
                             break;
                     }
 
+                    if (pretty)
+                    {
+                        using (MemoryStream ms = new MemoryStream())
+                        using (System.Xml.XmlWriter writer = XmlWriter.Create(ms, new XmlWriterSettings(){ Indent = true}))
+                        {
+                            _xmlSerializer.Serialize(instance, writer, serializationFilter);
+                            writer.Flush();
+                            return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                        }
+                    }
+
                     return _xmlSerializer.SerializeToString(instance, serializationFilter);
                 }
 
@@ -759,15 +771,59 @@ public partial class VersionedFhirStore : IFhirStore
                         case "":
                         case "false":
                         default:
+                            if (pretty)
+                            {
+                                using (MemoryStream ms = new MemoryStream())
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                {
+                                    _jsonSerializerFull.Serialize(instance, writer);
+                                    writer.Flush();
+                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                }
+                            }
+
                             return _jsonSerializerFull.SerializeToString(instance);
 
                         case "true":
+                            if (pretty)
+                            {
+                                using (MemoryStream ms = new MemoryStream())
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                {
+                                    _jsonSerializerSummary.Serialize(instance, writer);
+                                    writer.Flush();
+                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                }
+                            }
+
                             return _jsonSerializerSummary.SerializeToString(instance);
 
                         case "text":
+                            if (pretty)
+                            {
+                                using (MemoryStream ms = new MemoryStream())
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                {
+                                    _jsonSerializerText.Serialize(instance, writer);
+                                    writer.Flush();
+                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                }
+                            }
+
                             return _jsonSerializerText.SerializeToString(instance);
 
                         case "data":
+                            if (pretty)
+                            {
+                                using (MemoryStream ms = new MemoryStream())
+                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions() { Indented = true }))
+                                {
+                                    _jsonSerializerData.Serialize(instance, writer);
+                                    writer.Flush();
+                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                }
+                            }
+
                             return _jsonSerializerData.SerializeToString(instance);
                     }
                 }

@@ -72,21 +72,21 @@
 
     private void NavToFhirStore(string name)
     {
-        NavigationManager.NavigateTo($"/store?storeName={name}");
+        NavigationManager.NavigateTo($"/store?store={name}");
     }
 
     /// <summary>Navigation to local subscriptions.</summary>
     /// <param name="name">The name.</param>
     private void NavToLocalSubscriptions(string name)
     {
-        NavigationManager.NavigateTo($"/store/ext/subscriptions-local?storeName={name}");
+        NavigationManager.NavigateTo($"/store/ext/subscriptions-local?store={name}");
     }
 
     /// <summary>Navigation to received subscriptions.</summary>
     /// <param name="name">The name.</param>
     private void NavToReceivedSubscriptions(string name)
     {
-        NavigationManager.NavigateTo($"/store/ext/subscriptions-received?storeName={name}");
+        NavigationManager.NavigateTo($"/store/ext/subscriptions-received?store={name}");
     }
 
     /// <summary>

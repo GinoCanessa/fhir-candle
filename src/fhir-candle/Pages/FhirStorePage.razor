@@ -18,6 +18,13 @@
         <MudSpacer />
         <MudSwitch Color="Color.Info" @bind-Checked="hideEmptyResources" Label="Hide empty" />
         <MudSpacer />
+        <MudTooltip Text="Refresh Contents">
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Info" OnClick="HandleRefresh" />
+        </MudTooltip>
+        <MudTooltip Text="Toggle auto-refresh (10 seconds)">
+            <MudSwitch Color="Color.Info" @bind-Checked="autoRefresh" Label="Auto-refresh" />
+        </MudTooltip>
+        <MudSpacer />
         <MudTextField @bind-Value="@resourceFilter" Label="Filter" DebounceInterval="100" OnDebounceIntervalElapsed="HandleResourceFilterChange" />
     </ToolBarContent>
     <ColGroup>
@@ -27,12 +34,14 @@
     </ColGroup>
     <HeaderContent>
         <MudTh></MudTh>
-        <MudTh>Resource Name</MudTh>
+        <MudTh>Resource Type</MudTh>
         <MudTh>Count</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd></MudTd>
-        <MudTd DataLabel="Resource Name">@context.Key</MudTd>
+        <MudTd DataLabel="Resource Type">
+            <MudLink Href="@($"/store/resource-list?store={StoreName}&type={context.Key}")" Underline="Underline.Always">@context.Key</MudLink>
+        </MudTd>
         <MudTd DataLabel="Count">@context.Value.Count</MudTd>
     </RowTemplate>
 </MudTable>
@@ -44,7 +53,7 @@
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
-    [SupplyParameterFromQuery(Name = "storeName")]
+    [SupplyParameterFromQuery(Name = "store")]
     public string StoreName { get; set; } = "";
 
     private IFhirStore _store = null!;
@@ -54,6 +63,12 @@
 
     /// <summary>True to hide or false to show empty resources.</summary>
     private bool hideEmptyResources = true;
+
+    /// <summary>True to automatically refresh.</summary>
+    private bool autoRefresh = true;
+
+    /// <summary>The refresh timer.</summary>
+    private System.Threading.Timer? _refreshTimer = null;
 
     /// <summary>The resource search string.</summary>
     private string resourceFilter = string.Empty;
@@ -99,7 +114,30 @@
             _store.OnChanged += FhirStore_OnChanged;
         }
 
-        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+        _refreshTimer = new Timer(
+            TimerRefresh,
+            null,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(10));
+
+        NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+    }
+
+    /// <summary>Timer refresh.</summary>
+    /// <param name="state">The state.</param>
+    private void TimerRefresh(object? state)
+    {
+        if (autoRefresh)
+        {
+            HandleRefresh();
+        }
+    }
+
+    /// <summary>Handles a user refresh request.</summary>
+    private void HandleRefresh()
+    {
+        _displayTable?.UpdateSelection();
+        InvokeAsync(() => StateHasChanged());
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -121,7 +159,7 @@
                 _store.OnChanged += FhirStore_OnChanged;
             }
 
-            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
+            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
         }
     }
 
@@ -139,6 +177,9 @@
     /// </summary>
     public void Dispose()
     {
+        _refreshTimer?.Change(Timeout.Infinite, 0);
+        _refreshTimer?.Dispose();
+
         if (_store != null)
         {
             _store.OnChanged -= FhirStore_OnChanged;

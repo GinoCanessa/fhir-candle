@@ -51,6 +51,10 @@
 
 @code {
 
+    /// <summary>Occurs when On Changed.</summary>
+    public event EventHandler<EventArgs>? OnThemeChanged;
+
+    /// <summary>The theme.</summary>
     private MudTheme _theme = new()
     {
         Typography = new()
@@ -63,9 +67,11 @@
         }
     };
 
+    /// <summary>True if is dark mode, false if not.</summary>
     private bool _isDarkMode = true;
 
-    private bool IsDarkMode
+    /// <summary>Gets or sets a value indicating whether this object is dark mode.</summary>
+    public bool IsDarkMode
     {
         get
         {
@@ -77,18 +83,33 @@
             if (_isDarkMode != value)
             {
                 _isDarkMode = value;
-                try
-                {
-                    BrowserStore.SetAsync("darkMode", _isDarkMode);
-                }
-                catch(Exception)
-                {
-                    // ignore
-                }
+                ThemeHasChanged();
             }
         }
     }
 
+    /// <summary>Theme has changed.</summary>
+    private void ThemeHasChanged()
+    {
+        try
+        {
+            BrowserStore.SetAsync("darkMode", _isDarkMode);
+        }
+        catch (Exception)
+        {
+            // ignore
+        }
+
+        EventHandler<EventArgs>? handler = OnThemeChanged;
+
+        if (handler != null)
+        {
+            handler(this, new());
+        }
+    }
+
+
+    /// <summary>The crumbs.</summary>
     private List<BreadcrumbItem> _crumbs = new()
     {
         new BreadcrumbItem("FHIR Cache", "#"),

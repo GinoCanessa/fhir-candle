@@ -49,7 +49,7 @@
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
-    [SupplyParameterFromQuery(Name = "storeName")]
+    [SupplyParameterFromQuery(Name = "store")]
     public string StoreName { get; set; } = "";
 
     private IFhirStore _store = null!;
@@ -70,7 +70,7 @@
 
         // notify of store root in case user clicked here directly
         NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?storeName=" + StoreName, 2);
+        NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?store=" + StoreName, 2);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -97,8 +97,8 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?storeName=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?storeName=" + StoreName, 2);
+            NavTracker?.NotifyNav($"FHIR Store {StoreName}", "/store?store=" + StoreName, 1);
+            NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?store=" + StoreName, 2);
         }
     }
 

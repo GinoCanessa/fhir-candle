@@ -17,6 +17,7 @@ using fhir.candle.Services;
 using FhirStore.Models;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
@@ -221,7 +222,34 @@ public static partial class Program
 
             Dictionary<string, TenantConfiguration> tenants = BuildTeantConfigurations(config);
 
-            WebApplicationBuilder builder = WebApplication.CreateBuilder();
+            WebApplicationBuilder builder = null!;
+
+            // when packaging as a dotnet tool, we need to do some directory shennangians for the static content root
+            string root = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory) ?? string.Empty;
+            if (!string.IsNullOrEmpty(root))
+            {
+                string webroot = Path.Combine(root, "..", "..", "..", "staticwebassets");
+
+                if (Directory.Exists(webroot))
+                {
+                    builder = WebApplication.CreateBuilder(new WebApplicationOptions()
+                    {
+                        WebRootPath = webroot,
+                    });
+                }
+            }
+
+            if (builder == null)
+            {
+                builder = WebApplication.CreateBuilder();
+            }
+
+            StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
+
+            //builder.WebHost.UseWebRoot("wwwroot");
+
+
+            builder.WebHost.UseStaticWebAssets();
 
             builder.Services.AddCors();
 
@@ -258,7 +286,6 @@ public static partial class Program
 
             builder.WebHost.UseUrls(localUrl);
             //builder.WebHost.UseStaticWebAssets();
-            StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 
             WebApplication app = builder.Build();
 
@@ -276,6 +303,10 @@ public static partial class Program
 
             if (!config.NoGui)
             {
+                //app.MapWhen(ctx => !ctx.Request.Path
+                //    .StartsWithSegments("/_content"),
+                //        subApp => subApp.UseStaticFiles(new StaticFileOptions() { }));
+
                 //app.MapWhen(ctx => !ctx.Request.Path
                 //    .StartsWithSegments("/_framework"),
                 //        subApp => subApp.UseStaticFiles(new StaticFileOptions() {  }));

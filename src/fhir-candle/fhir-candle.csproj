@@ -7,7 +7,7 @@
 		<RootNamespace>fhir.candle</RootNamespace>
 		<StartupObject>fhir.candle.Program</StartupObject>
 		<!--<VersionPrefix>0.0.1</VersionPrefix>-->
-		<VersionPrefix>0.0.1-beta.2</VersionPrefix>
+		<VersionPrefix>0.0.1-beta.3</VersionPrefix>
 		<Version>$(VersionPrefix)</Version>
 		<AssemblyVersion>0.0.1.1</AssemblyVersion>
 		<FileVersion>0.0.1.1</FileVersion>
@@ -62,8 +62,8 @@
 
 	<ItemGroup>
 	  <PackageReference Include="MailKit" Version="4.0.0" />
-	  <PackageReference Include="MudBlazor" Version="6.3.0" />
-	  <PackageReference Include="BlazorMonaco" Version="3.0.0" />
+	  <PackageReference Include="MudBlazor" Version="6.3.0" IncludeAssets="all" />
+	  <PackageReference Include="BlazorMonaco" Version="3.0.0" IncludeAssets="all" />
 	  <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
 	  <PackageReference Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
 	  <PackageReference Include="zulip-cs-lib" Version="0.0.1-alpha.6" />
@@ -81,6 +81,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="..\..\fhirData\**\*.json" Pack="true" PackagePath="fhirData\%(RecursiveDir)%(FileName)%(Extension)">
+		<!--<None Include="..\..\fhirData\**\*.json" Pack="true">-->
 			<Link>fhirData\%(RecursiveDir)%(FileName)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<IncludeInPackage>true</IncludeInPackage>
@@ -91,6 +92,22 @@
 	    <Link>README.md</Link>
 	  </None>
 	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="bin\Release\net7.0\publish\wwwroot\**\*.*" Pack="true" PackagePath="staticwebassets\%(RecursiveDir)%(FileName)%(Extension)">
+			<Link>wwwroot\_content\%(RecursiveDir)%(FileName)%(Extension)</Link>
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+			<IncludeInPackage>true</IncludeInPackage>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Include Update="wwwroot\css\monaco.css" Pack="false">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Include>
+	</ItemGroup>
+
+
 	<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
 		<ItemGroup>
 			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4'">

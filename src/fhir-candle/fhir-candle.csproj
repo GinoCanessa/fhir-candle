@@ -11,7 +11,7 @@
 		<Version>$(VersionPrefix)</Version>
 		<AssemblyVersion>0.0.1.1</AssemblyVersion>
 		<FileVersion>0.0.1.1</FileVersion>
-<!--		<IsPackable>true</IsPackable>
+		<IsPackable>true</IsPackable>
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>fhir-candle</ToolCommandName>
 		<PackageOutputPath>..\..\nupkg</PackageOutputPath>
@@ -20,7 +20,10 @@
 		<PackageProjectUrl>https://github.com/GinoCanessa/fhir-candle</PackageProjectUrl>
 		<RepositoryType>git</RepositoryType>
 		<RepositoryUrl>https://github.com/GinoCanessa/fhir-candle</RepositoryUrl>
-		<Authors>GinoCanessa</Authors>-->
+		<Authors>GinoCanessa</Authors>
+		<Title>fhir-candle</Title>
+		<PackageTags>fhir;server;</PackageTags>
+		<NeutralLanguage>en</NeutralLanguage>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'candle' " />
@@ -76,10 +79,11 @@
 	  <None Remove="Models\" />
 	</ItemGroup>
 	<ItemGroup>
-		<Content Include="..\..\fhirData\**\*.json">
+		<None Include="..\..\fhirData\**\*.json" Pack="true" PackagePath="fhirData\%(RecursiveDir)%(FileName)%(Extension)">
 			<Link>fhirData\%(RecursiveDir)%(FileName)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
+			<IncludeInPackage>true</IncludeInPackage>
+		</None>
 	</ItemGroup>
 	<ItemGroup>
 	  <None Include="..\..\README.md" Pack="true" PackagePath="\">

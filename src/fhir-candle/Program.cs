@@ -256,6 +256,7 @@ public static partial class Program
             string localUrl = $"http://localhost:{config.ListenPort}";
 
             builder.WebHost.UseUrls(localUrl);
+            builder.WebHost.UseStaticWebAssets();
 
             WebApplication app = builder.Build();
 

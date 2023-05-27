@@ -8,6 +8,18 @@ fhir-candle is a small in-memory FHIR server that can be used for testing and de
 
 ## Get Started
 
+[Install .NET 7 or newer](https://get.dot.net) and run this command:
+
+```
+dotnet tool install --global fhir-candle
+```
+
+Start a FHIR server and open the browser by running
+
+```
+dotnet fhir-candle -o
+```
+
 
 ### Cloning this repository
 

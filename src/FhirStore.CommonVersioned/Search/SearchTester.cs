@@ -134,8 +134,7 @@ public class SearchTester
 
             if (sp.ParamType == SearchParamType.Composite)
             {
-                // TODO: Firely is missing composite definitions, need to either load the packages myself or submit fixes
-                //ignored.Add(sp);
+                // TODO: Firely added composite definitions, need to finish implementation
                 continue;
 
 #pragma warning disable CS0162 // Unreachable code detected

@@ -1,30 +1,45 @@
 # fhir-candle
-When a small FHIR will do!
+When you need a small FHIR.
 
 fhir-candle is a small in-memory FHIR server that can be used for testing and development. It is NOT intended to be used for production workloads.
 
 
 # Documentation
 
-## Running this software
+## Get Started
 
-### As a dotnet tool
 
 ### Cloning this repository
 
 To run the default server from the command line:
-* `dotnet run --project src/fhir-candle/fhir-candle.csproj`
+```
+dotnet run --project src/fhir-candle/fhir-candle.csproj
+```
 
 To pass arguments when using `dotnet run`, add an extra `--`.  For example, to see help:
-* `dotnet run --project src/fhir-candle/fhir-candle.csproj -- --help`
+```
+dotnet run --project src/fhir-candle/fhir-candle.csproj -- --help
+```
 
 To build a release version of the project:
-* `dotnet build src/fhir-candle/fhir-candle.csproj -c Release`
+```
+dotnet build src/fhir-candle/fhir-candle.csproj -c Release
+```
+
 
 The output of the release build can be run (from the root directory of the repo)
-* on all platforms: `dotnet  ./src/fhir-candle/bin/Release/net7.0/fhir-candle.dll`
-* on Windows: `.\src\fhir-candle\bin\Release\net7.0\fhir-candle.exe`
-* on Linux/MacOs: `./src/fhir-candle/bin/Release/net7.0/fhir-candle`
+* on all platforms
+```
+dotnet  ./src/fhir-candle/bin/Release/net7.0/fhir-candle.dll
+```
+* on Windows:
+```
+.\src\fhir-candle\bin\Release\net7.0\fhir-candle.exe
+```
+* on Linux/MacOs:
+```
+./src/fhir-candle/bin/Release/net7.0/fhir-candle
+```
 
 ### FHIR Tenants
 
@@ -51,8 +66,11 @@ load resources from the specified path.
 ### Subscriptions Reference Implementation
 
 This project also contains the reference stack for FHIR Subscriptions.  To use the default landing page
-of the subscriptions RI, the following arguments can be used:
-* `--fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --default-page index-subscriptions`
+of the subscriptions RI, the following command can be used:
+```
+fhir-candle --fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --default-page index-subscriptions
+```
+
 
 # To-Do
 Note: items are unsorted within their priorities
@@ -73,6 +91,7 @@ Note: items are unsorted within their priorities
 * Resource display / edit in UI
 * Subscription RI scenario/walkthrough
 * Resource editor design improvements
+* Composite search parameters
 
 ## Mid Priority
 * SMART support

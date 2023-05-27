@@ -3,11 +3,15 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using System;
 using System.CommandLine;
 using System.CommandLine.Binding;
 using System.CommandLine.Invocation;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 using fhir.candle.Models;
 using fhir.candle.Services;
 using FhirStore.Models;
@@ -17,6 +21,7 @@ using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using MudBlazor.Services;
 
 namespace fhir.candle;
@@ -55,9 +60,14 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<int>("Listen_Port", _defaultListenPort),
             "Listen port for the server");
 
+        Option<bool?> optOpenBrowser = new(
+            aliases: new[] { "--open-browser", "-o" },
+            getDefaultValue: () => configuration.GetValue<bool>("Open_Browser", false),
+            "Open a browser once the server starts.");
+
         Option<int?> optMaxResourceCount = new(
             aliases: new[] { "--max-resources", "-m" },
-            getDefaultValue: () => null,
+            getDefaultValue: () => configuration.GetValue<int?>("Max_Resources", null),
             "Maximum number of resources allowed per tenant.");
 
         Option<bool?> optNoGui = new(
@@ -67,7 +77,7 @@ public static partial class Program
 
         Option<string> optDefaultPage = new(
             name:  "--default-page",
-            getDefaultValue: () => "index-candle",
+            getDefaultValue: () => configuration.GetValue<string>("Default_Page", "index-candle")!,
             "Default index page to route to");
 
         Option<string?> optSourceDirectory = new(
@@ -134,6 +144,7 @@ public static partial class Program
         {
             optPublicUrl,
             optListenPort,
+            optOpenBrowser,
             optMaxResourceCount,
             optNoGui,
             optDefaultPage,
@@ -159,6 +170,7 @@ public static partial class Program
             {
                 PublicUrl = context.ParseResult.GetValueForOption(optPublicUrl) ?? string.Empty,
                 ListenPort = context.ParseResult.GetValueForOption(optListenPort) ?? _defaultListenPort,
+                OpenBrowser = context.ParseResult.GetValueForOption(optOpenBrowser) ?? false,
                 MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
                 NoGui = context.ParseResult.GetValueForOption(optNoGui) ?? false,
                 DefaultIndexPage = context.ParseResult.GetValueForOption(optDefaultPage) ?? string.Empty,
@@ -266,7 +278,13 @@ public static partial class Program
             }
 
             // run the server
-            await app.RunAsync(cancellationToken);
+            //await app.RunAsync(cancellationToken);
+            _ = app.StartAsync();
+
+            //_ = app.RunAsync(cancellationToken);
+            AfterServerStart(app, config);
+            await app.WaitForShutdownAsync(cancellationToken);
+
 
             return 0;
         }
@@ -279,6 +297,43 @@ public static partial class Program
             Console.WriteLine($"fhir-candle <<< caught exception: {ex.Message}");
             return -1;
         }
+    }
+
+    private static void AfterServerStart(WebApplication app, ServerConfiguration config)
+    {
+        Console.WriteLine("Press CTRL+C to exit");
+
+        if (config.OpenBrowser == true)
+        {
+            string url = $"http://localhost:{config.ListenPort}";
+
+            LaunchBrowser(url);
+        }
+    }
+
+    private static void LaunchBrowser(string url)
+    {
+        ProcessStartInfo psi = new();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            psi.FileName = "open";
+            psi.ArgumentList.Add(url);
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            psi.FileName = "xdg-open";
+            psi.ArgumentList.Add(url);
+        }
+        else
+        {
+            psi.FileName = "cmd";
+            psi.ArgumentList.Add("/C");
+            psi.ArgumentList.Add("start");
+            psi.ArgumentList.Add(url);
+        }
+
+        Process.Start(psi);
     }
 
     /// <summary>Builds an enumeration of teant configurations for this application.</summary>

@@ -14,6 +14,8 @@ public class ServerConfiguration
     /// <summary>Gets or sets the listen port.</summary>
     public required int ListenPort { get; set; }
 
+    public bool OpenBrowser { get; set; } = false;
+
     /// <summary>Gets or sets the number of maximum resources.</summary>
     public int MaxResourceCount { get; set; } = 0;
 

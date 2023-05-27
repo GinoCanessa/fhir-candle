@@ -1001,12 +1001,8 @@ public class ResourceStore<T> : IVersionedResourceStore
             Expression = sp.Expression,
             Target = VersionedShims.CopyTargetsToRt(sp.Target),
             Type = (SearchParamType)sp.Type!,
+            Component = sp.Component?.Select(cp => new ModelInfo.SearchParamComponent(cp.Definition, cp.Expression)).ToArray(),
         };
-
-        if (sp.Component.Any())
-        {
-            spDefinition.CompositeParams = sp.Component.Select(cp => cp.Definition).ToArray();
-        }
 
         foreach (ResourceType rt in VersionedShims.CopyTargetsToRt(sp.Base) ?? Array.Empty<ResourceType>())
         {
@@ -1064,34 +1060,35 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         _searchParameters.Add(spDefinition.Name, spDefinition);
 
-        // check for not having a matching search parameter resource
-        if (!_store.TryResolve($"SearchParameter/{_resourceName}-{spDefinition.Name}", out ITypedElement? _))
-        {
-            SearchParameter sp = new()
-            {
-                Id = $"{_resourceName}-{spDefinition.Name}",
-                Name = spDefinition.Name,
-                Code = spDefinition.Name,
-                Url = spDefinition.Url,
-                Description = spDefinition.Description,
-                Expression = spDefinition.Expression,
-                Target = VersionedShims.CopyTargetsNullable(spDefinition.Target),
-                Type = spDefinition.Type,
-            };
+        //// check for not having a matching search parameter resource
+        //if (!_store.TryResolve($"SearchParameter/{_resourceName}-{spDefinition.Name}", out ITypedElement? _))
+        //{
+        //    SearchParameter sp = new()
+        //    {
+        //        Id = $"{_resourceName}-{spDefinition.Name}",
+        //        Name = spDefinition.Name,
+        //        Code = spDefinition.Name,
+        //        Url = spDefinition.Url,
+        //        Description = spDefinition.Description,
+        //        Expression = spDefinition.Expression,
+        //        Target = VersionedShims.CopyTargetsNullable(spDefinition.Target),
+        //        Type = spDefinition.Type,
+        //    };
 
-            if (spDefinition.CompositeParams?.Any() ?? false)
-            {
-                sp.Component = new();
+        //    if (spDefinition.Component?.Any() ?? false)
+        //    {
+        //        sp.Component = new();
 
-                foreach (string composite in spDefinition.CompositeParams)
-                {
-                    sp.Component.Add(new()
-                    {
-                        Definition = composite,
-                    });
-                }
-            }
-        }
+        //        foreach (ModelInfo.SearchParamComponent component in spDefinition.Component)
+        //        {
+        //            sp.Component.Add(new()
+        //            {
+        //                Definition = component.Definition,
+        //                Expression = component.Expression,
+        //            });
+        //        }
+        //    }
+        //}
     }
 
     /// <summary>

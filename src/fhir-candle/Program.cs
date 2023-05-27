@@ -19,6 +19,7 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -256,7 +257,8 @@ public static partial class Program
             string localUrl = $"http://localhost:{config.ListenPort}";
 
             builder.WebHost.UseUrls(localUrl);
-            builder.WebHost.UseStaticWebAssets();
+            //builder.WebHost.UseStaticWebAssets();
+            StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 
             WebApplication app = builder.Build();
 
@@ -274,6 +276,14 @@ public static partial class Program
 
             if (!config.NoGui)
             {
+                //app.MapWhen(ctx => !ctx.Request.Path
+                //    .StartsWithSegments("/_framework"),
+                //        subApp => subApp.UseStaticFiles(new StaticFileOptions() {  }));
+
+                //app.MapWhen(ctx => !ctx.Request.Path
+                //    .StartsWithSegments("/_blazor"),
+                //        subApp => subApp.UseStaticFiles());
+
                 app.MapBlazorHub();
                 app.MapFallbackToPage("/_Host");
             }

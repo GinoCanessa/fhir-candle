@@ -24,6 +24,7 @@
 		<Title>fhir-candle</Title>
 		<PackageTags>fhir;server;</PackageTags>
 		<NeutralLanguage>en</NeutralLanguage>
+		<!--<StaticWebAssetBasePath>ui</StaticWebAssetBasePath>-->
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'candle' " />

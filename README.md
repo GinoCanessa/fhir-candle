@@ -17,9 +17,8 @@ dotnet tool install --global fhir-candle
 Start a FHIR server and open the browser by running
 
 ```
-dotnet fhir-candle -o
+fhir-candle -o
 ```
-
 
 ### Cloning this repository
 
@@ -40,15 +39,15 @@ dotnet build src/fhir-candle/fhir-candle.csproj -c Release
 
 
 The output of the release build can be run (from the root directory of the repo)
-* on all platforms
+* on all platforms:
 ```
-dotnet  ./src/fhir-candle/bin/Release/net7.0/fhir-candle.dll
+dotnet ./src/fhir-candle/bin/Release/net7.0/fhir-candle.dll
 ```
-* on Windows:
+* if you built on Windows:
 ```
 .\src\fhir-candle\bin\Release\net7.0\fhir-candle.exe
 ```
-* on Linux/MacOs:
+* if you built on Linux or MacOs:
 ```
 ./src/fhir-candle/bin/Release/net7.0/fhir-candle
 ```

@@ -228,7 +228,9 @@ public static partial class Program
             string root = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory) ?? string.Empty;
             if (!string.IsNullOrEmpty(root))
             {
-                string webroot = Path.Combine(root, "..", "..", "..", "staticwebassets");
+                string webroot = FindRelativeDir(root, "staticwebassets", false);
+
+                //string webroot = Path.Combine(root, "..", "..", "..", "staticwebassets");
 
                 if (Directory.Exists(webroot))
                 {
@@ -435,7 +437,8 @@ public static partial class Program
             }
             else
             {
-                string relativeDir = FindRelativeDir(config.SourceDirectory, false);
+                // look for a relative directory, starting in the running directory
+                string relativeDir = FindRelativeDir(string.Empty, config.SourceDirectory, false);
 
                 if (!string.IsNullOrEmpty(relativeDir))
                 {
@@ -471,10 +474,11 @@ public static partial class Program
     /// <param name="thowIfNotFound">(Optional) True to thow if not found.</param>
     /// <returns>The found FHIR directory.</returns>
     public static string FindRelativeDir(
+        string startDir,
         string dirName,
         bool thowIfNotFound = true)
     {
-        string currentDir = Path.GetDirectoryName(AppContext.BaseDirectory) ?? string.Empty;
+        string currentDir = string.IsNullOrEmpty(startDir) ? Path.GetDirectoryName(AppContext.BaseDirectory) ?? string.Empty : startDir;
         string testDir = Path.Combine(currentDir, dirName);
 
         while (!Directory.Exists(testDir))

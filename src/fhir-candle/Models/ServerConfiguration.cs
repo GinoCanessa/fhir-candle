@@ -8,6 +8,13 @@ namespace fhir.candle.Models;
 /// <summary>A server configuration.</summary>
 public class ServerConfiguration
 {
+    public enum UiModes
+    {
+        Default,
+        None,
+        SubscriptionsRI,
+    }
+
     /// <summary>Gets or sets URL of the public.</summary>
     public string PublicUrl { get; set; } = string.Empty;
 
@@ -19,11 +26,8 @@ public class ServerConfiguration
     /// <summary>Gets or sets the number of maximum resources.</summary>
     public int MaxResourceCount { get; set; } = 0;
 
-    /// <summary>Gets or sets a value indicating whether to not load the GUI.</summary>
-    public bool NoGui { get; set; } = false;
-
-    /// <summary>Gets or sets the default index page.</summary>
-    public string DefaultIndexPage { get; set; } = string.Empty;
+    /// <summary>Gets or sets the UI Mode.</summary>
+    public UiModes UiMode { get; set; } = UiModes.Default;
 
     /// <summary>Gets or sets the pathname of the source directory.</summary>
     public string? SourceDirectory { get; set; } = null;

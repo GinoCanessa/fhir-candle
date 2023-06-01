@@ -13,109 +13,165 @@
 </MudAlert>
 
 <MudPaper Class="pa-4 ma-2" Square="true">
-    <MudText Typo="Typo.h6">Subscriptions Reference Implementation</MudText>
-    <MudText Typo="Typo.body1">
-        This software is a reference implementation for Topic-Based FHIR Subscriptions.
-        It currently implements functionality across several FHIR versions:
-        <MudList>
-            <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
-                FHIR <MudLink Href="https://hl7.org/fhir/R5" Target="_" Underline="Underline.Always">R5</MudLink>
-                via the <MudLink Href="http://hl7.org/fhir/R5/subscriptions.html" Target="_" Underline="Underline.Always">Subscriptions Framework</MudLink>
-            </MudListItem>
-            <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
-                FHIR <MudLink Href="https://hl7.org/fhir/R4B" Target="_" Underline="Underline.Always">R4B</MudLink>
-                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">Backport IG</MudLink>
-            </MudListItem>
-            <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
-                FHIR <MudLink Href="https://hl7.org/fhir/R4" Target="_" Underline="Underline.Always">R4</MudLink>
-                and the <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">Backport IG</MudLink>
-            </MudListItem>
-        </MudList>
-    </MudText>
-    <MudText Typo="Typo.body1">
-        This system currently exposes the following FHIR endpoints:
-        <MudList Clickable="true">
-            @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
-            {
-                <MudListItem>
-                    <MudTooltip Text="Local Subscriptions (Send)" Placement="Placement.Right">
-                        <MudFab StartIcon="@Icons.Material.Filled.North"
-                                @onclick="() => NavToLocalSubscriptions(kvp.Key)"
-                                Size="Size.Small" />
-                    </MudTooltip>
+    <MudText Typo="Typo.h6">FHIR Endpoints</MudText>
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
+        {
+            <MudTabPanel Text="@kvp.Key">
+                @switch (kvp.Value.Config.FhirVersion)
+                {
+                    case TenantConfiguration.SupportedFhirVersions.R4:
+                        <MudText Typo="Typo.body1">
+                            FHIR @kvp.Value.Config.FhirVersion endpoint at <code>@kvp.Value.Config.BaseUrl</code>
+                            <sup>
+                                <button onclick="@($"navigator.clipboard.writeText('{kvp.Value.Config.BaseUrl}')")">
+                                    <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                </button>
+                            </sup>
+                        </MudText>
+                        <br />
+                        <MudText Typo="Typo.body1">
+                            This endpoint uses FHIR <MudLink Href="https://hl7.org/fhir/R4" Target="_" Underline="Underline.Always">R4</MudLink>
+                            and Subscriptions via the
+                            <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">Subscriptions Backport IG</MudLink>
+                        </MudText>
+                        break;
 
-                    <MudTooltip Text="Received Notifications" Placement="Placement.Right">
-                        <MudFab StartIcon="@Icons.Material.Filled.South"
-                                @onclick="() => NavToReceivedSubscriptions(kvp.Key)"
-                                Size="Size.Small" />
-                    </MudTooltip>
+                    case TenantConfiguration.SupportedFhirVersions.R4B:
+                        <MudText Typo="Typo.body1">
+                            FHIR @kvp.Value.Config.FhirVersion endpoint at <code>@kvp.Value.Config.BaseUrl</code>
+                            <sup>
+                                <button onclick="@($"navigator.clipboard.writeText('{kvp.Value.Config.BaseUrl}')")">
+                                    <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                </button>
+                            </sup>
+                        </MudText>
+                        <br />
+                        <MudText Typo="Typo.body1">
+                            This endpoint uses FHIR <MudLink Href="https://hl7.org/fhir/R4B" Target="_" Underline="Underline.Always">R4B</MudLink>
+                            and Subscriptions via the
+                            <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">Subscriptions Backport IG</MudLink>
+                        </MudText>
+                        break;
 
-                    <MudTooltip Text="FHIR Store Contents" Placement="Placement.Right">
-                        <MudFab StartIcon="@Icons.Material.Filled.ViewInAr"
-                                @onclick="() => NavToFhirStore(kvp.Key)"
-                                Size="Size.Small" />
-                    </MudTooltip>
+                    case TenantConfiguration.SupportedFhirVersions.R5:
+                        <MudText Typo="Typo.body1">
+                            FHIR @kvp.Value.Config.FhirVersion endpoint at <code>@kvp.Value.Config.BaseUrl</code>
+                            <sup>
+                                <button onclick="@($"navigator.clipboard.writeText('{kvp.Value.Config.BaseUrl}')")">
+                                    <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                </button>
+                            </sup>
+                        </MudText>
+                        <br />
+                        <MudText Typo="Typo.body1">
+                            This endpoint uses FHIR <MudLink Href="https://hl7.org/fhir/R5" Target="_" Underline="Underline.Always">R5</MudLink>
+                            and Subscriptions via the
+                            <MudLink Href="http://hl7.org/fhir/R5/subscriptions.html" Target="_" Underline="Underline.Always">Subscriptions Framework</MudLink>
+                        </MudText>
+                        break;
+                }
 
-                    @kvp.Value.Config.BaseUrl
-                    <button onclick="@($"navigator.clipboard.writeText('{kvp.Value.Config.BaseUrl}')")">
-                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL"/>
-                    </button>
-                    (FHIR @kvp.Value.Config.FhirVersion)
-                </MudListItem>
-            }
-        </MudList>
-    </MudText>
-    <MudText Typo="Typo.body1">
-        Each endpoint will always have the:
-        <MudList>
-            <MudListItem>
-                A patient resource with id <code>example</code>:
-                <MudChipSet>
-                    @foreach (string storeName in @StoreManager.Keys.OrderBy(k => k))
+                <MudList>
+                    <MudListItem>
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                        <MudLink Href="@($"/store?store={kvp.Key}")"
+                                 Underline="Underline.Always">FHIR Contents</MudLink>: FHIR resources in this tenant
+                    </MudListItem>
+
+                    <MudListItem>
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                        <MudLink Href="@($"/store/ext/subscriptions-local?store={kvp.Key}")"
+                                 Underline="Underline.Always">Local Notifications</MudLink>: outgoing Subscription notifications from this server
+                    </MudListItem>
+
+                    <MudListItem>
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                        <MudLink Href="@($"/store/ext/subscriptions-received?store={kvp.Key}")"
+                                 Underline="Underline.Always">Received Notifications</MudLink>: incoming notifications received by this server
+                    </MudListItem>
+                </MudList>
+
+                <MudText Typo="Typo.body1">
+                    The endpoint contains some immutable records for testing:
+                </MudText>
+
+                <MudList>
+                    <MudListItem Typo="Typo.body1">
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                        <MudLink Href="@($"/store/resource-viewer?store={kvp.Key}&type=Patient&id=example")"
+                                 Underline="Underline.Always">Patient/example</MudLink>:
+                        An example patient, loaded from the FHIR examples.
+                    </MudListItem>
+
+                    @switch (kvp.Value.Config.FhirVersion)
                     {
-                        <MudChip OnClick="@(() => NavToPatientExample(storeName))">
-                            @storeName/Patient/example
-                        </MudChip>
-                    }
-                </MudChipSet>
-            </MudListItem>
+                        case TenantConfiguration.SupportedFhirVersions.R4:
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                <MudLink Href="@($"/store/resource-viewer?store={kvp.Key}&type=Basic&id=encounter-complete")"
+                                         Underline="Underline.Always">Basic/encounter-complete</MudLink>:
+                                An example topic as a <code>Basic</code> resource, using cross-version extensions (equivalent
+                                to the R4B and R5 <code>encounter-complete</code> topics).
+                                The topic triggers when an encounter is either created with a <code>status</code> of <code>finished</code>
+                                or updated from any other status to <code>finished</code>.
+                            </MudListItem>
+                            break;
 
-            <MudListItem>
-                A Subscription Topic with id <code>encounter-complete</code>
-                and Canonical: <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>
+                        case TenantConfiguration.SupportedFhirVersions.R4B:
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                <MudLink Href="@($"/store/resource-viewer?store={kvp.Key}&type=SubscriptionTopic&id=encounter-complete")"
+                                         Underline="Underline.Always">Basic/encounter-complete</MudLink>:
+                                An example <code>SubscriptionTopic</code>.
+                                The topic triggers when an encounter is either created with a <code>status</code> of <code>finished</code>
+                                or updated from any other status to <code>finished</code>.
+                            </MudListItem>
+                            break;
 
-                <MudChipSet>
-                    @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
-                    {
-                        @if (kvp.Value.Config.FhirVersion == TenantConfiguration.SupportedFhirVersions.R4)
-                        {
-                            <MudChip OnClick="@(() => NavToTopicExample(kvp.Key, "Basic"))">
-                                @kvp.Key/Basic/encounter-complete
-                            </MudChip>
-                        }
-                        else
-                        {
-                            <MudChip OnClick="@(() => NavToTopicExample(kvp.Key, "SubscriptionTopic"))">
-                                @kvp.Key/SubscriptionTopic/encounter-complete
-                            </MudChip>
-                        }
+                        case TenantConfiguration.SupportedFhirVersions.R5:
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                <MudLink Href="@($"/store/resource-viewer?store={kvp.Key}&type=SubscriptionTopic&id=encounter-complete")"
+                                         Underline="Underline.Always">Basic/encounter-complete</MudLink>:
+                                An example <code>SubscriptionTopic</code>.
+                                The topic triggers when an encounter is either created with a <code>status</code> of <code>complete</code>
+                                or updated from any other status to <code>complete</code>.
+                            </MudListItem>
+                            break;
                     }
-                </MudChipSet>
-            </MudListItem>
-        </MudList>
-    </MudText>
-    <MudText Typo="Typo.body1">
-        Each endpoint also exposes a system-level operation, <code>$subscription-hook</code> which
-        receives subscription notifications for that FHIR version.  Any received notification bundles are stored
-        as resources locally, and the notifications will appear on the <code>Received Notifications</code> page
-        for that tenant.
-    </MudText>
-    <MudText Typo="Typo.body1">
-        Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
-        For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
-        the notifications and be visible in this system, but not actually send the notification to the
-        endpoint.
-    </MudText>
+                </MudList>
+
+                <MudText Typo="Typo.body1">
+                    The endpoint also exposes a system-level operation, <code>$subscription-hook</code>
+                    <sup>
+                        <button onclick="@($"navigator.clipboard.writeText('{kvp.Value.Config.BaseUrl}/$subscription-hook')")">
+                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                        </button>
+                    </sup>
+
+                    which can be used as a notification endpoint for FHIR @kvp.Value.Config.FhirVersion notifications (e.g.,
+                    if you are developing a server that sends notifications, you can point it here).
+                    Any received notification bundles are stored as resources locally, and the notifications will appear on
+                    the
+                    <MudLink Href="@($"/store/ext/subscriptions-received?store={kvp.Key}")"
+                             Underline="Underline.Always">Received Notifications</MudLink>
+                    page.
+                </MudText>
+                <br />
+                <MudText Typo="Typo.body1">
+                    Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
+                    For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
+                    the notifications and be visible on the
+                    <MudLink Href="@($"/store/ext/subscriptions-local?store={kvp.Key}")"
+                             Underline="Underline.Always">Local Notifications</MudLink>
+                    page, but not actually attempt to send the notification to the endpoint.
+                </MudText>
+
+            </MudTabPanel>
+        }
+
+    </MudTabs>
 </MudPaper>
 <MudPaper Class="pa-16 ma-2" Square="true">
     <MudText Typo="Typo.h6">Useful Links</MudText>

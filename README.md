@@ -78,7 +78,7 @@ load resources from the specified path.
 This project also contains the reference stack for FHIR Subscriptions.  To use the default landing page
 of the subscriptions RI, the following command can be used:
 ```
-fhir-candle --fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --default-page index-subscriptions
+fhir-candle --fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --ui-mode subscriptionsri
 ```
 
 

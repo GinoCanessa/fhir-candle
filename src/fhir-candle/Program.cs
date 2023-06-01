@@ -72,15 +72,10 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<int?>("Max_Resources", null),
             "Maximum number of resources allowed per tenant.");
 
-        Option<bool?> optNoGui = new(
-            name: "--no-gui",
-            getDefaultValue: () => configuration.GetValue<bool>("No_Gui", false),
-            "Run without loading the GUI");
-
-        Option<string> optDefaultPage = new(
-            name:  "--default-page",
-            getDefaultValue: () => configuration.GetValue<string>("Default_Page", "index-candle")!,
-            "Default index page to route to");
+        Option<ServerConfiguration.UiModes?> optUiMode = new(
+            name: "--ui-mode",
+            getDefaultValue: () => configuration.GetValue<ServerConfiguration.UiModes>("Mode", ServerConfiguration.UiModes.Default)!,
+            "UI content mode: " + string.Join(", ", Enum.GetNames(typeof(ServerConfiguration.UiModes))));
 
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
@@ -148,8 +143,7 @@ public static partial class Program
             optListenPort,
             optOpenBrowser,
             optMaxResourceCount,
-            optNoGui,
-            optDefaultPage,
+            optUiMode,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -174,8 +168,7 @@ public static partial class Program
                 ListenPort = context.ParseResult.GetValueForOption(optListenPort) ?? _defaultListenPort,
                 OpenBrowser = context.ParseResult.GetValueForOption(optOpenBrowser) ?? false,
                 MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
-                NoGui = context.ParseResult.GetValueForOption(optNoGui) ?? false,
-                DefaultIndexPage = context.ParseResult.GetValueForOption(optDefaultPage) ?? string.Empty,
+                UiMode = context.ParseResult.GetValueForOption(optUiMode) ?? ServerConfiguration.UiModes.Default,
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -269,7 +262,7 @@ public static partial class Program
 
             builder.Services.AddControllers();
 
-            if (!config.NoGui)
+            if (config.UiMode != ServerConfiguration.UiModes.None)
             {
                 builder.Services.AddRazorPages(options =>
                 {
@@ -279,9 +272,7 @@ public static partial class Program
                 builder.Services.AddMudServices();
 
                 // set our default UI page
-                Pages.Index.RootPage = string.IsNullOrEmpty(config.DefaultIndexPage)
-                    ? "/index-subscriptions"
-                    : "/" + config.DefaultIndexPage;
+                Pages.Index.Mode = config.UiMode;
             }
 
             string localUrl = $"http://localhost:{config.ListenPort}";
@@ -303,20 +294,8 @@ public static partial class Program
 
             app.MapControllers();
 
-            if (!config.NoGui)
+            if (config.UiMode != ServerConfiguration.UiModes.None)
             {
-                //app.MapWhen(ctx => !ctx.Request.Path
-                //    .StartsWithSegments("/_content"),
-                //        subApp => subApp.UseStaticFiles(new StaticFileOptions() { }));
-
-                //app.MapWhen(ctx => !ctx.Request.Path
-                //    .StartsWithSegments("/_framework"),
-                //        subApp => subApp.UseStaticFiles(new StaticFileOptions() {  }));
-
-                //app.MapWhen(ctx => !ctx.Request.Path
-                //    .StartsWithSegments("/_blazor"),
-                //        subApp => subApp.UseStaticFiles());
-
                 app.MapBlazorHub();
                 app.MapFallbackToPage("/_Host");
             }

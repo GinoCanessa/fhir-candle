@@ -31,20 +31,20 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd>
-            <MudTooltip Text="Local Subscriptions (Send)">
+            <MudTooltip Text="Local Subscriptions (Send)" Placement="Placement.Right">
                 <MudFab StartIcon="@Icons.Material.Filled.North"
                 @onclick="() => NavToLocalSubscriptions(context.Key)"
                         Size="Size.Small" />
             </MudTooltip>
 
-            <MudTooltip Text="Received Notifications">
+            <MudTooltip Text="Received Notifications" Placement="Placement.Right">
                 <MudFab StartIcon="@Icons.Material.Filled.South"
                 @onclick="() => NavToReceivedSubscriptions(context.Key)"
                         Size="Size.Small" />
             </MudTooltip>
 
 
-            <MudTooltip Text="FHIR Store Contents">
+            <MudTooltip Text="FHIR Store Contents" Placement="Placement.Right">
                 <MudFab StartIcon="@Icons.Material.Filled.ViewInAr"
                         @onclick="() => NavToFhirStore(context.Key)"
                         Size="Size.Small" />

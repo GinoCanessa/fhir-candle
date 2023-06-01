@@ -4,6 +4,7 @@
 
 @inject ProtectedLocalStorage BrowserStore
 @inject IFhirStoreManager StoreManager
+@inject IJSRuntime JS
 
 @implements INavTracker
 
@@ -111,7 +112,7 @@
 
     /// <summary>The crumbs.</summary>
     private List<BreadcrumbItem> _crumbs = new()
-    {
+{
         new BreadcrumbItem("FHIR Cache", "#"),
     };
 

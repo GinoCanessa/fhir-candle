@@ -20,6 +20,13 @@
     <ToolBarContent>
         <MudText Typo="Typo.h6">@ResourceType Resources</MudText>
         <MudSpacer />
+        <MudTooltip Text="Refresh Contents">
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Info" OnClick="HandleRefresh" />
+        </MudTooltip>
+        <MudTooltip Text="Toggle auto-refresh (10 seconds)">
+            <MudSwitch Color="Color.Info" @bind-Checked="autoRefresh" Label="Auto-refresh" />
+        </MudTooltip>
+        <MudSpacer />
         <MudTextField @bind-Value="_resourceFilter"
                       Placeholder="Search"
                       Adornment="Adornment.Start"
@@ -72,6 +79,12 @@
     /// <summary>The elements.</summary>
     private IEnumerable<string> _elements = Array.Empty<string>();
 
+    /// <summary>True to automatically refresh.</summary>
+    private bool autoRefresh = true;
+
+    /// <summary>The refresh timer.</summary>
+    private System.Threading.Timer? _refreshTimer = null;
+
     /// <summary>Gets or sets the resource filter.</summary>
     private string _resourceFilter { get; set; } = string.Empty;
 
@@ -110,6 +123,17 @@
             _resourceStore = _store[ResourceType];
         }
 
+        if (_resourceStore != null)
+        {
+            _resourceStore.OnChanged += ResourceStore_OnChanged;
+        }
+
+        _refreshTimer = new Timer(
+            TimerRefresh,
+            null,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(10));
+
         // notify of store root in case user clicked here directly
         NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
         NavTracker?.NotifyNav(
@@ -118,6 +142,23 @@
             2);
 
         NavigationManager.LocationChanged += HandleLocationChanged;
+    }
+
+    /// <summary>Timer refresh.</summary>
+    /// <param name="state">The state.</param>
+    private void TimerRefresh(object? state)
+    {
+        if (autoRefresh)
+        {
+            HandleRefresh();
+        }
+    }
+
+    /// <summary>Handles a user refresh request.</summary>
+    private void HandleRefresh()
+    {
+        _displayTable?.UpdateSelection();
+        InvokeAsync(() => StateHasChanged());
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -131,10 +172,21 @@
             {
             }
 
+            if (_resourceStore != null)
+            {
+                _resourceStore.OnChanged -= ResourceStore_OnChanged;
+            }
+
             _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
 
             if (_store != null)
             {
+                _resourceStore = _store[ResourceType];
+            }
+
+            if (_resourceStore != null)
+            {
+                _resourceStore.OnChanged += ResourceStore_OnChanged;
             }
 
             // notify of store root in case user clicked here directly
@@ -144,6 +196,14 @@
                 $"/store/resource-list?store={StoreName}&type={ResourceType}",
                 2);
         }
+    }
+
+    /// <summary>FHIR store on changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Event information.</param>
+    private void ResourceStore_OnChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
     }
 
     /// <summary>Handles the filter change described by value.</summary>
@@ -171,8 +231,16 @@
     {
         NavigationManager.LocationChanged -= HandleLocationChanged;
 
+        _refreshTimer?.Change(Timeout.Infinite, 0);
+        _refreshTimer?.Dispose();
+
         if (_store != null)
         {
+        }
+
+        if (_resourceStore != null)
+        {
+            _resourceStore.OnChanged -= ResourceStore_OnChanged;
         }
     }
 }

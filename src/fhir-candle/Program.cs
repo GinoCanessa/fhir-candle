@@ -275,7 +275,7 @@ public static partial class Program
                 Pages.Index.Mode = config.UiMode;
             }
 
-            string localUrl = $"http://localhost:{config.ListenPort}";
+            string localUrl = $"http://+:{config.ListenPort}";
 
             builder.WebHost.UseUrls(localUrl);
             //builder.WebHost.UseStaticWebAssets();

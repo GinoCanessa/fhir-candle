@@ -93,7 +93,6 @@ Note: items are unsorted within their priorities
     Build interfaces for Hosted Services, etc.
     Add module tag to Operation, etc.
     Conditional loading based on discovery within types
-* Story for easier loading of 'default' pages (e.g., listing)
 * Persistent 'unsubscribe' list
 * Finish search evaluators (remaining modifier combinations)
 * Save/restore points

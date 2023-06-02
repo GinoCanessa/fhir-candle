@@ -8,43 +8,85 @@
 <PageTitle>Subscriptions Tour</PageTitle>
 
 <MudPaper Class="pa-4 ma-2" Square="true">
-    <MudTimeline TimelineOrientation="TimelineOrientation.Horizontal" TimelinePosition="TimelinePosition.Top">
-        <MudTimelineItem Color="Color.Default">
+    <MudText Typo="Typo.h6">Subscriptions Tour</MudText>
+    <MudText Typo="Typo.body1">
+        This page contains a tour of topic-based subscriptions in FHIR @_store.Config.FhirVersion .
+    </MudText>
+    <br />
+
+    <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Choose a topic</MudText>
+            </ItemOpposite>
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Get/Select topic</MudAlert>
+                <MudCard>
+                    <MudCardContent>
+                        Do something
+                    </MudCardContent>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Select filter data</MudText>
+            </ItemOpposite>
             <ItemContent>
                 <MudAlert Severity="Severity.Normal">Determine patient (note this is specific to our topic)</MudAlert>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Configure subscription</MudText>
+            </ItemOpposite>
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Request a subscription, set channel, endpoint, headers/parameters, and content choices.</MudAlert>
+                <MudAlert Severity="Severity.Normal">set channel, endpoint, headers/parameters, and content choices.</MudAlert>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Request subscription</MudText>
+            </ItemOpposite>
+            <ItemContent>
+                <MudAlert Severity="Severity.Normal">Send request to server</MudAlert>
+            </ItemContent>
+        </MudTimelineItem>
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Check handshake</MudText>
+            </ItemOpposite>
             <ItemContent>
                 <MudAlert Severity="Severity.Normal">Wait on Handshake</MudAlert>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Trigger notification</MudText>
+            </ItemOpposite>
             <ItemContent>
                 <MudAlert Severity="Severity.Normal">Post an Encounter to trigger the subscription</MudAlert>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Check notification</MudText>
+            </ItemOpposite>
             <ItemContent>
                 <MudAlert Severity="Severity.Normal">Wait on notification</MudAlert>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Check on subscription</MudText>
+            </ItemOpposite>
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Query for Events</MudAlert>
+                <MudAlert Severity="Severity.Normal">Query for Status/Events</MudAlert>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default">
+        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+            <ItemOpposite>
+                <MudText Typo="Typo.h6">Clean up</MudText>
+            </ItemOpposite>
             <ItemContent>
                 <MudAlert Severity="Severity.Normal">Clean up</MudAlert>
             </ItemContent>
@@ -60,13 +102,6 @@
             </ItemContent>
         </MudTimelineItem>
 *@    </MudTimeline>
-</MudPaper>
-
-<MudPaper Class="pa-4 ma-2" Square="true">
-    <MudText Typo="Typo.h6">Subscriptions Tour</MudText>
-    <MudText Typo="Typo.body1">
-        This page contains a tour of topic-based subscriptions in FHIR @_store.Config.FhirVersion .
-    </MudText>
 </MudPaper>
 
 @code {

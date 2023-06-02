@@ -3,7 +3,7 @@ name: Deploy fhir-candle master branch to argo.run ci
 on:
   push:
     branches:
-    - disabledbranch
+    - main
 
 jobs:
   build:
@@ -19,7 +19,7 @@ jobs:
 
     - uses: azure/aks-set-context@v1
       with:
-        creds: '${{ secrets.AZURE_CREDENTIALS_23 }}'
+        creds: '${{ secrets.ARGO_AZ_CREDENTIALS_23 }}'
         cluster-name: ${{ secrets.ARGO_CLUSTER_NAME_23 }}
         resource-group: ${{ secrets.ARGO_RESOURCE_GROUP }}
 

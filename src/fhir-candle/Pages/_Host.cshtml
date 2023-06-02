@@ -41,6 +41,9 @@
         function setMonacoEditorResize(id) {
             window.onresize = () => { blazorMonaco.editor.layout(id, 0); }
         }
+        function scrollElementIntoView(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        }
     </script>
 
     <script src="_framework/blazor.server.js"></script>

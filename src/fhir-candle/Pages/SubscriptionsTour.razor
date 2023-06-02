@@ -2,6 +2,7 @@
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
+@inject IJSRuntime JS
 
 @implements IDisposable
 
@@ -13,95 +14,226 @@
         This page contains a tour of topic-based subscriptions in FHIR @_store.Config.FhirVersion .
     </MudText>
     <br />
-
     <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Choose a topic</MudText>
-            </ItemOpposite>
+        <MudTimelineItem Color="@ColorForStep(1)">
             <ItemContent>
-                <MudCard>
+                <MudCard id="element-step-1">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Choose a topic</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+
+                    @switch (_store.Config.FhirVersion)
+                    {
+                        case TenantConfiguration.SupportedFhirVersions.R4:
+                            <MudCardContent>
+                                <MudText Typo="Typo.body1">
+                                    In FHIR R4, topics are discovered by looking at the server 
+                                    <code>CapabilityStatement</code> for the
+                                    <MudLink Href="http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition-capabilitystatement-subscriptiontopic-canonical.html" 
+                                        Underline="Underline.Always">SubscriptionTopic Canonical Extension</MudLink>.
+                                </MudText>
+                                <br />
+                                <MudText Typo="Typo.body1">
+                                    For this walkthrough, we will be using the included <code>encounter-complete</code>
+                                    topic that has a canonical URL of <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>.
+                                    The current metadata for this server can be viewed
+                                    <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=CapabilityStatement&id=metadata")"
+                                             Underline="Underline.Always">here</MudLink>,
+                                    or requested (in FHIR) at
+                                    <code>@_store.Config.BaseUrl/metadata</code>
+                                    <sup>
+                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/metadata')")">
+                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                        </button>
+                                    </sup>.
+                                </MudText>
+                                <br />
+                                <MudText Typo="Typo.body1">
+                                    Note that in FHIR R4, there is not an official required format for representing <code>SubscriptionTopic</code>
+                                    resources.  Since topics are canonical resources, the expectation is that they will be defined
+                                    by authors (e.g., in Implementation Guides) and communicated out-of-band.  For example, for
+                                    an "encounter-start" topic, both the server and client can function with <i>only</i> the
+                                    canonical URL and the understanding of what that topic represents.
+                                </MudText>
+                                <br />
+                                <MudText Typo="Typo.body1">
+                                    With that said, one possible way of representing topics in FHIR R4 is to use the model provided
+                                    in FHIR R5, ported using FHIR cross-version support.  This implementation supports topics defined via
+                                    that mechanism.  Our included <code>encounter-complete</code> topic is thus available on this server
+                                    at <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Basic&id=encounter-complete")"
+                                             Underline="Underline.Always">Basic/encounter-complete</MudLink>
+                                    or in FHIR at
+                                    <code>@_store.Config.BaseUrl/Basic/encounter-complete</code>
+                                    <sup>
+                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/Basic/encounter-complete')")">
+                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                        </button>
+                                    </sup>.
+                                </MudText>
+                            </MudCardContent>
+                            break;
+
+                        case TenantConfiguration.SupportedFhirVersions.R4B:
+                        case TenantConfiguration.SupportedFhirVersions.R5:
+                            <MudCardContent>
+                                <MudText Typo="Typo.body1">
+                                    In FHIR @_store.Config.FhirVersion, topics are discovered by searching the server for
+                                    <code>SubscriptionTopic</code> resources.  The list of topics in this
+                                    tenant can be found
+                                    <MudLink Href="@($"/store/resource-list?store={StoreName}&type=SubscriptionTopic")"
+                                             Underline="Underline.Always">here</MudLink>,
+                                    or you can submit a FHIR search to:
+                                    <code>@_store.Config.BaseUrl/SubscriptionTopic</code>
+                                    <sup>
+                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/SubscriptionTopic')")">
+                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                        </button>
+                                    </sup>.
+                                </MudText>
+                                <br />
+                                <MudText Typo="Typo.body1">
+                                    For this walkthrough, we will be using the included <code>encounter-complete</code>
+                                    topic that has a canonical URL of <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>.
+                                    The definition for this topic can be seen at
+                                    <MudLink Href="@($"/store/resource-viewier?store={StoreName}&type=SubscriptionTopic&id=encounter-complete")"
+                                             Underline="Underline.Always">here</MudLink>,
+                                    or you can submit a FHIR read to:
+                                    <code>@_store.Config.BaseUrl/SubscriptionTopic/encounter-complete</code>
+                                    <sup>
+                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/SubscriptionTopic/encounter-complete')")">
+                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                        </button>
+                                    </sup>.
+                                </MudText>
+                            </MudCardContent>
+                            break;
+                    }
+
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => SetTopic())">Select encounter-complete topic</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </ItemContent>
+        </MudTimelineItem>
+        <MudTimelineItem Color="@ColorForStep(2)">
+            <ItemContent>
+                <MudCard id="element-step-2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Configure a subscription</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
                     <MudCardContent>
-                        Do something
+                        <MudText Typo="Typo.body1">Set channel, endpoint, headers, content, etc.</MudText>
                     </MudCardContent>
                 </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Select filter data</MudText>
-            </ItemOpposite>
+        <MudTimelineItem Color="@ColorForStep(3)">
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Determine patient (note this is specific to our topic)</MudAlert>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Select filter data</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Configure subscription</MudText>
-            </ItemOpposite>
+        <MudTimelineItem Color="@ColorForStep(4)">
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">set channel, endpoint, headers/parameters, and content choices.</MudAlert>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Request subscription</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1">Send request to server.</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined">Run</MudButton>
+                    </MudCardActions>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Request subscription</MudText>
-            </ItemOpposite>
-            <ItemContent>
-                <MudAlert Severity="Severity.Normal">Send request to server</MudAlert>
-            </ItemContent>
-        </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
+        <MudTimelineItem Color="@ColorForStep(5)">
             <ItemOpposite>
                 <MudText Typo="Typo.h6">Check handshake</MudText>
             </ItemOpposite>
             <ItemContent>
                 <MudAlert Severity="Severity.Normal">Wait on Handshake</MudAlert>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Server performs handshake</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1">Wait for handshake.</MudText>
+                    </MudCardContent>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Trigger notification</MudText>
-            </ItemOpposite>
+        <MudTimelineItem Color="@ColorForStep(6)">
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Post an Encounter to trigger the subscription</MudAlert>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Trigger a notification</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1">Post an Encounter to trigger the subscription.</MudText>
+                    </MudCardContent>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Check notification</MudText>
-            </ItemOpposite>
+        <MudTimelineItem Color="@ColorForStep(7)">
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Wait on notification</MudAlert>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Server sends notification</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1">Wait for notification</MudText>
+                    </MudCardContent>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Check on subscription</MudText>
-            </ItemOpposite>
+        <MudTimelineItem Color="@ColorForStep(8)">
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Query for Status/Events</MudAlert>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">RESTful Requests</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1">Query for status/events.</MudText>
+                    </MudCardContent>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="Color.Default" TimelineAlign="TimelineAlign.End">
-            <ItemOpposite>
-                <MudText Typo="Typo.h6">Clean up</MudText>
-            </ItemOpposite>
+        <MudTimelineItem Color="@ColorForStep(9)">
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Clean up</MudAlert>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Clean up</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1">Remove subscription/encounters/etc.</MudText>
+                    </MudCardContent>
+                </MudCard>
             </ItemContent>
         </MudTimelineItem>
-@*        <MudTimelineItem Color="Color.Info">
-            <ItemContent>
-                <MudAlert Severity="Severity.Info">Info + Info</MudAlert>
-            </ItemContent>
-        </MudTimelineItem>
-        <MudTimelineItem Color="Color.Success">
-            <ItemContent>
-                <MudAlert Severity="Severity.Success">Success + Success</MudAlert>
-            </ItemContent>
-        </MudTimelineItem>
-*@    </MudTimeline>
+    </MudTimeline>
 </MudPaper>
 
 @code {
@@ -115,6 +247,33 @@
     public string StoreName { get; set; } = "";
 
     private IFhirStore _store = null!;
+
+    private int onStep { get; set; } = 1;
+
+    private string topicUrl { get; set; } = "http://example.org/FHIR/SubscriptionTopic/encounter-complete";
+
+
+    private MudBlazor.Color ColorForStep(int step)
+    {
+        if (step < onStep)
+        {
+            return Color.Success;
+        }
+
+        if (step == onStep)
+        {
+            return Color.Primary;
+        }
+
+        return Color.Default;
+    }
+
+    private void SetTopic()
+    {
+        onStep = 2;
+        _ = JS.InvokeVoidAsync("scrollElementIntoView", "element-step-2");
+        InvokeAsync(() => StateHasChanged());
+    }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>

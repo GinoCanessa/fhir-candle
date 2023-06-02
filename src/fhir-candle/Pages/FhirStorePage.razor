@@ -110,7 +110,7 @@
         if ((!string.IsNullOrEmpty(StoreName)) &&
             (StoreManager.TryGetValue(StoreName, out _store!)))
         {
-            _store.OnChanged += FhirStore_OnChanged;
+            _store.OnChanged += Store_OnChanged;
         }
 
         _refreshTimer = new Timer(
@@ -148,14 +148,13 @@
         {
             if (_store != null)
             {
-                _store.OnChanged -= FhirStore_OnChanged;
+                _store.OnChanged -= Store_OnChanged;
             }
 
-            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-            if (_store != null)
+            if ((!string.IsNullOrEmpty(StoreName)) &&
+                (StoreManager.TryGetValue(StoreName, out _store!)))
             {
-                _store.OnChanged += FhirStore_OnChanged;
+                _store.OnChanged += Store_OnChanged;
             }
 
             NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
@@ -165,7 +164,7 @@
     /// <summary>FHIR store on changed.</summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">     Event information.</param>
-    private void FhirStore_OnChanged(object? sender, EventArgs e)
+    private void Store_OnChanged(object? sender, EventArgs e)
     {
         InvokeAsync(() => StateHasChanged());
     }
@@ -181,7 +180,7 @@
 
         if (_store != null)
         {
-            _store.OnChanged -= FhirStore_OnChanged;
+            _store.OnChanged -= Store_OnChanged;
         }
     }
 }

@@ -41,14 +41,14 @@
 </MudGrid>
 
 @code {
-    /// <summary>Gets or sets the navigation tracker.</summary>
-    [CascadingParameter]
-    public INavTracker? NavTracker { get; set; } = null;
+        /// <summary>Gets or sets the navigation tracker.</summary>
+        [CascadingParameter]
+        public INavTracker? NavTracker { get; set; } = null;
 
-    /// <summary>Gets or sets the package name.</summary>
-    [Parameter]
-    [SupplyParameterFromQuery(Name = "store")]
-    public string StoreName { get; set; } = "";
+        /// <summary>Gets or sets the package name.</summary>
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "store")]
+        public string StoreName { get; set; } = "";
 
     private IFhirStore _store = null!;
 
@@ -58,9 +58,8 @@
     {
         base.OnInitialized();
 
-        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-        if (_store != null)
+        if ((!string.IsNullOrEmpty(StoreName)) &&
+            (StoreManager.TryGetValue(StoreName, out _store!)))
         {
             _store.OnChanged += Store_OnChanged;
             _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
@@ -86,9 +85,8 @@
                 _store.OnSubscriptionsChanged -= Store_OnSubscriptionsChanged;
             }
 
-            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-            if (_store != null)
+            if ((!string.IsNullOrEmpty(StoreName)) &&
+                (StoreManager.TryGetValue(StoreName, out _store!)))
             {
                 _store.OnChanged += Store_OnChanged;
                 _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;

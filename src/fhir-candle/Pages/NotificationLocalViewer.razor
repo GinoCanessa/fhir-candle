@@ -70,9 +70,8 @@
     {
         base.OnInitialized();
 
-        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-        if (_store != null)
+        if ((!string.IsNullOrEmpty(StoreName)) &&
+            (StoreManager.TryGetValue(StoreName, out _store!)))
         {
             _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
 
@@ -98,11 +97,15 @@
                 _store.OnSubscriptionSendEvent -= Store_OnSubscriptionSendEvent;
             }
 
-            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-            if (_store != null)
+            if ((!string.IsNullOrEmpty(StoreName)) &&
+                (StoreManager.TryGetValue(StoreName, out _store!)))
             {
                 _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
+
+                if (!string.IsNullOrEmpty(SubscriptionId))
+                {
+                    _subscription = _store.CurrentSubscriptions.Where(s => s.Id.Equals(SubscriptionId, StringComparison.Ordinal)).First() ?? null!;
+                }
             }
 
             // notify of store root in case user clicked here directly

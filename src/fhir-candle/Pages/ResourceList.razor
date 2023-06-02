@@ -114,16 +114,10 @@
     {
         base.OnInitialized();
 
-        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-        if ((_store != null) &&
+        if ((!string.IsNullOrEmpty(StoreName)) &&
             (!string.IsNullOrEmpty(ResourceType)) &&
-            (_store.ContainsKey(ResourceType)))
-        {
-            _resourceStore = _store[ResourceType];
-        }
-
-        if (_resourceStore != null)
+            (StoreManager.TryGetValue(StoreName, out _store!)) &&
+            (_store.TryGetValue(ResourceType, out _resourceStore!)))
         {
             _resourceStore.OnChanged += ResourceStore_OnChanged;
         }
@@ -177,14 +171,10 @@
                 _resourceStore.OnChanged -= ResourceStore_OnChanged;
             }
 
-            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-            if (_store != null)
-            {
-                _resourceStore = _store[ResourceType];
-            }
-
-            if (_resourceStore != null)
+            if ((!string.IsNullOrEmpty(StoreName)) &&
+                (!string.IsNullOrEmpty(ResourceType)) &&
+                (StoreManager.TryGetValue(StoreName, out _store!)) &&
+                (_store.TryGetValue(ResourceType, out _resourceStore!)))
             {
                 _resourceStore.OnChanged += ResourceStore_OnChanged;
             }

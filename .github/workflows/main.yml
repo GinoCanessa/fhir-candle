@@ -26,7 +26,7 @@ jobs:
     - name: Build and rollout to CI
       run: |
         docker build . \
-          -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/fhir-candle:$GITHUB_SHA \
-          -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/fhir-candle:latest
-        docker push ${{ secrets.ARGO_CONTAINER_REGISTRY }}/fhir-candle
+          -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/subscriptions/fhir-candle:$GITHUB_SHA \
+          -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/subscriptions/fhir-candle:latest
+        docker push ${{ secrets.ARGO_CONTAINER_REGISTRY }}/subscriptions/fhir-candle
         kubectl -n subscriptions-ri rollout restart deployment/fhir-candle

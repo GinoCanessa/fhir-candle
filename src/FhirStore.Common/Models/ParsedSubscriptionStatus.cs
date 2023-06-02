@@ -55,10 +55,7 @@ public class ParsedSubscriptionStatus
     }
 
     /// <summary>Gets or initializes the identifier of the local bundle.</summary>
-    public required string LocalBundleId { get; init; }
-
-    /// <summary>Gets or initializes the identifier of the original bundle.</summary>
-    public string OriginalBundleId { get; init; } = string.Empty;
+    public required string BundleId { get; init; }
 
     /// <summary>Gets or initializes the processed date time.</summary>
     public DateTimeOffset ProcessedDateTime { get; init; } = DateTimeOffset.Now;

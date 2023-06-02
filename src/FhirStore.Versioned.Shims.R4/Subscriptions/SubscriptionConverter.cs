@@ -251,7 +251,7 @@ public class SubscriptionConverter
 
         common = new()
         {
-            LocalBundleId = status.Id,
+            BundleId = bundleId,
             SubscriptionReference = GetString(values, "subscription"),
             SubscriptionTopicCanonical = GetString(values, "topic"),
             Status = GetString(values, "status"),
@@ -337,6 +337,7 @@ public class SubscriptionConverter
         // create our notification bundle
         Bundle bundle = new()
         {
+            Id = Guid.NewGuid().ToString(),
             Type = Bundle.BundleType.History,
             Timestamp = DateTimeOffset.Now,
             Entry = new(),

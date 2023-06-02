@@ -1,0 +1,131 @@
+﻿@page "/store/ext/notification-received-viewer"
+
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+
+@implements IDisposable
+
+<PageTitle>Received Subscription Events</PageTitle>
+
+<MudGrid>
+    @foreach (ParsedSubscriptionStatus status in _notifications ?? Array.Empty<ParsedSubscriptionStatus>().ToList())
+    {
+        <MudItem>
+            <MudCard Outlined="true" Class="mx-6 my-4">
+                <MudCardContent>
+                    <MudField Label="Subscription">@status.SubscriptionReference</MudField>
+                    <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
+                    <MudField Label="Local Bundle">Bundle/@status.BundleId</MudField>
+                    <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
+                    <MudField Label="Type">@status.NotificationType</MudField>
+                    <MudField Label="Bundle">
+                        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={status.BundleId}")" Underline="Underline.Always">Bundle/@status.BundleId</MudLink>
+
+                    </MudField>
+
+                    @if (status.NotificationEvents.Any())
+                    {
+                        @foreach (ParsedSubscriptionStatus.ParsedNotificationEvent ne in status.NotificationEvents)
+                        {
+                            <MudField Label="Event Number">@ne.EventNumber</MudField>
+                            <MudField Label="Timestamp">@ne.Timestamp?.ToLocalTime().ToString("O")</MudField>
+                            <MudField Label="Focus Reference">@ne.FocusReference</MudField>
+                            <MudField Label="Additional Context">@string.Join(", ", ne.AdditionalContextReferences ?? Array.Empty<string>())</MudField>
+                        }
+                    }
+
+                    @if (status.Errors.Any())
+                    {
+                        <MudField Label="Error">@status.Errors.First()</MudField>
+                    }
+                    </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "store")]
+    public string StoreName { get; set; } = "";
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "ref")]
+    public string SubscriptionRef { get; set; } = "";
+
+    private IFhirStore _store = null!;
+
+    private List<ParsedSubscriptionStatus> _notifications = null!;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+        if (_store != null)
+        {
+            _store.OnReceivedSubscriptionEvent += Store_OnReceivedSubscriptionEvent;
+
+            if (!string.IsNullOrEmpty(SubscriptionRef))
+            {
+                _ = _store.ReceivedNotifications.TryGetValue(SubscriptionRef, out _notifications!);
+            }
+        }
+
+        // notify of store root in case user clicked here directly
+        NavTracker?.NotifyNav($"Received Subscription Events", $"/store/ext/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/store/ext/notification-received-viewer", StringComparison.Ordinal))
+        {
+            if (_store != null)
+            {
+                _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
+            }
+
+            _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
+
+            if (_store != null)
+            {
+                _store.OnReceivedSubscriptionEvent += Store_OnReceivedSubscriptionEvent;
+            }
+
+            // notify of store root in case user clicked here directly
+            NavTracker?.NotifyNav($"Received Subscription Events", $"/store/ext/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
+        }
+    }
+
+    /// <summary>Event handler. Called by Store for on subscription events.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Subscription event information.</param>
+    private void Store_OnReceivedSubscriptionEvent(object? sender, ReceivedSubscriptionEventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_store != null)
+        {
+            _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
+        }
+    }
+
+}

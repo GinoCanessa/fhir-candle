@@ -1,11 +1,11 @@
-﻿@page "/store/ext/subscriptions-viewer"
+﻿@page "/store/ext/notification-local-viewer"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
 
 @implements IDisposable
 
-<PageTitle>Subscription Events</PageTitle>
+<PageTitle>Generated Subscription Events</PageTitle>
 
 <MudGrid>
     @foreach (SubscriptionEvent subEvent in _subscription?.GeneratedEvents.Values.AsEnumerable() ?? Array.Empty<SubscriptionEvent>())
@@ -83,7 +83,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"Subscription Events", $"/store/ext/subscriptions-viewer?store={StoreName}&id={SubscriptionId}", 3);
+        NavTracker?.NotifyNav($"Generated Subscription Events", $"/store/ext/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -91,7 +91,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-viewer", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/store/ext/notification-local-viewer", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -106,8 +106,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Local Subscriptions", "/store/ext/subscriptions-viewer?store=" + StoreName, 2);
+            NavTracker?.NotifyNav($"Generated Subscription Events", $"/store/ext/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
         }
     }
 

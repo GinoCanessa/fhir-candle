@@ -77,6 +77,11 @@ public class OpSubscriptionHook : IFhirOperation
             return HttpStatusCode.BadRequest;
         }
 
+        if (string.IsNullOrEmpty(bundle.Id))
+        {
+            bundle.Id = Guid.NewGuid().ToString();
+        }
+
         ParsedSubscriptionStatus? status = store.ParseNotificationBundle(bundle);
 
         if (status == null)
@@ -88,14 +93,12 @@ public class OpSubscriptionHook : IFhirOperation
             return HttpStatusCode.BadRequest;
         }
 
-        string originalId = bundle.Id;
-
         // TODO: Clean up interfaces and types so we can avoid casts like this
         // store this bundle in our store
-        ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(bundle, false);
+        Hl7.Fhir.Model.Resource? r = ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(bundle, true);
 
         // register the notification received event
-        store.RegisterReceivedNotification(bundle.Id, status);
+        store.RegisterReceivedNotification(r?.Id ?? bundle.Id, status);
 
         responseResource = null;
         responseOutcome = store.BuildOutcomeForRequest(HttpStatusCode.OK, "Subscription Notification Received");

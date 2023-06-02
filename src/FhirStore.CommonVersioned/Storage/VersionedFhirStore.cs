@@ -398,7 +398,7 @@ public partial class VersionedFhirStore : IFhirStore
     public IEnumerable<ParsedSubscription> CurrentSubscriptions => _subscriptions.Values;
 
     /// <summary>Gets the received notifications.</summary>
-    public IEnumerable<KeyValuePair<string, List<ParsedSubscriptionStatus>>> ReceivedNotifications => _receivedNotifications.AsEnumerable();
+    public ConcurrentDictionary<string, List<ParsedSubscriptionStatus>> ReceivedNotifications => _receivedNotifications;
 
     /// <summary>Gets the element that has the specified key in the read-only dictionary.</summary>
     /// <typeparam name="string">        Type of the string.</typeparam>

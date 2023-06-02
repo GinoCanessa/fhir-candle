@@ -82,7 +82,7 @@
                     <MudListItem>
                         <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
                         <MudLink Href="@($"/store/ext/subscriptions-local?store={kvp.Key}")"
-                                 Underline="Underline.Always">Local Notifications</MudLink>: outgoing Subscription notifications from this server
+                                 Underline="Underline.Always">Local Subscriptions</MudLink>: outgoing Subscription notifications from this server
                     </MudListItem>
 
                     <MudListItem>
@@ -168,7 +168,7 @@
                     For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
                     the notifications and be visible on the
                     <MudLink Href="@($"/store/ext/subscriptions-local?store={kvp.Key}")"
-                             Underline="Underline.Always">Local Notifications</MudLink>
+                             Underline="Underline.Always">Local Subscriptions</MudLink>
                     page, but not actually attempt to send the notification to the endpoint.
                 </MudText>
 

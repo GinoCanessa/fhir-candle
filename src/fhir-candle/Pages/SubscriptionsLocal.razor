@@ -14,15 +14,20 @@
         <MudBadge Content="@sub.GeneratedEvents.Count()" Color="@ColorForStatus(sub.CurrentStatus)" Overlap="true" Class="mx-6 my-4">
             <MudCard Outlined="true">
                 <MudCardContent>
-                    <MudField Label="Subscription">Subscription/@sub.Id</MudField>
+                    <MudField Label="Subscription">
+                        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={sub.Id}")" Underline="Underline.Always">Subscription/@sub.Id</MudLink>
+                    </MudField>
                     <MudField Label="Topic">@sub.TopicUrl</MudField>
                     <MudField Label="Channel">@sub.ChannelCode</MudField>
                     <MudField Label="Endpoint">@sub.Endpoint</MudField>
+
+                    <MudField Label="Generated Event Details">
+                            <MudLink Href="@($"/store/ext/notification-local-viewer?store={StoreName}&id={sub.Id}")" Underline="Underline.Always">Generated Events</MudLink>
+                    </MudField>
+
                     @if (sub.GeneratedEvents.Any())
                     {
-                        <MudField Label="Latest">
-                            <MudLink Href="@($"/store/ext/subscriptions-viewer?store={StoreName}&id={sub.Id}")" Underline="Underline.Always">@HeaderFor(sub.GeneratedEvents.Last().Value)</MudLink>
-                        </MudField>
+                        <MudField Label="Latest">@HeaderFor(sub.GeneratedEvents.Last().Value)</MudField>
                     }
                     @if (sub.NotificationErrors.Any())
                     {

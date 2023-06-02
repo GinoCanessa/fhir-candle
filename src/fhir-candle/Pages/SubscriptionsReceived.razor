@@ -8,31 +8,32 @@
 <PageTitle>Received Notifications</PageTitle>
 
 <MudGrid>
-    @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store?.ReceivedNotifications ?? Array.Empty<KeyValuePair<string, List<ParsedSubscriptionStatus>>>())
+    @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store?.ReceivedNotifications.AsEnumerable() ?? Array.Empty<KeyValuePair<string, List<ParsedSubscriptionStatus>>>())
     {
     <MudItem>
         <MudBadge Content="@kvp.Value.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
             <MudCard Outlined="true">
                 <MudCardContent>
                     <MudField Label="Subscription">@kvp.Key</MudField>
-                    @if (kvp.Value.Any())
+                    @if (kvp.Value.Any() && (kvp.Value.Last() is ParsedSubscriptionStatus status))
                     {
-                        @foreach (ParsedSubscriptionStatus status in new ParsedSubscriptionStatus[] { kvp.Value.Last() })
-                        {
-                            <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
-                            <MudField Label="Local Bundle">Bundle/@status.LocalBundleId</MudField>
-                            <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
-                            <MudField Label="Type">@status.NotificationType</MudField>
-                            
-                            @if (status.NotificationEvents.Any())
-                            {
-                                <MudField Label="Focus">@status.NotificationEvents.First().FocusReference</MudField>
-                            }
+                        <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
+                        <MudField Label="Local Bundle">Bundle/@status.BundleId</MudField>
+                        <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
+                        <MudField Label="Type">@status.NotificationType</MudField>
 
-                            @if (status.Errors.Any())
-                            {
-                                <MudField Label="Error">@status.Errors.First()</MudField>
-                            }
+                        <MudField Label="Recevied Event Details">
+                            <MudLink Href="@($"/store/ext/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" Underline="Underline.Always">Received Events</MudLink>
+                        </MudField>
+    
+                        @if (status.NotificationEvents.Any())
+                        {
+                            <MudField Label="Focus">@status.NotificationEvents.First().FocusReference</MudField>
+                        }
+
+                        @if (status.Errors.Any())
+                        {
+                            <MudField Label="Error">@status.Errors.First()</MudField>
                         }
                     }
                 </MudCardContent>

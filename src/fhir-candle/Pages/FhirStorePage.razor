@@ -107,9 +107,8 @@
     {
         base.OnInitialized();
 
-        _store = StoreManager.ContainsKey(StoreName) ? StoreManager[StoreName] : null!;
-
-        if (_store != null)
+        if ((!string.IsNullOrEmpty(StoreName)) &&
+            (StoreManager.TryGetValue(StoreName, out _store!)))
         {
             _store.OnChanged += FhirStore_OnChanged;
         }

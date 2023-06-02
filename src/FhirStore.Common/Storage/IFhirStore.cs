@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirStore.Models;
+using System.Collections.Concurrent;
 using System.Net;
 
 namespace FhirStore.Storage;
@@ -279,5 +280,5 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     IEnumerable<ParsedSubscription> CurrentSubscriptions { get; }
 
     /// <summary>Gets the received notifications.</summary>
-    IEnumerable<KeyValuePair<string, List<ParsedSubscriptionStatus>>> ReceivedNotifications { get; }
+    ConcurrentDictionary<string, List<ParsedSubscriptionStatus>> ReceivedNotifications { get; }
 }

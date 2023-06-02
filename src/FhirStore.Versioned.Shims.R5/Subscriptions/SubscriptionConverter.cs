@@ -81,10 +81,10 @@ public class SubscriptionConverter
 
     /// <summary>Attempts to parse a ParsedSubscriptionStatus from the given object.</summary>
     /// <param name="subscriptionStatus">The subscription.</param>
-    /// <param name="originalBundleId">  Identifier for the bundle.</param>
+    /// <param name="bundleId">  Identifier for the bundle.</param>
     /// <param name="common">            [out] The common.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryParse(object subscriptionStatus, string originalBundleId, out ParsedSubscriptionStatus common)
+    public bool TryParse(object subscriptionStatus, string bundleId, out ParsedSubscriptionStatus common)
     {
         if ((subscriptionStatus == null) ||
             (subscriptionStatus is not Hl7.Fhir.Model.SubscriptionStatus status))
@@ -128,8 +128,7 @@ public class SubscriptionConverter
 
         common = new()
         {
-            LocalBundleId = status.Id,
-            OriginalBundleId = originalBundleId,
+            BundleId = bundleId,
             SubscriptionReference = status.Subscription?.Reference ?? string.Empty,
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
             Status = status.Status?.ToString() ?? string.Empty,
@@ -194,6 +193,7 @@ public class SubscriptionConverter
         // create our notification bundle
         Bundle bundle = new()
         {
+            Id = Guid.NewGuid().ToString(),
             Type = Bundle.BundleType.SubscriptionNotification,
             Timestamp = DateTimeOffset.Now,
             Entry = new(),

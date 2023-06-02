@@ -267,6 +267,8 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool SupportsResource(string resourceName);
 
+    bool TryGetResourceInfo(object resource, out string resourceName, out string id);
+
     /// <summary>Gets the supported resources.</summary>
     IEnumerable<string> SupportedResources { get; }
 

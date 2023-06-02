@@ -357,6 +357,21 @@ public partial class VersionedFhirStore : IFhirStore
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool SupportsResource(string resourceName) => _store.ContainsKey(resourceName);
 
+    public bool TryGetResourceInfo(object resource, out string resourceName, out string id)
+    {
+        if ((resource == null) ||
+            (resource is not Resource r))
+        {
+            resourceName = string.Empty;
+            id = string.Empty;
+            return false;
+        }
+
+        resourceName = r.TypeName;
+        id = r.Id;
+        return true;
+    }
+
     /// <summary>
     /// Gets an enumerable collection that contains the keys in the read-only dictionary.
     /// </summary>

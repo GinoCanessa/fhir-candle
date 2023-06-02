@@ -13,20 +13,20 @@ jobs:
 
     - uses: azure/docker-login@v1
       with:
-        login-server: ${{ secrets.CONTAINER_REGISTRY }}
-        username: ${{ fromJSON(secrets.AZURE_CREDENTIALS_23).clientId }}
-        password: ${{ fromJSON(secrets.AZURE_CREDENTIALS_23).clientSecret }}
+        login-server: ${{ secrets.ARGO_CONTAINER_REGISTRY }}
+        username: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).clientId }}
+        password: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).clientSecret }}
 
     - uses: azure/aks-set-context@v1
       with:
         creds: '${{ secrets.AZURE_CREDENTIALS_23 }}'
-        cluster-name: ${{ secrets.CLUSTER_NAME_23 }}
-        resource-group: ${{ secrets.RESOURCE_GROUP }}
+        cluster-name: ${{ secrets.ARGO_CLUSTER_NAME_23 }}
+        resource-group: ${{ secrets.ARGO_RESOURCE_GROUP }}
 
     - name: Build and rollout to CI
       run: |
         docker build . \
-          -t ${{ secrets.CONTAINER_REGISTRY }}/fhir-candle:$GITHUB_SHA \
-          -t ${{ secrets.CONTAINER_REGISTRY }}/fhir-candle:latest
-        docker push ${{ secrets.CONTAINER_REGISTRY }}/fhir-candle
+          -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/fhir-candle:$GITHUB_SHA \
+          -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/fhir-candle:latest
+        docker push ${{ secrets.ARGO_CONTAINER_REGISTRY }}/fhir-candle
         kubectl -n subscriptions-ri rollout restart deployment/fhir-candle

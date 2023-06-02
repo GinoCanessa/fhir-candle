@@ -100,19 +100,36 @@
     /// <returns>An asynchronous result.</returns>
     private async Task LoadResourceContent()
     {
-        _ = _store.InstanceRead(
-            ResourceType,
-            Id,
-            (_resourceFormatCode == ResourceFormatCodes.JSON) ? "application/fhir+json" : "application/fhir+xml",
-            string.Empty,
-            true,
-            string.Empty,
-            string.Empty,
-            string.Empty,
-            out string content,
-            out _,
-            out _,
-            out _);
+        string content;
+
+        // check for needing to generate metadata
+        if (ResourceType.Equals("CapabilityStatement", StringComparison.Ordinal) &&
+            Id.Equals("metadata", StringComparison.Ordinal))
+        {
+            _ = _store.GetMetadata(
+                (_resourceFormatCode == ResourceFormatCodes.JSON) ? "application/fhir+json" : "application/fhir+xml",
+                true,
+                out content,
+                out _,
+                out _,
+                out _);
+        }
+        else
+        {
+            _ = _store.InstanceRead(
+                ResourceType,
+                Id,
+                (_resourceFormatCode == ResourceFormatCodes.JSON) ? "application/fhir+json" : "application/fhir+xml",
+                string.Empty,
+                true,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                out content,
+                out _,
+                out _,
+                out _);
+        }
 
         // "virtual\u0022double\u0027single\u0060back"
 

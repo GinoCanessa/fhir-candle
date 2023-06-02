@@ -1,0 +1,32 @@
+name: Deploy fhir-candle master branch to argo.run ci
+# Basics from https://docs.microsoft.com/en-us/azure/dev-spaces/how-to/github-actions
+on:
+  push:
+    branches:
+    - disabledbranch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+
+    - uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.CONTAINER_REGISTRY }}
+        username: ${{ fromJSON(secrets.AZURE_CREDENTIALS_23).clientId }}
+        password: ${{ fromJSON(secrets.AZURE_CREDENTIALS_23).clientSecret }}
+
+    - uses: azure/aks-set-context@v1
+      with:
+        creds: '${{ secrets.AZURE_CREDENTIALS_23 }}'
+        cluster-name: ${{ secrets.CLUSTER_NAME_23 }}
+        resource-group: ${{ secrets.RESOURCE_GROUP }}
+
+    - name: Build and rollout to CI
+      run: |
+        docker build . \
+          -t ${{ secrets.CONTAINER_REGISTRY }}/fhir-candle:$GITHUB_SHA \
+          -t ${{ secrets.CONTAINER_REGISTRY }}/fhir-candle:latest
+        docker push ${{ secrets.CONTAINER_REGISTRY }}/fhir-candle
+        kubectl -n subscriptions-ri rollout restart deployment/fhir-candle

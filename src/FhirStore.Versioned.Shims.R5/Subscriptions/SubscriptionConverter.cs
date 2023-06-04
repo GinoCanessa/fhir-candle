@@ -12,6 +12,9 @@ namespace FhirStore.Versioned.Shims.Subscriptions;
 /// <summary>A FHIR R5 subscription format converter.</summary>
 public class SubscriptionConverter
 {
+    public static SubscriptionStatusCodes ActiveCode = SubscriptionStatusCodes.Active;
+    public static SubscriptionStatusCodes OffCode = SubscriptionStatusCodes.Off;
+
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
     /// <param name="common">      [out] The common.</param>
@@ -39,6 +42,7 @@ public class SubscriptionConverter
             ContentType = sub.ContentType,
             ContentLevel = sub.Content?.ToString() ?? string.Empty,
             MaxEventsPerNotification = sub.MaxCount ?? 0,
+            ExpirationTicks = sub.End?.Ticks ?? (DateTime.Now.Ticks + ParsedSubscription.DefaultSubscriptionExpiration),
         };
 
         // add parameters
@@ -73,6 +77,87 @@ public class SubscriptionConverter
                     filter.Comparator?.ToString() ?? string.Empty,
                     filter.Modifier?.ToString() ?? string.Empty,
                     filter.Value));
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryParse(ParsedSubscription common, out Subscription subscription)
+    {
+        if ((common == null) ||
+            string.IsNullOrEmpty(common.Id) ||
+            string.IsNullOrEmpty(common.TopicUrl))
+        {
+            subscription = null!;
+            return false;
+        }
+
+        SubscriptionStatusCodes? status;
+
+        try
+        {
+            status = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatusCodes>(common.CurrentStatus);
+        }
+        catch (Exception)
+        {
+            status = SubscriptionStatusCodes.Requested;
+        }
+
+        subscription = new()
+        {
+            Id = common.Id,
+            Topic = common.TopicUrl,
+            Status = status!,
+            Reason = string.IsNullOrEmpty(common.Reason) ? null : common.Reason,
+            ChannelType = new Coding(common.ChannelSystem, common.ChannelCode),
+            Endpoint = common.Endpoint,
+            HeartbeatPeriod = common.HeartbeatSeconds,
+            Timeout = common.TimeoutSeconds,
+            ContentType = common.ContentType,
+            Content = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<Subscription.SubscriptionPayloadContent>(common.ContentLevel),
+            MaxCount = common.MaxEventsPerNotification,
+            End = new DateTimeOffset(common.ExpirationTicks, TimeSpan.Zero),
+        };
+
+        // add parameters
+        if (common.Parameters.Any())
+        {
+            subscription.Parameter = new();
+
+            foreach ((string key, List<string> values) in common.Parameters)
+            {
+                subscription.Parameter.AddRange(values.Select(v => new Subscription.ParameterComponent()
+                {
+                    Name = key,
+                    Value = v,
+                }));
+            }
+        }
+
+        // add filters
+        if (common.Filters.Any())
+        {
+            subscription.FilterBy = new();
+            foreach (List<ParsedSubscription.SubscriptionFilter> filters in common.Filters.Values)
+            {
+                foreach (ParsedSubscription.SubscriptionFilter filter in filters)
+                {
+                    subscription.FilterBy.Add(new Subscription.FilterByComponent()
+                    {
+                        ResourceType = filter.ResourceType,
+                        FilterParameter = filter.Name,
+                        Comparator = string.IsNullOrEmpty(filter.Comparator)
+                            ? null
+                            : Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SearchComparator>(common.ContentLevel),
+                        Modifier = string.IsNullOrEmpty(filter.Modifier)
+                            ? null
+                            : Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SearchModifierCode>(filter.Modifier),
+                        Value = filter.Value,
+                    });
+                }
             }
         }
 

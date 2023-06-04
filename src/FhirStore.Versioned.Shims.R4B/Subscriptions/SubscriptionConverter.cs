@@ -6,6 +6,7 @@
 using FhirStore.Extensions;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
+using static Hl7.Fhir.Model.SearchParameter;
 
 namespace FhirStore.Versioned.Shims.Subscriptions;
 
@@ -29,6 +30,9 @@ public class SubscriptionConverter
 
     /// <summary>(Immutable) URL of the content.</summary>
     private const string _contentUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content";
+
+    public static SubscriptionStatusCodes ActiveCode = SubscriptionStatusCodes.Active;
+    public static SubscriptionStatusCodes OffCode = SubscriptionStatusCodes.Off;
 
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
@@ -55,6 +59,7 @@ public class SubscriptionConverter
                 : Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Channel.Type),
             Endpoint = sub.Channel.Endpoint ?? string.Empty,
             ContentType = sub.Channel.Payload?.ToString() ?? string.Empty,
+            ExpirationTicks = sub.End?.Ticks ?? (DateTime.Now.Ticks + ParsedSubscription.DefaultSubscriptionExpiration),
         };
 
         // check for extended information
@@ -183,6 +188,113 @@ public class SubscriptionConverter
                         string.Empty,                               // TODO: figure out prefix based on type info we don't have here
                         (keyComponents.Length > 1) ? keyComponents[1] : string.Empty,
                         components[1]));
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryParse(ParsedSubscription common, out Subscription subscription)
+    {
+        if ((common == null) ||
+            string.IsNullOrEmpty(common.Id) ||
+            string.IsNullOrEmpty(common.TopicUrl))
+        {
+            subscription = null!;
+            return false;
+        }
+
+        Subscription.SubscriptionChannelType? ct;
+        string extendedCt;
+
+        try
+        {
+            ct = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<Subscription.SubscriptionChannelType>(common.ChannelCode);
+            extendedCt = string.Empty;
+        }
+        catch (Exception)
+        {
+            ct = Subscription.SubscriptionChannelType.RestHook;
+            extendedCt = common.ChannelCode;
+        }
+
+        SubscriptionStatusCodes? status;
+
+        try
+        {
+            status = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatusCodes>(common.CurrentStatus);
+        }
+        catch (Exception)
+        {
+            status = SubscriptionStatusCodes.Requested;
+        }
+
+        subscription = new()
+        {
+            Id = common.Id,
+            Status = status!,
+            Reason = string.IsNullOrEmpty(common.Reason) ? "Required" : common.Reason,
+            Criteria = common.TopicUrl,
+            Channel = new()
+            {
+                Type = ct,
+                Endpoint = common.Endpoint,
+                Payload = common.ContentType,
+            },
+            End = new DateTimeOffset(common.ExpirationTicks, TimeSpan.Zero),
+        };
+
+        if (common.HeartbeatSeconds != null)
+        {
+            subscription.Channel.AddExtension(_heartbeatPeriodUrl, new Integer(common.HeartbeatSeconds));
+        }
+
+        if (common.TimeoutSeconds != null)
+        {
+            subscription.Channel.AddExtension(_timeoutUrl, new Integer(common.TimeoutSeconds));
+        }
+
+        if (common.MaxEventsPerNotification != null)
+        {
+            subscription.Channel.AddExtension(_maxCountUrl, new Integer(common.MaxEventsPerNotification));
+        }
+
+        if (!string.IsNullOrEmpty(extendedCt))
+        {
+            subscription.Channel.AddExtension(_channelTypeUrl, new FhirString(extendedCt));
+        }
+
+        subscription.Channel.AddExtension(_contentUrl, new FhirString(common.ContentLevel));
+
+        // add parameters
+        if (common.Parameters.Any())
+        {
+            List<string> headers = new();
+
+            foreach ((string key, List<string> values) in common.Parameters)
+            {
+                headers.AddRange(values.Select(v => key + "=" + v));
+            }
+
+            subscription.Channel.Header = headers;
+        }
+
+        // add filters
+        if (common.Filters.Any())
+        {
+            foreach (List<ParsedSubscription.SubscriptionFilter> filters in common.Filters.Values)
+            {
+                foreach (ParsedSubscription.SubscriptionFilter f in filters)
+                {
+                    string mod = string.IsNullOrEmpty(f.Modifier) ? string.Empty : ":" + f.Modifier;
+                    string pre = f.Comparator ?? string.Empty;
+
+                    subscription.CriteriaElement.AddExtension(
+                        _filterCriteriaUrl,
+                        new FhirString($"{f.ResourceType}?{f.Name}{mod}={pre}{f.Value}"));
                 }
             }
         }

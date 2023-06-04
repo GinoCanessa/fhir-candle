@@ -132,8 +132,15 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The operations supported by this server, by name.</summary>
     private Dictionary<string, IFhirOperation> _operations = new();
 
+    private enum LoadStateCodes
+    {
+        None,
+        Read,
+        Process,
+    }
+
     /// <summary>True while the store is loading initial content.</summary>
-    private bool _inLoad = false;
+    private LoadStateCodes _loadState = LoadStateCodes.None;
 
     /// <summary>Items to reprocess after a load completes.</summary>
     private Dictionary<string, List<object>>? _loadReprocess = null;
@@ -245,7 +252,7 @@ public partial class VersionedFhirStore : IFhirStore
         {
             _hasProtected = config.ProtectLoadedContent;
             _loadReprocess = new();
-            _inLoad = true;
+            _loadState = LoadStateCodes.Read;
 
             string serializedResource, serializedOutcome, eTag, lastModified, location;
             HttpStatusCode sc;
@@ -293,7 +300,7 @@ public partial class VersionedFhirStore : IFhirStore
                 Console.WriteLine($"{config.ControllerName} <<< {sc}: {file.FullName}");
             }
 
-            _inLoad = false;
+            _loadState = LoadStateCodes.Process;
 
             // reload any subscriptions in case they loaded before topics
             if (_loadReprocess.Any())
@@ -314,6 +321,7 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
 
+            _loadState = LoadStateCodes.None;
             _loadReprocess = null;
         }
 
@@ -559,6 +567,46 @@ public partial class VersionedFhirStore : IFhirStore
             {
                 _ = _receivedNotifications.TryRemove(id, out _);
                 RegisterReceivedSubscriptionChanged(id, 0, true);
+            }
+        }
+    }
+
+    private void CheckExpiredSubscriptions()
+    {
+        if (!_subscriptions.Any())
+        {
+            return;
+        }
+
+        long currentTicks = DateTimeOffset.Now.Ticks;
+
+        HashSet<string> idsToRemove = new();
+
+        // traverse subscriptions to find the ones we need to remove
+        foreach (ParsedSubscription sub in _subscriptions.Values)
+        {
+            if ((sub.ExpirationTicks == -1) ||
+                (sub.ExpirationTicks > currentTicks))
+            {
+                continue;
+            }
+
+            idsToRemove.Add(sub.Id);
+        }
+
+        // remove the parsed subscription and update the resource to be off
+        foreach (string id in idsToRemove)
+        {
+            // remove the executable version of this subscription
+            _ = _subscriptions.TryRemove(id, out _);
+
+            // look for a subscription resource to modify
+            if (_store.TryGetValue("Subscription", out IVersionedResourceStore? resourceStore) &&
+                resourceStore!.TryGetValue(id, out object? resourceObj) &&
+                (resourceObj is Subscription r))
+            {
+                r.Status = SubscriptionConverter.OffCode;
+                resourceStore.InstanceUpdate(r, false, _protectedResources);
             }
         }
     }
@@ -1028,7 +1076,7 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.InternalServerError;
         }
 
-        if (_inLoad && _hasProtected)
+        if ((_loadState != LoadStateCodes.None) && _hasProtected)
         {
             _protectedResources.Add(resourceType + "/" + r.Id);
         }
@@ -1688,6 +1736,18 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
+    public void ChangeSubscriptionStatus(string id, string status)
+    {
+        if (!_subscriptions.TryGetValue(id, out ParsedSubscription? subscription) ||
+            (subscription == null))
+        {
+            return;
+        }
+
+        subscription.CurrentStatus = status;
+        RegisterSubscriptionsChanged(subscription);
+    }
+
     /// <summary>Registers the event.</summary>
     /// <param name="subscriptionId">   Identifier for the subscription.</param>
     /// <param name="subscriptionEvent">The subscription event.</param>
@@ -1803,6 +1863,28 @@ public partial class VersionedFhirStore : IFhirStore
         return string.Empty;
     }
 
+    public bool TrySerializeToSubscription(
+        ParsedSubscription subscriptionInfo,
+        out string serialized,
+        bool pretty,
+        string destFormat = "application/fhir+json")
+    {
+        if (!_subscriptionConverter.TryParse(subscriptionInfo, out Hl7.Fhir.Model.Subscription subscription))
+        {
+            serialized = string.Empty;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(destFormat))
+        {
+            destFormat = "application/fhir+json";
+        }
+
+        serialized = SerializeFhir(subscription, destFormat, pretty);
+        return true;
+    }
+
+
     /// <summary>Bundle for subscription events.</summary>
     /// <param name="subscriptionId">  Identifier for the subscription.</param>
     /// <param name="eventNumbers">    One or more event numbers to include.</param>
@@ -1915,7 +1997,7 @@ public partial class VersionedFhirStore : IFhirStore
         // check to see if we have this topic
         if (!_topics.ContainsKey(subscription.TopicUrl))
         {
-            if (_inLoad)
+            if (_loadState == LoadStateCodes.Read)
             {
                 if (!_loadReprocess!.ContainsKey("Subscription"))
                 {
@@ -1926,6 +2008,12 @@ public partial class VersionedFhirStore : IFhirStore
             }
 
             return false;
+        }
+
+        // check for overriding the expiration of subscriptions
+        if (_loadState == LoadStateCodes.Process)
+        {
+            subscription.ExpirationTicks = -1;
         }
 
         ParsedSubscriptionTopic topic = _topics[subscription.TopicUrl];

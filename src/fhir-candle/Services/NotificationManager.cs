@@ -11,6 +11,7 @@ using MailKit.Net.Smtp;
 using MailKit;
 using MimeKit;
 using fhir.candle.Models;
+using System.Collections.Concurrent;
 
 namespace fhir.candle.Services;
 
@@ -31,6 +32,17 @@ public class NotificationManager : INotificationManager
 
     /// <summary>The heartbeat timer.</summary>
     private Timer _heartbeatTimer = null!;
+
+    private Timer _notificationTimer = null!;
+
+    private record NotificationRequest
+    {
+        public required IFhirStore Store { get; init; }
+
+        public required SubscriptionSendEventArgs Args { get; init; }
+    }
+
+    private ConcurrentQueue<NotificationRequest> _notificationRequestQ = new();
 
     /// <summary>The zulip site URL (e.g., https://chat.fhir.org/).</summary>
     private string _zulipUrl;
@@ -159,22 +171,35 @@ public class NotificationManager : INotificationManager
                 return false;
         }
 
+        bool success;
+
         switch (e.Subscription.ChannelCode.ToLowerInvariant())
         {
             case "email":
-                return await TryNotifyEmail(store, e, contents);
+                success = await TryNotifyEmail(store, e, contents);
+                break;
 
             case "rest-hook":
-                return await TryNotifyRestHook(store, e, contents);
+                success = await TryNotifyRestHook(store, e, contents);
+                break;
 
             case "zulip":
-                return await TryNotifyZulip(store, e, contents);
+                success = await TryNotifyZulip(store, e, contents);
+                break;
 
             case "websocket":
             default:
                 _logger.LogError($"TryNotify <<< unimplemented channel type: {e.Subscription.ChannelCode}");
                 return false;
         }
+
+        if ((e.NotificationType == ParsedSubscription.NotificationTypeCodes.Handshake) &&
+            success)
+        {
+            store.ChangeSubscriptionStatus(e.Subscription.Id, "active");
+        }
+
+        return success;
     }
 
     /// <summary>Attempt to send a notification via REST Hook.</summary>
@@ -610,12 +635,32 @@ public class NotificationManager : INotificationManager
 
         // start our heartbeat timer
         _heartbeatTimer = new Timer(
-                CheckAndSendHeartbeats,
-                null,
-                TimeSpan.Zero,
-                TimeSpan.FromSeconds(2));
+            CheckAndSendHeartbeats,
+            null,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(2));
+
+        _notificationTimer = new Timer(
+            CheckNotificationQ,
+            null,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(1));
 
         return Task.CompletedTask;
+    }
+
+    private void CheckNotificationQ(object? state)
+    {
+        while (_notificationRequestQ.Any())
+        {
+            if ((!_notificationRequestQ.TryDequeue(out NotificationRequest? req)) ||
+                (req == null))
+            {
+                return;
+            }
+
+            _ = TryNotify(req.Store, req.Args);
+        }
     }
 
     /// <summary>Check and send heartbeats.</summary>
@@ -631,6 +676,7 @@ public class NotificationManager : INotificationManager
             foreach (ParsedSubscription sub in store.CurrentSubscriptions)
             {
                 if ((!sub.CurrentStatus.Equals("active", StringComparison.Ordinal)) ||
+                    (sub.HeartbeatSeconds == null) ||
                     (sub.HeartbeatSeconds <= 0))
                 {
                     continue;
@@ -639,21 +685,25 @@ public class NotificationManager : INotificationManager
                 // wait one offset if the subscription is new
                 if (sub.LastCommunicationTicks == 0)
                 {
-                    sub.LastCommunicationTicks = currentTicks + (sub.HeartbeatSeconds - 1 * TimeSpan.TicksPerSecond);
+                    sub.LastCommunicationTicks = currentTicks + ((long)sub.HeartbeatSeconds - 1 * TimeSpan.TicksPerSecond);
                     continue;
                 }
 
-                long threshold = currentTicks - (sub.HeartbeatSeconds * TimeSpan.TicksPerSecond);
+                long threshold = currentTicks - ((long)sub.HeartbeatSeconds! * TimeSpan.TicksPerSecond);
 
                 if (sub.LastCommunicationTicks < threshold)
                 {
                     sub.LastCommunicationTicks = currentTicks;
 
-                    _ = TryNotify(store, new()
+                    _notificationRequestQ.Enqueue(new()
                     {
-                        Tenant = store.Config,
-                        Subscription = sub,
-                        NotificationType = ParsedSubscription.NotificationTypeCodes.Heartbeat,
+                        Store = store,
+                        Args = new()
+                        {
+                            Tenant = store.Config,
+                            Subscription = sub,
+                            NotificationType = ParsedSubscription.NotificationTypeCodes.Heartbeat,
+                        },
                     });
                 }
             }
@@ -671,7 +721,11 @@ public class NotificationManager : INotificationManager
             return;
         }
 
-        _ = TryNotify(_storeManager[e.Tenant.ControllerName], e);
+        _notificationRequestQ.Enqueue(new()
+        {
+            Store = _storeManager[e.Tenant.ControllerName],
+            Args = e,
+        });
     }
 
     /// <summary>Event handler. Called by Store for on subscriptions changed events.</summary>
@@ -701,21 +755,16 @@ public class NotificationManager : INotificationManager
                 return;
             }
 
-            bool success = TryNotify(store, new()
+            _notificationRequestQ.Enqueue(new()
             {
-                Tenant = e.Tenant,
-                Subscription = e.ChangedSubscription!,
-                NotificationType = ParsedSubscription.NotificationTypeCodes.Handshake,
-            }).Result;
-
-            if (success)
-            {
-                e.ChangedSubscription!.CurrentStatus = "active";
-            }
-            else
-            {
-                e.ChangedSubscription!.CurrentStatus = "error";
-            }
+                Store = store,
+                Args = new()
+                {
+                    Tenant = e.Tenant,
+                    Subscription = e.ChangedSubscription!,
+                    NotificationType = ParsedSubscription.NotificationTypeCodes.Handshake,
+                }
+            });
         }
 
         // check for a changed subscription

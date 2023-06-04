@@ -263,6 +263,14 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string contentType = "",
         string contentLevel = "");
 
+    bool TrySerializeToSubscription(
+        ParsedSubscription subscriptionInfo,
+        out string serialized,
+        bool pretty,
+        string destFormat = "");
+
+    void ChangeSubscriptionStatus(string id, string status);
+
     /// <summary>Supports resource.</summary>
     /// <param name="resourceName">Name of the resource.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>

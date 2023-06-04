@@ -11,6 +11,8 @@ namespace FhirStore.Models;
 /// <summary>A common subscription.</summary>
 public class ParsedSubscription
 {
+    public static readonly long DefaultSubscriptionExpiration = TimeSpan.FromMinutes(10).Ticks;
+
     private long _currentEventCount = 0;
     private Dictionary<long, SubscriptionEvent> _generatedEvents = new();
     private List<string> _notificationErrors = new();
@@ -88,10 +90,10 @@ public class ParsedSubscription
     public Dictionary<string, List<string>> Parameters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Gets or sets the heartbeat seconds.</summary>
-    public int HeartbeatSeconds { get; set; } = 0;
+    public int? HeartbeatSeconds { get; set; } = null;
 
     /// <summary>Gets or sets the timeout seconds.</summary>
-    public int TimeoutSeconds { get; set; } = 0;
+    public int? TimeoutSeconds { get; set; } = null;
 
     /// <summary>Gets or sets the type of the content.</summary>
     public string ContentType { get; set; } = string.Empty;
@@ -100,13 +102,17 @@ public class ParsedSubscription
     public string ContentLevel { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the maximum events per notification.</summary>
-    public int MaxEventsPerNotification { get; set; } = 0;
+    public int? MaxEventsPerNotification { get; set; } = null;
 
     /// <summary>Gets or sets the current status of the subscription.</summary>
     public string CurrentStatus { get; set; } = "active";
 
+    public string Reason { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the system tick (time) when the last communication was sent.</summary>
     public long LastCommunicationTicks { get; set; } = 0;
+
+    public long ExpirationTicks { get; set; } = DateTime.Now.Ticks + DefaultSubscriptionExpiration;
 
     /// <summary>Gets or sets the number of current events.</summary>
     public long CurrentEventCount { get => _currentEventCount; }

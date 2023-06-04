@@ -19,6 +19,11 @@
             <ItemContent>
                 <MudCard id="element-step-1">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(1)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(1)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Choose a topic</MudText>
                         </CardHeaderContent>
@@ -112,7 +117,7 @@
                     }
 
                     <MudCardActions>
-                        <MudButton Variant="Variant.Outlined" OnClick="@(() => SetTopic())">Select encounter-complete topic</MudButton>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(2))">Select encounter-complete topic</MudButton>
                     </MudCardActions>
                 </MudCard>
             </ItemContent>
@@ -121,40 +126,128 @@
             <ItemContent>
                 <MudCard id="element-step-2">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(2)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(2)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Configure a subscription</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText Typo="Typo.body1">Set channel, endpoint, headers, content, etc.</MudText>
+                        <MudText Typo="Typo.body1">
+                            In this step, we are configuration the subscription options.
+                        </MudText>
+
+                        <br />
+                        <MudDivider />
+                        <MudText Typo="Typo.body1">
+                            The following options are fixed for this walkthrough and are displayed only for reference:
+                        </MudText>
+
+                        <MudSelect Label="Channel Type" HelperText="Walkthrough is restricted to REST-Hook" @bind-Value="subscription.ChannelCode" ReadOnly="true">
+                            <MudSelectItem Value="@("email")">Email</MudSelectItem>
+                            <MudSelectItem Value="@("message")">FHIR Message</MudSelectItem>
+                            <MudSelectItem Value="@("rest-hook")">REST Hook (http/s POST)</MudSelectItem>
+                            <MudSelectItem Value="@("websocket")">Websocket</MudSelectItem>
+                            <MudSelectItem Value="@("zulip")">Zulip</MudSelectItem>
+                        </MudSelect>
+                        <MudTextField @bind-Value="subscription.Endpoint" Label="Endpoint" ReadOnly="true" />
+                        <MudTextField @bind-Value="subscription.HeartbeatSeconds" Label="Heartbeat frequency (seconds)" ReadOnly="true" />
+                        <MudField Label="End (expiration)">@(DateTime.Now.ToString("O")) (in 10 minutes)</MudField>
+
+                        <br />
+                        <MudDivider />
+                        <MudText Typo="Typo.body1">
+                            The following options are selected in this walkthrough:
+                        </MudText>
+                        <MudSelect Label="Content Type" HelperText="MIME Type to use for notifications" @bind-Value="subscription.ContentType">
+                            <MudSelectItem Value="@("application/fhir+json")">FHIR JSON</MudSelectItem>
+                            <MudSelectItem Value="@("application/fhir+xml")">FHIR XML</MudSelectItem>
+                        </MudSelect>
+                        <MudSelect Label="Content Level" HelperText="Amount of data to include in notifications" @bind-Value="subscription.ContentLevel">
+                            <MudSelectItem Value="@("empty")">Empty</MudSelectItem>
+                            <MudSelectItem Value="@("id-only")">IDs Only</MudSelectItem>
+                            <MudSelectItem Value="@("full-resource")">Full Resources</MudSelectItem>
+                        </MudSelect>
                     </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(3))">Use these settings</MudButton>
+                    </MudCardActions>
                 </MudCard>
             </ItemContent>
         </MudTimelineItem>
         <MudTimelineItem Color="@ColorForStep(3)">
             <ItemContent>
-                <MudCard>
+                <MudCard id="element-step-3">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(3)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(3)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Select filter data</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1">
+                            The final piece of configuration for a subscription are filter values.
+                            In this tour, we will be using <code>Patient/example</code> as a 
+                            patient filter for our topic.  Note that allowed filters are defined
+                            by each topic.
+                        </MudText>
+                        <MudField Label="Subscription Filter">Patient/example</MudField>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(4))">Use this filter</MudButton>
+                    </MudCardActions>
                 </MudCard>
             </ItemContent>
         </MudTimelineItem>
         <MudTimelineItem Color="@ColorForStep(4)">
             <ItemContent>
-                <MudCard>
+                <MudCard id="element-step-4">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(4)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(4)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Request subscription</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText Typo="Typo.body1">Send request to server.</MudText>
+                        <MudText Typo="Typo.body1">
+                            With our configuration complete, we are ready to create our
+                            resource and request it on the server.
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(subscriptionLocation))
+                        {
+                            <br />
+                            <MudText Typo="Typo.body1">
+                                Now that our subscription is created, is can be viewed
+                                <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={subscription.Id}")"
+                                         Underline="Underline.Always">here</MudLink>,
+                                or requested (in FHIR) at
+                                <code>@subscriptionLocation</code>
+                                <sup>
+                                    <button onclick="@($"navigator.clipboard.writeText('{subscriptionLocation}')")">
+                                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                    </button>
+                                </sup>.
+                            </MudText>
+                        }
+
+                        @if ((errorAtStep == 4) && (!string.IsNullOrEmpty(errorMessage)))
+                        {
+                            <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+                        }
                     </MudCardContent>
                     <MudCardActions>
-                        <MudButton Variant="Variant.Outlined">Run</MudButton>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => PostSubscription())">POST Subscription request</MudButton>
                     </MudCardActions>
                 </MudCard>
             </ItemContent>
@@ -164,23 +257,51 @@
                 <MudText Typo="Typo.h6">Check handshake</MudText>
             </ItemOpposite>
             <ItemContent>
-                <MudAlert Severity="Severity.Normal">Wait on Handshake</MudAlert>
-                <MudCard>
+                <MudCard id="element-step-5">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(5)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(5)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Server performs handshake</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText Typo="Typo.body1">Wait for handshake.</MudText>
+                        @if (string.IsNullOrEmpty(handshakeBundleId))
+                        {
+                            <MudText Typo="Typo.body1">Waiting for handshake.</MudText>
+                        }
+                        else
+                        {
+                            <br />
+                            <MudText Typo="Typo.body1">
+                                Handshake received! The notification bundle can be viewed
+                                <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={handshakeBundleId}")"
+                                         Underline="Underline.Always">here</MudLink>,
+                                or requested (in FHIR) at
+                                <code>@_store.Config.BaseUrl/Bundle/@handshakeBundleId</code>
+                                <sup>
+                                    <button onclick="@($"navigator.clipboard.writeText('{_store.Config.BaseUrl}/Bundle/{handshakeBundleId}')")">
+                                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                    </button>
+                                </sup>.
+                            </MudText>
+                        }
                     </MudCardContent>
                 </MudCard>
             </ItemContent>
         </MudTimelineItem>
         <MudTimelineItem Color="@ColorForStep(6)">
             <ItemContent>
-                <MudCard>
+                <MudCard id="element-step-6">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(6)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(6)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Trigger a notification</MudText>
                         </CardHeaderContent>
@@ -193,8 +314,13 @@
         </MudTimelineItem>
         <MudTimelineItem Color="@ColorForStep(7)">
             <ItemContent>
-                <MudCard>
+                <MudCard id="element-step-7">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(7)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(7)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Server sends notification</MudText>
                         </CardHeaderContent>
@@ -207,8 +333,13 @@
         </MudTimelineItem>
         <MudTimelineItem Color="@ColorForStep(8)">
             <ItemContent>
-                <MudCard>
+                <MudCard id="element-step-8">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(8)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(8)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">RESTful Requests</MudText>
                         </CardHeaderContent>
@@ -221,8 +352,13 @@
         </MudTimelineItem>
         <MudTimelineItem Color="@ColorForStep(9)">
             <ItemContent>
-                <MudCard>
+                <MudCard id="element-step-9">
                     <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@ColorForStep(9)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(9)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Clean up</MudText>
                         </CardHeaderContent>
@@ -250,11 +386,45 @@
 
     private int onStep { get; set; } = 1;
 
-    private string topicUrl { get; set; } = "http://example.org/FHIR/SubscriptionTopic/encounter-complete";
+    private int errorAtStep { get; set; } = -1;
 
+    private string errorMessage { get; set; } = string.Empty;
+
+    private string subscriptionLocation { get; set; } = string.Empty;
+
+    private string handshakeBundleId { get; set; } = string.Empty;
+
+    ParsedSubscription subscription = new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            TopicUrl = "http://example.org/FHIR/SubscriptionTopic/encounter-complete",
+            CurrentStatus = "requested",
+            Reason = "Test subscription for walkthrough",
+            ChannelCode = "rest-hook",
+            ChannelSystem = "http://terminology.hl7.org/CodeSystem/subscription-channel-type",
+            Endpoint = string.Empty,
+            HeartbeatSeconds = 120,
+            ContentType = "application/fhir+json",
+            ContentLevel = "id-only",
+            Filters = new()
+            {
+                { "Encounter", new List<ParsedSubscription.SubscriptionFilter>()
+                    {
+                        new ParsedSubscription.SubscriptionFilter("Encounter", "patient", string.Empty, string.Empty, "Patient/example"),
+                    }
+                },
+            }
+        };
+
+    private bool postingSubscription = false;
 
     private MudBlazor.Color ColorForStep(int step)
     {
+        if (step == errorAtStep)
+        {
+            return Color.Error;
+        }
+
         if (step < onStep)
         {
             return Color.Success;
@@ -268,11 +438,80 @@
         return Color.Default;
     }
 
-    private void SetTopic()
+    private string IconForStep(int step)
     {
-        onStep = 2;
-        _ = JS.InvokeVoidAsync("scrollElementIntoView", "element-step-2");
+        if (step == errorAtStep)
+        {
+            return Icons.Material.Filled.Error;
+        }
+
+        if (step < onStep)
+        {
+            return Icons.Material.Filled.Check;
+        }
+
+        if (step == onStep)
+        {
+            return Icons.Material.Filled.Edit;
+        }
+
+        return Icons.Material.Filled.LockClock;
+    }
+
+    private void MoveToStep(int toStep)
+    {
+        errorAtStep = -1;
+        errorMessage = string.Empty;
+        onStep = toStep;
+        _ = JS.InvokeVoidAsync("scrollElementIntoView", "element-step-" + toStep);
         InvokeAsync(() => StateHasChanged());
+    }
+
+    private void PostSubscription()
+    {
+        if ((postingSubscription) || (!string.IsNullOrEmpty(subscriptionLocation)))
+        {
+            return;
+        }
+
+        postingSubscription = true;
+
+        if (!_store.TrySerializeToSubscription(subscription, out string serialized, false))
+        {
+            errorAtStep = 4;
+            errorMessage = "Failed to serialize request content.";
+            postingSubscription = false;
+            return;
+        }
+
+        System.Net.HttpStatusCode sc = _store.InstanceCreate(
+            "Subscription",
+            serialized,
+            "application/fhir+json",
+            "application/fhir+json",
+            true,
+            string.Empty,
+            true,
+            out _,
+            out string outcome,
+            out _,
+            out _,
+            out string location
+        );
+
+        if ((sc == System.Net.HttpStatusCode.OK) ||
+            (sc == System.Net.HttpStatusCode.Created))
+        {
+            postingSubscription = false;
+            subscriptionLocation = location;
+            MoveToStep(5);
+            return;
+        }
+
+        errorAtStep = 4;
+        errorMessage = outcome;
+        postingSubscription = false;
+        return;
     }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
@@ -287,6 +526,8 @@
             _store.OnChanged += Store_OnChanged;
             _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
             _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
+
+            subscription.Endpoint = _store.Config.BaseUrl + "/$subscription-hook";
         }
 
         // notify of store root in case user clicked here directly
@@ -314,6 +555,8 @@
                 _store.OnChanged += Store_OnChanged;
                 _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
                 _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
+
+                subscription.Endpoint = _store.Config.BaseUrl + "/$subscription-hook";
             }
 
             // notify of store root in case user clicked here directly
@@ -327,7 +570,32 @@
     /// <param name="e">     Subscription event information.</param>
     private void Store_OnSubscriptionsChanged(object? sender, SubscriptionChangedEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        if (e.ChangedSubscription?.Id.Equals(subscription.Id, StringComparison.Ordinal) ?? false)
+        {
+            if (e.ChangedSubscription.CurrentStatus == "active")
+            {
+                if ((_store.ReceivedNotifications.TryGetValue(subscriptionLocation, out List<ParsedSubscriptionStatus>? notifications)) &&
+                    (notifications != null))
+                {
+                    ParsedSubscriptionStatus? handshake = notifications.Where(n => n.NotificationType == ParsedSubscription.NotificationTypeCodes.Handshake)?.First() ?? null;
+
+                    if (handshake != null)
+                    {
+                        handshakeBundleId = handshake.BundleId;
+                    }
+                }
+
+                MoveToStep(6);
+            }
+
+            return;
+        }
+
+        if ((!string.IsNullOrEmpty(e.RemovedSubscriptionId)) &&
+            (e.RemovedSubscriptionId.Equals(subscription.Id, StringComparison.Ordinal)))
+        {
+            MoveToStep(10);
+        }
     }
 
     /// <summary>Event handler. Called by Store for on subscription events.</summary>

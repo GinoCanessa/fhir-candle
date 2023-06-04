@@ -9,7 +9,7 @@ namespace FhirStore.Models;
 public class TenantConfiguration
 {
     /// <summary>Values that represent supported FHIR versions.</summary>
-    public enum SupportedFhirVersions
+    public enum SupportedFhirVersions : int
     {
         R4,
         R4B,

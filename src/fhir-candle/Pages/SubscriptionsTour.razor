@@ -307,8 +307,50 @@
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText Typo="Typo.body1">Post an Encounter to trigger the subscription.</MudText>
+                        <MudText Typo="Typo.body1">
+                            The topic we are using is set to trigger when an <code>Encounter</code> is set to the
+                            status of <code>@encounterStatus</code>.  This can be true either when the encounter
+                            resource is create, or it could be updated from another state.
+                        </MudText>
+                        <br />
+                        <MudText Typo="Typo.body1">
+                            Since we specified the filter that encounters need to have a <code>patient</code>
+                            that matches <code>Patient/example</code>, we need to also set the <code>subject</code>
+                            reference to that patient.
+                        </MudText>
+                        <br />
+                        <MudText Typo="Typo.body1">
+                            For simplicity during this walkthrough, we will create an encounter with all the 
+                            values needed to trigger a notification.
+                        </MudText>
+
+                        @if (postedEncounters.Any() &&
+                             (postedEncounters.Last() is string encounterId) &&
+                             (!string.IsNullOrEmpty(encounterId)))
+                        {
+                            <br />
+                            <MudText Typo="Typo.body1">
+                                Encounter posted! The resource can be viewed
+                                <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Encounter&id={encounterId}")"
+                                         Underline="Underline.Always">here</MudLink>,
+                                or requested (in FHIR) at
+                                <code>@_store.Config.BaseUrl/Encounter/@encounterId</code>
+                                <sup>
+                                    <button onclick="@($"navigator.clipboard.writeText('{_store.Config.BaseUrl}/Encounter/{encounterId}')")">
+                                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+                                    </button>
+                                </sup>.
+                            </MudText>
+                        }
+
+                        @if ((errorAtStep == 6) && (!string.IsNullOrEmpty(errorMessage)))
+                        {
+                            <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+                        }
                     </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => PostEncounter())">POST Encounter</MudButton>
+                    </MudCardActions>
                 </MudCard>
             </ItemContent>
         </MudTimelineItem>
@@ -322,16 +364,40 @@
                             </MudAvatar>
                         </CardHeaderAvatar>
                         <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Server sends notification</MudText>
+                            <MudText Typo="Typo.h6">Review notifications</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText Typo="Typo.body1">Wait for notification</MudText>
+                        @if (!postedEncounters.Any())
+                        {
+                            <MudText Typo="Typo.body1">Waiting for notifications...</MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body1">
+                                This subscription has triggered @postedEncounters.Count notifications.
+                            </MudText>
+                            <br />
+                            <MudText Typo="Typo.body1">
+                                Details about sent notifications for this subscription can be found
+                                <MudLink Href="@($"/store/ext/notification-local-viewer?store={StoreName}&id={subscription.Id}")"
+                                         Underline="Underline.Always">here</MudLink>.
+                            </MudText>
+                            <br />
+                            <MudText Typo="Typo.body1">
+                                Details about received notifications for this subscription can be found
+                                <MudLink Href="@($"/store/ext/notification-received-viewer?store={StoreName}&ref={subscriptionLocation}")"
+                                         Underline="Underline.Always">here</MudLink>.
+                            </MudText>
+                        }
                     </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(8))">Ok</MudButton>
+                    </MudCardActions>
                 </MudCard>
             </ItemContent>
         </MudTimelineItem>
-        <MudTimelineItem Color="@ColorForStep(8)">
+@*        <MudTimelineItem Color="@ColorForStep(8)">
             <ItemContent>
                 <MudCard id="element-step-8">
                     <MudCardHeader>
@@ -349,14 +415,14 @@
                     </MudCardContent>
                 </MudCard>
             </ItemContent>
-        </MudTimelineItem>
-        <MudTimelineItem Color="@ColorForStep(9)">
+        </MudTimelineItem>*@
+        <MudTimelineItem Color="@ColorForStep(8)">
             <ItemContent>
-                <MudCard id="element-step-9">
+                <MudCard id="element-step-8">
                     <MudCardHeader>
                         <CardHeaderAvatar>
-                            <MudAvatar Color="@ColorForStep(9)" Variant="Variant.Outlined">
-                                <MudIcon Icon="@IconForStep(9)" />
+                            <MudAvatar Color="@ColorForStep(8)" Variant="Variant.Outlined">
+                                <MudIcon Icon="@IconForStep(8)" />
                             </MudAvatar>
                         </CardHeaderAvatar>
                         <CardHeaderContent>
@@ -364,8 +430,20 @@
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText Typo="Typo.body1">Remove subscription/encounters/etc.</MudText>
+                        <MudText Typo="Typo.body1">
+                            That completes this tour.  If you have any questions, comments, or suggestions
+                            for this software, please let us know.  A link to the GitHub repository for this
+                            project can be found on the top right corner of the screen.
+                        </MudText>
+                        <br />
+                        <MudText Typo="Typo.body1">
+                            Please click the button below to remove the resources created during this session.
+                            Thank you!
+                        </MudText>
                     </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(() => CleanUp())">Done</MudButton>
+                    </MudCardActions>
                 </MudCard>
             </ItemContent>
         </MudTimelineItem>
@@ -388,35 +466,69 @@
 
     private int errorAtStep { get; set; } = -1;
 
-    private string errorMessage { get; set; } = string.Empty;
+    private string errorMessage = string.Empty;
 
-    private string subscriptionLocation { get; set; } = string.Empty;
+    private string subscriptionLocation = string.Empty;
 
-    private string handshakeBundleId { get; set; } = string.Empty;
+    private string handshakeBundleId = string.Empty;
+
+    private const string _encounterJsonR4 = """"
+{
+  "resourceType": "Encounter",
+  "status": "finished",
+  "class": {
+    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+    "code": "VR",
+    "display": "virtual"
+  },
+  "subject": { "reference": "Patient/example" }
+}
+"""";
+
+    private const string _encounterJsonR4B = _encounterJsonR4;
+
+    private const string _encounterJsonR5 = """"
+{
+  "resourceType": "Encounter",
+  "status": "completed",
+  "class": [{
+    "coding": [{
+      "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+      "code": "VR",
+      "display": "virtual"
+    }]
+  }],
+  "subject": { "reference": "Patient/example" }
+}
+"""";
 
     ParsedSubscription subscription = new()
+    {
+        Id = Guid.NewGuid().ToString(),
+        TopicUrl = "http://example.org/FHIR/SubscriptionTopic/encounter-complete",
+        CurrentStatus = "requested",
+        Reason = "Test subscription for walkthrough",
+        ChannelCode = "rest-hook",
+        ChannelSystem = "http://terminology.hl7.org/CodeSystem/subscription-channel-type",
+        Endpoint = string.Empty,
+        HeartbeatSeconds = 120,
+        ContentType = "application/fhir+json",
+        ContentLevel = "id-only",
+        Filters = new()
         {
-            Id = Guid.NewGuid().ToString(),
-            TopicUrl = "http://example.org/FHIR/SubscriptionTopic/encounter-complete",
-            CurrentStatus = "requested",
-            Reason = "Test subscription for walkthrough",
-            ChannelCode = "rest-hook",
-            ChannelSystem = "http://terminology.hl7.org/CodeSystem/subscription-channel-type",
-            Endpoint = string.Empty,
-            HeartbeatSeconds = 120,
-            ContentType = "application/fhir+json",
-            ContentLevel = "id-only",
-            Filters = new()
-            {
-                { "Encounter", new List<ParsedSubscription.SubscriptionFilter>()
-                    {
-                        new ParsedSubscription.SubscriptionFilter("Encounter", "patient", string.Empty, string.Empty, "Patient/example"),
-                    }
-                },
-            }
-        };
+            { "Encounter", new List<ParsedSubscription.SubscriptionFilter>()
+                {
+                    new ParsedSubscription.SubscriptionFilter("Encounter", "patient", string.Empty, string.Empty, "Patient/example"),
+                }
+            },
+        }
+    };
 
-    private bool postingSubscription = false;
+    private string encounterStatus = "completed";
+
+    private bool postingResource = false;
+
+    List<string> postedEncounters = new();
 
     private MudBlazor.Color ColorForStep(int step)
     {
@@ -463,24 +575,29 @@
         errorAtStep = -1;
         errorMessage = string.Empty;
         onStep = toStep;
-        _ = JS.InvokeVoidAsync("scrollElementIntoView", "element-step-" + toStep);
+
+        if (toStep < 9)
+        {
+            _ = JS.InvokeVoidAsync("scrollElementIntoView", "element-step-" + toStep);
+        }
+
         InvokeAsync(() => StateHasChanged());
     }
 
     private void PostSubscription()
     {
-        if ((postingSubscription) || (!string.IsNullOrEmpty(subscriptionLocation)))
+        if ((postingResource) || (!string.IsNullOrEmpty(subscriptionLocation)))
         {
             return;
         }
 
-        postingSubscription = true;
+        postingResource = true;
 
         if (!_store.TrySerializeToSubscription(subscription, out string serialized, false))
         {
             errorAtStep = 4;
             errorMessage = "Failed to serialize request content.";
-            postingSubscription = false;
+            postingResource = false;
             return;
         }
 
@@ -502,7 +619,7 @@
         if ((sc == System.Net.HttpStatusCode.OK) ||
             (sc == System.Net.HttpStatusCode.Created))
         {
-            postingSubscription = false;
+            postingResource = false;
             subscriptionLocation = location;
             MoveToStep(5);
             return;
@@ -510,8 +627,108 @@
 
         errorAtStep = 4;
         errorMessage = outcome;
-        postingSubscription = false;
+        postingResource = false;
         return;
+    }
+
+    private void PostEncounter()
+    {
+        if (postingResource)
+        {
+            return;
+        }
+
+        postingResource = true;
+
+        System.Net.HttpStatusCode sc = _store.InstanceCreate(
+            "Encounter",
+            getJsonEncounter(),
+            "application/fhir+json",
+            "application/fhir+json",
+            true,
+            string.Empty,
+            false,
+            out _,
+            out string outcome,
+            out _,
+            out _,
+            out string location
+        );
+
+        if ((sc == System.Net.HttpStatusCode.OK) ||
+            (sc == System.Net.HttpStatusCode.Created))
+        {
+            postingResource = false;
+
+            int loc = location.LastIndexOf('/');
+            if (loc != -1)
+            {
+                postedEncounters.Add(location.Substring(loc + 1));
+            }
+
+            MoveToStep(7);
+            return;
+        }
+
+        errorAtStep = 6;
+        errorMessage = outcome;
+        postingResource = false;
+        return;
+
+        string getJsonEncounter() => _store.Config.FhirVersion switch
+        {
+            TenantConfiguration.SupportedFhirVersions.R4 => _encounterJsonR4,
+            TenantConfiguration.SupportedFhirVersions.R4B => _encounterJsonR4B,
+            TenantConfiguration.SupportedFhirVersions.R5 => _encounterJsonR5,
+            _ => string.Empty,
+        };
+    }
+
+    private void CleanUp()
+    {
+        if (!string.IsNullOrEmpty(subscriptionLocation))
+        {
+            subscriptionLocation = string.Empty;
+
+            _ = _store.InstanceDelete(
+                "Subscription",
+                subscription.Id,
+                "application/fhir+json",
+                false,
+                string.Empty,
+                out _,
+                out _);
+        }
+
+        if (!string.IsNullOrEmpty(handshakeBundleId))
+        {
+            _ = _store.InstanceDelete(
+                "Bundle",
+                handshakeBundleId,
+                "application/fhir+json",
+                false,
+                string.Empty,
+                out _,
+                out _);
+
+            handshakeBundleId = string.Empty;
+        }
+
+        foreach (string encId in postedEncounters)
+        {
+            _ = _store.InstanceDelete(
+                "Encounter",
+                encId,
+                "application/fhir+json",
+                false,
+                string.Empty,
+                out _,
+                out _);
+        }
+
+        postedEncounters.Clear();
+
+        MoveToStep(1);
     }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
@@ -528,6 +745,10 @@
             _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
 
             subscription.Endpoint = _store.Config.BaseUrl + "/$subscription-hook";
+
+            encounterStatus = _store.Config.FhirVersion >= TenantConfiguration.SupportedFhirVersions.R5
+                ? "completed"
+                : "finished";
         }
 
         // notify of store root in case user clicked here directly

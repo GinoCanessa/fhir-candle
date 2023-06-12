@@ -13,6 +13,8 @@ public class OpSubscriptionEvents : IFhirOperation
     /// <summary>Gets the name of the operation.</summary>
     public string OperationName => "$events";
 
+    public string OperationVersion => "0.0.1";
+
     /// <summary>Gets the canonical by FHIR version.</summary>
     public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {

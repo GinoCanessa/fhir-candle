@@ -16,6 +16,8 @@ public class OpSubscriptionHook : IFhirOperation
     /// <summary>Gets the name of the operation.</summary>
     public string OperationName => "$subscription-hook";
 
+    public string OperationVersion => "0.0.1";
+
     /// <summary>Gets the canonical by FHIR version.</summary>
     public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
@@ -23,6 +25,8 @@ public class OpSubscriptionHook : IFhirOperation
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
     };
+
+    public bool IsQuery => false;
 
     /// <summary>Gets a value indicating whether we allow get.</summary>
     public bool AllowGet => true;
@@ -104,5 +108,41 @@ public class OpSubscriptionHook : IFhirOperation
         responseOutcome = store.BuildOutcomeForRequest(HttpStatusCode.OK, "Subscription Notification Received");
         contentLocation = string.Empty;
         return HttpStatusCode.OK;
+    }
+
+    public Hl7.Fhir.Model.OperationDefinition GetDefinition(FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+    {
+        List<Hl7.Fhir.Model.ResourceType> resourceTypes = new();
+
+        foreach (string r in SupportedResources)
+        {
+            try
+            {
+                Hl7.Fhir.Model.ResourceType? rt = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<Hl7.Fhir.Model.ResourceType>(r);
+                if (rt != null)
+                {
+                    resourceTypes.Add((Hl7.Fhir.Model.ResourceType)rt!);
+                }
+            }
+            catch(Exception)
+            {
+            }
+        }
+
+        Hl7.Fhir.Model.OperationDefinition def = new()
+        {
+            Id = OperationName.Substring(1) + "-" + OperationVersion.Replace('.', '-'),
+            Name = OperationName,
+            Url = CanonicalByFhirVersion[fhirVersion],
+            Status = Hl7.Fhir.Model.PublicationStatus.Draft,
+            Kind = IsQuery ? Hl7.Fhir.Model.OperationDefinition.OperationKind.Query : Hl7.Fhir.Model.OperationDefinition.OperationKind.Operation,
+            Code = OperationName.Substring(1),
+            Resource = (IEnumerable<Hl7.Fhir.Model.ResourceType?>)resourceTypes,
+            System = AllowSystemLevel,
+            Type = AllowResourceLevel,
+            Instance = AllowInstanceLevel,
+        };
+
+
     }
 }

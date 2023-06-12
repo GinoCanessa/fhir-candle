@@ -8,8 +8,6 @@
 
   <Import Project="..\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems" Label="Shared" />
 
-  <Import Project="..\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.projitems" Label="Shared" />
-
   <ItemGroup>
     <PackageReference Include="Hl7.Fhir.R4B" Version="5.2.0" />
   </ItemGroup>

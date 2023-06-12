@@ -5,7 +5,8 @@
 
 using fhir.candle.Search;
 using FhirStore.Models;
-using FhirStore.Storage;
+using FhirStore.Operations;
+using FhirStore.Versioned.Subscriptions;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
@@ -15,14 +16,12 @@ using Hl7.Fhir.Support;
 using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
 using System.Net;
-using FhirStore.Versioned.Shims.Subscriptions;
 using System.Text.RegularExpressions;
-using static fhir.candle.Search.SearchDefinitions;
 using System.Collections;
 using System.Collections.Concurrent;
-using FhirStore.Operations;
 using System.Text.Json;
 using System.Xml;
+using static fhir.candle.Search.SearchDefinitions;
 
 namespace FhirStore.Storage;
 
@@ -132,6 +131,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The operations supported by this server, by name.</summary>
     private Dictionary<string, IFhirOperation> _operations = new();
 
+    /// <summary>Values that represent load state codes.</summary>
     private enum LoadStateCodes
     {
         None,
@@ -342,6 +342,20 @@ public partial class VersionedFhirStore : IFhirStore
             if (!_operations.ContainsKey(fhirOp.OperationName))
             {
                 _operations.Add(fhirOp.OperationName, fhirOp);
+
+                try
+                {
+                    Hl7.Fhir.Model.OperationDefinition? opDef = fhirOp.GetDefinition(_config.FhirVersion);
+
+                    if (opDef != null)
+                    {
+                        _ = _store["OperationDefinition"].InstanceCreate(opDef, true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error loading operation definition {fhirOp.OperationName}: {ex.Message}");
+                }
             }
         }
 
@@ -1736,6 +1750,9 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
+    /// <summary>Change subscription status.</summary>
+    /// <param name="id">    The identifier.</param>
+    /// <param name="status">The status.</param>
     public void ChangeSubscriptionStatus(string id, string status)
     {
         if (!_subscriptions.TryGetValue(id, out ParsedSubscription? subscription) ||

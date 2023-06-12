@@ -16,6 +16,4 @@
 
   <Import Project="..\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems" Label="Shared" />
 
-  <Import Project="..\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems" Label="Shared" />
-
 </Project>

@@ -6,6 +6,7 @@
 using FhirStore.Models;
 using FhirStore.Operations;
 using FhirStore.Storage;
+using FhirStore.Versioned.Extensions;
 using System.Net;
 
 namespace FhirStore.CommonVersioned.Operations;
@@ -16,6 +17,7 @@ public class OpSubscriptionHook : IFhirOperation
     /// <summary>Gets the name of the operation.</summary>
     public string OperationName => "$subscription-hook";
 
+    /// <summary>Gets the operation version.</summary>
     public string OperationVersion => "0.0.1";
 
     /// <summary>Gets the canonical by FHIR version.</summary>
@@ -26,7 +28,8 @@ public class OpSubscriptionHook : IFhirOperation
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
     };
 
-    public bool IsQuery => false;
+    /// <summary>Gets a value indicating whether this operation is a named query.</summary>
+    public bool IsNamedQuery => false;
 
     /// <summary>Gets a value indicating whether we allow get.</summary>
     public bool AllowGet => true;
@@ -110,39 +113,45 @@ public class OpSubscriptionHook : IFhirOperation
         return HttpStatusCode.OK;
     }
 
-    public Hl7.Fhir.Model.OperationDefinition GetDefinition(FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+    /// <summary>Gets an OperationDefinition for this operation.</summary>
+    /// <param name="fhirVersion">The FHIR version.</param>
+    /// <returns>The definition.</returns>
+    public Hl7.Fhir.Model.OperationDefinition? GetDefinition(
+        FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
     {
-        List<Hl7.Fhir.Model.ResourceType> resourceTypes = new();
-
-        foreach (string r in SupportedResources)
-        {
-            try
-            {
-                Hl7.Fhir.Model.ResourceType? rt = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<Hl7.Fhir.Model.ResourceType>(r);
-                if (rt != null)
-                {
-                    resourceTypes.Add((Hl7.Fhir.Model.ResourceType)rt!);
-                }
-            }
-            catch(Exception)
-            {
-            }
-        }
-
         Hl7.Fhir.Model.OperationDefinition def = new()
         {
             Id = OperationName.Substring(1) + "-" + OperationVersion.Replace('.', '-'),
             Name = OperationName,
             Url = CanonicalByFhirVersion[fhirVersion],
             Status = Hl7.Fhir.Model.PublicationStatus.Draft,
-            Kind = IsQuery ? Hl7.Fhir.Model.OperationDefinition.OperationKind.Query : Hl7.Fhir.Model.OperationDefinition.OperationKind.Operation,
+            Kind = IsNamedQuery ? Hl7.Fhir.Model.OperationDefinition.OperationKind.Query : Hl7.Fhir.Model.OperationDefinition.OperationKind.Operation,
             Code = OperationName.Substring(1),
-            Resource = (IEnumerable<Hl7.Fhir.Model.ResourceType?>)resourceTypes,
+            Resource = SupportedResources.CopyTargetsNullable(),
             System = AllowSystemLevel,
             Type = AllowResourceLevel,
             Instance = AllowInstanceLevel,
+            Parameter = new(),
         };
 
+        def.Parameter.Add(new()
+        {
+            Name = "resource",
+            Use = Hl7.Fhir.Model.OperationParameterUse.In,
+            Min = 1,
+            Max = "1",
+            Type = Hl7.Fhir.Model.FHIRAllTypes.Bundle,
+        });
 
+        def.Parameter.Add(new()
+        {
+            Name = "return",
+            Use = Hl7.Fhir.Model.OperationParameterUse.Out,
+            Min = 1,
+            Max = "1",
+            Type = Hl7.Fhir.Model.FHIRAllTypes.OperationOutcome,
+        });
+
+        return def;
     }
 }

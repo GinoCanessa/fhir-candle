@@ -13,8 +13,14 @@ public interface IFhirOperation
     /// <summary>Gets the name of the operation.</summary>
     string OperationName { get; }
 
+    /// <summary>Gets the operation version.</summary>
+    string OperationVersion { get; }
+
     /// <summary>Gets the canonical by FHIR version.</summary>
     Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion { get; }
+
+    /// <summary>Gets a value indicating whether this object is named query.</summary>
+    bool IsNamedQuery { get; }
 
     /// <summary>Gets a value indicating whether we allow get.</summary>
     bool AllowGet { get; }
@@ -45,7 +51,7 @@ public interface IFhirOperation
     /// <param name="responseOutcome"> [out] The response outcome.</param>
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoOperation(
+    HttpStatusCode DoOperation(
         Storage.VersionedFhirStore store,
         string resourceType,
         Storage.IVersionedResourceStore? resourceStore,
@@ -55,5 +61,8 @@ public interface IFhirOperation
         out Hl7.Fhir.Model.Resource? responseResource,
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation);
+
+    Hl7.Fhir.Model.OperationDefinition? GetDefinition(FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion);
+
 }
 

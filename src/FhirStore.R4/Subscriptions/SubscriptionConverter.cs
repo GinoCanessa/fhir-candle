@@ -393,7 +393,6 @@ public class SubscriptionConverter
     public Hl7.Fhir.Model.Resource StatusForSubscription(
         ParsedSubscription subscription,
         string notificationType,
-        /// <summary>Gets the base url)</summary>
         string baseUrl)
     {
         return new Hl7.Fhir.Model.Parameters()
@@ -443,7 +442,6 @@ public class SubscriptionConverter
         IEnumerable<long> eventNumbers,
         string notificationType,
         string baseUrl,
-        /// <summary>The content level.</summary>
         string contentLevel = "")
     {
         if (string.IsNullOrEmpty(contentLevel))
@@ -558,7 +556,7 @@ public class SubscriptionConverter
                     se.AdditionalContext.Select(o => new Parameters.ParameterComponent()
                     {
                         Name = "additional-context",
-                        Value = new ResourceReference($"{((Resource)o).TypeName}/{((Resource)o).Id}"),
+                        Value = new ResourceReference($"{baseUrl}/{((Resource)o).TypeName}/{((Resource)o).Id}"),
                     }));
             }
 

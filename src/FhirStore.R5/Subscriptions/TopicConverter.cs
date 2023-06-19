@@ -5,9 +5,9 @@
 
 using FhirStore.Models;
 
-namespace FhirStore.Versioned.Shims.Subscriptions;
+namespace FhirStore.Versioned.Subscriptions;
 
-/// <summary>A topic format converter.</summary>
+/// <summary>A FHIR R5 topic format converter.</summary>
 public class TopicConverter
 {
     /// <summary>
@@ -37,13 +37,15 @@ public class TopicConverter
         {
             foreach (Hl7.Fhir.Model.SubscriptionTopic.ResourceTriggerComponent rt in st.ResourceTrigger)
             {
-                if (!common.ResourceTriggers.ContainsKey(rt.Resource))
+                string resourceType = rt.Resource.Contains('/') ? rt.Resource.Substring(rt.Resource.LastIndexOf('/') + 1) : rt.Resource;
+
+                if (!common.ResourceTriggers.ContainsKey(resourceType))
                 {
-                    common.ResourceTriggers.Add(rt.Resource, new());
+                    common.ResourceTriggers.Add(resourceType, new());
                 }
 
-                common.ResourceTriggers[rt.Resource].Add(new(
-                    rt.Resource,
+                common.ResourceTriggers[resourceType].Add(new(
+                    resourceType,
                     rt.SupportedInteraction?.Contains(Hl7.Fhir.Model.SubscriptionTopic.InteractionTrigger.Create) ?? false,
                     rt.SupportedInteraction?.Contains(Hl7.Fhir.Model.SubscriptionTopic.InteractionTrigger.Update) ?? false,
                     rt.SupportedInteraction?.Contains(Hl7.Fhir.Model.SubscriptionTopic.InteractionTrigger.Delete) ?? false,
@@ -62,15 +64,17 @@ public class TopicConverter
         {
             foreach (Hl7.Fhir.Model.SubscriptionTopic.EventTriggerComponent et in st.EventTrigger)
             {
-                if (!common.EventTriggers.ContainsKey(et.Resource))
+                string resourceType = et.Resource.Contains('/') ? et.Resource.Substring(et.Resource.LastIndexOf('/') + 1) : et.Resource;
+
+                if (!common.EventTriggers.ContainsKey(resourceType))
                 {
-                    common.EventTriggers.Add(et.Resource, new());
+                    common.EventTriggers.Add(resourceType, new());
                 }
 
                 if (!(et.Event?.Coding?.Any() ?? false))
                 {
-                    common.EventTriggers[et.Resource].Add(new(
-                            et.Resource,
+                    common.EventTriggers[resourceType].Add(new(
+                            resourceType,
                             string.Empty,
                             string.Empty,
                             et.Event?.Text ?? et.Description ?? string.Empty));
@@ -79,8 +83,8 @@ public class TopicConverter
 
                 foreach (Hl7.Fhir.Model.Coding c in et.Event.Coding)
                 {
-                    common.EventTriggers[et.Resource].Add(new(
-                        et.Resource,
+                    common.EventTriggers[resourceType].Add(new(
+                        resourceType,
                         c.System ?? string.Empty,
                         c.Code ?? string.Empty,
                         c.Display ?? string.Empty));
@@ -92,14 +96,16 @@ public class TopicConverter
         {
             foreach (Hl7.Fhir.Model.SubscriptionTopic.CanFilterByComponent cf in st.CanFilterBy)
             {
-                if (!common.AllowedFilters.ContainsKey(cf.Resource))
+                string resourceType = cf.Resource.Contains('/') ? cf.Resource.Substring(cf.Resource.LastIndexOf('/') + 1) : cf.Resource;
+
+                if (!common.AllowedFilters.ContainsKey(resourceType))
                 {
-                    common.AllowedFilters.Add(cf.Resource, new());
+                    common.AllowedFilters.Add(resourceType, new());
                 }
 
                 // TODO: Grab the FHIRPath expression from the definition
-                common.AllowedFilters[cf.Resource].Add(new(
-                    cf.Resource,
+                common.AllowedFilters[resourceType].Add(new(
+                    resourceType,
                     cf.FilterParameter ?? string.Empty,
                     cf.FilterDefinition ?? string.Empty));
             }
@@ -109,13 +115,15 @@ public class TopicConverter
         {
             foreach (Hl7.Fhir.Model.SubscriptionTopic.NotificationShapeComponent ns in st.NotificationShape)
             {
-                if (!common.NotificationShapes.ContainsKey(ns.Resource))
+                string resourceType = ns.Resource.Contains('/') ? ns.Resource.Substring(ns.Resource.LastIndexOf('/') + 1) : ns.Resource;
+
+                if (!common.NotificationShapes.ContainsKey(resourceType))
                 {
-                    common.NotificationShapes.Add(ns.Resource, new());
+                    common.NotificationShapes.Add(resourceType, new());
                 }
 
-                common.NotificationShapes[ns.Resource].Add(new(
-                    ns.Resource,
+                common.NotificationShapes[resourceType].Add(new(
+                    resourceType,
                     ns.Include?.Select(i => "_include=" + i.Replace("&iterate=", "&_include:iterate=", StringComparison.Ordinal)).ToList() ?? new(),
                     ns.RevInclude?.Select(r => "_revinclude=" + r.Replace("&iterate=", "&_revinclude:iterate=", StringComparison.Ordinal)).ToList() ?? new()));
             }

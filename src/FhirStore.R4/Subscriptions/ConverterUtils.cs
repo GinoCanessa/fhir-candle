@@ -6,9 +6,9 @@
 
 using Hl7.Fhir.Model;
 
-namespace FhirStore.Versioned.Shims.Subscriptions;
+namespace FhirStore.Versioned.Subscriptions;
 
-/// <summary>A converter utilities.</summary>
+/// <summary>FHIR R4 Subscriptions converter utilities.</summary>
 internal static class ConverterUtils
 {
     /// <summary>(Immutable) The Base URL of R5 SubscriptionTopic cross-version extensions.</summary>

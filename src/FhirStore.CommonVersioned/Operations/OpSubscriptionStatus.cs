@@ -5,6 +5,8 @@
 
 using System.Net;
 using FhirStore.Models;
+using FhirStore.Versioned;
+using FhirStore.Versioned.Extensions;
 using Hl7.Fhir.Model;
 
 namespace FhirStore.Operations;
@@ -15,6 +17,9 @@ public class OpSubscriptionStatus : IFhirOperation
     /// <summary>Gets the name of the operation.</summary>
     public string OperationName => "$status";
 
+    /// <summary>Gets the operation version.</summary>
+    public string OperationVersion => "0.0.1";
+
     /// <summary>Gets the canonical by FHIR version.</summary>
     public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
@@ -22,6 +27,9 @@ public class OpSubscriptionStatus : IFhirOperation
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-status" },
     };
+
+    /// <summary>Gets a value indicating whether this object is named query.</summary>
+    public bool IsNamedQuery => false;
 
     /// <summary>Gets a value indicating whether we allow get.</summary>
     public bool AllowGet => true;
@@ -182,9 +190,9 @@ public class OpSubscriptionStatus : IFhirOperation
         }
 
         // create our response bundle
-        Bundle bundle = new()
+        Hl7.Fhir.Model.Bundle bundle = new()
         {
-            Type = Bundle.BundleType.Searchset,
+            Type = Hl7.Fhir.Model.Bundle.BundleType.Searchset,
             Timestamp = DateTimeOffset.Now,
             Entry = new(),
         };
@@ -193,7 +201,7 @@ public class OpSubscriptionStatus : IFhirOperation
 
         foreach ((string id, Hl7.Fhir.Model.Resource r) in subscriptionStatuses)
         {
-            bundle.AddSearchEntry(r, $"urn:uuid:{r.Id}", Bundle.SearchEntryMode.Match);
+            bundle.AddSearchEntry(r, $"urn:uuid:{r.Id}", Hl7.Fhir.Model.Bundle.SearchEntryMode.Match);
         }
 
         responseResource = bundle;
@@ -201,6 +209,66 @@ public class OpSubscriptionStatus : IFhirOperation
         contentLocation = string.Empty;
 
         return HttpStatusCode.OK;
+    }
+
+
+    /// <summary>Gets an OperationDefinition for this operation.</summary>
+    /// <param name="fhirVersion">The FHIR version.</param>
+    /// <returns>The definition.</returns>
+    public Hl7.Fhir.Model.OperationDefinition? GetDefinition(
+        FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+    {
+        Hl7.Fhir.Model.OperationDefinition def = new()
+        {
+            Id = OperationName.Substring(1) + "-" + OperationVersion.Replace('.', '-'),
+            Name = OperationName,
+            Url = CanonicalByFhirVersion[fhirVersion],
+            Status = Hl7.Fhir.Model.PublicationStatus.Draft,
+            Kind = IsNamedQuery ? Hl7.Fhir.Model.OperationDefinition.OperationKind.Query : Hl7.Fhir.Model.OperationDefinition.OperationKind.Operation,
+            Code = OperationName.Substring(1),
+            Resource = SupportedResources.CopyTargetsNullable(),
+            System = AllowSystemLevel,
+            Type = AllowResourceLevel,
+            Instance = AllowInstanceLevel,
+            Parameter = new(),
+        };
+
+        def.Parameter.Add(new()
+        {
+            Name = "id",
+            Use = Hl7.Fhir.Model.OperationParameterUse.In,
+            Min = 0,
+            Max = "*",
+            Type = FHIRAllTypes.Id,
+            Documentation = "At the Instance level, this parameter is ignored. At the Resource level, one or more parameters containing a FHIR id for a Subscription to get status information for. In the absence of any specified ids, the server returns the status for all Subscriptions available to the caller. Multiple values are joined via OR (e.g., \"id1\" OR \"id2\")."
+        });
+
+        def.Parameter.Add(new()
+        {
+            Name = "status",
+            Use = Hl7.Fhir.Model.OperationParameterUse.In,
+            Min = 0,
+            Max = "*",
+            Type = FHIRAllTypes.Code,
+            Binding = new()
+            {
+                Strength = Hl7.Fhir.Model.BindingStrength.Required,
+                ValueSet = "http://hl7.org/fhir/ValueSet/subscription-status",
+            },
+            Documentation = "At the Instance level, this parameter is ignored. At the Resource level, a Subscription status to filter by (e.g., \"active\"). In the absence of any specified status values, the server does not filter contents based on the status. Multiple values are joined via OR (e.g., \"error\" OR \"off\")."
+        });
+
+        def.Parameter.Add(new()
+        {
+            Name = "return",
+            Use = Hl7.Fhir.Model.OperationParameterUse.Out,
+            Min = 1,
+            Max = "1",
+            Type = Hl7.Fhir.Model.FHIRAllTypes.Bundle,
+            Documentation = "The operation returns a bundle containing one or more subscription status resources, one per Subscription being queried. The Bundle type is \"searchset\".",
+        });
+
+        return def;
     }
 }
 

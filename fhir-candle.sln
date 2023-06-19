@@ -17,12 +17,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirStore.R4", "src\FhirSto
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirStore.Common", "src\FhirStore.Common\FhirStore.Common.csproj", "{F5886ACD-3CCD-4EA0-8438-A33AD0ED7A42}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R5", "src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.shproj", "{ADCCCEBD-B2BE-4364-8694-B5D6462AE60C}"
-EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R4", "src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.shproj", "{E449F416-1E58-4920-90B0-4FD0BB429E80}"
-EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirStore.Versioned.Shims.R4B", "src\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.shproj", "{786DB8AB-9A51-4A71-8AD2-7DB7D373C98B}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8B6BFF93-0260-40D3-BF26-175BC295D77B}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
@@ -73,13 +67,7 @@ Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{05dd03de-a22d-4fd8-a8a8-06fd05f20a18}*SharedItemsImports = 13
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{316b7737-194d-41d8-8725-b79c09cd8f93}*SharedItemsImports = 5
-		src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems*{316b7737-194d-41d8-8725-b79c09cd8f93}*SharedItemsImports = 5
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
-		src\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
-		src\FhirStore.Versioned.Shims.R4B\FhirStore.Versioned.Shims.R4B.projitems*{786db8ab-9a51-4a71-8ad2-7db7d373c98b}*SharedItemsImports = 13
-		src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems*{adcccebd-b2be-4364-8694-b5d6462ae60c}*SharedItemsImports = 13
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{b767a8a4-910f-4fc3-be6b-a0515c6e167e}*SharedItemsImports = 5
-		src\FhirStore.Versioned.Shims.R5\FhirStore.Versioned.Shims.R5.projitems*{b767a8a4-910f-4fc3-be6b-a0515c6e167e}*SharedItemsImports = 5
-		src\FhirStore.Versioned.Shims.R4\FhirStore.Versioned.Shims.R4.projitems*{e449f416-1e58-4920-90b0-4fd0bb429e80}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

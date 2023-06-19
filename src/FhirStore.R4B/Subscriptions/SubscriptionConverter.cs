@@ -6,14 +6,38 @@
 using FhirStore.Extensions;
 using FhirStore.Models;
 using Hl7.Fhir.Model;
+using static Hl7.Fhir.Model.SearchParameter;
 
-namespace FhirStore.Versioned.Shims.Subscriptions;
+namespace FhirStore.Versioned.Subscriptions;
 
-/// <summary>A FHIR R5 subscription format converter.</summary>
+/// <summary>A FHIR R4B subscription format converter.</summary>
 public class SubscriptionConverter
 {
+    /// <summary>(Immutable) URL of the filter criteria.</summary>
+    private const string _filterCriteriaUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-filter-criteria";
+
+    /// <summary>(Immutable) URL of the heartbeat period.</summary>
+    private const string _heartbeatPeriodUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-heartbeat-period";
+
+    /// <summary>(Immutable) URL of the timeout.</summary>
+    private const string _timeoutUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-timeout";
+
+    /// <summary>(Immutable) URL of the maximum count.</summary>
+    private const string _maxCountUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-max-count";
+
+    /// <summary>(Immutable) URL of the channel type.</summary>
+    private const string _channelTypeUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-channel-type";
+
+    /// <summary>(Immutable) URL of the content.</summary>
+    private const string _contentUrl = "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content";
+
+    /// <summary>The active code.</summary>
     public static SubscriptionStatusCodes ActiveCode = SubscriptionStatusCodes.Active;
+    /// <summary>The off code.</summary>
     public static SubscriptionStatusCodes OffCode = SubscriptionStatusCodes.Off;
+
+    /// <summary>URL of the payload content value set.</summary>
+    public static string PayloadContentVsUrl = "http://hl7.org/fhir/uv/subscriptions-backport/ValueSet/backport-content-value-set";
 
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
@@ -24,7 +48,7 @@ public class SubscriptionConverter
         if ((subscription == null) ||
             (subscription is not Hl7.Fhir.Model.Subscription sub) ||
             string.IsNullOrEmpty(sub.Id) ||
-            string.IsNullOrEmpty(sub.Topic))
+            string.IsNullOrEmpty(sub.Criteria))
         {
             common = null!;
             return false;
@@ -33,50 +57,143 @@ public class SubscriptionConverter
         common = new()
         {
             Id = sub.Id,
-            TopicUrl = sub.Topic,
-            ChannelSystem = sub.ChannelType?.System ?? string.Empty,
-            ChannelCode = sub.ChannelType?.Code ?? string.Empty,
-            Endpoint = sub.Endpoint,
-            HeartbeatSeconds = sub.HeartbeatPeriod ?? 0,
-            TimeoutSeconds = sub.Timeout ?? 0,
-            ContentType = sub.ContentType,
-            ContentLevel = sub.Content?.ToString() ?? string.Empty,
-            MaxEventsPerNotification = sub.MaxCount ?? 0,
+            TopicUrl = sub.Criteria,
+            ChannelSystem = string.Empty,
+            ChannelCode = sub.Channel.Type == null
+                ? string.Empty
+                : Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Channel.Type),
+            Endpoint = sub.Channel.Endpoint ?? string.Empty,
+            ContentType = sub.Channel.Payload?.ToString() ?? string.Empty,
             ExpirationTicks = sub.End?.Ticks ?? (DateTime.Now.Ticks + ParsedSubscription.DefaultSubscriptionExpiration),
         };
 
-        // add parameters
-        if (sub.Parameter?.Any() ?? false)
-        {
-            foreach (Hl7.Fhir.Model.Subscription.ParameterComponent param in sub.Parameter)
-            {
-                if (!common.Parameters.ContainsKey(param.Name))
-                {
-                    common.Parameters.Add(param.Name, new());
-                }
+        // check for extended information
+        IEnumerable<Hl7.Fhir.Model.Extension>? exts;
 
-                common.Parameters[param.Name].Add(param.Value.ToString());
+        exts = sub.Channel.Extension?.Where(e => e.Url.Equals(_heartbeatPeriodUrl));
+        if (exts?.Any() ?? false)
+        {
+            if (int.TryParse(exts.First().Value.ToString(), out int heartbeat))
+            {
+                common.HeartbeatSeconds = heartbeat;
             }
         }
 
-        // add filters
-        if (sub.FilterBy?.Any() ?? false)
+        exts = sub.Channel.Extension?.Where(e => e.Url.Equals(_timeoutUrl));
+        if (exts?.Any() ?? false)
         {
-            foreach (Hl7.Fhir.Model.Subscription.FilterByComponent filter in sub.FilterBy)
+            if (int.TryParse(exts.First().Value.ToString(), out int timeout))
             {
-                string key = string.IsNullOrEmpty(filter.ResourceType) ? "*" : filter.ResourceType;
+                common.TimeoutSeconds = timeout;
+            }
+        }
+
+        exts = sub.Channel.Extension?.Where(e => e.Url.Equals(_maxCountUrl));
+        if (exts?.Any() ?? false)
+        {
+            if (int.TryParse(exts.First().Value.ToString(), out int maxCount))
+            {
+                common.MaxEventsPerNotification = maxCount;
+            }
+        }
+
+        exts = sub.Channel.TypeElement?.Extension?.Where(e => e.Url.Equals(_channelTypeUrl));
+        if (exts?.Any() ?? false)
+        {
+            Hl7.Fhir.Model.Coding c = (Hl7.Fhir.Model.Coding)exts.First().Value;
+            common.ChannelSystem = c.System;
+            common.ChannelCode = c.Code;
+        }
+
+        exts = sub.Channel.PayloadElement?.Extension?.Where(e => e.Url.Equals(_contentUrl));
+        if (exts?.Any() ?? false)
+        {
+            common.ContentLevel = exts.First().Value.ToString() ?? string.Empty;
+        }
+
+        // add parameters
+        if (sub.Channel.Header?.Any() ?? false)
+        {
+            foreach (string header in sub.Channel.Header)
+            {
+                int index = header.IndexOf(':');
+                if (index == -1)
+                {
+                    index = header.IndexOf('=');
+                }
+
+                if (index == -1)
+                {
+                    continue;
+                }
+
+                string key = header.Substring(0, index).Trim();
+                string value = header.Substring(index + 1).Trim();
+
+                if (!common.Parameters.ContainsKey(key))
+                {
+                    common.Parameters.Add(key, new());
+                }
+
+                common.Parameters[key].Add(value.ToString());
+            }
+
+        }
+
+        // add filters
+        exts = sub.CriteriaElement?.Extension?.Where(e => e.Url.Equals(_filterCriteriaUrl)) ?? null;
+        if (exts?.Any() ?? false)
+        {
+            foreach (string criteria in exts.Select(e => e.Value.ToString() ?? string.Empty))
+            {
+                if (string.IsNullOrEmpty(criteria))
+                {
+                    continue;
+                }
+
+                string key;
+                string resourceType;
+                string value;
+
+                int index = criteria.IndexOf('?');
+                if (index == -1)
+                {
+                    key = "-";
+                    resourceType = string.Empty;
+                    value = criteria;
+                }
+                else
+                {
+                    key = criteria.Substring(0, index);
+                    resourceType = key;
+                    value = criteria.Substring(index + 1);
+                }
 
                 if (!common.Filters.ContainsKey(key))
                 {
                     common.Filters.Add(key, new());
                 }
 
-                common.Filters[key].Add(new(
-                    filter.ResourceType ?? string.Empty,
-                    filter.FilterParameter,
-                    filter.Comparator?.ToString() ?? string.Empty,
-                    filter.Modifier?.ToString() ?? string.Empty,
-                    filter.Value));
+                string[] queryParams = value.Split('&');
+                
+                foreach (string queryParam in queryParams)
+                {
+                    string[] components = queryParam.Split('=');
+
+                    if (components.Length != 2)
+                    {
+                        continue;
+                    }
+
+                    string[] keyComponents = components[0].Split(":");
+
+                    common.Filters[key].Add(new(
+                        resourceType,
+                        keyComponents[0],
+                        string.Empty,                               // TODO: figure out prefix based on type info we don't have here
+                        (keyComponents.Length > 1) ? keyComponents[1] : string.Empty,
+                        components[1]));
+                }
             }
         }
 
@@ -95,6 +212,20 @@ public class SubscriptionConverter
             return false;
         }
 
+        Subscription.SubscriptionChannelType? ct;
+        string extendedCt;
+
+        try
+        {
+            ct = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<Subscription.SubscriptionChannelType>(common.ChannelCode);
+            extendedCt = string.Empty;
+        }
+        catch (Exception)
+        {
+            ct = Subscription.SubscriptionChannelType.RestHook;
+            extendedCt = common.ChannelCode;
+        }
+
         SubscriptionStatusCodes? status;
 
         try
@@ -109,54 +240,66 @@ public class SubscriptionConverter
         subscription = new()
         {
             Id = common.Id,
-            Topic = common.TopicUrl,
             Status = status!,
-            Reason = string.IsNullOrEmpty(common.Reason) ? null : common.Reason,
-            ChannelType = new Coding(common.ChannelSystem, common.ChannelCode),
-            Endpoint = common.Endpoint,
-            HeartbeatPeriod = common.HeartbeatSeconds,
-            Timeout = common.TimeoutSeconds,
-            ContentType = common.ContentType,
-            Content = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<Subscription.SubscriptionPayloadContent>(common.ContentLevel),
-            MaxCount = common.MaxEventsPerNotification,
+            Reason = string.IsNullOrEmpty(common.Reason) ? "Required" : common.Reason,
+            Criteria = common.TopicUrl,
+            Channel = new()
+            {
+                Type = ct,
+                Endpoint = common.Endpoint,
+                Payload = common.ContentType,
+            },
             End = new DateTimeOffset(common.ExpirationTicks, TimeSpan.Zero),
         };
+
+        if (common.HeartbeatSeconds != null)
+        {
+            subscription.Channel.AddExtension(_heartbeatPeriodUrl, new Integer(common.HeartbeatSeconds));
+        }
+
+        if (common.TimeoutSeconds != null)
+        {
+            subscription.Channel.AddExtension(_timeoutUrl, new Integer(common.TimeoutSeconds));
+        }
+
+        if (common.MaxEventsPerNotification != null)
+        {
+            subscription.Channel.AddExtension(_maxCountUrl, new Integer(common.MaxEventsPerNotification));
+        }
+
+        if (!string.IsNullOrEmpty(extendedCt))
+        {
+            subscription.Channel.AddExtension(_channelTypeUrl, new FhirString(extendedCt));
+        }
+
+        subscription.Channel.AddExtension(_contentUrl, new FhirString(common.ContentLevel));
 
         // add parameters
         if (common.Parameters.Any())
         {
-            subscription.Parameter = new();
+            List<string> headers = new();
 
             foreach ((string key, List<string> values) in common.Parameters)
             {
-                subscription.Parameter.AddRange(values.Select(v => new Subscription.ParameterComponent()
-                {
-                    Name = key,
-                    Value = v,
-                }));
+                headers.AddRange(values.Select(v => key + "=" + v));
             }
+
+            subscription.Channel.Header = headers;
         }
 
         // add filters
         if (common.Filters.Any())
         {
-            subscription.FilterBy = new();
             foreach (List<ParsedSubscription.SubscriptionFilter> filters in common.Filters.Values)
             {
-                foreach (ParsedSubscription.SubscriptionFilter filter in filters)
+                foreach (ParsedSubscription.SubscriptionFilter f in filters)
                 {
-                    subscription.FilterBy.Add(new Subscription.FilterByComponent()
-                    {
-                        ResourceType = filter.ResourceType,
-                        FilterParameter = filter.Name,
-                        Comparator = string.IsNullOrEmpty(filter.Comparator)
-                            ? null
-                            : Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SearchComparator>(common.ContentLevel),
-                        Modifier = string.IsNullOrEmpty(filter.Modifier)
-                            ? null
-                            : Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SearchModifierCode>(filter.Modifier),
-                        Value = filter.Value,
-                    });
+                    string mod = string.IsNullOrEmpty(f.Modifier) ? string.Empty : ":" + f.Modifier;
+                    string pre = f.Comparator ?? string.Empty;
+
+                    subscription.CriteriaElement.AddExtension(
+                        _filterCriteriaUrl,
+                        new FhirString($"{f.ResourceType}?{f.Name}{mod}={pre}{f.Value}"));
                 }
             }
         }
@@ -166,7 +309,7 @@ public class SubscriptionConverter
 
     /// <summary>Attempts to parse a ParsedSubscriptionStatus from the given object.</summary>
     /// <param name="subscriptionStatus">The subscription.</param>
-    /// <param name="bundleId">  Identifier for the bundle.</param>
+    /// <param name="bundleId">          Identifier for the bundle.</param>
     /// <param name="common">            [out] The common.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryParse(object subscriptionStatus, string bundleId, out ParsedSubscriptionStatus common)
@@ -179,7 +322,7 @@ public class SubscriptionConverter
         }
 
         List<string> errors = new();
-        if (status.Error?.Any() ?? false)
+        if (status.Error.Any())
         {
             foreach (CodeableConcept error in status.Error)
             {
@@ -203,7 +346,9 @@ public class SubscriptionConverter
                 notificationEvents.Add(new()
                 {
                     Id = notificationEvent.ElementId ?? string.Empty,
-                    EventNumber = notificationEvent.EventNumber,
+                    EventNumber = long.TryParse(notificationEvent.EventNumber, out long en)
+                        ? en
+                        : null,
                     Timestamp = notificationEvent.Timestamp,
                     FocusReference = notificationEvent.Focus?.Reference ?? string.Empty,
                     AdditionalContextReferences = notificationEvent.AdditionalContext?.Select(ac => ac.Reference) ?? Array.Empty<string>(),
@@ -218,10 +363,13 @@ public class SubscriptionConverter
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
             Status = status.Status?.ToString() ?? string.Empty,
             NotificationType =
-                status.Type != null
-                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Type).ToFhirEnum<ParsedSubscription.NotificationTypeCodes>()
+                (status.Type?.ToString() ?? string.Empty).TryFhirEnum(out ParsedSubscription.NotificationTypeCodes nt)
+                ? nt
                 : null,
-            EventsSinceSubscriptionStart = status.EventsSinceSubscriptionStart,
+            EventsSinceSubscriptionStart =
+                long.TryParse(status.EventsSinceSubscriptionStart, out long count)
+                ? count
+                : null,
             NotificationEvents = notificationEvents.ToArray(),
             Errors = errors.ToArray(),
         };
@@ -237,6 +385,7 @@ public class SubscriptionConverter
     public Hl7.Fhir.Model.Resource StatusForSubscription(
         ParsedSubscription subscription,
         string notificationType,
+        /// <summary>Gets the base url)</summary>
         string baseUrl)
     {
         if (!Enum.TryParse(subscription.CurrentStatus, out SubscriptionStatusCodes statusCode))
@@ -249,19 +398,20 @@ public class SubscriptionConverter
             Id = Guid.NewGuid().ToString(),
             Subscription = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id),
             Topic = subscription.TopicUrl,
-            EventsSinceSubscriptionStart = subscription.CurrentEventCount,
+            EventsSinceSubscriptionStart = subscription.CurrentEventCount.ToString(),
             Status = statusCode,
             Type = Hl7.Fhir.Utility.EnumUtility.ParseLiteral<SubscriptionStatus.SubscriptionNotificationType>(notificationType),
         };
     }
 
-    /// <summary>Bundle for subscription events.</summary>
+    /// Build a bundle of subscription events into the desired format and content level.
     /// <param name="subscription">    The subscription.</param>
     /// <param name="eventNumbers">    The event numbers.</param>
     /// <param name="notificationType">Type of the notification.</param>
     /// <param name="baseUrl">         URL of the base.</param>
+    /// <param name="contentType">     (Optional) Type of the content.</param>
     /// <param name="contentLevel">    (Optional) The content level.</param>
-    /// <returns>A Bundle?</returns>
+    /// <returns>A string.</returns>
     public Bundle? BundleForSubscriptionEvents(
         ParsedSubscription subscription,
         IEnumerable<long> eventNumbers,
@@ -279,7 +429,7 @@ public class SubscriptionConverter
         Bundle bundle = new()
         {
             Id = Guid.NewGuid().ToString(),
-            Type = Bundle.BundleType.SubscriptionNotification,
+            Type = Bundle.BundleType.History,
             Timestamp = DateTimeOffset.Now,
             Entry = new(),
         };
@@ -292,7 +442,7 @@ public class SubscriptionConverter
         // create our status resource
         SubscriptionStatus status = (SubscriptionStatus)StatusForSubscription(subscription, notificationType, baseUrl);
 
-        // add our status to the bundle
+        // add a status placeholder to the bundle
         bundle.AddResourceEntry(status, $"urn:uuid:{status.Id}");
 
         HashSet<string> addedResources = new();
@@ -335,7 +485,7 @@ public class SubscriptionConverter
                 // add just this event number to our status
                 status.NotificationEvent.Add(new()
                 {
-                    EventNumber = eventNumber,
+                    EventNumber = eventNumber.ToString(),
                     Timestamp = se.Timestamp,
                 });
 
@@ -349,7 +499,7 @@ public class SubscriptionConverter
             // add this event to our status
             status.NotificationEvent.Add(new()
             {
-                EventNumber = eventNumber,
+                EventNumber = eventNumber.ToString(),
                 Focus = new ResourceReference(baseUrl + "/" + relativeUrl),
                 AdditionalContext = (se.AdditionalContext?.Any() ?? false)
                     ? se.AdditionalContext.Select(o => new ResourceReference($"{baseUrl}/{((Resource)o).TypeName}/{((Resource)o).Id}")).ToList()

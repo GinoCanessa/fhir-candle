@@ -3,6 +3,9 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirStore.Versioned;
+using FhirStore.Versioned.Extensions;
+using FhirStore.Versioned.Subscriptions;
 using System.Net;
 
 namespace FhirStore.Operations;
@@ -13,6 +16,9 @@ public class OpSubscriptionEvents : IFhirOperation
     /// <summary>Gets the name of the operation.</summary>
     public string OperationName => "$events";
 
+    /// <summary>Gets the operation version.</summary>
+    public string OperationVersion => "0.0.1";
+
     /// <summary>Gets the canonical by FHIR version.</summary>
     public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
@@ -20,6 +26,9 @@ public class OpSubscriptionEvents : IFhirOperation
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-events" },
         { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-events" },
     };
+
+    /// <summary>Gets a value indicating whether this operation is a named query.</summary>
+    public bool IsNamedQuery => false;
 
     /// <summary>Gets a value indicating whether we allow get.</summary>
     public bool AllowGet => true;
@@ -161,6 +170,84 @@ public class OpSubscriptionEvents : IFhirOperation
         contentLocation = string.Empty;
 
         return HttpStatusCode.OK;
+    }
+
+
+    /// <summary>Gets an OperationDefinition for this operation.</summary>
+    /// <param name="fhirVersion">The FHIR version.</param>
+    /// <returns>The definition.</returns>
+    public Hl7.Fhir.Model.OperationDefinition? GetDefinition(
+        FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+    {
+        Hl7.Fhir.Model.OperationDefinition def = new()
+        {
+            Id = OperationName.Substring(1) + "-" + OperationVersion.Replace('.', '-'),
+            Name = OperationName,
+            Url = CanonicalByFhirVersion[fhirVersion],
+            Status = Hl7.Fhir.Model.PublicationStatus.Draft,
+            Kind = IsNamedQuery ? Hl7.Fhir.Model.OperationDefinition.OperationKind.Query : Hl7.Fhir.Model.OperationDefinition.OperationKind.Operation,
+            Code = OperationName.Substring(1),
+            Resource = SupportedResources.CopyTargetsNullable(),
+            System = AllowSystemLevel,
+            Type = AllowResourceLevel,
+            Instance = AllowInstanceLevel,
+            Parameter = new(),
+        };
+
+        def.Parameter.Add(new()
+        {
+            Name = "eventsSinceNumber",
+            Use = Hl7.Fhir.Model.OperationParameterUse.In,
+            Min = 0,
+            Max = "1",
+            Type = VersionedUtils.GetInt64Type,
+            Documentation = "The starting event number, inclusive of this event (lower bound)."
+        });
+
+        def.Parameter.Add(new()
+        {
+            Name = "eventsUntilNumber",
+            Use = Hl7.Fhir.Model.OperationParameterUse.In,
+            Min = 0,
+            Max = "1",
+            Type = VersionedUtils.GetInt64Type,
+            Documentation = "The ending event number, inclusive of this event (upper bound)."
+        });
+
+        def.Parameter.Add(new()
+        {
+            Name = "content",
+            Use = Hl7.Fhir.Model.OperationParameterUse.In,
+            Min = 0,
+            Max = "1",
+            Type = Hl7.Fhir.Model.FHIRAllTypes.Code,
+            Binding = new()
+            {
+                Strength = Hl7.Fhir.Model.BindingStrength.Required,
+                ValueSet = SubscriptionConverter.PayloadContentVsUrl,
+            },
+            Documentation = "Requested content style of returned data. Codes are from the payload content value set (e.g., empty, id-only, full-resource). Note that this is only a hint to the server what a client would prefer, and MAY be ignored."
+        });
+
+        def.Parameter.Add(new()
+        {
+            Name = "return",
+            Use = Hl7.Fhir.Model.OperationParameterUse.Out,
+            Min = 1,
+            Max = "1",
+            Type = Hl7.Fhir.Model.FHIRAllTypes.Bundle,
+            Documentation = GetReturnDocValue(),
+        });
+
+        string GetReturnDocValue() => fhirVersion switch
+        {
+            Models.TenantConfiguration.SupportedFhirVersions.R4 => "The operation returns a valid notification bundle, with the first entry being a Parameters resource. The bundle type is \"history\".",
+            Models.TenantConfiguration.SupportedFhirVersions.R4B => "The operation returns a valid notification bundle, with the first entry being a SubscriptionStatus resource. The bundle type is \"history\".",
+            Models.TenantConfiguration.SupportedFhirVersions.R5 => "The operation returns a valid notification bundle, with the first entry being a SubscriptionStatus resource. The bundle type is \"subscription-notification\".",
+            _ => string.Empty,
+        };
+
+        return def;
     }
 }
 

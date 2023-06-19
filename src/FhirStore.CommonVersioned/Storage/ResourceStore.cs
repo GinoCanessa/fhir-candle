@@ -15,8 +15,8 @@ using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
 using System.Collections.Concurrent;
 using System.Linq;
-using FhirStore.Versioned.Shims.Extensions;
-using FhirStore.Versioned.Shims.Subscriptions;
+using FhirStore.Versioned.Extensions;
+using FhirStore.Versioned.Subscriptions;
 using System.Collections;
 using System.Text.RegularExpressions;
 
@@ -999,12 +999,12 @@ public class ResourceStore<T> : IVersionedResourceStore
             Url = sp.Url,
             Description = sp.Description,
             Expression = sp.Expression,
-            Target = VersionedShims.CopyTargetsToRt(sp.Target),
+            Target = ResourceTypeExtensions.CopyTargetsToRt(sp.Target),
             Type = (SearchParamType)sp.Type!,
             Component = sp.Component?.Select(cp => new ModelInfo.SearchParamComponent(cp.Definition, cp.Expression)).ToArray(),
         };
 
-        foreach (ResourceType rt in VersionedShims.CopyTargetsToRt(sp.Base) ?? Array.Empty<ResourceType>())
+        foreach (ResourceType rt in ResourceTypeExtensions.CopyTargetsToRt(sp.Base) ?? Array.Empty<ResourceType>())
         {
             spDefinition.Resource = ModelInfo.ResourceTypeToFhirTypeName(rt)!;
             _store.TrySetExecutableSearchParameter(spDefinition.Resource, spDefinition);
@@ -1023,7 +1023,7 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         string name = sp.Code ?? sp.Name ?? sp.Id;
 
-        foreach (ResourceType rt in VersionedShims.CopyTargetsToRt(sp.Base) ?? Array.Empty<ResourceType>())
+        foreach (ResourceType rt in ResourceTypeExtensions.CopyTargetsToRt(sp.Base) ?? Array.Empty<ResourceType>())
         {
             _store.TryRemoveExecutableSearchParameter(ModelInfo.ResourceTypeToFhirTypeName(rt)!, name);
         }

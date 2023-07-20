@@ -389,6 +389,30 @@ public class SearchTester
                         }
                         break;
 
+                    case "string-address":
+                        if (EvalStringSearch.TestStringStartsWithAgainstAddress(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-contains-address":
+                        if (EvalStringSearch.TestStringContainsAgainstAddress(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-exact-address":
+                        if (EvalStringSearch.TestStringExactAgainstAddress(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
                     case "token-canonical":
                     case "token-id":
                     case "token-oid":

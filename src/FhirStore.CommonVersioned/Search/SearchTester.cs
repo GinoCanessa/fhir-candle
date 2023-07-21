@@ -298,9 +298,9 @@ public class SearchTester
                         }
                         break;
 
+                    case "reference-canonical":
                     case "reference-uri":
                     case "reference-url":
-                    case "reference-canonical":
                         if (EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp))
                         {
                             found = true;
@@ -326,6 +326,41 @@ public class SearchTester
 
                     case "reference-uuid":
                         if (EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // note: this is a special case, the literals used are 'actual' resource types (e.g., patient)
+                    case "reference-resourcetype-canonical":
+                    case "reference-resourcetype-uri":
+                    case "reference-resourcetype-url":
+                        if (EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp, sp.ModifierLiteral!))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "reference-resourcetype-reference":
+                        if (EvalReferenceSearch.TestReference(resultNode, sp, sp.ModifierLiteral!))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "reference-resourcetype-oid":
+                        if (EvalReferenceSearch.TestReferenceAgainstOid(resultNode, sp, sp.ModifierLiteral!))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "reference-resourcetype-uuid":
+                        if (EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp, sp.ModifierLiteral!))
                         {
                             found = true;
                             break;
@@ -511,15 +546,6 @@ public class SearchTester
                             found = true;
                             break;
                         }
-                        break;
-
-                    // note: this is a special case, the literals used are 'actual' resource types (e.g., patient)
-                    case "reference-resourcetype-canonical":
-                    case "reference-resourcetype-reference":
-                    case "reference-resourcetype-oid":
-                    case "reference-resourcetype-uri":
-                    case "reference-resourcetype-url":
-                    case "reference-resourcetype-uuid":
                         break;
 
                     case "reference-above-canonical":

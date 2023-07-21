@@ -249,7 +249,6 @@ public static class EvalReferenceSearch
             string cv = value.Substring(index + 1);
             string cu = value.Substring(0, index);
 
-
             for (int i = 0; i < sp.ValueReferences.Length; i++)
             {
                 if (sp.IgnoredValueFlags[i])
@@ -295,6 +294,46 @@ public static class EvalReferenceSearch
                 {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Tests reference identifier.</summary>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <returns>True if the test passes, false if the test fails.</returns>
+    public static bool TestReferenceIdentifier(
+        ITypedElement valueNode,
+        ParsedSearchParameter sp)
+    {
+        if ((valueNode == null) ||
+            (sp.ValueFhirCodes == null))
+        {
+            return false;
+        }
+
+        Hl7.Fhir.Model.ResourceReference v = valueNode.ToPoco<Hl7.Fhir.Model.ResourceReference>();
+
+        string valueSystem = v.Identifier?.System ?? string.Empty;
+        string valueCode = v.Identifier?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(valueSystem) && string.IsNullOrEmpty(valueCode))
+        {
+            return false;
+        }
+        
+        for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (EvalTokenSearch.CompareCodeWithSystem(valueSystem, valueCode, sp.ValueFhirCodes[i].System ?? string.Empty, sp.ValueFhirCodes[i].Value))
+            {
+                return true;
             }
         }
 

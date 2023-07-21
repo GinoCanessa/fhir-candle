@@ -44,7 +44,13 @@ public class R5Tests
     internal const int _observationsWithSubjectExample = 4;
 
     /// <summary>(Immutable) Number of encounters.</summary>
-    internal const int _encounterCount = 1;
+    internal const int _encounterCount = 3;
+
+    /// <summary>(Immutable) Identifier for the encounters with subject.</summary>
+    internal const int _encountersWithSubjectIdentifier = 1;
+
+    /// <summary>(Immutable) The number of encounters with the subject 'Patient/example'.</summary>
+    internal const int _encountersWithSubjectExample = 3;
 
     /// <summary>(Immutable) Number of subscription topics.</summary>
     internal const int _subscriptionTopicCount = 1;
@@ -106,6 +112,63 @@ public class R5TestsPatientLooped : IClassFixture<R5Tests>
         }
     }
 }
+
+/// <summary>Test R5 Encounter searches.</summary>
+public class R5TestsEncounter : IClassFixture<R5Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R5Tests _fixture;
+
+    /// <summary>Initializes a new instance of the <see cref="R5TestsEncounter"/> class.</summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">The test output helper.</param>
+    public R5TestsEncounter(R5Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    [Theory]
+    [InlineData("subject:identifier=urn:oid:1.2.36.146.595.217.0.1|12345", R5Tests._encountersWithSubjectIdentifier)]
+    [InlineData("subject:identifier=urn:oid:1.2.36.146.595.217.0.1|", R5Tests._encountersWithSubjectIdentifier)]
+    [InlineData("subject:identifier=|12345", R5Tests._encountersWithSubjectIdentifier)]
+    [InlineData("subject=Patient/example", R5Tests._encountersWithSubjectExample)]
+    [InlineData("subject._id=example", R5Tests._encountersWithSubjectExample)]
+    [InlineData("subject:Patient._id=example", R5Tests._encountersWithSubjectExample)]
+    [InlineData("subject._id=example&_include=Encounter:patient", R5Tests._encountersWithSubjectExample, R5Tests._encountersWithSubjectExample + 1)]
+    public void EncounterSearch(string search, int matchCount, int? entryCount = null)
+    {
+        //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
+
+        _fixture._store.TypeSearch("Encounter", search, "application/fhir+json", string.Empty, false, out string bundle, out _);
+
+        bundle.Should().NotBeNullOrEmpty();
+
+        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(bundle);
+
+        results.Should().NotBeNull();
+        results!.Total.Should().Be(matchCount);
+        if (entryCount != null)
+        {
+            results!.Entries.Should().HaveCount((int)entryCount);
+        }
+
+        results!.Links.Should().NotBeNullOrEmpty();
+        string selfLink = results!.Links!.Where(l => l.Relation.Equals("self"))?.Select(l => l.Url).First() ?? string.Empty;
+        selfLink.Should().NotBeNullOrEmpty();
+        selfLink.Should().StartWith(_fixture._config.BaseUrl + "/Encounter?");
+        foreach (string searchPart in search.Split('&'))
+        {
+            selfLink.Should().Contain(searchPart);
+        }
+
+        //_testOutputHelper.WriteLine(bundle);
+    }
+}
+
 
 /// <summary>Test R5 Observation searches.</summary>
 public class R5TestsObservation : IClassFixture<R5Tests>

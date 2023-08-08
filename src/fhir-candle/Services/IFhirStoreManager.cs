@@ -3,8 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Models;
+using FhirCandle.Storage;
 
 namespace fhir.candle.Services;
 

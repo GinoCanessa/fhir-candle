@@ -6,7 +6,7 @@
 
 using Hl7.Fhir.Model;
 
-namespace FhirStore.Versioned.Subscriptions;
+namespace FhirCandle.Subscriptions;
 
 /// <summary>FHIR R4 Subscriptions converter utilities.</summary>
 internal static class ConverterUtils

@@ -3,12 +3,12 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Extensions;
-using FhirStore.Models;
+using FhirCandle.Extensions;
+using FhirCandle.Models;
 using Hl7.Fhir.Model;
 using static Hl7.Fhir.Model.SearchParameter;
 
-namespace FhirStore.Versioned.Subscriptions;
+namespace FhirCandle.Subscriptions;
 
 /// <summary>A FHIR R4B subscription format converter.</summary>
 public class SubscriptionConverter

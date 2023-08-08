@@ -3,11 +3,11 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Models;
+using FhirCandle.Storage;
 using Hl7.FhirPath;
 
-namespace FhirStore.Storage;
+namespace FhirCandle.Storage;
 
 /// <summary>Interface for resource store.</summary>
 /// <typeparam name="T">Resource type parameter.</typeparam>

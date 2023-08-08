@@ -3,11 +3,11 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Models;
+using FhirCandle.Models;
 using System.Collections.Concurrent;
 using System.Net;
 
-namespace FhirStore.Storage;
+namespace FhirCandle.Storage;
 
 /// <summary>Interface for versioned store.</summary>
 public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResourceStore>
@@ -196,7 +196,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedResource,
         out string serializedOutcome);
 
-
     /// <summary>Type operation.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="operationName">     Name of the operation.</param>
@@ -289,4 +288,22 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
 
     /// <summary>Gets the received notifications.</summary>
     ConcurrentDictionary<string, List<ParsedSubscriptionStatus>> ReceivedNotifications { get; }
+
+    ///// <summary>
+    ///// Get the metadata from a remote fhir server.
+    ///// </summary>
+    ///// <param name="fhirServerUrl"></param>
+    ///// <returns></returns>
+    //HttpStatusCode GetRemoteMetadata(
+    //    string fhirServerUrl);
+
+    ///// <summary>
+    ///// Attempt to retrieve the available remote subscription topics.
+    ///// </summary>
+    ///// <param name="fhirServerUrl"></param>
+    ///// <param name="topics"></param>
+    ///// <returns></returns>
+    //HttpStatusCode GetRemoteSubscriptionTopics(
+    //    string fhirServerUrl,
+    //    out Dictionary<string, ParsedSubscriptionTopic?> topics);
 }

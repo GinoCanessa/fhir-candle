@@ -5,7 +5,7 @@
 
 using Hl7.Fhir.ElementModel;
 
-namespace FhirStore.Models;
+namespace FhirCandle.Models;
 
 /// <summary>A FHIR path variable resolver.</summary>
 public class FhirPathVariableResolver

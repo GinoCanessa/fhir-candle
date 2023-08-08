@@ -3,12 +3,12 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Models;
+using FhirCandle.Models;
 using Hl7.Fhir.ElementModel;
 using System.Globalization;
-using static fhir.candle.Search.SearchDefinitions;
+using static FhirCandle.Search.SearchDefinitions;
 
-namespace fhir.candle.Search;
+namespace FhirCandle.Search;
 
 /// <summary>A class that contains functions to test date inputs against various FHIR types.</summary>
 public static class EvalDateSearch

@@ -3,18 +3,14 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Extensions;
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Models;
+using FhirCandle.Storage;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
-using Hl7.FhirPath;
-using Newtonsoft.Json.Linq;
-using System.Globalization;
-using static fhir.candle.Search.SearchDefinitions;
+using static FhirCandle.Search.SearchDefinitions;
 
-namespace fhir.candle.Search;
+namespace FhirCandle.Search;
 
 /// <summary>Test parsed search parameters against resources.</summary>
 public class SearchTester

@@ -3,16 +3,16 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-extern alias storeR4B;
+extern alias candleR4B;
 
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Models;
+using FhirCandle.Storage;
 using fhir.candle.Tests.Models;
 using FluentAssertions;
 using System.Text.Json;
 using Xunit.Abstractions;
-using storeR4B::FhirStore.Models;
-using storeR4B::FhirStore.Storage;
+using candleR4B::FhirCandle.Models;
+using candleR4B::FhirCandle.Storage;
 
 namespace fhir.candle.Tests;
 

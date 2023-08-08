@@ -3,9 +3,9 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Extensions;
-using fhir.candle.Search;
-using FhirStore.Storage;
+using FhirCandle.Extensions;
+using FhirCandle.Search;
+using FhirCandle.Storage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 using Hl7.FhirPath;
@@ -13,11 +13,11 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
-using static fhir.candle.Search.SearchDefinitions;
+using static FhirCandle.Search.SearchDefinitions;
 using Newtonsoft.Json.Linq;
 using System.Runtime.Versioning;
 
-namespace FhirStore.Models;
+namespace FhirCandle.Models;
 
 /// <summary>A parsed search parameter.</summary>
 public class ParsedSearchParameter
@@ -188,7 +188,7 @@ public class ParsedSearchParameter
     public required CompiledExpression? CompiledExpression { get; set; }
 
     /// <summary>
-    /// Initializes a new instance of the FhirStore.Models.ParsedSearchParameter class.
+    /// Initializes a new instance of the FhirCandle.Models.ParsedSearchParameter class.
     /// </summary>
     /// <param name="store">          The FHIR store.</param>
     /// <param name="resourceStore">  The resource store.</param>

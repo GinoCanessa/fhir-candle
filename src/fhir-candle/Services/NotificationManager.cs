@@ -4,8 +4,8 @@
 // </copyright>
 
 using fhir.candle.Zulip;
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Models;
+using FhirCandle.Storage;
 using System.Text;
 using MailKit.Net.Smtp;
 using MailKit;

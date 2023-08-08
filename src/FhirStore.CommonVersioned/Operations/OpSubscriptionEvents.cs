@@ -3,12 +3,12 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Versioned;
-using FhirStore.Versioned.Extensions;
-using FhirStore.Versioned.Subscriptions;
+using FhirCandle.Extensions;
+using FhirCandle.Subscriptions;
+using FhirCandle.Versioned;
 using System.Net;
 
-namespace FhirStore.Operations;
+namespace FhirCandle.Operations;
 
 /// <summary>The FHIR Subscription $events operation.</summary>
 public class OpSubscriptionEvents : IFhirOperation
@@ -20,11 +20,11 @@ public class OpSubscriptionEvents : IFhirOperation
     public string OperationVersion => "0.0.1";
 
     /// <summary>Gets the canonical by FHIR version.</summary>
-    public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
+    public Dictionary<FhirCandle.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-events" },
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-events" },
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-events" },
+        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-events" },
+        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-events" },
+        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-events" },
     };
 
     /// <summary>Gets a value indicating whether this operation is a named query.</summary>
@@ -177,7 +177,7 @@ public class OpSubscriptionEvents : IFhirOperation
     /// <param name="fhirVersion">The FHIR version.</param>
     /// <returns>The definition.</returns>
     public Hl7.Fhir.Model.OperationDefinition? GetDefinition(
-        FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+        FhirCandle.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
     {
         Hl7.Fhir.Model.OperationDefinition def = new()
         {

@@ -3,14 +3,14 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-extern alias storeR4;
-extern alias storeR4B;
-extern alias storeR5;
+extern alias candleR4;
+extern alias candleR4B;
+extern alias candleR5;
 
 using System.Collections;
 using fhir.candle.Models;
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Models;
+using FhirCandle.Storage;
 
 namespace fhir.candle.Services;
 
@@ -139,15 +139,15 @@ public class FhirStoreManager : IFhirStoreManager
             switch (config.FhirVersion)
             {
                 case TenantConfiguration.SupportedFhirVersions.R4:
-                    _storesByController.Add(name, new storeR4::FhirStore.Storage.VersionedFhirStore());
+                    _storesByController.Add(name, new candleR4::FhirCandle.Storage.VersionedFhirStore());
                     break;
 
                 case TenantConfiguration.SupportedFhirVersions.R4B:
-                    _storesByController.Add(name, new storeR4B::FhirStore.Storage.VersionedFhirStore());
+                    _storesByController.Add(name, new candleR4B::FhirCandle.Storage.VersionedFhirStore());
                     break;
 
                 case TenantConfiguration.SupportedFhirVersions.R5:
-                    _storesByController.Add(name, new storeR5::FhirStore.Storage.VersionedFhirStore());
+                    _storesByController.Add(name, new candleR5::FhirCandle.Storage.VersionedFhirStore());
                     break;
             }
 

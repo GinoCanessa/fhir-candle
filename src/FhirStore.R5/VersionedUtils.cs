@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirStore.Versioned;
+namespace FhirCandle.Versioned;
 
 /// <summary>A versioned utilities.</summary>
 internal static class VersionedUtils

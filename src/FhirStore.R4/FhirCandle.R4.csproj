@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FhirStore.Common\FhirStore.Common.csproj" />
+    <ProjectReference Include="..\FhirStore.Common\FhirCandle.Common.csproj" />
   </ItemGroup>
 
   <Import Project="..\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems" Label="Shared" />

@@ -27,23 +27,23 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FhirStore.Common\FhirStore.Common.csproj" />
+    <ProjectReference Include="..\FhirStore.Common\FhirCandle.Common.csproj" />
     <ProjectReference Include="..\fhir-candle\fhir-candle.csproj" />
-    <ProjectReference Include="..\FhirStore.R4\FhirStore.R4.csproj" />
-    <ProjectReference Include="..\FhirStore.R4B\FhirStore.R4B.csproj" />
-    <ProjectReference Include="..\FhirStore.R5\FhirStore.R5.csproj" />
+    <ProjectReference Include="..\FhirStore.R4\FhirCandle.R4.csproj" />
+    <ProjectReference Include="..\FhirStore.R4B\FhirCandle.R4B.csproj" />
+    <ProjectReference Include="..\FhirStore.R5\FhirCandle.R5.csproj" />
   </ItemGroup>
 
   <Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
     <ItemGroup>
-      <ReferencePath Condition="'%(FileName)'=='FhirStore.R4'">
-        <Aliases>storeR4</Aliases>
+      <ReferencePath Condition="'%(FileName)'=='FhirCandle.R4'">
+        <Aliases>candleR4</Aliases>
       </ReferencePath>
-      <ReferencePath Condition="'%(FileName)'=='FhirStore.R4B'">
-        <Aliases>storeR4B</Aliases>
+      <ReferencePath Condition="'%(FileName)'=='FhirCandle.R4B'">
+        <Aliases>candleR4B</Aliases>
       </ReferencePath>
-      <ReferencePath Condition="'%(FileName)'=='FhirStore.R5'">
-        <Aliases>storeR5</Aliases>
+      <ReferencePath Condition="'%(FileName)'=='FhirCandle.R5'">
+        <Aliases>candleR5</Aliases>
       </ReferencePath>
     </ItemGroup>
   </Target>

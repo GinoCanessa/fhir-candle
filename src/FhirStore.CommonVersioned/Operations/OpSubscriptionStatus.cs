@@ -4,12 +4,12 @@
 // </copyright>
 
 using System.Net;
-using FhirStore.Models;
-using FhirStore.Versioned;
-using FhirStore.Versioned.Extensions;
+using FhirCandle.Models;
+using FhirCandle.Versioned;
+using FhirCandle.Extensions;
 using Hl7.Fhir.Model;
 
-namespace FhirStore.Operations;
+namespace FhirCandle.Operations;
 
 /// <summary>The FHIR Subscription status operation.</summary>
 public class OpSubscriptionStatus : IFhirOperation
@@ -21,11 +21,11 @@ public class OpSubscriptionStatus : IFhirOperation
     public string OperationVersion => "0.0.1";
 
     /// <summary>Gets the canonical by FHIR version.</summary>
-    public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
+    public Dictionary<FhirCandle.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-status" },
+        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
+        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://hl7.org/fhir/uv/subscriptions-backport/OperationDefinition/backport-subscription-status" },
+        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://hl7.org/fhir/OperationDefinition/Subscription-status" },
     };
 
     /// <summary>Gets a value indicating whether this object is named query.</summary>
@@ -216,7 +216,7 @@ public class OpSubscriptionStatus : IFhirOperation
     /// <param name="fhirVersion">The FHIR version.</param>
     /// <returns>The definition.</returns>
     public Hl7.Fhir.Model.OperationDefinition? GetDefinition(
-        FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+        FhirCandle.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
     {
         Hl7.Fhir.Model.OperationDefinition def = new()
         {

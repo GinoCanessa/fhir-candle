@@ -15,6 +15,7 @@ using System.Threading;
 using fhir.candle.Models;
 using fhir.candle.Services;
 using FhirCandle.Models;
+using FhirCandle.Storage;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

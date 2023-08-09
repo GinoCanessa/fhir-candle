@@ -21,11 +21,11 @@ public class OpSubscriptionHook : IFhirOperation
     public string OperationVersion => "0.0.1";
 
     /// <summary>Gets the canonical by FHIR version.</summary>
-    public Dictionary<FhirCandle.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
+    public Dictionary<TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
-        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
-        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
-        { FhirCandle.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { TenantConfiguration.SupportedFhirVersions.R4, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { TenantConfiguration.SupportedFhirVersions.R4B, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { TenantConfiguration.SupportedFhirVersions.R5, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
     };
 
     /// <summary>Gets a value indicating whether this operation is a named query.</summary>
@@ -117,7 +117,7 @@ public class OpSubscriptionHook : IFhirOperation
     /// <param name="fhirVersion">The FHIR version.</param>
     /// <returns>The definition.</returns>
     public Hl7.Fhir.Model.OperationDefinition? GetDefinition(
-        FhirCandle.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+        TenantConfiguration.SupportedFhirVersions fhirVersion)
     {
         Hl7.Fhir.Model.OperationDefinition def = new()
         {

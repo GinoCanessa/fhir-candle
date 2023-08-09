@@ -8,14 +8,13 @@ extern alias candleR4B;
 extern alias candleR5;
 
 using System.Collections;
-using fhir.candle.Models;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 
 namespace fhir.candle.Services;
 
 /// <summary>Manager for FHIR stores.</summary>
-public class FhirStoreManager : IFhirStoreManager
+public class FhirStoreManager : IFhirStoreManager, IDisposable
 {
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;

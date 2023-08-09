@@ -3,13 +3,12 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirCandle.Models;
-using FhirCandle.Storage;
+using Microsoft.Extensions.Hosting;
 
-namespace fhir.candle.Services;
+namespace FhirCandle.Storage;
 
 /// <summary>Interface for FHIR store manager.</summary>
-public interface IFhirStoreManager : IHostedService, IDisposable, IReadOnlyDictionary<string, IFhirStore>
+public interface IFhirStoreManager : IHostedService, IReadOnlyDictionary<string, IFhirStore>
 {
     /// <summary>Occurs when On Changed.</summary>
     event EventHandler<EventArgs>? OnChanged;

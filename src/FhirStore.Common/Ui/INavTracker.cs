@@ -3,9 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using System;
-
-namespace fhir.candle.Models;
+namespace FhirCandle.Ui;
 
 /// <summary>Interface for navigation tracker.</summary>
 public interface INavTracker

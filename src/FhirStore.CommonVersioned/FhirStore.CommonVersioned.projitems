@@ -30,5 +30,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Operations\IFhirOperation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionStatus.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionEvents.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Client\CandleClient.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Client\" />
   </ItemGroup>
 </Project>

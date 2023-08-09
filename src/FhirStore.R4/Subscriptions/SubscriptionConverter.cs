@@ -4,12 +4,12 @@
 // </copyright>
 
 using System.Globalization;
-using FhirStore.Extensions;
-using FhirStore.Models;
+using FhirCandle.Extensions;
+using FhirCandle.Models;
 using Hl7.Fhir.Model;
-using static FhirStore.Versioned.Subscriptions.ConverterUtils;
+using static FhirCandle.Subscriptions.ConverterUtils;
 
-namespace FhirStore.Versioned.Subscriptions;
+namespace FhirCandle.Subscriptions;
 
 /// <summary>A FHIR R4 subscription format converter.</summary>
 public class SubscriptionConverter

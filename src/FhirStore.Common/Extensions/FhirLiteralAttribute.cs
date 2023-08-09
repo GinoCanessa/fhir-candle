@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirStore.Extensions;
+namespace FhirCandle.Extensions;
 
 /// <summary>Attribute for FHIR enum values to link strings and .Net equivalents.</summary>
 [AttributeUsage(AttributeTargets.Field)]

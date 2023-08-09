@@ -7,12 +7,17 @@
 		<RootNamespace>fhir.candle</RootNamespace>
 		<StartupObject>fhir.candle.Program</StartupObject>
 		<!--<VersionPrefix>0.0.1</VersionPrefix>-->
-		<VersionPrefix>0.0.1-beta.8</VersionPrefix>
+		<!--<VersionPrefix>0.0.1-beta.8</VersionPrefix>-->
+		<VersionPrefix>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</VersionPrefix>
 		<Version>$(VersionPrefix)</Version>
-		<AssemblyVersion>0.0.1.1</AssemblyVersion>
-		<FileVersion>0.0.1.1</FileVersion>
+		<!--<Version>$([System.DateTime]::Now.ToString(&quot;0.0.yyyyMMDD&quot;))</Version>-->
+		<!--<AssemblyVersion>0.0.1.1</AssemblyVersion>-->
+		<AssemblyVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</AssemblyVersion>
+		<!--<FileVersion>0.0.1.1</FileVersion>-->
+		<FileVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</FileVersion>
 		<IsPackable>true</IsPackable>
 		<PackAsTool>true</PackAsTool>
+		<PackageVersion>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</PackageVersion>
 		<ToolCommandName>fhir-candle</ToolCommandName>
 		<PackageOutputPath>..\..\nupkg</PackageOutputPath>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -64,8 +69,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="MailKit" Version="4.0.0" />
-	  <PackageReference Include="MudBlazor" Version="6.3.1" IncludeAssets="all" />
+	  <PackageReference Include="MailKit" Version="4.1.0" />
+	  <PackageReference Include="MudBlazor" Version="6.8.0" IncludeAssets="all" />
 	  <PackageReference Include="BlazorMonaco" Version="3.0.0" IncludeAssets="all" />
 	  <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
 	  <PackageReference Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
@@ -73,10 +78,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\FhirStore.Common\FhirStore.Common.csproj" />
-	  <ProjectReference Include="..\FhirStore.R4\FhirStore.R4.csproj" />
-	  <ProjectReference Include="..\FhirStore.R4B\FhirStore.R4B.csproj" />
-	  <ProjectReference Include="..\FhirStore.R5\FhirStore.R5.csproj" />
+	  <ProjectReference Include="..\FhirCandle.Ui.R4\FhirCandle.Ui.R4.csproj" />
+	  <ProjectReference Include="..\FhirStore.Common\FhirCandle.Common.csproj" />
+	  <ProjectReference Include="..\FhirStore.R4\FhirCandle.R4.csproj" />
+	  <ProjectReference Include="..\FhirStore.R4B\FhirCandle.R4B.csproj" />
+	  <ProjectReference Include="..\FhirStore.R5\FhirCandle.R5.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -110,17 +116,16 @@
 	  </Include>
 	</ItemGroup>
 
-
 	<Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
 		<ItemGroup>
-			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4'">
-				<Aliases>storeR4</Aliases>
+			<ReferencePath Condition="'%(FileName)'=='FhirCandle.R4'">
+				<Aliases>candleR4</Aliases>
 			</ReferencePath>
-			<ReferencePath Condition="'%(FileName)'=='FhirStore.R4B'">
-				<Aliases>storeR4B</Aliases>
+			<ReferencePath Condition="'%(FileName)'=='FhirCandle.R4B'">
+				<Aliases>candleR4B</Aliases>
 			</ReferencePath>
-			<ReferencePath Condition="'%(FileName)'=='FhirStore.R5'">
-				<Aliases>storeR5</Aliases>
+			<ReferencePath Condition="'%(FileName)'=='FhirCandle.R5'">
+				<Aliases>candleR5</Aliases>
 			</ReferencePath>
 			<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4.Core'">
 				<Aliases>coreR4</Aliases>

@@ -4,9 +4,9 @@
 // </copyright>
 
 using System.ComponentModel;
-using FhirStore.Extensions;
+using FhirCandle.Extensions;
 
-namespace FhirStore.Models;
+namespace FhirCandle.Models;
 
 /// <summary>A common subscription.</summary>
 public class ParsedSubscription

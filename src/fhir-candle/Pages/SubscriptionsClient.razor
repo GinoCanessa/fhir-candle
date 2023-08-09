@@ -1,0 +1,354 @@
+﻿@page "/store/ext/subscriptions-client"
+
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+@inject IJSRuntime JS
+
+@implements IDisposable
+
+<PageTitle>Subscriptions Client</PageTitle>
+
+<MudStack Row="true">
+    <MudItem Style="overflow: scroll; height: calc(100vh - var(--mud-appbar-height));" xs="6">
+        <MudPaper Class="pa-4 ma-2">
+            <MudText Typo="Typo.body1">
+                This section contains various client functionality to help with subscription server.
+                Note that all calls are made <b>by the server</b>.  If you need to test a server
+                that is not publicly-accesible, please install <code>fhir-candle</code> on your local
+                machine.
+            </MudText>
+            <br />
+            <MudTextField @bind-Value="fhirServerUrl" Label="FHIR Server Base Url" />
+        </MudPaper>
+
+        <MudExpansionPanels MultiExpansion="true">
+            <MudExpansionPanel Text="Metadata">
+                <MudText Typo="Typo.body1">
+                    Fetch the <code>CapabilityStatement</code> from the FHIR server.
+                </MudText>
+                <MudField Class="pa-2" Label="Request template" Variant="Variant.Outlined">[baseURL]/metadata</MudField>
+                <MudButton Variant="Variant.Outlined">GET</MudButton>
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Topic Discovery">
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </MudItem>
+
+    <MudItem Style="overflow: scroll; height: calc(100vh - var(--mud-appbar-height));" xs="6">
+        <MudPaper Class="pa-4 ma-2" Square="true">
+            <MudText Typo="Typo.h6">Response View</MudText>
+
+            <MudTextField @bind-Value="lastRequestUrl" Label="Last Request URL" ReadOnly="true" />
+            <MudTextField @bind-Value="lastRequestStatusCode" Label="Last Request Status" ReadOnly="true" />
+        </MudPaper>
+    </MudItem>
+</MudStack>
+
+
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "store")]
+    public string StoreName { get; set; } = "";
+
+    private IFhirStore _store = null!;
+
+    private string fhirServerUrl { get; set; } = "";
+
+    private string lastRequestUrl { get; set; } = "";
+
+    private int lastRequestStatusCode { get; set; } = 0;
+
+    private string errorMessage = string.Empty;
+
+    private string subscriptionLocation = string.Empty;
+
+    private string handshakeBundleId = string.Empty;
+
+    private const string _encounterJsonR4 = """"
+{
+  "resourceType": "Encounter",
+  "status": "finished",
+  "class": {
+    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+    "code": "VR",
+    "display": "virtual"
+  },
+  "subject": { "reference": "Patient/example" }
+}
+"""";
+
+    private const string _encounterJsonR4B = _encounterJsonR4;
+
+    private const string _encounterJsonR5 = """"
+{
+  "resourceType": "Encounter",
+  "status": "completed",
+  "class": [{
+    "coding": [{
+      "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+      "code": "VR",
+      "display": "virtual"
+    }]
+  }],
+  "subject": { "reference": "Patient/example" }
+}
+"""";
+
+    ParsedSubscription subscription = new()
+    {
+        Id = Guid.NewGuid().ToString(),
+        TopicUrl = "http://example.org/FHIR/SubscriptionTopic/encounter-complete",
+        CurrentStatus = "requested",
+        Reason = "Test subscription for walkthrough",
+        ChannelCode = "rest-hook",
+        ChannelSystem = "http://terminology.hl7.org/CodeSystem/subscription-channel-type",
+        Endpoint = string.Empty,
+        HeartbeatSeconds = 120,
+        ContentType = "application/fhir+json",
+        ContentLevel = "id-only",
+        Filters = new()
+        {
+            { "Encounter", new List<ParsedSubscription.SubscriptionFilter>()
+                {
+                    new ParsedSubscription.SubscriptionFilter("Encounter", "patient", string.Empty, string.Empty, "Patient/example"),
+                }
+            },
+        }
+    };
+
+    private string encounterStatus = "completed";
+
+    private bool networkInUse = false;
+
+    List<string> postedEncounters = new();
+
+    private void GetMetadata()
+    {
+        if (networkInUse || string.IsNullOrEmpty(fhirServerUrl))
+        {
+            return;
+        }
+
+        networkInUse = true;
+
+        networkInUse = false;
+    }
+
+    private void PostSubscription()
+    {
+        if ((networkInUse) || (!string.IsNullOrEmpty(subscriptionLocation)))
+        {
+            return;
+        }
+
+        networkInUse = true;
+
+        if (!_store.TrySerializeToSubscription(subscription, out string serialized, false))
+        {
+            errorMessage = "Failed to serialize request content.";
+            networkInUse = false;
+            return;
+        }
+
+        System.Net.HttpStatusCode sc = _store.InstanceCreate(
+            "Subscription",
+            serialized,
+            "application/fhir+json",
+            "application/fhir+json",
+            true,
+            string.Empty,
+            true,
+            out _,
+            out string outcome,
+            out _,
+            out _,
+            out string location
+        );
+
+        if ((sc == System.Net.HttpStatusCode.OK) ||
+            (sc == System.Net.HttpStatusCode.Created))
+        {
+            networkInUse = false;
+            subscriptionLocation = location;
+            return;
+        }
+
+        errorMessage = outcome;
+        networkInUse = false;
+        return;
+    }
+
+    private void PostEncounter()
+    {
+        if (networkInUse)
+        {
+            return;
+        }
+
+        networkInUse = true;
+
+        System.Net.HttpStatusCode sc = _store.InstanceCreate(
+            "Encounter",
+            getJsonEncounter(),
+            "application/fhir+json",
+            "application/fhir+json",
+            true,
+            string.Empty,
+            false,
+            out _,
+            out string outcome,
+            out _,
+            out _,
+            out string location
+        );
+
+        if ((sc == System.Net.HttpStatusCode.OK) ||
+            (sc == System.Net.HttpStatusCode.Created))
+        {
+            networkInUse = false;
+
+            int loc = location.LastIndexOf('/');
+            if (loc != -1)
+            {
+                postedEncounters.Add(location.Substring(loc + 1));
+            }
+
+            return;
+        }
+
+        errorMessage = outcome;
+        networkInUse = false;
+        return;
+
+        string getJsonEncounter() => _store.Config.FhirVersion switch
+        {
+            TenantConfiguration.SupportedFhirVersions.R4 => _encounterJsonR4,
+            TenantConfiguration.SupportedFhirVersions.R4B => _encounterJsonR4B,
+            TenantConfiguration.SupportedFhirVersions.R5 => _encounterJsonR5,
+            _ => string.Empty,
+        };
+    }
+
+    private void CleanUp()
+    {
+        if (!string.IsNullOrEmpty(subscriptionLocation))
+        {
+            subscriptionLocation = string.Empty;
+
+            _ = _store.InstanceDelete(
+                "Subscription",
+                subscription.Id,
+                "application/fhir+json",
+                false,
+                string.Empty,
+                out _,
+                out _);
+        }
+
+        if (!string.IsNullOrEmpty(handshakeBundleId))
+        {
+            _ = _store.InstanceDelete(
+                "Bundle",
+                handshakeBundleId,
+                "application/fhir+json",
+                false,
+                string.Empty,
+                out _,
+                out _);
+
+            handshakeBundleId = string.Empty;
+        }
+
+        foreach (string encId in postedEncounters)
+        {
+            _ = _store.InstanceDelete(
+                "Encounter",
+                encId,
+                "application/fhir+json",
+                false,
+                string.Empty,
+                out _,
+                out _);
+        }
+
+        postedEncounters.Clear();
+    }
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if ((!string.IsNullOrEmpty(StoreName)) &&
+            (StoreManager.TryGetValue(StoreName, out _store!)))
+        {
+            _store.OnChanged += Store_OnChanged;
+
+            fhirServerUrl = _store.Config.BaseUrl;
+
+            subscription.Endpoint = _store.Config.BaseUrl + "/$subscription-hook";
+
+            encounterStatus = _store.Config.FhirVersion >= TenantConfiguration.SupportedFhirVersions.R5
+                ? "completed"
+                : "finished";
+        }
+
+        // notify of store root in case user clicked here directly
+        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+        NavTracker?.NotifyNav($"Subscriptions Client", "/store/ext/subscriptions-client?store=" + StoreName, 2);
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-client", StringComparison.Ordinal))
+        {
+            if (_store != null)
+            {
+                _store.OnChanged -= Store_OnChanged;
+            }
+
+            if ((!string.IsNullOrEmpty(StoreName)) &&
+                (StoreManager.TryGetValue(StoreName, out _store!)))
+            {
+                _store.OnChanged += Store_OnChanged;
+
+                subscription.Endpoint = _store.Config.BaseUrl + "/$subscription-hook";
+            }
+
+            // notify of store root in case user clicked here directly
+            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+            NavTracker?.NotifyNav($"Subscriptions Tour", "/store/ext/subscriptions-client?store=" + StoreName, 2);
+        }
+    }
+
+
+    /// <summary>FHIR store on changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Event information.</param>
+    private void Store_OnChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_store != null)
+        {
+            _store.OnChanged -= Store_OnChanged;
+        }
+    }
+}

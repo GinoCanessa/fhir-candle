@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirStore.Models;
+namespace FhirCandle.Models;
 
 /// <summary>Additional information for subscription changed events.</summary>
 public class ReceivedSubscriptionChangedEventArgs

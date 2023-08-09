@@ -7,7 +7,7 @@ using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 
-namespace FhirStore.Versioned.Extensions;
+namespace FhirCandle.Extensions;
 
 /// <summary>Resource Type extensions for version-specific FHIR stores.</summary>
 public static class ResourceTypeExtensions

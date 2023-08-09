@@ -6,7 +6,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 
-namespace FhirStore.Extensions;
+namespace FhirCandle.Extensions;
 
 /// <summary>A FHIR enum extensions.</summary>
 public static class FhirEnumExtensions

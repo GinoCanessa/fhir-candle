@@ -5,7 +5,7 @@
 
 using System.Net;
 
-namespace FhirStore.Operations;
+namespace FhirCandle.Operations;
 
 /// <summary>Interface for executalbe FHIR operations.</summary>
 public interface IFhirOperation
@@ -17,7 +17,7 @@ public interface IFhirOperation
     string OperationVersion { get; }
 
     /// <summary>Gets the canonical by FHIR version.</summary>
-    Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion { get; }
+    Dictionary<FhirCandle.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion { get; }
 
     /// <summary>Gets a value indicating whether this object is named query.</summary>
     bool IsNamedQuery { get; }
@@ -62,7 +62,7 @@ public interface IFhirOperation
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation);
 
-    Hl7.Fhir.Model.OperationDefinition? GetDefinition(FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion);
+    Hl7.Fhir.Model.OperationDefinition? GetDefinition(FhirCandle.Models.TenantConfiguration.SupportedFhirVersions fhirVersion);
 
 }
 

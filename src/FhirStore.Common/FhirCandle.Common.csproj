@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>FhirCandle</RootNamespace>
+	<VersionPrefix>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</VersionPrefix>
+	<Version>$(VersionPrefix)</Version>
+	<AssemblyVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</AssemblyVersion>
+	<FileVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Operations\**" />
+    <EmbeddedResource Remove="Operations\**" />
+    <None Remove="Operations\**" />
+    <None Remove="Extensions\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Services\" />
+    <Folder Include="Extensions\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Operations\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
+  </ItemGroup>
+</Project>

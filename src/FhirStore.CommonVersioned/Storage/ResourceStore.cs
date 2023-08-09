@@ -3,24 +3,18 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using fhir.candle.Search;
-using FhirStore.Extensions;
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Search;
+using FhirCandle.Extensions;
+using FhirCandle.Models;
+using FhirCandle.Subscriptions;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
-using Hl7.Fhir.Language.Debugging;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
-using Hl7.FhirPath.Expressions;
 using System.Collections.Concurrent;
-using System.Linq;
-using FhirStore.Versioned.Extensions;
-using FhirStore.Versioned.Subscriptions;
 using System.Collections;
-using System.Text.RegularExpressions;
 
-namespace FhirStore.Storage;
+namespace FhirCandle.Storage;
 
 /// <summary>A resource store.</summary>
 /// <typeparam name="T">Resource type parameter.</typeparam>

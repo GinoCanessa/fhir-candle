@@ -3,13 +3,13 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-extern alias storeR4;
-extern alias storeR4B;
-extern alias storeR5;
+extern alias candleR4;
+extern alias candleR4B;
+extern alias candleR5;
 
 using fhir.candle.Tests.Models;
-using FhirStore.Models;
-using FhirStore.Storage;
+using FhirCandle.Models;
+using FhirCandle.Storage;
 using FluentAssertions;
 using Hl7.Fhir.Model;
 using System.Net;
@@ -44,19 +44,19 @@ public class FhirStoreTests
     internal readonly TenantConfiguration _configR4;
 
     /// <summary>The FHIR store for FHIR R4.</summary>
-    internal IFhirStore _storeR4;
+    internal IFhirStore _candleR4;
 
     /// <summary>(Immutable) The configuration for FHIR R4B.</summary>
     internal readonly TenantConfiguration _configR4B;
 
     /// <summary>The FHIR store for FHIR R4B.</summary>
-    internal IFhirStore _storeR4B;
+    internal IFhirStore _candleR4B;
 
     /// <summary>(Immutable) The configuration for FHIR R5.</summary>
     internal readonly TenantConfiguration _configR5;
 
     /// <summary>The FHIR store for FHIR R5.</summary>
-    internal IFhirStore _storeR5;
+    internal IFhirStore _candleR5;
 
     internal Dictionary<TenantConfiguration.SupportedFhirVersions, int> _expectedRestResources = new()
     {
@@ -92,14 +92,14 @@ public class FhirStoreTests
             BaseUrl = "http://localhost/fhir/r5",
         };
 
-        _storeR4 = new storeR4::FhirStore.Storage.VersionedFhirStore();
-        _storeR4.Init(_configR4);
+        _candleR4 = new candleR4::FhirCandle.Storage.VersionedFhirStore();
+        _candleR4.Init(_configR4);
 
-        _storeR4B = new storeR4B::FhirStore.Storage.VersionedFhirStore();
-        _storeR4B.Init(_configR4B);
+        _candleR4B = new candleR4B::FhirCandle.Storage.VersionedFhirStore();
+        _candleR4B.Init(_configR4B);
 
-        _storeR5 = new storeR5::FhirStore.Storage.VersionedFhirStore();
-        _storeR5.Init(_configR5);
+        _candleR5 = new candleR5::FhirCandle.Storage.VersionedFhirStore();
+        _candleR5.Init(_configR5);
     }
 
     /// <summary>Gets store for version.</summary>
@@ -112,13 +112,13 @@ public class FhirStoreTests
         switch (version)
         {
             case TenantConfiguration.SupportedFhirVersions.R4:
-                return _storeR4;
+                return _candleR4;
 
             case TenantConfiguration.SupportedFhirVersions.R4B:
-                return _storeR4B;
+                return _candleR4B;
 
             case TenantConfiguration.SupportedFhirVersions.R5:
-                return _storeR5;
+                return _candleR5;
         }
 
         throw new ArgumentException($"Invalid version: {version}", nameof(version));

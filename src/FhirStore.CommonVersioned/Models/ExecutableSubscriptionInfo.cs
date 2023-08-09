@@ -4,10 +4,10 @@
 // </copyright>
 
 
-using FhirStore.Models;
+using FhirCandle.Models;
 using Hl7.FhirPath;
 
-namespace FhirStore.Models;
+namespace FhirCandle.Models;
 
 /// <summary>An executable subscription tree.</summary>
 public class ExecutableSubscriptionInfo

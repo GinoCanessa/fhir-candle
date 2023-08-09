@@ -3,11 +3,11 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Models;
+using FhirCandle.Models;
 using Hl7.Fhir.Model;
-using static FhirStore.Versioned.Subscriptions.ConverterUtils;
+using static FhirCandle.Subscriptions.ConverterUtils;
 
-namespace FhirStore.Versioned.Subscriptions;
+namespace FhirCandle.Subscriptions;
 
 /// <summary>FHIR R4 topic format converter.</summary>
 public class TopicConverter

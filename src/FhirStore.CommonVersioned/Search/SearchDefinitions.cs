@@ -3,10 +3,10 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Extensions;
+using FhirCandle.Extensions;
 using Hl7.Fhir.Model;
 
-namespace fhir.candle.Search;
+namespace FhirCandle.Search;
 
 /// <summary>Common search definitions.</summary>
 public static class SearchDefinitions

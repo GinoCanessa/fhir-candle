@@ -3,12 +3,13 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Models;
+using FhirCandle.Models;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
-using static fhir.candle.Search.SearchDefinitions;
+using Newtonsoft.Json.Linq;
+using static FhirCandle.Search.SearchDefinitions;
 
-namespace fhir.candle.Search;
+namespace FhirCandle.Search;
 
 /// <summary>A class that contains functions to test string inputs against various FHIR types.</summary>
 public static class EvalStringSearch

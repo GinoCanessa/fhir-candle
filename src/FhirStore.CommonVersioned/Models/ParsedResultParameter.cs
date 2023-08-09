@@ -3,11 +3,11 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Extensions;
-using FhirStore.Storage;
+using FhirCandle.Extensions;
+using FhirCandle.Storage;
 using Hl7.Fhir.Model;
 
-namespace FhirStore.Models;
+namespace FhirCandle.Models;
 
 /// <summary>A parsed search result parameter.</summary>
 public class ParsedResultParameters
@@ -42,7 +42,7 @@ public class ParsedResultParameters
     private string _appliedQueryString = string.Empty;
 
     /// <summary>
-    /// Initializes a new instance of the FhirStore.Models.ParsedResultParameters class.
+    /// Initializes a new instance of the FhirCandle.Models.ParsedResultParameters class.
     /// </summary>
     /// <param name="queryString">The query string.</param>
     /// <param name="store">      The FHIR store.</param>

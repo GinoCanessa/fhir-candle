@@ -3,10 +3,10 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using fhir.candle.Search;
-using FhirStore.Models;
-using FhirStore.Operations;
-using FhirStore.Versioned.Subscriptions;
+using FhirCandle.Search;
+using FhirCandle.Models;
+using FhirCandle.Operations;
+using FhirCandle.Subscriptions;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
@@ -21,9 +21,9 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Xml;
-using static fhir.candle.Search.SearchDefinitions;
+using static FhirCandle.Search.SearchDefinitions;
 
-namespace FhirStore.Storage;
+namespace FhirCandle.Storage;
 
 /// <summary>A FHIR store.</summary>
 public partial class VersionedFhirStore : IFhirStore
@@ -246,7 +246,7 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
         }
-
+        
         // check for a load directory
         if (config.LoadDirectory != null)
         {

@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirStore.Models;
+namespace FhirCandle.Models;
 
 /// <summary>A parsed subscription topic.</summary>
 public class ParsedSubscriptionTopic
@@ -66,7 +66,7 @@ public class ParsedSubscriptionTopic
     /// <summary>Gets or initializes the identifier.</summary>
     public required string Id { get; init; }
 
-    /// <summary>Gets or initializes URL of this subscription topic.</summary>
+    /// <summary>Gets or initializes the canonical URL of this subscription topic.</summary>
     public required string Url { get; init; }
 
     /// <summary>Gets or sets the resource triggers.</summary>

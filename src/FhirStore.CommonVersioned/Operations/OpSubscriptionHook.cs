@@ -3,10 +3,10 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using FhirStore.Models;
-using FhirStore.Operations;
-using FhirStore.Storage;
-using FhirStore.Versioned.Extensions;
+using FhirCandle.Models;
+using FhirCandle.Operations;
+using FhirCandle.Storage;
+using FhirCandle.Extensions;
 using System.Net;
 
 namespace FhirStore.CommonVersioned.Operations;
@@ -21,11 +21,11 @@ public class OpSubscriptionHook : IFhirOperation
     public string OperationVersion => "0.0.1";
 
     /// <summary>Gets the canonical by FHIR version.</summary>
-    public Dictionary<FhirStore.Models.TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
+    public Dictionary<TenantConfiguration.SupportedFhirVersions, string> CanonicalByFhirVersion => new()
     {
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R4B, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
-        { FhirStore.Models.TenantConfiguration.SupportedFhirVersions.R5, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { TenantConfiguration.SupportedFhirVersions.R4, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { TenantConfiguration.SupportedFhirVersions.R4B, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
+        { TenantConfiguration.SupportedFhirVersions.R5, "http://argo.run/fhir/OperationDefinition/subscription-hook" },
     };
 
     /// <summary>Gets a value indicating whether this operation is a named query.</summary>
@@ -61,9 +61,9 @@ public class OpSubscriptionHook : IFhirOperation
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
-        Storage.VersionedFhirStore store,
+        VersionedFhirStore store,
         string resourceType,
-        Storage.IVersionedResourceStore? resourceStore,
+        IVersionedResourceStore? resourceStore,
         string instanceId,
         string queryString,
         Hl7.Fhir.Model.Resource? bodyResource,
@@ -117,7 +117,7 @@ public class OpSubscriptionHook : IFhirOperation
     /// <param name="fhirVersion">The FHIR version.</param>
     /// <returns>The definition.</returns>
     public Hl7.Fhir.Model.OperationDefinition? GetDefinition(
-        FhirStore.Models.TenantConfiguration.SupportedFhirVersions fhirVersion)
+        TenantConfiguration.SupportedFhirVersions fhirVersion)
     {
         Hl7.Fhir.Model.OperationDefinition def = new()
         {

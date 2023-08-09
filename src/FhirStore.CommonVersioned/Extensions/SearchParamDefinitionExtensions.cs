@@ -5,7 +5,7 @@
 
 using Hl7.Fhir.Model;
 
-namespace FhirStore.Extensions;
+namespace FhirCandle.Extensions;
 
 /// <summary>A search parameter definition extensions.</summary>
 public static class SearchParamDefinitionExtensions

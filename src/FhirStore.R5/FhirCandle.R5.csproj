@@ -4,6 +4,10 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+	<VersionPrefix>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</VersionPrefix>
+	<Version>$(VersionPrefix)</Version>
+	<AssemblyVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</AssemblyVersion>
+	<FileVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</FileVersion>
   </PropertyGroup>
 
   <Import Project="..\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems" Label="Shared" />
@@ -13,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FhirStore.Common\FhirStore.Common.csproj" />
+    <ProjectReference Include="..\FhirStore.Common\FhirCandle.Common.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,7 +3,6 @@ When you need a small FHIR.
 
 fhir-candle is a small in-memory FHIR server that can be used for testing and development. It is NOT intended to be used for production workloads.
 
-
 # Documentation
 
 ## Get Started
@@ -13,6 +12,8 @@ fhir-candle is a small in-memory FHIR server that can be used for testing and de
 ```
 dotnet tool install --global fhir-candle --prerelease
 ```
+
+Note the `prerelease` tag - this software has not yet hit the v1 milestone.
 
 Start a FHIR server and open the browser by running:
 ```

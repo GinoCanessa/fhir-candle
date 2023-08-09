@@ -298,9 +298,9 @@ public class SearchTester
                         }
                         break;
 
+                    case "reference-canonical":
                     case "reference-uri":
                     case "reference-url":
-                    case "reference-canonical":
                         if (EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp))
                         {
                             found = true;
@@ -326,6 +326,59 @@ public class SearchTester
 
                     case "reference-uuid":
                         if (EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // note that mapping identifier to canonical is specifically disallowed
+                    // (see https://hl7.org/fhir/search.html#modifieridentifier)
+                    //case "reference-identifier-canonical":
+                    case "reference-identifier-reference":
+                    case "reference-identifier-oid":
+                    case "reference-identifier-uri":
+                    case "reference-identifier-url":
+                    case "reference-identifier-uuid":
+                        if (EvalReferenceSearch.TestReferenceIdentifier(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // note: the literals used are 'actual' resource types (e.g., patient)
+                    case "reference-resourcetype-canonical":
+                    case "reference-resourcetype-uri":
+                    case "reference-resourcetype-url":
+                        if (EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp, sp.ModifierLiteral!))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // note: the literals used are 'actual' resource types (e.g., patient)
+                    case "reference-resourcetype-reference":
+                        if (EvalReferenceSearch.TestReference(resultNode, sp, sp.ModifierLiteral!))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // note: the literals used are 'actual' resource types (e.g., patient)
+                    case "reference-resourcetype-oid":
+                        if (EvalReferenceSearch.TestReferenceAgainstOid(resultNode, sp, sp.ModifierLiteral!))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    // note: the literals used are 'actual' resource types (e.g., patient)
+                    case "reference-resourcetype-uuid":
+                        if (EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp, sp.ModifierLiteral!))
                         {
                             found = true;
                             break;
@@ -383,6 +436,30 @@ public class SearchTester
 
                     case "string-exact-humanname":
                         if (EvalStringSearch.TestStringExactAgainstHumanName(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-address":
+                        if (EvalStringSearch.TestStringStartsWithAgainstAddress(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-contains-address":
+                        if (EvalStringSearch.TestStringContainsAgainstAddress(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "string-exact-address":
+                        if (EvalStringSearch.TestStringExactAgainstAddress(resultNode, sp))
                         {
                             found = true;
                             break;
@@ -489,15 +566,6 @@ public class SearchTester
                         }
                         break;
 
-                    // note: this is a special case, the literals used are 'actual' resource types (e.g., patient)
-                    case "reference-resourcetype-canonical":
-                    case "reference-resourcetype-reference":
-                    case "reference-resourcetype-oid":
-                    case "reference-resourcetype-uri":
-                    case "reference-resourcetype-url":
-                    case "reference-resourcetype-uuid":
-                        break;
-
                     case "reference-above-canonical":
                     case "reference-above-reference":
                     case "reference-above-oid":
@@ -516,12 +584,6 @@ public class SearchTester
                     case "reference-codetext-uri":
                     case "reference-codetext-url":
                     case "reference-codetext-uuid":
-                    case "reference-identifier-canonical":
-                    case "reference-identifier-reference":
-                    case "reference-identifier-oid":
-                    case "reference-identifier-uri":
-                    case "reference-identifier-url":
-                    case "reference-identifier-uuid":
                     case "reference-in-canonical":
                     case "reference-in-reference":
                     case "reference-in-oid":

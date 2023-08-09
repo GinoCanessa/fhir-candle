@@ -144,6 +144,8 @@ public class R4BTestsObservation : IClassFixture<R4BTests>
     [InlineData("value-quantity=820||265201", 1)]
     [InlineData("value-quantity=820||cL/s", 1)]
     [InlineData("subject=Patient/example", R4BTests._observationsWithSubjectExample)]
+    [InlineData("subject:Patient=Patient/example", R5Tests._observationsWithSubjectExample)]
+    [InlineData("subject:Device=Patient/example", 0)]
     [InlineData("subject=Patient/UnknownPatientId", 0)]
     [InlineData("subject=example", R4BTests._observationsWithSubjectExample)]
     [InlineData("code=http://loinc.org|9272-6", 1)]

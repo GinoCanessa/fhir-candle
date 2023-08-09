@@ -31,15 +31,17 @@
             <MudFab StartIcon="@Icons.Material.Filled.Close" OnClick="@ToggleDrawer" Size="Size.Small" />
         </MudDrawerHeader>
         <MudNavMenu>
-            <MudNavLink Href="/">FHIR Candle</MudNavLink>
+            <MudNavLink Href="/">Home</MudNavLink>
             <MudNavGroup Title="Stores" Expanded="true">
                 @foreach (string key in StoreManager.Keys.OrderBy(s => s))
                 {
                     <MudNavLink Href="@LinkForStore(key)" Icon="@Icons.Material.Filled.ViewInAr">@key</MudNavLink>
                 }
-
             </MudNavGroup>
         </MudNavMenu>
+
+        <MudSpacer />
+        <MudText Typo="Typo.caption" Class="px-4 mud-text-secondary">@GetType()?.Assembly?.GetName()?.Version?.ToString()</MudText>
     </MudDrawer>
 
     @*Note that we have to set padding-top here because of the non-fixed app bar *@

@@ -1,4 +1,4 @@
-name: Deploy fhir-candle master branch to argo.run ci
+name: Deploy fhir-candle main branch to argo.run ci
 # Basics from https://docs.microsoft.com/en-us/azure/dev-spaces/how-to/github-actions
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v3
 
     - uses: azure/docker-login@v1
       with:

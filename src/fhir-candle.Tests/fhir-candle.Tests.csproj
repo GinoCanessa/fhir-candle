@@ -4,8 +4,11 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
     <IsPackable>false</IsPackable>
+	<VersionPrefix>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</VersionPrefix>
+	<Version>$(VersionPrefix)</Version>
+	<AssemblyVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</AssemblyVersion>
+	<FileVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FhirCandle.Ui.R4\FhirCandle.Ui.R4.csproj" />
     <ProjectReference Include="..\FhirStore.Common\FhirCandle.Common.csproj" />
     <ProjectReference Include="..\fhir-candle\fhir-candle.csproj" />
     <ProjectReference Include="..\FhirStore.R4\FhirCandle.R4.csproj" />

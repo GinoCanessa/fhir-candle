@@ -7,12 +7,17 @@
 		<RootNamespace>fhir.candle</RootNamespace>
 		<StartupObject>fhir.candle.Program</StartupObject>
 		<!--<VersionPrefix>0.0.1</VersionPrefix>-->
-		<VersionPrefix>0.0.1-beta.8</VersionPrefix>
+		<!--<VersionPrefix>0.0.1-beta.8</VersionPrefix>-->
+		<VersionPrefix>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</VersionPrefix>
 		<Version>$(VersionPrefix)</Version>
-		<AssemblyVersion>0.0.1.1</AssemblyVersion>
-		<FileVersion>0.0.1.1</FileVersion>
+		<!--<Version>$([System.DateTime]::Now.ToString(&quot;0.0.yyyyMMDD&quot;))</Version>-->
+		<!--<AssemblyVersion>0.0.1.1</AssemblyVersion>-->
+		<AssemblyVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</AssemblyVersion>
+		<!--<FileVersion>0.0.1.1</FileVersion>-->
+		<FileVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</FileVersion>
 		<IsPackable>true</IsPackable>
 		<PackAsTool>true</PackAsTool>
+		<PackageVersion>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</PackageVersion>
 		<ToolCommandName>fhir-candle</ToolCommandName>
 		<PackageOutputPath>..\..\nupkg</PackageOutputPath>
 		<PackageReadmeFile>README.md</PackageReadmeFile>

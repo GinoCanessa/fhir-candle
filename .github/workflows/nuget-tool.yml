@@ -1,0 +1,21 @@
+name: Budndle fhir-candle main branch as NuGet Tool
+# Basics from https://docs.microsoft.com/en-us/azure/dev-spaces/how-to/github-actions
+on:
+  push:
+    branches:
+    - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '7'
+
+    - name: Publish the package to nuget.org
+    - run: |
+        dotnet pack -c Release ./src/fhir-candle/fhir-candle.csproj
+        dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.GINOC_NUGET }} --source https://api.nuget.org/v3/index.json

@@ -1,4 +1,4 @@
-﻿@page "/store/ext/notification-local-viewer"
+﻿@page "/subscriptions/notification-local-viewer"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -82,7 +82,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"Generated Subscription Events", $"/store/ext/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
+        NavTracker?.NotifyNav($"Generated Subscription Events", $"/subscriptions/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -90,7 +90,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/notification-local-viewer", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/subscriptions/notification-local-viewer", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -109,7 +109,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"Generated Subscription Events", $"/store/ext/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
+            NavTracker?.NotifyNav($"Generated Subscription Events", $"/subscriptions/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
         }
     }
 

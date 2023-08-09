@@ -1,4 +1,4 @@
-﻿@page "/store/ext/subscriptions-client"
+﻿@page "/subscriptions/client"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -302,7 +302,7 @@
 
         // notify of store root in case user clicked here directly
         NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Subscriptions Client", "/store/ext/subscriptions-client?store=" + StoreName, 2);
+        NavTracker?.NotifyNav($"Subscriptions Client", "/subscriptions/client?store=" + StoreName, 2);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -310,7 +310,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-client", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/subscriptions/client", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -327,7 +327,7 @@
 
             // notify of store root in case user clicked here directly
             NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Subscriptions Tour", "/store/ext/subscriptions-client?store=" + StoreName, 2);
+            NavTracker?.NotifyNav($"Subscriptions Tour", "/subscriptions/client?store=" + StoreName, 2);
         }
     }
 

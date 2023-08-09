@@ -67,10 +67,14 @@ public static class EvalReferenceSearch
     }
 
     /// <summary>Tests reference against most FHIR types.</summary>
-    /// <param name="valueNode">The value node.</param>
-    /// <param name="sp">       The sp.</param>
+    /// <param name="valueNode">         The value node.</param>
+    /// <param name="sp">                The sp.</param>
+    /// <param name="resourceTypeFilter">(Optional) A filter specifying the resource type.</param>
     /// <returns>True if the test passes, false if the test fails.</returns>
-    public static bool TestReference(ITypedElement valueNode, ParsedSearchParameter sp)
+    public static bool TestReference(
+        ITypedElement valueNode,
+        ParsedSearchParameter sp,
+        string resourceTypeFilter = "")
     {
         if ((valueNode == null) ||
             (valueNode.InstanceType != "Reference") ||
@@ -86,6 +90,10 @@ public static class EvalReferenceSearch
             return false;
         }
 
+        string filterMatch = string.IsNullOrEmpty(resourceTypeFilter)
+            ? string.Empty
+            : resourceTypeFilter + '/';
+
         for (int i = 0; i < sp.ValueReferences.Length; i++)
         {
             if (sp.IgnoredValueFlags[i])
@@ -95,7 +103,16 @@ public static class EvalReferenceSearch
 
             if (CompareRefsCommon(r, sp.ValueReferences[i]))
             {
-                return true;
+                if (string.IsNullOrEmpty(filterMatch))
+                {
+                    return true;
+                }
+
+                if (r.Reference.Contains(filterMatch, StringComparison.Ordinal) ||
+                    ((!string.IsNullOrEmpty(r.Type)) && r.Type.Equals(resourceTypeFilter)))
+                {
+                    return true;
+                }
             }
         }
 
@@ -103,10 +120,14 @@ public static class EvalReferenceSearch
     }
 
     /// <summary>Tests references against OIDs.</summary>
-    /// <param name="valueNode">The value node.</param>
-    /// <param name="sp">       The sp.</param>
+    /// <param name="valueNode">         The value node.</param>
+    /// <param name="sp">                The sp.</param>
+    /// <param name="resourceTypeFilter">(Optional) A filter specifying the resource type.</param>
     /// <returns>True if the test passes, false if the test fails.</returns>
-    public static bool TestReferenceAgainstOid(ITypedElement valueNode, ParsedSearchParameter sp)
+    public static bool TestReferenceAgainstOid(
+        ITypedElement valueNode, 
+        ParsedSearchParameter sp,
+        string resourceTypeFilter = "")
     {
         if ((valueNode == null) ||
             (valueNode.InstanceType != "Reference") ||
@@ -131,19 +152,30 @@ public static class EvalReferenceSearch
 
             if (CompareRefsOid(r, sp.ValueReferences[i]))
             {
-                return true;
+                if (string.IsNullOrEmpty(resourceTypeFilter))
+                {
+                    return true;
+                }
+
+                if ((!string.IsNullOrEmpty(r.Type)) && r.Type.Equals(resourceTypeFilter, StringComparison.Ordinal))
+                {
+                    return true;
+                }
             }
         }
 
         return false;
     }
 
-
     /// <summary>Tests references against UUIDs.</summary>
-    /// <param name="valueNode">The value node.</param>
-    /// <param name="sp">       The sp.</param>
+    /// <param name="valueNode">         The value node.</param>
+    /// <param name="sp">                The sp.</param>
+    /// <param name="resourceTypeFilter">(Optional) A filter specifying the resource type.</param>
     /// <returns>True if the test passes, false if the test fails.</returns>
-    public static bool TestReferenceAgainstUuid(ITypedElement valueNode, ParsedSearchParameter sp)
+    public static bool TestReferenceAgainstUuid(
+        ITypedElement valueNode,
+        ParsedSearchParameter sp,
+        string resourceTypeFilter = "")
     {
         if ((valueNode == null) ||
             (valueNode.InstanceType != "Reference") ||
@@ -168,7 +200,15 @@ public static class EvalReferenceSearch
 
             if (CompareRefsUuid(r, sp.ValueReferences[i]))
             {
-                return true;
+                if (string.IsNullOrEmpty(resourceTypeFilter))
+                {
+                    return true;
+                }
+
+                if ((!string.IsNullOrEmpty(r.Type)) && r.Type.Equals(resourceTypeFilter, StringComparison.Ordinal))
+                {
+                    return true;
+                }
             }
         }
 
@@ -176,10 +216,14 @@ public static class EvalReferenceSearch
     }
 
     /// <summary>Tests reference against primitive url types (canonical, uri, url).</summary>
-    /// <param name="valueNode">The value node.</param>
-    /// <param name="sp">       The sp.</param>
+    /// <param name="valueNode">         The value node.</param>
+    /// <param name="sp">                The sp.</param>
+    /// <param name="resourceTypeFilter">(Optional) A filter specifying the resource type.</param>
     /// <returns>True if the test passes, false if the test fails.</returns>
-    public static bool TestReferenceAgainstPrimitive(ITypedElement valueNode, ParsedSearchParameter sp)
+    public static bool TestReferenceAgainstPrimitive(
+        ITypedElement valueNode, 
+        ParsedSearchParameter sp,
+        string resourceTypeFilter = "")
     {
         if ((valueNode == null) ||
             (sp.ValueReferences == null))
@@ -194,13 +238,16 @@ public static class EvalReferenceSearch
             return false;
         }
 
+        string filterMatch = string.IsNullOrEmpty(resourceTypeFilter)
+            ? string.Empty
+            : resourceTypeFilter + '/';
+
         int index = value.LastIndexOf('|');
 
         if (index != -1)
         {
             string cv = value.Substring(index + 1);
             string cu = value.Substring(0, index);
-
 
             for (int i = 0; i < sp.ValueReferences.Length; i++)
             {
@@ -214,7 +261,15 @@ public static class EvalReferenceSearch
                 if (s.Url.Equals(cu, StringComparison.Ordinal) &&
                     (string.IsNullOrEmpty(s.CanonicalVersion) || s.CanonicalVersion.Equals(cv, StringComparison.Ordinal)))
                 {
-                    return true;
+                    if (string.IsNullOrEmpty(resourceTypeFilter))
+                    {
+                        return true;
+                    }
+                    
+                    if (cu.Contains(filterMatch, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
                 }
             }
 
@@ -229,6 +284,54 @@ public static class EvalReferenceSearch
             }
 
             if (sp.ValueReferences[i].Url.Equals(value, StringComparison.Ordinal))
+            {
+                if (string.IsNullOrEmpty(resourceTypeFilter))
+                {
+                    return true;
+                }
+
+                if (sp.ValueReferences[i].Url.Contains(filterMatch, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Tests reference identifier.</summary>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <returns>True if the test passes, false if the test fails.</returns>
+    public static bool TestReferenceIdentifier(
+        ITypedElement valueNode,
+        ParsedSearchParameter sp)
+    {
+        if ((valueNode == null) ||
+            (sp.ValueFhirCodes == null))
+        {
+            return false;
+        }
+
+        Hl7.Fhir.Model.ResourceReference v = valueNode.ToPoco<Hl7.Fhir.Model.ResourceReference>();
+
+        string valueSystem = v.Identifier?.System ?? string.Empty;
+        string valueCode = v.Identifier?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(valueSystem) && string.IsNullOrEmpty(valueCode))
+        {
+            return false;
+        }
+        
+        for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (EvalTokenSearch.CompareCodeWithSystem(valueSystem, valueCode, sp.ValueFhirCodes[i].System ?? string.Empty, sp.ValueFhirCodes[i].Value))
             {
                 return true;
             }

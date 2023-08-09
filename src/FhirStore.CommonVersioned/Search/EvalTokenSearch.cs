@@ -11,19 +11,18 @@ namespace FhirCandle.Search;
 /// <summary>A class that contains functions to test token inputs against various FHIR types.</summary>
 public static class EvalTokenSearch
 {
-    /// <summary>Compare code with system.</summary>
+    /// <summary>Compare code and system values - note that empty values in '2' slots are considered matches against anything.</summary>
     /// <param name="s1">The first system.</param>
     /// <param name="c1">The first code.</param>
     /// <param name="s2">The second system.</param>
     /// <param name="c2">The second code.</param>
     /// <returns>True if they match, false if they do not.</returns>
-    private static bool CompareCodeWithSystem(string s1, string c1, string s2, string c2)
+    internal static bool CompareCodeWithSystem(string s1, string c1, string s2, string c2)
     {
-        if (string.IsNullOrEmpty(s1) || 
-            string.IsNullOrEmpty(s2) ||
+        if (string.IsNullOrEmpty(s2) ||
             s1.Equals(s2, StringComparison.OrdinalIgnoreCase))
         {
-            return c1.Equals(c2, StringComparison.OrdinalIgnoreCase);
+            return string.IsNullOrEmpty(c2) || c1.Equals(c2, StringComparison.OrdinalIgnoreCase);
         }
 
         return false;

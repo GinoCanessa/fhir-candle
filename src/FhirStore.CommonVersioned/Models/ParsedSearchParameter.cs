@@ -750,6 +750,25 @@ public class ParsedSearchParameter
                             IgnoredValueFlags[i] = true;
                         }
                     }
+
+                    // references can use identifiers - it is better to attempt parsing them here for sanity later
+                    ValueFhirCodes = new Hl7.Fhir.ElementModel.Types.Code[Values.Length];
+
+                    // traverse values
+                    for (int i = 0; i < Values.Length; i++)
+                    {
+                        string[] components = Values[i].Split('|', StringSplitOptions.TrimEntries);
+
+                        if (components.Length == 1)
+                        {
+                            ValueFhirCodes[i] = new(null, components[0]);
+                        }
+                        else
+                        {
+                            ValueFhirCodes[i] = new(components[0], components[1]);
+                        }
+                    }
+
                 }
                 break;
 

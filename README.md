@@ -1,11 +1,11 @@
 # fhir-candle
+[![Tests](https://github.com/GinoCanessa/fhir-candle/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/GinoCanessa/fhir-candle/actions/workflows/build-and-test.yml)
+[![Publish dotnet tool](https://img.shields.io/nuget/v/fhir-candle.svg)](https://github.com/GinoCanessa/fhir-candle/actions/workflows/nuget-tool.yml)
+[![Deploy to subscriptions.argo.run](https://github.com/GinoCanessa/fhir-candle/actions/workflows/argo-subscriptions.yml/badge.svg)](https://github.com/GinoCanessa/fhir-candle/actions/workflows/argo-subscriptions.yml)
+
 When you need a small FHIR.
 
 fhir-candle is a small in-memory FHIR server that can be used for testing and development. It is NOT intended to be used for production workloads.
-
-[![Test](https://github.com/GinoCanessa/fhir-candle/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/GinoCanessa/fhir-candle/actions/workflows/build-and-test.yml)
-[![Publish NuGet Tool](https://github.com/GinoCanessa/fhir-candle/actions/workflows/nuget-tool.yml/badge.svg)](https://github.com/GinoCanessa/fhir-candle/actions/workflows/nuget-tool.yml)
-[![Deploy to subscriptions.argo.run](https://github.com/GinoCanessa/fhir-candle/actions/workflows/argo-subscriptions.yml/badge.svg)](https://github.com/GinoCanessa/fhir-candle/actions/workflows/argo-subscriptions.yml)
 
 # Documentation
 

@@ -223,6 +223,21 @@
 </MudPaper>
 
 @code {
+    private const string _json = """"
+{
+  "resourceType": "Encounter",
+  "status": "completed",
+  "class": [{
+    "coding": [{
+      "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+      "code": "VR",
+      "display": "virtual"
+    }]
+  }],
+  "subject": { "reference": "Patient/example" }
+}
+"""";
+
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;

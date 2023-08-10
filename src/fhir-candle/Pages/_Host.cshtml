@@ -16,6 +16,8 @@
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     @*<link href="css/site.css" rel="stylesheet" />*@
     <link href="css/monaco.css" rel="stylesheet" />
+    <link rel="stylesheet" href="highlight/styles/atom-one-dark.min.css" />
+    <link rel="alternate stylesheet" href="highlight/styles/atom-one-light.min.css" disabled="disabled" />
 
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
 </head>
@@ -43,6 +45,20 @@
         }
         function scrollElementIntoView(id) {
             document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+
+    <script src="highlight/highlight.min.js"></script>
+    <script src="highlight/languages/json.min.js"></script>
+    <script src="highlight/languages/http.min.js"></script>
+    <script src="highlight/languages/shell.min.js"></script>
+    <script src="highlight/languages/xml.min.js"></script>
+
+     <script>
+        window.highlightSnippet = function () {
+            document.querySelectorAll('pre code').forEach((el) => {
+                hljs.highlightBlock(el);
+            });
         }
     </script>
 

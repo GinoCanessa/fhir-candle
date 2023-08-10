@@ -6,9 +6,10 @@
     <SharedGUID>05dd03de-a22d-4fd8-a8a8-06fd05f20a18</SharedGUID>
   </PropertyGroup>
   <PropertyGroup Label="Configuration">
-    <Import_RootNamespace>FhirStore.CommonVersioned</Import_RootNamespace>
+    <Import_RootNamespace>FhirCandle</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Client\CandleClient.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\SearchParamDefinitionExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ExecutableSubscriptionInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\FhirPathVariableResolver.cs" />
@@ -24,15 +25,12 @@
     <Compile Include="$(MSBuildThisFileDirectory)Search\EvalUriSearch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\SearchDefinitions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\SearchTester.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Serialization\Utils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\IVersionedResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\IFhirOperation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionStatus.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionEvents.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Client\CandleClient.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Client\" />
   </ItemGroup>
 </Project>

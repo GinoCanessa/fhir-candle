@@ -6,14 +6,9 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>fhir.candle</RootNamespace>
 		<StartupObject>fhir.candle.Program</StartupObject>
-		<!--<VersionPrefix>0.0.1</VersionPrefix>-->
-		<!--<VersionPrefix>0.0.1-beta.8</VersionPrefix>-->
 		<VersionPrefix>$([System.DateTime]::Now.ToString("yyyy.MMdd.HHmm"))</VersionPrefix>
 		<Version>$(VersionPrefix)</Version>
-		<!--<Version>$([System.DateTime]::Now.ToString(&quot;0.0.yyyyMMDD&quot;))</Version>-->
-		<!--<AssemblyVersion>0.0.1.1</AssemblyVersion>-->
 		<AssemblyVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</AssemblyVersion>
-		<!--<FileVersion>0.0.1.1</FileVersion>-->
 		<FileVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</FileVersion>
 		<IsPackable>true</IsPackable>
 		<PackAsTool>true</PackAsTool>
@@ -78,6 +73,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\FhirCandle.Ui.Common\FhirCandle.Ui.Common.csproj" />
 	  <ProjectReference Include="..\FhirCandle.Ui.R4B\FhirCandle.Ui.R4B.csproj" />
 	  <ProjectReference Include="..\FhirCandle.Ui.R4\FhirCandle.Ui.R4.csproj" />
 	  <ProjectReference Include="..\FhirCandle.Ui.R5\FhirCandle.Ui.R5.csproj" />
@@ -119,6 +115,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Folder Include="Components\" />
 	  <Folder Include="Pages\Client\" />
 	</ItemGroup>
 

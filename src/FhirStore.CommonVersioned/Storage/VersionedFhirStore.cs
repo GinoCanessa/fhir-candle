@@ -22,6 +22,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Xml;
 using static FhirCandle.Search.SearchDefinitions;
+using FhirCandle.Serialization;
 
 namespace FhirCandle.Storage;
 
@@ -48,45 +49,6 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>The compiler.</summary>
     private static FhirPathCompiler _compiler = null!;
-
-    /// <summary>The JSON parser.</summary>
-    FhirJsonPocoDeserializer _jsonParser = new(new FhirJsonPocoDeserializerSettings()
-    {
-        DisableBase64Decoding = false,
-    });
-
-    /// <summary>The JSON serializer for full resources.</summary>
-    FhirJsonPocoSerializer _jsonSerializerFull = new(new FhirJsonPocoSerializerSettings()
-    {
-        SummaryFilter = null,
-    });
-
-    /// <summary>The JSON serializer for summary=data.</summary>
-    FhirJsonPocoSerializer _jsonSerializerData = new(new FhirJsonPocoSerializerSettings()
-    {
-        SummaryFilter = SerializationFilter.ForText(),
-    });
-
-    /// <summary>The JSON serializer for summary=text.</summary>
-    FhirJsonPocoSerializer _jsonSerializerText = new(new FhirJsonPocoSerializerSettings()
-    {
-        SummaryFilter = SerializationFilter.ForData(),
-    });
-
-    /// <summary>The JSON serializer for summary=true.</summary>
-    FhirJsonPocoSerializer _jsonSerializerSummary = new(new FhirJsonPocoSerializerSettings()
-    {
-        SummaryFilter = SerializationFilter.ForSummary(),
-    });
-
-    /// <summary>The XML parser.</summary>
-    FhirXmlPocoDeserializer _xmlParser = new(new FhirXmlPocoDeserializerSettings()
-    {
-        DisableBase64Decoding = false,
-    });
-
-    /// <summary>The XML serializer.</summary>
-    FhirXmlPocoSerializer _xmlSerializer = new();
 
     /// <summary>The store.</summary>
     private Dictionary<string, IVersionedResourceStore> _store = new();
@@ -740,194 +702,6 @@ public partial class VersionedFhirStore : IFhirStore
         return resource.ToTypedElement().ToScopedNode();
     }
 
-    /// <summary>Builds outcome for request.</summary>
-    /// <param name="sc">     The screen.</param>
-    /// <param name="message">(Optional) The message.</param>
-    /// <returns>An OperationOutcome.</returns>
-    internal OperationOutcome BuildOutcomeForRequest(HttpStatusCode sc, string message = "")
-    {
-        if (sc.IsSuccessful())
-        {
-            return new OperationOutcome()
-            {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
-                {
-                    new OperationOutcome.IssueComponent()
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Information,
-                        Code = OperationOutcome.IssueType.Unknown,
-                        Diagnostics = string.IsNullOrEmpty(message)
-                            ? "Request processed successfully"
-                            : message,
-                    },
-                },
-            };
-        }
-
-        return new OperationOutcome()
-        {
-            Id = Guid.NewGuid().ToString(),
-            Issue = new List<OperationOutcome.IssueComponent>()
-            {
-                new OperationOutcome.IssueComponent()
-                {
-                    Severity = OperationOutcome.IssueSeverity.Error,
-                    Code = OperationOutcome.IssueType.Unknown,
-                    Diagnostics = string.IsNullOrEmpty(message)
-                        ? $"Request failed with status code {sc.ToString()}"
-                        : message,
-                },
-            },
-        };
-    }
-
-    /// <summary>Serialize this object to the proper format.</summary>
-    /// <param name="instance">   The instance.</param>
-    /// <param name="destFormat"> Destination format.</param>
-    /// <param name="pretty">     If the output should be 'pretty' formatted.</param>
-    /// <param name="summaryType">(Optional) Type of the summary.</param>
-    /// <returns>A string.</returns>
-    public string SerializeFhir(
-        Resource instance,
-        string destFormat,
-        bool pretty,
-        string summaryFlag = "")
-    {
-        // TODO: Need to add support for count
-
-        switch (destFormat)
-        {
-            case "xml":
-            case "fhir+xml":
-            case "application/xml":
-            case "application/fhir+xml":
-                {
-                    SerializationFilter? serializationFilter;
-
-                    switch (summaryFlag.ToLowerInvariant())
-                    {
-                        case "":
-                        case "false":
-                        default:
-                            serializationFilter = null;
-                            break;
-
-                        case "true":
-                            serializationFilter = SerializationFilter.ForSummary();
-                            break;
-
-                        case "text":
-                            serializationFilter = SerializationFilter.ForText();
-                            break;
-
-                        case "data":
-                            serializationFilter = SerializationFilter.ForData();
-                            break;
-                    }
-
-                    if (pretty)
-                    {
-                        using (MemoryStream ms = new MemoryStream())
-                        using (System.Xml.XmlWriter writer = XmlWriter.Create(ms, new XmlWriterSettings(){ Indent = true}))
-                        {
-                            _xmlSerializer.Serialize(instance, writer, serializationFilter);
-                            writer.Flush();
-                            return System.Text.Encoding.UTF8.GetString(ms.ToArray());
-                        }
-                    }
-
-                    return _xmlSerializer.SerializeToString(instance, serializationFilter);
-                }
-
-            // default to JSON
-            default:
-                {
-                    switch (summaryFlag.ToLowerInvariant())
-                    {
-                        case "":
-                        case "false":
-                        default:
-                            if (pretty)
-                            {
-                                using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
-                                    { 
-                                        SkipValidation = true,
-                                        Indented = true,
-                                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                                    }))
-                                {
-                                    _jsonSerializerFull.Serialize(instance, writer);
-                                    writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
-                                }
-                            }
-
-                            return _jsonSerializerFull.SerializeToString(instance);
-
-                        case "true":
-                            if (pretty)
-                            {
-                                using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
-                                {
-                                    SkipValidation = true,
-                                    Indented = true,
-                                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                                }))
-                                {
-                                    _jsonSerializerSummary.Serialize(instance, writer);
-                                    writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
-                                }
-                            }
-
-                            return _jsonSerializerSummary.SerializeToString(instance);
-
-                        case "text":
-                            if (pretty)
-                            {
-                                using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
-                                {
-                                    SkipValidation = true,
-                                    Indented = true,
-                                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                                }))
-                                {
-                                    _jsonSerializerText.Serialize(instance, writer);
-                                    writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
-                                }
-                            }
-
-                            return _jsonSerializerText.SerializeToString(instance);
-
-                        case "data":
-                            if (pretty)
-                            {
-                                using (MemoryStream ms = new MemoryStream())
-                                using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
-                                {
-                                    SkipValidation = true,
-                                    Indented = true,
-                                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                                }))
-                                {
-                                    _jsonSerializerData.Serialize(instance, writer);
-                                    writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
-                                }
-                            }
-
-                            return _jsonSerializerData.SerializeToString(instance);
-                    }
-                }
-                //return instance.ToJson(_jsonSerializerSettings);
-        }
-    }
-
     /// <summary>Instance create.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="content">           The content.</param>
@@ -956,92 +730,21 @@ public partial class VersionedFhirStore : IFhirStore
         out string lastModified,
         out string location)
     {
-        object parsed;
+        HttpStatusCode sc = Utils.TryDeserializeFhir(content, sourceFormat, out Resource? r, out string exMessage);
 
-        switch (sourceFormat)
-        {
-            case "json":
-            case "fhir+json":
-            case "application/json":
-            case "application/fhir+json":
-                try
-                {
-                    parsed = _jsonParser.DeserializeResource(content);
-                }
-                catch (Exception ex)
-                {
-                    serializedResource = string.Empty;
-
-                    OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"JSON Parse failed: {ex.Message}");
-                    serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                    eTag = string.Empty;
-                    lastModified = string.Empty;
-                    location = string.Empty;
-                    return HttpStatusCode.BadRequest;
-                }
-                break;
-
-            case "xml":
-            case "fhir+xml":
-            case "application/xml":
-            case "application/fhir+xml":
-                try
-                {
-                    parsed = _xmlParser.DeserializeResource(content);
-                }
-                catch (Exception ex)
-                {
-                    serializedResource = string.Empty;
-
-                    OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"XML Parse failed: {ex.Message}");
-                    serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                    eTag = string.Empty;
-                    lastModified = string.Empty;
-                    location = string.Empty;
-                    return HttpStatusCode.BadRequest;
-                }
-                break;
-
-            default:
-                {
-                    serializedResource = string.Empty;
-                    
-                    OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.UnsupportedMediaType, "Unsupported media type");
-                    serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                    eTag = string.Empty;
-                    lastModified = string.Empty;
-                    location = string.Empty;
-                    return HttpStatusCode.UnsupportedMediaType;
-                }
-        }
-
-        if (parsed == null)
+        if ((!sc.IsSuccessful()) || (r == null))
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Failed to parse resource content");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(
+                sc, 
+                $"Failed to deserialize resource, format: {sourceFormat}, error: {exMessage}");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.UnprocessableEntity;
-        }
-
-        if (parsed is not Resource r)
-        {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Data is not a valid FHIR resource");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return HttpStatusCode.UnprocessableEntity;
+            return sc;
         }
 
         if (string.IsNullOrEmpty(resourceType))
@@ -1053,8 +756,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {r.TypeName} does not match request: {resourceType}");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {r.TypeName} does not match request: {resourceType}");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1066,8 +769,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1081,8 +784,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to create resource");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to create resource");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1099,9 +802,9 @@ public partial class VersionedFhirStore : IFhirStore
             _resourceQ.Enqueue(resourceType + "/" + r.Id + "/" + stored.Meta.VersionId);
         }
 
-        serializedResource = SerializeFhir(stored, destFormat, pretty, string.Empty);
-        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
-        serializedOutcome = SerializeFhir(sucessOutcome, destFormat, pretty);
+        serializedResource = Utils.SerializeFhir(stored, destFormat, pretty, string.Empty);
+        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
+        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
 
         eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
         lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
@@ -1131,11 +834,9 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
-            serializedResource = string.Empty;
-            serializedOutcome = string.Empty;
             return HttpStatusCode.UnprocessableEntity;
         }
 
@@ -1146,15 +847,15 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource {id} not found");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource {id} not found");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.NotFound;
         }
 
-        serializedResource = SerializeFhir(deleted, destFormat, pretty, string.Empty);
-        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.Created, $"Deleted {resourceType}/{id}");
-        serializedOutcome = SerializeFhir(sucessOutcome, destFormat, pretty);
+        serializedResource = Utils.SerializeFhir(deleted, destFormat, pretty, string.Empty);
+        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Deleted {resourceType}/{id}");
+        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
 
         return HttpStatusCode.OK;
     }
@@ -1191,8 +892,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Resource type is required");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Resource type is required");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1203,8 +904,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1215,8 +916,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "ID required for instance-level read.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "ID required for instance-level read.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1229,17 +930,17 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource: {resourceType}/{id} not found");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource: {resourceType}/{id} not found");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
             return HttpStatusCode.NotFound;
         }
 
-        serializedResource = SerializeFhir(stored, destFormat, pretty, summaryFlag);
-        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {stored.TypeName}/{stored.Id}");
-        serializedOutcome = SerializeFhir(sucessOutcome, destFormat, pretty);
+        serializedResource = Utils.SerializeFhir(stored, destFormat, pretty, summaryFlag);
+        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {stored.TypeName}/{stored.Id}");
+        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
 
         eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
         lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
@@ -1278,72 +979,29 @@ public partial class VersionedFhirStore : IFhirStore
         out string lastModified,
         out string location)
     {
-        object parsed;
+        HttpStatusCode sc = Utils.TryDeserializeFhir(content, sourceFormat, out Resource? r, out string exMessage);
 
-        switch (sourceFormat)
-        {
-            case "json":
-            case "fhir+json":
-            case "application/json":
-            case "application/fhir+json":
-                //parsed = _jsonParser.Parse(content);
-                parsed = _jsonParser.DeserializeResource(content);
-                break;
-
-            case "xml":
-            case "fhir+xml":
-            case "application/xml":
-            case "application/fhir+xml":
-                //parsed = _xmlParser.Parse(content);
-                parsed = _xmlParser.DeserializeResource(content);
-                break;
-
-            default:
-                {
-                    serializedResource = string.Empty;
-
-                    OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.UnsupportedMediaType, "Unsupported media type");
-                    serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                    eTag = string.Empty;
-                    lastModified = string.Empty;
-                    location = string.Empty;
-                    return HttpStatusCode.UnsupportedMediaType;
-                }
-        }
-
-        if (parsed == null)
+        if ((!sc.IsSuccessful()) || (r == null))
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Failed to parse resource content");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(
+                sc,
+                $"Failed to deserialize resource, format: {sourceFormat}, error: {exMessage}");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.UnprocessableEntity;
-        }
-
-        if (parsed is not Resource r)
-        {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Data is not a valid FHIR resource");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return HttpStatusCode.UnprocessableEntity;
+            return sc;
         }
 
         if (r.TypeName != resourceType)
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {r.TypeName} does not match request: {resourceType}");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {r.TypeName} does not match request: {resourceType}");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1355,8 +1013,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1370,8 +1028,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedResource = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to update resource");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to update resource");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             eTag = string.Empty;
             lastModified = string.Empty;
@@ -1379,9 +1037,9 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.InternalServerError;
         }
 
-        serializedResource = SerializeFhir(updated, destFormat, pretty, string.Empty);
-        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.Created, $"Updated {updated.TypeName}/{updated.Id}");
-        serializedOutcome = SerializeFhir(sucessOutcome, destFormat, pretty);
+        serializedResource = Utils.SerializeFhir(updated, destFormat, pretty, string.Empty);
+        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Updated {updated.TypeName}/{updated.Id}");
+        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
 
         eTag = string.IsNullOrEmpty(updated.Meta?.VersionId) ? string.Empty : $"W/\"{updated.Meta.VersionId}\"";
         lastModified = updated.Meta?.LastUpdated == null ? string.Empty : updated.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
@@ -1868,7 +1526,7 @@ public partial class VersionedFhirStore : IFhirStore
                 return string.Empty;
             }
 
-            string serialized = SerializeFhir(
+            string serialized = Utils.SerializeFhir(
                 bundle,
                 string.IsNullOrEmpty(contentType) ? _subscriptions[subscriptionId].ContentType : contentType,
                 pretty,
@@ -1897,7 +1555,7 @@ public partial class VersionedFhirStore : IFhirStore
             destFormat = "application/fhir+json";
         }
 
-        serialized = SerializeFhir(subscription, destFormat, pretty);
+        serialized = Utils.SerializeFhir(subscription, destFormat, pretty);
         return true;
     }
 
@@ -2109,6 +1767,16 @@ public partial class VersionedFhirStore : IFhirStore
         return true;
     }
 
+    /// <summary>Perform a FHIR System-level operation.</summary>
+    /// <param name="operationName">     Name of the operation.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode SystemOperation(
         string operationName,
         string queryString,
@@ -2122,8 +1790,8 @@ public partial class VersionedFhirStore : IFhirStore
         if (!_operations.ContainsKey(operationName))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.NotFound;
         }
@@ -2133,76 +1801,33 @@ public partial class VersionedFhirStore : IFhirStore
         if (!op.AllowSystemLevel)
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow system-level execution.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow system-level execution.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
         }
 
+        HttpStatusCode sc;
         Resource? r = null;
 
         if (!string.IsNullOrEmpty(content))
         {
-            object parsed;
+            sc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out string exMessage);
 
-            switch (sourceFormat)
+            if ((!sc.IsSuccessful()) || (r == null))
             {
-                case "json":
-                case "fhir+json":
-                case "application/json":
-                case "application/fhir+json":
-                    try
-                    {
-                        parsed = _jsonParser.DeserializeResource(content);
-                    }
-                    catch (Exception ex)
-                    {
-                        serializedResource = string.Empty;
+                serializedResource = string.Empty;
 
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"JSON Parse failed: {ex.Message}");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+                OperationOutcome oo = Utils.BuildOutcomeForRequest(
+                    sc,
+                    $"Failed to deserialize resource, format: {sourceFormat}, error: {exMessage}");
+                serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
-                        return HttpStatusCode.BadRequest;
-                    }
-                    break;
-
-                case "xml":
-                case "fhir+xml":
-                case "application/xml":
-                case "application/fhir+xml":
-                    try
-                    {
-                        parsed = _xmlParser.DeserializeResource(content);
-                    }
-                    catch (Exception ex)
-                    {
-                        serializedResource = string.Empty;
-
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"XML Parse failed: {ex.Message}");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                        return HttpStatusCode.BadRequest;
-                    }
-                    break;
-
-                default:
-                    {
-                        serializedResource = string.Empty;
-
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.UnsupportedMediaType, "Unsupported media type");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                        return HttpStatusCode.UnsupportedMediaType;
-                    }
-            }
-
-            if ((parsed != null) && (parsed is Resource))
-            {
-                r = (Resource)parsed;
+                return sc;
             }
         }
 
-        HttpStatusCode sc = op.DoOperation(
+        sc = op.DoOperation(
             this,
             string.Empty,
             null,
@@ -2213,10 +1838,10 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        serializedResource = (responseResource == null) ? string.Empty : SerializeFhir(responseResource, destFormat, pretty, string.Empty);
+        serializedResource = (responseResource == null) ? string.Empty : Utils.SerializeFhir(responseResource, destFormat, pretty, string.Empty);
 
-        OperationOutcome outcome = (responseOutcome == null) ? BuildOutcomeForRequest(sc, $"System Operation {operationName} complete") : responseOutcome;
-        serializedOutcome = SerializeFhir(outcome, destFormat, pretty);
+        OperationOutcome outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"System Operation {operationName} complete") : responseOutcome;
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
         return sc;
     }
@@ -2245,8 +1870,8 @@ public partial class VersionedFhirStore : IFhirStore
         if (!_store.ContainsKey(resourceType))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource type {resourceType} does not exist on this server.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource type {resourceType} does not exist on this server.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.NotFound;
         }
@@ -2254,8 +1879,8 @@ public partial class VersionedFhirStore : IFhirStore
         if (!_operations.ContainsKey(operationName))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.NotFound;
         }
@@ -2265,8 +1890,8 @@ public partial class VersionedFhirStore : IFhirStore
         if (!op.AllowResourceLevel)
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow type-level execution.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow type-level execution.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
         }
@@ -2274,76 +1899,33 @@ public partial class VersionedFhirStore : IFhirStore
         if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(resourceType)))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
         }
 
+        HttpStatusCode sc;
         Resource? r = null;
 
         if (!string.IsNullOrEmpty(content))
         {
-            object parsed;
+            sc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out string exMessage);
 
-            switch (sourceFormat)
+            if ((!sc.IsSuccessful()) || (r == null))
             {
-                case "json":
-                case "fhir+json":
-                case "application/json":
-                case "application/fhir+json":
-                    try
-                    {
-                        parsed = _jsonParser.DeserializeResource(content);
-                    }
-                    catch (Exception ex)
-                    {
-                        serializedResource = string.Empty;
+                serializedResource = string.Empty;
 
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"JSON Parse failed: {ex.Message}");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+                OperationOutcome oo = Utils.BuildOutcomeForRequest(
+                    sc,
+                    $"Failed to deserialize resource, format: {sourceFormat}, error: {exMessage}");
+                serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
-                        return HttpStatusCode.BadRequest;
-                    }
-                    break;
-
-                case "xml":
-                case "fhir+xml":
-                case "application/xml":
-                case "application/fhir+xml":
-                    try
-                    {
-                        parsed = _xmlParser.DeserializeResource(content);
-                    }
-                    catch (Exception ex)
-                    {
-                        serializedResource = string.Empty;
-
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"XML Parse failed: {ex.Message}");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                        return HttpStatusCode.BadRequest;
-                    }
-                    break;
-
-                default:
-                    {
-                        serializedResource = string.Empty;
-
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.UnsupportedMediaType, "Unsupported media type");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                        return HttpStatusCode.UnsupportedMediaType;
-                    }
-            }
-
-            if ((parsed != null) && (parsed is Resource))
-            {
-                r = (Resource)parsed;
+                return sc;
             }
         }
 
-        HttpStatusCode sc = op.DoOperation(
+        sc = op.DoOperation(
             this,
             resourceType,
             _store[resourceType],
@@ -2354,10 +1936,10 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        serializedResource = (responseResource == null) ? string.Empty : SerializeFhir(responseResource, destFormat, pretty, string.Empty);
+        serializedResource = (responseResource == null) ? string.Empty : Utils.SerializeFhir(responseResource, destFormat, pretty, string.Empty);
 
-        OperationOutcome outcome = (responseOutcome == null) ? BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} complete") : responseOutcome;
-        serializedOutcome = SerializeFhir(outcome, destFormat, pretty);
+        OperationOutcome outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} complete") : responseOutcome;
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
         return sc;
     }
@@ -2388,8 +1970,8 @@ public partial class VersionedFhirStore : IFhirStore
         if (!_store.ContainsKey(resourceType))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource type {resourceType} does not exist on this server.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource type {resourceType} does not exist on this server.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.NotFound;
         }
@@ -2398,8 +1980,8 @@ public partial class VersionedFhirStore : IFhirStore
             !((IReadOnlyDictionary<string, Resource>)_store[resourceType]).ContainsKey(id))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Instance {resourceType}/{id} does not exist on this server.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Instance {resourceType}/{id} does not exist on this server.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.NotFound;
         }
@@ -2407,8 +1989,8 @@ public partial class VersionedFhirStore : IFhirStore
         if (!_operations.ContainsKey(operationName))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.NotFound;
         }
@@ -2418,8 +2000,8 @@ public partial class VersionedFhirStore : IFhirStore
         if (!op.AllowInstanceLevel)
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow instance-level execution.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow instance-level execution.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
         }
@@ -2427,76 +2009,33 @@ public partial class VersionedFhirStore : IFhirStore
         if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(resourceType)))
         {
             serializedResource = string.Empty;
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
         }
 
+        HttpStatusCode sc;
         Resource? r = null;
 
         if (!string.IsNullOrEmpty(content))
         {
-            object parsed;
+            sc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out string exMessage);
 
-            switch (sourceFormat)
+            if ((!sc.IsSuccessful()) || (r == null))
             {
-                case "json":
-                case "fhir+json":
-                case "application/json":
-                case "application/fhir+json":
-                    try
-                    {
-                        parsed = _jsonParser.DeserializeResource(content);
-                    }
-                    catch (Exception ex)
-                    {
-                        serializedResource = string.Empty;
+                serializedResource = string.Empty;
 
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"JSON Parse failed: {ex.Message}");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+                OperationOutcome oo = Utils.BuildOutcomeForRequest(
+                    sc,
+                    $"Failed to deserialize resource, format: {sourceFormat}, error: {exMessage}");
+                serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
-                        return HttpStatusCode.BadRequest;
-                    }
-                    break;
-
-                case "xml":
-                case "fhir+xml":
-                case "application/xml":
-                case "application/fhir+xml":
-                    try
-                    {
-                        parsed = _xmlParser.DeserializeResource(content);
-                    }
-                    catch (Exception ex)
-                    {
-                        serializedResource = string.Empty;
-
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"XML Parse failed: {ex.Message}");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                        return HttpStatusCode.BadRequest;
-                    }
-                    break;
-
-                default:
-                    {
-                        serializedResource = string.Empty;
-
-                        OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.UnsupportedMediaType, "Unsupported media type");
-                        serializedOutcome = SerializeFhir(oo, destFormat, pretty);
-
-                        return HttpStatusCode.UnsupportedMediaType;
-                    }
-            }
-
-            if ((parsed != null) && (parsed is Resource))
-            {
-                r = (Resource)parsed;
+                return sc;
             }
         }
 
-        HttpStatusCode sc = op.DoOperation(
+        sc = op.DoOperation(
             this,
             resourceType,
             _store[resourceType],
@@ -2507,10 +2046,10 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        serializedResource = (responseResource == null) ? string.Empty : SerializeFhir(responseResource, destFormat, pretty, string.Empty);
+        serializedResource = (responseResource == null) ? string.Empty : Utils.SerializeFhir(responseResource, destFormat, pretty, string.Empty);
 
-        OperationOutcome outcome = (responseOutcome == null) ? BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} complete") : responseOutcome;
-        serializedOutcome = SerializeFhir(outcome, destFormat, pretty);
+        OperationOutcome outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} complete") : responseOutcome;
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
         return sc;
     }
@@ -2537,8 +2076,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedBundle = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Resource type is required");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Resource type is required");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
         }
@@ -2547,8 +2086,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedBundle = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.BadRequest;
         }
@@ -2571,8 +2110,8 @@ public partial class VersionedFhirStore : IFhirStore
         {
             serializedBundle = string.Empty;
 
-            OperationOutcome oo = BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to search resource type: {resourceType}");
-            serializedOutcome = SerializeFhir(oo, destFormat, pretty);
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to search resource type: {resourceType}");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
 
             return HttpStatusCode.UnsupportedMediaType;
         }
@@ -2637,9 +2176,9 @@ public partial class VersionedFhirStore : IFhirStore
             AddReverseInclusions(bundle, resource, resultParameters, addedIds);
         }
 
-        serializedBundle = SerializeFhir(bundle, destFormat, pretty, summaryFlag);
-        OperationOutcome sucessOutcome = BuildOutcomeForRequest(HttpStatusCode.OK, $"Search {resourceType}");
-        serializedOutcome = SerializeFhir(sucessOutcome, destFormat, pretty);
+        serializedBundle = Utils.SerializeFhir(bundle, destFormat, pretty, summaryFlag);
+        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Search {resourceType}");
+        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
 
         return HttpStatusCode.OK;
     }

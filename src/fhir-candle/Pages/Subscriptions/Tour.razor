@@ -1,4 +1,4 @@
-﻿@page "/store/ext/subscriptions-tour"
+﻿@page "/subscriptions/tour"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -29,92 +29,31 @@
                         </CardHeaderContent>
                     </MudCardHeader>
 
-                    @switch (_store.Config.FhirVersion)
-                    {
-                        case TenantConfiguration.SupportedFhirVersions.R4:
-                            <MudCardContent>
-                                <MudText Typo="Typo.body1">
-                                    In FHIR R4, topics are discovered by looking at the server 
-                                    <code>CapabilityStatement</code> for the
-                                    <MudLink Href="http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition-capabilitystatement-subscriptiontopic-canonical.html" 
-                                        Underline="Underline.Always">SubscriptionTopic Canonical Extension</MudLink>.
-                                </MudText>
-                                <br />
-                                <MudText Typo="Typo.body1">
-                                    For this walkthrough, we will be using the included <code>encounter-complete</code>
-                                    topic that has a canonical URL of <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>.
-                                    The current metadata for this server can be viewed
-                                    <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=CapabilityStatement&id=metadata")"
-                                             Underline="Underline.Always">here</MudLink>,
-                                    or requested (in FHIR) at
-                                    <code>@_store.Config.BaseUrl/metadata</code>
-                                    <sup>
-                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/metadata')")">
-                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
-                                        </button>
-                                    </sup>.
-                                </MudText>
-                                <br />
-                                <MudText Typo="Typo.body1">
-                                    Note that in FHIR R4, there is not an official required format for representing <code>SubscriptionTopic</code>
-                                    resources.  Since topics are canonical resources, the expectation is that they will be defined
-                                    by authors (e.g., in Implementation Guides) and communicated out-of-band.  For example, for
-                                    an "encounter-start" topic, both the server and client can function with <i>only</i> the
-                                    canonical URL and the understanding of what that topic represents.
-                                </MudText>
-                                <br />
-                                <MudText Typo="Typo.body1">
-                                    With that said, one possible way of representing topics in FHIR R4 is to use the model provided
-                                    in FHIR R5, ported using FHIR cross-version support.  This implementation supports topics defined via
-                                    that mechanism.  Our included <code>encounter-complete</code> topic is thus available on this server
-                                    at <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Basic&id=encounter-complete")"
-                                             Underline="Underline.Always">Basic/encounter-complete</MudLink>
-                                    or in FHIR at
-                                    <code>@_store.Config.BaseUrl/Basic/encounter-complete</code>
-                                    <sup>
-                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/Basic/encounter-complete')")">
-                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
-                                        </button>
-                                    </sup>.
-                                </MudText>
-                            </MudCardContent>
-                            break;
+                    <MudCardContent>
+                        @switch (_store.Config.FhirVersion)
+                        {
+                            case TenantConfiguration.SupportedFhirVersions.R4:
+                                <FhirCandle.Ui.R4.Subscriptions.TourStep01
+                                    Store="@_store"
+                                    StoreName="@StoreName"
+                                    />
+                                break;
 
-                        case TenantConfiguration.SupportedFhirVersions.R4B:
-                        case TenantConfiguration.SupportedFhirVersions.R5:
-                            <MudCardContent>
-                                <MudText Typo="Typo.body1">
-                                    In FHIR @_store.Config.FhirVersion, topics are discovered by searching the server for
-                                    <code>SubscriptionTopic</code> resources.  The list of topics in this
-                                    tenant can be found
-                                    <MudLink Href="@($"/store/resource-list?store={StoreName}&type=SubscriptionTopic")"
-                                             Underline="Underline.Always">here</MudLink>,
-                                    or you can submit a FHIR search to:
-                                    <code>@_store.Config.BaseUrl/SubscriptionTopic</code>
-                                    <sup>
-                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/SubscriptionTopic')")">
-                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
-                                        </button>
-                                    </sup>.
-                                </MudText>
-                                <br />
-                                <MudText Typo="Typo.body1">
-                                    For this walkthrough, we will be using the included <code>encounter-complete</code>
-                                    topic that has a canonical URL of <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>.
-                                    The definition for this topic can be seen at
-                                    <MudLink Href="@($"/store/resource-viewier?store={StoreName}&type=SubscriptionTopic&id=encounter-complete")"
-                                             Underline="Underline.Always">here</MudLink>,
-                                    or you can submit a FHIR read to:
-                                    <code>@_store.Config.BaseUrl/SubscriptionTopic/encounter-complete</code>
-                                    <sup>
-                                        <button onclick="@($"navigator.clipboard.writeText('{@_store.Config.BaseUrl}/SubscriptionTopic/encounter-complete')")">
-                                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
-                                        </button>
-                                    </sup>.
-                                </MudText>
-                            </MudCardContent>
-                            break;
-                    }
+                            case TenantConfiguration.SupportedFhirVersions.R4B:
+                                <FhirCandle.Ui.R4B.Subscriptions.TourStep01
+                                    Store="@_store"
+                                    StoreName="@StoreName"
+                                    />
+                                break;
+
+                            case TenantConfiguration.SupportedFhirVersions.R5:
+                                <FhirCandle.Ui.R5.Subscriptions.TourStep01
+                                    Store="@_store"
+                                    StoreName="@StoreName"
+                                    />
+                                break;
+                        }
+                    </MudCardContent>
 
                     <MudCardActions>
                         <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(2))">Select encounter-complete topic</MudButton>
@@ -380,13 +319,13 @@
                             <br />
                             <MudText Typo="Typo.body1">
                                 Details about sent notifications for this subscription can be found
-                                <MudLink Href="@($"/store/ext/notification-local-viewer?store={StoreName}&id={subscription.Id}")"
+                                <MudLink Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={subscription.Id}")"
                                          Underline="Underline.Always">here</MudLink>.
                             </MudText>
                             <br />
                             <MudText Typo="Typo.body1">
                                 Details about received notifications for this subscription can be found
-                                <MudLink Href="@($"/store/ext/notification-received-viewer?store={StoreName}&ref={subscriptionLocation}")"
+                                <MudLink Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={subscriptionLocation}")"
                                          Underline="Underline.Always">here</MudLink>.
                             </MudText>
                         }
@@ -471,36 +410,6 @@
     private string subscriptionLocation = string.Empty;
 
     private string handshakeBundleId = string.Empty;
-
-    private const string _encounterJsonR4 = """"
-{
-  "resourceType": "Encounter",
-  "status": "finished",
-  "class": {
-    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
-    "code": "VR",
-    "display": "virtual"
-  },
-  "subject": { "reference": "Patient/example" }
-}
-"""";
-
-    private const string _encounterJsonR4B = _encounterJsonR4;
-
-    private const string _encounterJsonR5 = """"
-{
-  "resourceType": "Encounter",
-  "status": "completed",
-  "class": [{
-    "coding": [{
-      "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
-      "code": "VR",
-      "display": "virtual"
-    }]
-  }],
-  "subject": { "reference": "Patient/example" }
-}
-"""";
 
     ParsedSubscription subscription = new()
     {
@@ -677,9 +586,9 @@
 
         string getJsonEncounter() => _store.Config.FhirVersion switch
         {
-            TenantConfiguration.SupportedFhirVersions.R4 => _encounterJsonR4,
-            TenantConfiguration.SupportedFhirVersions.R4B => _encounterJsonR4B,
-            TenantConfiguration.SupportedFhirVersions.R5 => _encounterJsonR5,
+            TenantConfiguration.SupportedFhirVersions.R4 => FhirCandle.Ui.R4.Subscriptions.TourUtils.EncounterJson,
+            TenantConfiguration.SupportedFhirVersions.R4B => FhirCandle.Ui.R4B.Subscriptions.TourUtils.EncounterJson,
+            TenantConfiguration.SupportedFhirVersions.R5 => FhirCandle.Ui.R5.Subscriptions.TourUtils.EncounterJson,
             _ => string.Empty,
         };
     }
@@ -753,7 +662,7 @@
 
         // notify of store root in case user clicked here directly
         NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Subscriptions Tour", "/store/ext/subscriptions-tour?store=" + StoreName, 2);
+        NavTracker?.NotifyNav($"Subscriptions Tour", "/subscriptions/tour?store=" + StoreName, 2);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -761,7 +670,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-tour", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/subscriptions/tour", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -782,7 +691,7 @@
 
             // notify of store root in case user clicked here directly
             NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Subscriptions Tour", "/store/ext/subscriptions-tour?store=" + StoreName, 2);
+            NavTracker?.NotifyNav($"Subscriptions Tour", "/subscriptions/tour?store=" + StoreName, 2);
         }
     }
 

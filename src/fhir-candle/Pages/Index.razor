@@ -81,13 +81,13 @@
 
                     <MudListItem>
                         <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                        <MudLink Href="@($"/store/ext/subscriptions-local?store={kvp.Key}")"
+                        <MudLink Href="@($"/subscriptions/local?store={kvp.Key}")"
                                  Underline="Underline.Always">Local Subscriptions</MudLink>: outgoing Subscription notifications from this server
                     </MudListItem>
 
                     <MudListItem>
                         <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                        <MudLink Href="@($"/store/ext/subscriptions-received?store={kvp.Key}")"
+                        <MudLink Href="@($"/subscriptions/notifications-received?store={kvp.Key}")"
                                  Underline="Underline.Always">Received Notifications</MudLink>: incoming notifications received by this server
                     </MudListItem>
                 </MudList>
@@ -146,12 +146,12 @@
                     <br />
                     <MudText Typo="Typo.body1">
                         If you are getting started with topic-based subscriptions, there is a deatiled tour available
-                        <MudLink Href="@($"/store/ext/subscriptions-tour?store={kvp.Key}")" Underline="Underline.Always">here</MudLink>.
+                        <MudLink Href="@($"/subscriptions/tour?store={kvp.Key}")" Underline="Underline.Always">here</MudLink>.
                     </MudText>
                     <br />
                     <MudText Typo="Typo.body1">
                         If you are building or testing a topic-based subscription server implementation, there is a client available
-                        <MudLink Href="@($"/store/ext/subscriptions-client?store={kvp.Key}")" Underline="Underline.Always">here</MudLink>.
+                        <MudLink Href="@($"/subscriptions/client?store={kvp.Key}")" Underline="Underline.Always">here</MudLink>.
                     </MudText>
                     <br />
                 }
@@ -169,7 +169,7 @@
                     if you are developing a server that sends notifications, you can point it here).
                     Any received notification bundles are stored as resources locally, and the notifications will appear on
                     the
-                    <MudLink Href="@($"/store/ext/subscriptions-received?store={kvp.Key}")"
+                    <MudLink Href="@($"/subscriptions/notifications-received?store={kvp.Key}")"
                              Underline="Underline.Always">Received Notifications</MudLink>
                     page.
                 </MudText>
@@ -178,7 +178,7 @@
                     Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
                     For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
                     the notifications and be visible on the
-                    <MudLink Href="@($"/store/ext/subscriptions-local?store={kvp.Key}")"
+                    <MudLink Href="@($"/subscriptions/local?store={kvp.Key}")"
                              Underline="Underline.Always">Local Subscriptions</MudLink>
                     page, but not actually attempt to send the notification to the endpoint.
                 </MudText>

@@ -1,4 +1,4 @@
-name: Budndle fhir-candle main branch as NuGet Tool
+name: Bundle fhir-candle main branch as NuGet Tool
 # Basics from https://docs.microsoft.com/en-us/azure/dev-spaces/how-to/github-actions
 on:
   push:

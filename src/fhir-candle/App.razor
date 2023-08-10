@@ -1,5 +1,8 @@
 ﻿<Router AppAssembly="@typeof(App).Assembly"
-        AdditionalAssemblies="new[] {typeof(FhirCandle.Ui.R4.Client.SubscriptionsTour).Assembly}">
+        AdditionalAssemblies="new[] {
+            typeof(FhirCandle.Ui.R4.Subscriptions.TourUtils).Assembly,
+            typeof(FhirCandle.Ui.R4B.Subscriptions.TourUtils).Assembly,
+            typeof(FhirCandle.Ui.R5.Subscriptions.TourUtils).Assembly}">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />

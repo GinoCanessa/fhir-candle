@@ -1,4 +1,4 @@
-﻿@page "/store/ext/subscriptions-local"
+﻿@page "/subscriptions/local"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -22,7 +22,7 @@
                     <MudField Label="Endpoint">@sub.Endpoint</MudField>
 
                     <MudField Label="Generated Event Details">
-                            <MudLink Href="@($"/store/ext/notification-local-viewer?store={StoreName}&id={sub.Id}")" Underline="Underline.Always">Generated Events</MudLink>
+                            <MudLink Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={sub.Id}")" Underline="Underline.Always">Generated Events</MudLink>
                     </MudField>
 
                     @if (sub.GeneratedEvents.Any())
@@ -68,7 +68,7 @@
 
         // notify of store root in case user clicked here directly
         NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Local Subscriptions", "/store/ext/subscriptions-local?store=" + StoreName, 2);
+        NavTracker?.NotifyNav($"Local Subscriptions", "/subscriptions/local?store=" + StoreName, 2);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -76,7 +76,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-local", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/subscriptions/local", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -95,7 +95,7 @@
 
             // notify of store root in case user clicked here directly
             NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Local Subscriptions", "/store/ext/subscriptions-local?store=" + StoreName, 2);
+            NavTracker?.NotifyNav($"Local Subscriptions", "/subscriptions/local?store=" + StoreName, 2);
         }
     }
 

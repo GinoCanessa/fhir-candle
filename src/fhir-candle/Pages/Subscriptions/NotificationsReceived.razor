@@ -1,4 +1,4 @@
-﻿@page "/store/ext/subscriptions-received"
+﻿@page "/subscriptions/notifications-received"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -23,7 +23,7 @@
                         <MudField Label="Type">@status.NotificationType</MudField>
 
                         <MudField Label="Recevied Event Details">
-                            <MudLink Href="@($"/store/ext/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" Underline="Underline.Always">Received Events</MudLink>
+                            <MudLink Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" Underline="Underline.Always">Received Events</MudLink>
                         </MudField>
     
                         @if (status.NotificationEvents.Any())
@@ -70,7 +70,7 @@
 
         // notify of store root in case user clicked here directly
         NavTracker?.NotifyNav(StoreName, "/store?storeName=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?store=" + StoreName, 2);
+        NavTracker?.NotifyNav($"Received Notifications", "/subscriptions/notifications-received?store=" + StoreName, 2);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -78,7 +78,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/subscriptions-received", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/subscriptions/notifications-received", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -97,7 +97,7 @@
 
             // notify of store root in case user clicked here directly
             NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Received Notifications", "/store/ext/subscriptions-received?store=" + StoreName, 2);
+            NavTracker?.NotifyNav($"Received Notifications", "/subscriptions/notifications-received?store=" + StoreName, 2);
         }
     }
 

@@ -1,4 +1,4 @@
-﻿@page "/store/ext/notification-received-viewer"
+﻿@page "/subscriptions/notification-received-viewer"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -80,7 +80,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"Received Subscription Events", $"/store/ext/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
+        NavTracker?.NotifyNav($"Received Subscription Events", $"/subscriptions/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -88,7 +88,7 @@
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store/ext/notification-received-viewer", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/subscriptions/notification-received-viewer", StringComparison.Ordinal))
         {
             if (_store != null)
             {
@@ -102,7 +102,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"Received Subscription Events", $"/store/ext/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
+            NavTracker?.NotifyNav($"Received Subscription Events", $"/subscriptions/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
         }
     }
 

@@ -1,4 +1,4 @@
-name: Deploy fhir-candle main branch to argo.run ci
+name: Deploy to subscriptions.argo.run
 # Basics from https://docs.microsoft.com/en-us/azure/dev-spaces/how-to/github-actions
 on:
   push:

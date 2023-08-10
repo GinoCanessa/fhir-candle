@@ -1,4 +1,4 @@
-name: build and test
+name: Test
 # Basics from https://learn.microsoft.com/en-us/dotnet/devops/dotnet-test-github-action
 on:
   push:

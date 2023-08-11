@@ -108,7 +108,7 @@ public class OpSubscriptionHook : IFhirOperation
         store.RegisterReceivedNotification(r?.Id ?? bundle.Id, status);
 
         responseResource = null;
-        responseOutcome = store.BuildOutcomeForRequest(HttpStatusCode.OK, "Subscription Notification Received");
+        responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(HttpStatusCode.OK, "Subscription Notification Received");
         contentLocation = string.Empty;
         return HttpStatusCode.OK;
     }

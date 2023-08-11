@@ -14,8 +14,9 @@
             <MudText Typo="Typo.body1">
                 This section contains various client functionality to help with subscription server.
                 Note that all calls are made <b>by the server</b>.  If you need to test a server
-                that is not publicly-accesible, please install <code>fhir-candle</code> on your local
-                machine.
+                that is not publicly accesible (e.g., on localhost), please install 
+                <MudLink Href="https://github.com/GinoCanessa/fhir-candle" Target="_" Underline="Underline.Always">fhir-candle</MudLink>
+                on your local machine.
             </MudText>
             <br />
             <MudTextField @bind-Value="fhirServerUrl" Label="FHIR Server Base Url" />
@@ -44,8 +45,6 @@
     </MudItem>
 </MudStack>
 
-
-
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
@@ -69,36 +68,6 @@
     private string subscriptionLocation = string.Empty;
 
     private string handshakeBundleId = string.Empty;
-
-    private const string _encounterJsonR4 = """"
-{
-  "resourceType": "Encounter",
-  "status": "finished",
-  "class": {
-    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
-    "code": "VR",
-    "display": "virtual"
-  },
-  "subject": { "reference": "Patient/example" }
-}
-"""";
-
-    private const string _encounterJsonR4B = _encounterJsonR4;
-
-    private const string _encounterJsonR5 = """"
-{
-  "resourceType": "Encounter",
-  "status": "completed",
-  "class": [{
-    "coding": [{
-      "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
-      "code": "VR",
-      "display": "virtual"
-    }]
-  }],
-  "subject": { "reference": "Patient/example" }
-}
-"""";
 
     ParsedSubscription subscription = new()
     {
@@ -186,53 +155,7 @@
 
     private void PostEncounter()
     {
-        if (networkInUse)
-        {
-            return;
-        }
 
-        networkInUse = true;
-
-        System.Net.HttpStatusCode sc = _store.InstanceCreate(
-            "Encounter",
-            getJsonEncounter(),
-            "application/fhir+json",
-            "application/fhir+json",
-            true,
-            string.Empty,
-            false,
-            out _,
-            out string outcome,
-            out _,
-            out _,
-            out string location
-        );
-
-        if ((sc == System.Net.HttpStatusCode.OK) ||
-            (sc == System.Net.HttpStatusCode.Created))
-        {
-            networkInUse = false;
-
-            int loc = location.LastIndexOf('/');
-            if (loc != -1)
-            {
-                postedEncounters.Add(location.Substring(loc + 1));
-            }
-
-            return;
-        }
-
-        errorMessage = outcome;
-        networkInUse = false;
-        return;
-
-        string getJsonEncounter() => _store.Config.FhirVersion switch
-        {
-            TenantConfiguration.SupportedFhirVersions.R4 => _encounterJsonR4,
-            TenantConfiguration.SupportedFhirVersions.R4B => _encounterJsonR4B,
-            TenantConfiguration.SupportedFhirVersions.R5 => _encounterJsonR5,
-            _ => string.Empty,
-        };
     }
 
     private void CleanUp()

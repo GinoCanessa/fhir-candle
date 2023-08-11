@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FhirCandle.Ui.Common\FhirCandle.Ui.Common.csproj" />
     <ProjectReference Include="..\FhirStore.Common\FhirCandle.Common.csproj" />
     <ProjectReference Include="..\FhirStore.R5\FhirCandle.R5.csproj" />
   </ItemGroup>

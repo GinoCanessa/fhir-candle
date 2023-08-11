@@ -1,0 +1,24 @@
+﻿@using Microsoft.JSInterop;
+@inject IJSRuntime JS
+
+<pre class="code"><code class="@Language">
+    @ChildContent
+</code></pre>
+
+@code {
+    /// <summary>Gets or sets the child content.</summary>
+    [Parameter]
+    public RenderFragment ChildContent { get; set; } = null!;
+
+    /// <summary>Gets or sets the language.</summary>
+    [Parameter]
+    public string Language { get; set; } = "json";
+
+    /// <summary>Executes the after render asynchronous action.</summary>
+    /// <param name="firstRender">True to first render.</param>
+    /// <returns>An asynchronous result.</returns>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("highlightSnippet");
+    }
+}

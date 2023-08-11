@@ -112,7 +112,35 @@ public static class Utils
         out string exMessage)
         where TResource : Resource
     {
-        switch (format)
+        //string utf8Content = null!;
+        string[] formatComponents = format.Split(';', StringSplitOptions.TrimEntries);
+
+        //IEnumerable<string> csComponents = formatComponents.Where(c => c.StartsWith("charset=", StringComparison.Ordinal) || c.StartsWith("charset ", StringComparison.Ordinal));
+        //if (csComponents.Any())
+        //{
+        //    string[] charsetComponents = csComponents.First().Split('=', StringSplitOptions.TrimEntries);
+        //    if (charsetComponents.Length == 2)
+        //    {
+        //        switch (charsetComponents[1])
+        //        {
+        //            case "utf-8":
+        //                utf8Content = content;
+        //                break;
+
+        //            default:
+        //                byte[] utf8Bytes = System.Text.Encoding.UTF8.GetBytes(content);
+        //                utf8Content = System.Text.Encoding.UTF8.GetString(utf8Bytes);
+        //                break;
+        //        }
+        //    }
+        //}
+
+        //if (utf8Content == null)
+        //{
+        //    utf8Content = content;
+        //}
+
+        switch (formatComponents[0])
         {
             case "json":
             case "fhir+json":
@@ -179,19 +207,49 @@ public static class Utils
 
     /// <summary>Serialize this object to the proper format.</summary>
     /// <param name="instance">   The instance.</param>
-    /// <param name="destFormat"> Destination format.</param>
+    /// <param name="format"> Destination format.</param>
     /// <param name="pretty">     If the output should be 'pretty' formatted.</param>
     /// <param name="summaryType">(Optional) Type of the summary.</param>
     /// <returns>A string.</returns>
     public static string SerializeFhir(
         Resource instance,
-        string destFormat,
+        string format,
         bool pretty,
         string summaryFlag = "")
     {
         // TODO: Need to add support for count
 
-        switch (destFormat)
+        string[] formatComponents = format.Split(';', StringSplitOptions.TrimEntries);
+
+        System.Text.Encoding encoding = System.Text.Encoding.UTF8;
+        //IEnumerable<string> csComponents = formatComponents.Where(c => c.StartsWith("charset=", StringComparison.Ordinal) || c.StartsWith("charset ", StringComparison.Ordinal));
+        //if (csComponents.Any())
+        //{
+        //    string[] charsetComponents = csComponents.First().Split('=', StringSplitOptions.TrimEntries);
+        //    if (charsetComponents.Length == 2)
+        //    {
+        //        switch (charsetComponents[1])
+        //        {
+        //            case "utf-8":
+        //                encoding = System.Text.Encoding.UTF8;
+        //                break;
+
+        //            case "utf-16":
+        //                encoding = System.Text.Encoding.Unicode;
+        //                break;
+
+        //            case "utf-32":
+        //                encoding = System.Text.Encoding.UTF32;
+        //                break;
+
+        //            case "ascii":
+        //                encoding = System.Text.Encoding.ASCII;
+        //                break;
+        //        }
+        //    }
+        //}
+
+        switch (formatComponents[0])
         {
             case "xml":
             case "fhir+xml":
@@ -221,14 +279,14 @@ public static class Utils
                             break;
                     }
 
-                    if (pretty)
+                    if (pretty || (encoding != System.Text.Encoding.UTF8))
                     {
                         using (MemoryStream ms = new MemoryStream())
-                        using (System.Xml.XmlWriter writer = XmlWriter.Create(ms, new XmlWriterSettings() { Indent = true }))
+                        using (System.Xml.XmlWriter writer = XmlWriter.Create(ms, new XmlWriterSettings() { Encoding = encoding, Indent = pretty }))
                         {
                             _xmlSerializer.Serialize(instance, writer, serializationFilter);
                             writer.Flush();
-                            return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                            return encoding.GetString(ms.ToArray());
                         }
                     }
 
@@ -243,76 +301,76 @@ public static class Utils
                         case "":
                         case "false":
                         default:
-                            if (pretty)
+                            if (pretty || (encoding != System.Text.Encoding.UTF8))
                             {
                                 using (MemoryStream ms = new MemoryStream())
                                 using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
                                 {
                                     SkipValidation = true,
-                                    Indented = true,
+                                    Indented = pretty,
                                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                                 }))
                                 {
                                     _jsonSerializerFull.Serialize(instance, writer);
                                     writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                    return encoding.GetString(ms.ToArray());
                                 }
                             }
 
                             return _jsonSerializerFull.SerializeToString(instance);
 
                         case "true":
-                            if (pretty)
+                            if (pretty || (encoding != System.Text.Encoding.UTF8))
                             {
                                 using (MemoryStream ms = new MemoryStream())
                                 using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
                                 {
                                     SkipValidation = true,
-                                    Indented = true,
+                                    Indented = pretty,
                                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                                 }))
                                 {
                                     _jsonSerializerSummary.Serialize(instance, writer);
                                     writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                    return encoding.GetString(ms.ToArray());
                                 }
                             }
 
                             return _jsonSerializerSummary.SerializeToString(instance);
 
                         case "text":
-                            if (pretty)
+                            if (pretty || (encoding != System.Text.Encoding.UTF8))
                             {
                                 using (MemoryStream ms = new MemoryStream())
                                 using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
                                 {
                                     SkipValidation = true,
-                                    Indented = true,
+                                    Indented = pretty,
                                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                                 }))
                                 {
                                     _jsonSerializerText.Serialize(instance, writer);
                                     writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                    return encoding.GetString(ms.ToArray());
                                 }
                             }
 
                             return _jsonSerializerText.SerializeToString(instance);
 
                         case "data":
-                            if (pretty)
+                            if (pretty || (encoding != System.Text.Encoding.UTF8))
                             {
                                 using (MemoryStream ms = new MemoryStream())
                                 using (Utf8JsonWriter writer = new Utf8JsonWriter(ms, new JsonWriterOptions()
                                 {
                                     SkipValidation = true,
-                                    Indented = true,
+                                    Indented = pretty,
                                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                                 }))
                                 {
                                     _jsonSerializerData.Serialize(instance, writer);
                                     writer.Flush();
-                                    return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+                                    return encoding.GetString(ms.ToArray());
                                 }
                             }
 

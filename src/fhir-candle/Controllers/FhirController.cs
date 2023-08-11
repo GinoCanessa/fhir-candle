@@ -4,11 +4,7 @@
 // </copyright>
 
 using System.Net;
-using fhir.candle.Services;
 using FhirCandle.Storage;
-using Hl7.Fhir.Rest;
-using Microsoft.AspNetCore.Hosting.Server;
-using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
@@ -57,6 +53,10 @@ public class FhirController : ControllerBase
 
     }
 
+    /// <summary>Gets the MIME type.</summary>
+    /// <param name="queryParam">The query parameter.</param>
+    /// <param name="request">   The request.</param>
+    /// <returns>The mime type.</returns>
     private string GetMimeType(string? queryParam, HttpRequest request)
     {
         if (!string.IsNullOrEmpty(queryParam))
@@ -95,6 +95,12 @@ public class FhirController : ControllerBase
         return "application/fhir+json";
     }
 
+    /// <summary>Adds a body.</summary>
+    /// <param name="response">The response.</param>
+    /// <param name="prefer">  The prefer.</param>
+    /// <param name="resource">The resource.</param>
+    /// <param name="outcome"> The outcome.</param>
+    /// <returns>An asynchronous result.</returns>
     private async Task AddBody(HttpResponse response, string? prefer, string resource, string outcome)
     {
         switch (prefer)
@@ -123,6 +129,11 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>(An Action that handles HTTP GET requests) gets a metadata.</summary>
+    /// <param name="store"> The store.</param>
+    /// <param name="format">Describes the format to use.</param>
+    /// <param name="pretty">The pretty.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/metadata")]
     public async Task GetMetadata(
         [FromRoute] string store,
@@ -165,6 +176,14 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>(An Action that handles HTTP GET requests) gets type operation.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="opName">      Name of the operation.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/{resourceName}/${opName}")]
     public async Task GetTypeOperation(
         [FromRoute] string store,
@@ -207,14 +226,22 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>(An Action that handles HTTP GET requests) gets resource instance.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="id">          The identifier.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/{resourceName}/{id}")]
     public async Task GetResourceInstance(
-    [FromRoute] string store,
-    [FromRoute] string resourceName,
-    [FromRoute] string id,
-    [FromQuery(Name = "_format")] string? format,
-    [FromQuery(Name = "_summary")] string? summary,
-    [FromQuery(Name = "_pretty")] string? pretty)
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromRoute] string id,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromQuery(Name = "_pretty")] string? pretty)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -262,82 +289,15 @@ public class FhirController : ControllerBase
         }
     }
 
-    //[HttpGet, Route("{store}/{resourceName}/{id}")]
-    //public async Task GetResourceInstanceOrOperation(
-    //    [FromRoute] string store,
-    //    [FromRoute] string resourceName,
-    //    [FromRoute] string id,
-    //    [FromQuery(Name = "_format")] string? format,
-    //    [FromQuery(Name = "_summary")] string? summary,
-    //    [FromQuery(Name = "_pretty")] string? pretty)
-    //{
-    //    if ((!_fhirStoreManager.ContainsKey(store)) ||
-    //        (!_fhirStoreManager[store].SupportsResource(resourceName)))
-    //    {
-    //        Response.StatusCode = 404;
-    //        return;
-    //    }
-
-    //    format = GetMimeType(format, Request);
-
-    //    HttpStatusCode sc;
-    //    string resource, outcome, eTag, lastModified;
-
-    //    if (id[0] == '$')
-    //    {
-    //        // operation
-    //        sc = _fhirStoreManager[store].TypeOperation(
-    //            resourceName,
-    //            id,
-    //            Request.QueryString.ToString(),
-    //            string.Empty,
-    //            string.Empty,
-    //            format,
-    //            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-    //            out resource,
-    //            out outcome);
-    //    }
-    //    else
-    //    {
-    //        // read instance
-    //        sc = _fhirStoreManager[store].InstanceRead(
-    //            resourceName,
-    //            id,
-    //            format,
-    //            summary ?? string.Empty,
-    //            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-    //            string.Empty,
-    //            string.Empty,
-    //            string.Empty,
-    //            out resource,
-    //            out outcome,
-    //            out eTag,
-    //            out lastModified);
-
-    //        if (!string.IsNullOrEmpty(eTag))
-    //        {
-    //            Response.Headers.Add(HeaderNames.ETag, eTag);
-    //        }
-
-    //        if (!string.IsNullOrEmpty(lastModified))
-    //        {
-    //            Response.Headers.Add(HeaderNames.LastModified, lastModified);
-    //        }
-    //    }
-
-    //    Response.ContentType = format;
-    //    Response.StatusCode = (int)sc;
-
-    //    if (!string.IsNullOrEmpty(resource))
-    //    {
-    //        await Response.WriteAsync(resource);
-    //    }
-    //    else if (!string.IsNullOrEmpty(outcome))
-    //    {
-    //        await Response.WriteAsync(outcome);
-    //    }
-    //}
-
+    /// <summary>(An Action that handles HTTP GET requests) gets instance operation.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="id">          The identifier.</param>
+    /// <param name="opName">      Name of the operation.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/{resourceName}/{id}/${opName}")]
     public async Task GetInstanceOperation(
         [FromRoute] string store,
@@ -386,6 +346,17 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts an instance operation.
+    /// </summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="id">          The identifier.</param>
+    /// <param name="opName">      Name of the operation.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/{resourceName}/{id}/{opName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostInstanceOperation(
@@ -461,6 +432,14 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>(An Action that handles HTTP POST requests) posts a type operation.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="opName">      Name of the operation.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/{resourceName}/{opName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostTypeOperation(
@@ -534,7 +513,13 @@ public class FhirController : ControllerBase
         }
     }
 
-
+    /// <summary>(An Action that handles HTTP POST requests) posts a system operation.</summary>
+    /// <param name="store"> The store.</param>
+    /// <param name="opName">Name of the operation.</param>
+    /// <param name="format">Describes the format to use.</param>
+    /// <param name="pretty">The pretty.</param>
+    /// <param name="prefer">The prefer.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/${opName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostSystemOperation(
@@ -598,6 +583,13 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>(An Action that handles HTTP POST requests) posts a resource type.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer">      The prefer.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/{resourceName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostResourceType(
@@ -697,7 +689,14 @@ public class FhirController : ControllerBase
         }
     }
 
-
+    /// <summary>(An Action that handles HTTP PUT requests) puts resource instance.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="id">          The identifier.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer">      The prefer.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPut, Route("{store}/{resourceName}/{id}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PutResourceInstance(
@@ -782,6 +781,16 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// (An Action that handles HTTP DELETE requests) deletes the resource instance.
+    /// </summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="id">          The identifier.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer">      The prefer.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpDelete, Route("{store}/{resourceName}/{id}")]
     public async Task DeleteResourceInstance(
         [FromRoute] string store,
@@ -815,6 +824,13 @@ public class FhirController : ControllerBase
         await AddBody(Response, prefer, resource, outcome);
     }
 
+    /// <summary>(An Action that handles HTTP GET requests) gets resource type search.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/{resourceName}")]
     public async Task GetResourceTypeSearch(
         [FromRoute] string store,
@@ -850,6 +866,15 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts a resource type search.
+    /// </summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/{resourceName}/_search")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task PostResourceTypeSearch(

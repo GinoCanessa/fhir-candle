@@ -1000,8 +1000,15 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         foreach (ResourceType rt in ResourceTypeExtensions.CopyTargetsToRt(sp.Base) ?? Array.Empty<ResourceType>())
         {
-            spDefinition.Resource = ModelInfo.ResourceTypeToFhirTypeName(rt)!;
-            _store.TrySetExecutableSearchParameter(spDefinition.Resource, spDefinition);
+            try
+            {
+                spDefinition.Resource = ModelInfo.ResourceTypeToFhirTypeName(rt)!;
+                _store.TrySetExecutableSearchParameter(spDefinition.Resource, spDefinition);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception Setting Executable Search Paramter {rt}.{name}: {ex.Message}");
+            }
         }
     }
 
@@ -1052,7 +1059,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        _searchParameters.Add(spDefinition.Name, spDefinition);
+        if (_searchParameters.ContainsKey(spDefinition.Name))
+        {
+            _searchParameters[spDefinition.Name] = spDefinition;
+        }
+        else
+        {
+            _searchParameters.Add(spDefinition.Name, spDefinition);
+        }
 
         //// check for not having a matching search parameter resource
         //if (!_store.TryResolve($"SearchParameter/{_resourceName}-{spDefinition.Name}", out ITypedElement? _))

@@ -25,6 +25,15 @@
 		<PackageTags>fhir;server;</PackageTags>
 		<NeutralLanguage>en</NeutralLanguage>
 		<!--<StaticWebAssetBasePath>ui</StaticWebAssetBasePath>-->
+
+	    <StaticWebAssetBasePath Condition="$(StaticWebAssetBasePath) == ''">/</StaticWebAssetBasePath>
+
+		<!--<AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+		<GenerateMvcApplicationPartsAssemblyAttributes>true</GenerateMvcApplicationPartsAssemblyAttributes>
+		<RazorCompileOnBuild>true</RazorCompileOnBuild>
+		<IncludeRazorContentInPack>true</IncludeRazorContentInPack>
+		<GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+		<EnableDefaultRazorGenerateItems>true</EnableDefaultRazorGenerateItems>-->
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'candle' " />
@@ -94,6 +103,7 @@
 			<IncludeInPackage>true</IncludeInPackage>
 		</None>
 	</ItemGroup>
+	
 	<ItemGroup>
 	  <None Include="..\..\README.md" Pack="true" PackagePath="\">
 	    <Link>README.md</Link>

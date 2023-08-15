@@ -224,9 +224,7 @@ public static partial class Program
             {
                 string webroot = FindRelativeDir(root, "staticwebassets", false);
 
-                //string webroot = Path.Combine(root, "..", "..", "..", "staticwebassets");
-
-                if (Directory.Exists(webroot))
+                if ((!string.IsNullOrEmpty(webroot)) && Directory.Exists(webroot))
                 {
                     builder = WebApplication.CreateBuilder(new WebApplicationOptions()
                     {
@@ -243,7 +241,6 @@ public static partial class Program
             StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 
             //builder.WebHost.UseWebRoot("wwwroot");
-
 
             builder.WebHost.UseStaticWebAssets();
 

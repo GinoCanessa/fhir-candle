@@ -15,7 +15,11 @@ jobs:
       with:
         dotnet-version: '7'
 
-    - name: Publish the package to nuget.org
+        # Note that we need to pack twice because of an issue with staticwebassets.
+    - name: Build and Publish
       run: |
+        dotnet restore
+        dotnet pack -c Release ./src/fhir-candle/fhir-candle.csproj
+        rm ./nupkg/*.nupkg
         dotnet pack -c Release ./src/fhir-candle/fhir-candle.csproj
         dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.GINOC_NUGET }} --source https://api.nuget.org/v3/index.json

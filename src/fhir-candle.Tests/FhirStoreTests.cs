@@ -12,11 +12,13 @@ using FhirCandle.Models;
 using FhirCandle.Storage;
 using FluentAssertions;
 using Hl7.Fhir.Model;
+using Org.BouncyCastle.Utilities.Collections;
 using System.Net;
 using System.Security.AccessControl;
 using System.Text.Json;
 using System.Xml.Linq;
 using Xunit.Abstractions;
+using static FhirCandle.Storage.Common;
 
 namespace fhir.candle.Tests;
 
@@ -58,6 +60,10 @@ public class FhirStoreTests
     /// <summary>The FHIR store for FHIR R5.</summary>
     internal IFhirStore _candleR5;
 
+    /// <summary>The stores.</summary>
+    internal Dictionary<TenantConfiguration.SupportedFhirVersions, IFhirStore> _stores = new();
+
+    /// <summary>The expected REST resources.</summary>
     internal Dictionary<TenantConfiguration.SupportedFhirVersions, int> _expectedRestResources = new()
     {
         { TenantConfiguration.SupportedFhirVersions.R4, 146 },
@@ -94,12 +100,15 @@ public class FhirStoreTests
 
         _candleR4 = new candleR4::FhirCandle.Storage.VersionedFhirStore();
         _candleR4.Init(_configR4);
+        _stores.Add(TenantConfiguration.SupportedFhirVersions.R4, _candleR4);
 
         _candleR4B = new candleR4B::FhirCandle.Storage.VersionedFhirStore();
         _candleR4B.Init(_configR4B);
+        _stores.Add(TenantConfiguration.SupportedFhirVersions.R4B, _candleR4B);
 
         _candleR5 = new candleR5::FhirCandle.Storage.VersionedFhirStore();
         _candleR5.Init(_configR5);
+        _stores.Add(TenantConfiguration.SupportedFhirVersions.R5, _candleR5);
     }
 
     /// <summary>Gets store for version.</summary>
@@ -125,7 +134,7 @@ public class FhirStoreTests
     }
 }
 
-/// <summary>A metadata test.</summary>
+/// <summary>Test fetching metadata in JSON.</summary>
 public class MetadataJson : IClassFixture<FhirStoreTests>
 {
     /// <summary>(Immutable) The test output helper.</summary>
@@ -174,7 +183,7 @@ public class MetadataJson : IClassFixture<FhirStoreTests>
     }
 }
 
-/// <summary>A metadata test.</summary>
+/// <summary>Test fetching metadata in XML.</summary>
 public class MetadataXml : IClassFixture<FhirStoreTests>
 {
     /// <summary>(Immutable) The test output helper.</summary>
@@ -448,5 +457,83 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
             out location);
 
         sc.Should().Be(HttpStatusCode.BadRequest);
+    }
+}
+
+public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    private const string _resourceType = "Patient";
+    private const string _id = "invalid";
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly FhirStoreTests _fixture;
+
+    public TestBundleRequestParsing(FhirStoreTests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    /// <summary>Test determining interactions.</summary>
+    /// <param name="verb">    The verb.</param>
+    /// <param name="url">     URL of the resource.</param>
+    /// <param name="expected">The expected interaction.</param>
+    [Theory]
+    [InlineData("GET", "", StoreInteractionCodes.SystemSearch)]
+    [InlineData("GET", "?withParams=true", StoreInteractionCodes.SystemSearch)]
+    [InlineData("GET", "metadata", StoreInteractionCodes.SystemCapabilities)]
+    [InlineData("GET", "_history", StoreInteractionCodes.SystemHistory)]
+    [InlineData("GET", "$test", StoreInteractionCodes.SystemOperation)]
+    [InlineData("GET", "$test?withParams=true", StoreInteractionCodes.SystemOperation)]
+    [InlineData("GET", "Patient", StoreInteractionCodes.TypeSearch)]
+    [InlineData("GET", "Invalid", null)]
+    [InlineData("GET", "Patient/$test", StoreInteractionCodes.TypeOperation)]
+    [InlineData("GET", "Invalid/$test", null)]
+    [InlineData("GET", "Patient/id", StoreInteractionCodes.InstanceRead)]
+    [InlineData("GET", "Invalid/id", null)]
+    [InlineData("GET", "Patient/id/$test", StoreInteractionCodes.InstanceOperation)]
+    [InlineData("GET", "Invalid/id/$test", null)]
+    [InlineData("GET", "Patient/id/_history", StoreInteractionCodes.InstanceHistory)]
+    [InlineData("GET", "Patient/id/_history/version", StoreInteractionCodes.InstanceVersionRead)]
+    [InlineData("GET", "Patient/id/*", StoreInteractionCodes.CompartmentSearch)]
+    [InlineData("GET", "Patient/id/Patient", StoreInteractionCodes.CompartmentTypeSearch)]
+    [InlineData("GET", "get/with/too/many/path/segments", null)]
+    [InlineData("POST", "", StoreInteractionCodes.SystemBundle)]
+    [InlineData("POST", "?withParams=true", StoreInteractionCodes.SystemBundle)]
+    [InlineData("POST", "_search", StoreInteractionCodes.SystemSearch)]
+    [InlineData("POST", "_search?withParams=true", StoreInteractionCodes.SystemSearch)]
+    [InlineData("POST", "$test", StoreInteractionCodes.SystemOperation)]
+    [InlineData("POST", "$test?withParams=true", StoreInteractionCodes.SystemOperation)]
+    [InlineData("POST", "Patient", StoreInteractionCodes.TypeCreate)]
+    [InlineData("POST", "Invalid", null)]
+    [InlineData("POST", "Patient?withParams=true", StoreInteractionCodes.TypeCreate)]
+    [InlineData("POST", "Patient/_search", StoreInteractionCodes.TypeSearch)]
+    [InlineData("POST", "Invalid/_search", null)]
+    [InlineData("POST", "Patient/$test", StoreInteractionCodes.TypeOperation)]
+    [InlineData("POST", "Invalid/$test", null)]
+    [InlineData("POST", "Patient/id", null)]
+    [InlineData("POST", "Patient/id/$test", StoreInteractionCodes.InstanceOperation)]
+    [InlineData("POST", "Patient/id/_search", StoreInteractionCodes.CompartmentSearch)]
+    [InlineData("PUT", "", null)]
+    [InlineData("PUT", "?withParams=true", null)]
+    [InlineData("PUT", "_search", null)]
+    [InlineData("PUT", "$test", null)]
+    [InlineData("PUT", "Patient", null)]
+    [InlineData("PUT", "Patient/id", StoreInteractionCodes.InstanceUpdate)]
+    [InlineData("PUT", "Patient/$test", null)]
+
+
+    public void DetermineInteraction(string verb, string url, StoreInteractionCodes? expected)
+    {
+        foreach (IFhirStore store in _fixture._stores.Values)
+        {
+            store.DetermineInteraction(verb, url, out string _).Should().Be(expected);
+        }
     }
 }

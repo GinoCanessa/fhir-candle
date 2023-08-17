@@ -812,6 +812,86 @@ public partial class VersionedFhirStore : IFhirStore
         return HttpStatusCode.Created;
     }
 
+    /// <summary>Process a Batch or Transaction bundle.</summary>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    public HttpStatusCode ProcessBundle(
+        string content,
+        string sourceFormat,
+        string destFormat,
+        bool pretty,
+        out string serializedResource,
+        out string serializedOutcome)
+    {
+        const string resourceType = "Bundle";
+
+        HttpStatusCode sc = Utils.TryDeserializeFhir(content, sourceFormat, out Resource? r, out string exMessage);
+
+        if ((!sc.IsSuccessful()) || (r == null))
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(
+                sc,
+                $"Failed to deserialize resource, format: {sourceFormat}, error: {exMessage}");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
+
+            return sc;
+        }
+
+        if ((r.TypeName != resourceType) ||
+            (!(r is Bundle requestBundle)))
+        {
+            serializedResource = string.Empty;
+
+            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Cannot process non-Bundle resource type ({r.TypeName}) as a Bundle");
+            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
+
+            return HttpStatusCode.UnprocessableEntity;
+        }
+
+        Bundle responseBundle = new Bundle()
+        {
+            Id = Guid.NewGuid().ToString(),
+        };
+
+        switch (requestBundle.Type)
+        {
+            case Bundle.BundleType.Transaction:
+                responseBundle.Type = Bundle.BundleType.TransactionResponse;
+                break;
+
+            case Bundle.BundleType.Batch:
+                responseBundle.Type = Bundle.BundleType.BatchResponse;
+                break;
+
+            default:
+                {
+                    serializedResource = string.Empty;
+
+                    OperationOutcome oo = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.BadRequest, 
+                        $"Cannot process Bundle of type: {requestBundle.Type} - must be batch or transaction");
+                    serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
+
+                    return HttpStatusCode.UnprocessableEntity;
+                }
+        }
+
+
+
+        serializedResource = Utils.SerializeFhir(responseBundle, destFormat, pretty, string.Empty);
+        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Processed {requestBundle.Type} bundle");
+        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
+
+        return HttpStatusCode.OK;
+    }
+
     /// <summary>Instance delete.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
@@ -2575,6 +2655,257 @@ public partial class VersionedFhirStore : IFhirStore
         // update our current capabilities
         _store["CapabilityStatement"].InstanceUpdate(cs, true, _protectedResources);
         _capabilitiesAreStale = false;
+    }
+
+    private void ProcessBatch(Bundle batch, Bundle response)
+    {
+        foreach (Bundle.EntryComponent entry in batch.Entry)
+        {
+            if (entry.Request == null)
+            {
+                response.Entry.Add(new Bundle.EntryComponent()
+                {
+                    FullUrl = entry.FullUrl,
+                    Response = new Bundle.ResponseComponent()
+                    {
+                        Status = HttpStatusCode.BadRequest.ToString(),
+                        Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Entry is missing a request"),
+                    },
+                });
+
+                continue;
+            }
+
+        }
+    }
+
+    /// <summary>Determine interaction.</summary>
+    /// <param name="verb">   The HTTP verb.</param>
+    /// <param name="url">    URL of the request.</param>
+    /// <param name="message">[out] The message.</param>
+    /// <returns>A Common.StoreInteractionCodes?</returns>
+    public Common.StoreInteractionCodes? DetermineInteraction(
+        string verb,
+        string url,
+        out string message)
+    {
+        string[] pathAndQuery = url.Split('?', StringSplitOptions.RemoveEmptyEntries);
+
+        string path;
+        string query;
+
+        switch (pathAndQuery.Length)
+        {
+            case 0:
+                path = string.Empty;
+                query = string.Empty;
+                break;
+
+            case 1:
+                if (url.StartsWith('?'))
+                {
+                    path = string.Empty;
+                    query = pathAndQuery[0];
+                }
+                else
+                {
+                    path = pathAndQuery[0];
+                    query = string.Empty;
+                }
+                break;
+
+            case 2:
+                path = pathAndQuery[0];
+                query = pathAndQuery[1];
+                break;
+
+            default:
+                {
+                    message = $"DetermineInteraction: Malformed URL: {url} cannot be parsed!";
+                    Console.WriteLine(message);
+
+                    return null;
+                }
+        }
+
+        string[] pathComponents = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        message = string.Empty;
+
+        switch (verb)
+        {
+            case "GET":
+                {
+                    // check for system-level search
+                    if (pathComponents.Length == 0)
+                    {
+                        return Common.StoreInteractionCodes.SystemSearch;
+                    }
+
+                    if (pathComponents[0].Equals("metadata", StringComparison.Ordinal))
+                    {
+                        return Common.StoreInteractionCodes.SystemCapabilities;
+                    }
+
+                    if (pathComponents[0].Equals("_history", StringComparison.Ordinal))
+                    {
+                        return Common.StoreInteractionCodes.SystemHistory;
+                    }
+
+                    if (pathComponents[0].StartsWith('$'))
+                    {
+                        return Common.StoreInteractionCodes.SystemOperation;
+                    }
+
+                    if (_store.Keys.Contains(pathComponents[0]))
+                    {
+                        if (pathComponents[0].StartsWith('$'))
+                        {
+                            return Common.StoreInteractionCodes.SystemOperation;
+                        }
+
+                        if (pathComponents.Length == 1)
+                        {
+                            return Common.StoreInteractionCodes.TypeSearch;
+                        }
+
+                        if (pathComponents[1].StartsWith('$'))
+                        {
+                            return Common.StoreInteractionCodes.TypeOperation;
+                        }
+
+                        if (pathComponents.Length == 2)
+                        {
+                            return Common.StoreInteractionCodes.InstanceRead;
+                        }
+
+                        if (pathComponents[2].StartsWith('$'))
+                        {
+                            return Common.StoreInteractionCodes.InstanceOperation;
+                        }
+
+                        if (pathComponents[2].Equals("_history", StringComparison.Ordinal))
+                        {
+                            if (pathComponents.Length > 3)
+                            {
+                                return Common.StoreInteractionCodes.InstanceVersionRead;
+                            }
+                            else
+                            {
+                                return Common.StoreInteractionCodes.InstanceHistory;
+                            }
+                        }
+
+                        if (pathComponents[2].Equals("*", StringComparison.Ordinal))
+                        {
+                            return Common.StoreInteractionCodes.CompartmentSearch;
+                        }
+
+                        if (_store.Keys.Contains(pathComponents[2]))
+                        {
+                            return Common.StoreInteractionCodes.CompartmentTypeSearch;
+                        }
+                    }
+
+                }
+                break;
+
+            case "POST":
+                {
+                    // check for system-level bundle
+                    if (pathComponents.Length == 0)
+                    {
+                        return Common.StoreInteractionCodes.SystemBundle;
+                    }
+
+                    if (pathComponents[0].Equals("_search", StringComparison.Ordinal))
+                    {
+                        return Common.StoreInteractionCodes.SystemSearch;
+                    }
+
+                    if (pathComponents[0].StartsWith('$'))
+                    {
+                        return Common.StoreInteractionCodes.SystemOperation;
+                    }
+
+                    if (_store.Keys.Contains(pathComponents[0]))
+                    {
+                        if (pathComponents.Length == 1)
+                        {
+                            return Common.StoreInteractionCodes.TypeCreate;
+                        }
+
+                        if (pathComponents[1].Equals("_search", StringComparison.Ordinal))
+                        {
+                            return Common.StoreInteractionCodes.TypeSearch;
+                        }
+
+                        if (pathComponents[1].StartsWith('$'))
+                        {
+                            return Common.StoreInteractionCodes.TypeOperation;
+                        }
+
+                        if (pathComponents.Length == 2)
+                        {
+                            message = $"DetermineInteraction: {verb}+{url} cannot be parsed!";
+                            Console.WriteLine(message);
+
+                            return null;
+                        }
+
+                        if (pathComponents[2].Equals("_search", StringComparison.Ordinal))
+                        {
+                            return Common.StoreInteractionCodes.CompartmentSearch;
+                        }
+
+                        if (pathComponents[2].StartsWith('$'))
+                        {
+                            return Common.StoreInteractionCodes.InstanceOperation;
+                        }
+
+                        if (_store.Keys.Contains(pathComponents[2]) &&
+                            (pathComponents.Length > 3) &&
+                            pathComponents[3].Equals("_search", StringComparison.Ordinal))
+                        {
+                            return Common.StoreInteractionCodes.CompartmentTypeSearch;
+                        }
+                    }
+                }
+                break;
+
+            case "PUT":
+                {
+                    if ((pathComponents.Length == 2) &&
+                        _store.Keys.Contains(pathComponents[0]) &&
+                        (!pathComponents[1].StartsWith('$')))
+                    {
+                        return Common.StoreInteractionCodes.InstanceUpdate;
+                    }
+                }
+                break;
+
+            case "DELETE":
+                {
+
+                }
+                break;
+
+            case "PATCH":
+                {
+
+                }
+                break;
+
+            case "HEAD":
+                {
+
+                }
+                break;
+        }
+
+        message = $"DetermineInteraction: {verb}+{url} cannot be parsed!";
+        Console.WriteLine(message);
+
+        return null;
     }
 
     /// <summary>State has changed.</summary>

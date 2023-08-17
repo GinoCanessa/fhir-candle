@@ -938,4 +938,111 @@ public class FhirController : ControllerBase
             return;
         }
     }
+
+
+    /// <summary>(An Action that handles HTTP POST requests) posts to the server root.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer">      The prefer.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpPost, Route("{store}")]
+    [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    public async Task PostSystemBundle(
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, HttpContext.Request);
+
+        // sanity check
+        if ((Request == null) || (Request.Body == null))
+        {
+            System.Console.WriteLine("PostSystemBundle <<< cannot process a POST without data!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+
+                HttpStatusCode sc;
+                string resource, outcome;
+
+                if (resourceName[0] == '$')
+                {
+                    sc = _fhirStoreManager[store].SystemOperation(
+                        resourceName,
+                        Request.QueryString.ToString(),
+                        string.Empty,
+                        string.Empty,
+                        format,
+                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                        out resource,
+                        out outcome);
+                }
+                else
+                {
+                    sc = _fhirStoreManager[store].InstanceCreate(
+                        resourceName,
+                        content,
+                        Request.ContentType ?? string.Empty,
+                        format,
+                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                        string.Empty,
+                        true,
+                        out resource,
+                        out outcome,
+                        out string eTag,
+                        out string lastModified,
+                        out string location);
+
+                    if (!string.IsNullOrEmpty(eTag))
+                    {
+                        Response.Headers.Add(HeaderNames.ETag, eTag);
+                    }
+
+                    if (!string.IsNullOrEmpty(lastModified))
+                    {
+                        Response.Headers.Add(HeaderNames.LastModified, lastModified);
+                    }
+
+                    if (!string.IsNullOrEmpty(location))
+                    {
+                        Response.Headers.Add(HeaderNames.Location, location);
+                    }
+                }
+
+                Response.ContentType = format;
+                Response.StatusCode = (int)sc;
+
+                await AddBody(Response, prefer, resource, outcome);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"PostSystemBundle <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+    }
 }

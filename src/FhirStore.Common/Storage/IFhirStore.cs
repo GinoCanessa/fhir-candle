@@ -158,6 +158,22 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedResource,
         out string serializedOutcome);
 
+    /// <summary>Process a Batch or Transaction bundle.</summary>
+    /// <param name="content">           The content.</param>
+    /// <param name="sourceFormat">      Source format.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    HttpStatusCode ProcessBundle(
+        string content,
+        string sourceFormat,
+        string destFormat,
+        bool pretty,
+        out string serializedResource,
+        out string serializedOutcome);
+
     /// <summary>Type search.</summary>
     /// <param name="resourceType">     Type of the resource.</param>
     /// <param name="queryString">      The query string.</param>
@@ -275,6 +291,11 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool SupportsResource(string resourceName);
 
+    /// <summary>Attempts to get resource information.</summary>
+    /// <param name="resource">    The resource.</param>
+    /// <param name="resourceName">[out] Name of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryGetResourceInfo(object resource, out string resourceName, out string id);
 
     /// <summary>Gets the supported resources.</summary>
@@ -288,6 +309,17 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
 
     /// <summary>Gets the received notifications.</summary>
     ConcurrentDictionary<string, List<ParsedSubscriptionStatus>> ReceivedNotifications { get; }
+
+    /// <summary>Determine interaction.</summary>
+    /// <param name="verb">   The HTTP verb.</param>
+    /// <param name="url">    URL of the request.</param>
+    /// <param name="message">[out] The message.</param>
+    /// <returns>A Common.StoreInteractionCodes?</returns>
+    Common.StoreInteractionCodes? DetermineInteraction(
+        string verb,
+        string url,
+        out string message);
+
 
     ///// <summary>
     ///// Get the metadata from a remote fhir server.

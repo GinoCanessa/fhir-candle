@@ -311,14 +311,22 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     ConcurrentDictionary<string, List<ParsedSubscriptionStatus>> ReceivedNotifications { get; }
 
     /// <summary>Determine interaction.</summary>
-    /// <param name="verb">   The HTTP verb.</param>
-    /// <param name="url">    URL of the request.</param>
-    /// <param name="message">[out] The message.</param>
+    /// <param name="verb">          The HTTP verb.</param>
+    /// <param name="url">           URL of the request.</param>
+    /// <param name="message">       [out] The message.</param>
+    /// <param name="pathComponents">[out] The path components.</param>
     /// <returns>A Common.StoreInteractionCodes?</returns>
     Common.StoreInteractionCodes? DetermineInteraction(
         string verb,
         string url,
-        out string message);
+        out string message,
+        out string requestUrlPath,
+        out string requestUrlQuery,
+        out string resourceType,
+        out string id,
+        out string operationName,
+        out string compartmentType,
+        out string version);
 
 
     ///// <summary>

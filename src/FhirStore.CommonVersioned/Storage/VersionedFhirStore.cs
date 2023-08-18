@@ -910,33 +910,58 @@ public partial class VersionedFhirStore : IFhirStore
         out string serializedResource,
         out string serializedOutcome)
     {
-        if (!_store.ContainsKey(resourceType))
+        HttpStatusCode sc = DoInstanceDelete(
+            resourceType,
+            id,
+            ifMatch,
+            out Resource? resource,
+            out OperationOutcome outcome);
+
+        if (resource == null)
         {
             serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
-            return HttpStatusCode.UnprocessableEntity;
+        }
+        else
+        {
+            serializedResource = Utils.SerializeFhir(resource, destFormat, pretty);
         }
 
-        // attempt delete
-        Resource? deleted = _store[resourceType].InstanceDelete(id, _protectedResources);
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
-        if (deleted == null)
+        return sc;
+    }
+
+    /// <summary>Executes the instance delete operation.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="ifMatch">     A match specifying if.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <param name="outcome">     [out] The outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    private HttpStatusCode DoInstanceDelete(
+        string resourceType,
+        string id,
+        string ifMatch,
+        out Resource? resource,
+        out OperationOutcome outcome)
+    {
+        if (!_store.ContainsKey(resourceType))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource {id} not found");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource type: {resourceType} is not supported");
             return HttpStatusCode.NotFound;
         }
 
-        serializedResource = Utils.SerializeFhir(deleted, destFormat, pretty, string.Empty);
-        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Deleted {resourceType}/{id}");
-        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
+        // attempt delete
+        resource = _store[resourceType].InstanceDelete(id, _protectedResources);
 
+        if (resource == null)
+        {
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource {id} not found");
+            return HttpStatusCode.NotFound;
+        }
+
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}");
         return HttpStatusCode.OK;
     }
 
@@ -2047,56 +2072,8 @@ public partial class VersionedFhirStore : IFhirStore
         out string serializedResource,
         out string serializedOutcome)
     {
-        if (!_store.ContainsKey(resourceType))
-        {
-            serializedResource = string.Empty;
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource type {resourceType} does not exist on this server.");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
-            return HttpStatusCode.NotFound;
-        }
-
-        if (string.IsNullOrEmpty(id) ||
-            !((IReadOnlyDictionary<string, Resource>)_store[resourceType]).ContainsKey(id))
-        {
-            serializedResource = string.Empty;
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Instance {resourceType}/{id} does not exist on this server.");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
-            return HttpStatusCode.NotFound;
-        }
-
-        if (!_operations.ContainsKey(operationName))
-        {
-            serializedResource = string.Empty;
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
-            return HttpStatusCode.NotFound;
-        }
-
-        IFhirOperation op = _operations[operationName];
-
-        if (!op.AllowInstanceLevel)
-        {
-            serializedResource = string.Empty;
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow instance-level execution.");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
-            return HttpStatusCode.BadRequest;
-        }
-
-        if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(resourceType)))
-        {
-            serializedResource = string.Empty;
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
-            return HttpStatusCode.BadRequest;
-        }
-
-        HttpStatusCode sc;
         Resource? r = null;
+        HttpStatusCode sc;
 
         if (!string.IsNullOrEmpty(content))
         {
@@ -2105,7 +2082,6 @@ public partial class VersionedFhirStore : IFhirStore
             if ((!sc.IsSuccessful()) || (r == null))
             {
                 serializedResource = string.Empty;
-
                 OperationOutcome oo = Utils.BuildOutcomeForRequest(
                     sc,
                     $"Failed to deserialize resource, format: {sourceFormat}, error: {exMessage}");
@@ -2115,22 +2091,97 @@ public partial class VersionedFhirStore : IFhirStore
             }
         }
 
-        sc = op.DoOperation(
+        sc = DoInstanceOperation(
+            resourceType,
+            operationName,
+            id,
+            queryString,
+            r,
+            out Resource? resource,
+            out OperationOutcome outcome);
+
+        if (resource == null)
+        {
+            serializedResource = string.Empty;
+        }
+        else
+        {
+            serializedResource = Utils.SerializeFhir(resource, destFormat, pretty);
+        }
+
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
+
+        return sc;
+    }
+
+    /// <summary>Executes the instance operation operation.</summary>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="operationName">  Name of the operation.</param>
+    /// <param name="id">             [out] The identifier.</param>
+    /// <param name="queryString">    The query string.</param>
+    /// <param name="requestResource">The request resource.</param>
+    /// <param name="resource">       [out] The resource.</param>
+    /// <param name="outcome">        [out] The outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    private HttpStatusCode DoInstanceOperation(
+        string resourceType,
+        string operationName,
+        string id,
+        string queryString,
+        Resource? requestResource,
+        out Resource? resource,
+        out OperationOutcome outcome)
+    {
+        if (!_store.ContainsKey(resourceType))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource type: {resourceType} is not supported");
+            return HttpStatusCode.NotFound;
+        }
+
+        if (string.IsNullOrEmpty(id) ||
+            !((IReadOnlyDictionary<string, Resource>)_store[resourceType]).ContainsKey(id))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Instance {resourceType}/{id} does not exist on this server.");
+            return HttpStatusCode.NotFound;
+        }
+
+        if (!_operations.ContainsKey(operationName))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Operation {operationName} does not have an executable implementation on this server.");
+            return HttpStatusCode.NotFound;
+        }
+
+        IFhirOperation op = _operations[operationName];
+
+        if (!op.AllowInstanceLevel)
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} does not allow instance-level execution.");
+            return HttpStatusCode.BadRequest;
+        }
+
+        if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(resourceType)))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Operation {operationName} is not allowed on {resourceType}.");
+            return HttpStatusCode.BadRequest;
+        }
+
+        HttpStatusCode sc = op.DoOperation(
             this,
             resourceType,
             _store[resourceType],
             id,
             queryString,
-            r,
-            out Resource? responseResource,
+            requestResource,
+            out resource,
             out OperationOutcome? responseOutcome,
             out _);
 
-        serializedResource = (responseResource == null) ? string.Empty : Utils.SerializeFhir(responseResource, destFormat, pretty, string.Empty);
-
-        OperationOutcome outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} complete") : responseOutcome;
-        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
-
+        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} returned {sc}");
         return sc;
     }
 
@@ -2657,10 +2708,21 @@ public partial class VersionedFhirStore : IFhirStore
         _capabilitiesAreStale = false;
     }
 
-    private void ProcessBatch(Bundle batch, Bundle response)
+    /// <summary>Process a batch request.</summary>
+    /// <param name="batch">   The batch.</param>
+    /// <param name="response">The response.</param>
+    private void ProcessBatch(
+        Bundle batch,
+        Bundle response)
     {
+        HttpStatusCode sc;
+        Resource? resource;
+        OperationOutcome outcome;
+
         foreach (Bundle.EntryComponent entry in batch.Entry)
         {
+            resource = null;
+
             if (entry.Request == null)
             {
                 response.Entry.Add(new Bundle.EntryComponent()
@@ -2676,47 +2738,180 @@ public partial class VersionedFhirStore : IFhirStore
                 continue;
             }
 
+            Common.StoreInteractionCodes? interaction = DetermineInteraction(
+                entry.Request.Method?.ToString() ?? string.Empty,
+                entry.Request.Url,
+                out string message,
+                out string requestUrlPath,
+                out string requestUrlQuery,
+                out string requestResourceType,
+                out string requestId,
+                out string requestOperationName,
+                out string requestCompartmentType,
+                out string requestVersion);
+
+            switch (interaction)
+            {
+                case Common.StoreInteractionCodes.InstanceDelete:
+                    {
+                        sc = DoInstanceDelete(
+                            requestResourceType,
+                            requestId,
+                            entry.Request.IfMatch,
+                            out resource,
+                            out outcome);
+
+                        response.Entry.Add(new Bundle.EntryComponent()
+                        {
+                            FullUrl = entry.FullUrl,
+                            Resource = resource,
+                            Response = new Bundle.ResponseComponent()
+                            {
+                                Status = sc.ToString(),
+                                Outcome = outcome,
+                            },
+                        });
+
+                        continue;
+                    }
+
+                case Common.StoreInteractionCodes.InstanceOperation:
+                    {
+                        sc = DoInstanceOperation(
+                            requestResourceType,
+                            requestOperationName,
+                            requestId,
+                            requestUrlQuery,
+                            entry.Resource,
+                            out resource,
+                            out outcome);
+
+                        response.Entry.Add(new Bundle.EntryComponent()
+                        {
+                            FullUrl = entry.FullUrl,
+                            Resource = resource,
+                            Response = new Bundle.ResponseComponent()
+                            {
+                                Status = sc.ToString(),
+                                Outcome = outcome,
+                            },
+                        });
+
+                        continue;
+                    }
+
+                case Common.StoreInteractionCodes.InstanceRead:
+                    break;
+                case Common.StoreInteractionCodes.InstanceUpdate:
+                    break;
+                case Common.StoreInteractionCodes.TypeCreate:
+                    break;
+                case Common.StoreInteractionCodes.TypeCreateConditional:
+                    break;
+                case Common.StoreInteractionCodes.TypeDelete:
+                    break;
+                case Common.StoreInteractionCodes.TypeDeleteConditional:
+                    break;
+                case Common.StoreInteractionCodes.TypeOperation:
+                    break;
+                case Common.StoreInteractionCodes.TypeSearch:
+                    break;
+                case Common.StoreInteractionCodes.SystemCapabilities:
+                    break;
+                case Common.StoreInteractionCodes.SystemBundle:
+                    break;
+                case Common.StoreInteractionCodes.SystemDeleteConditional:
+                    break;
+                case Common.StoreInteractionCodes.SystemOperation:
+                    break;
+                case Common.StoreInteractionCodes.SystemSearch:
+                    break;
+
+                case Common.StoreInteractionCodes.CompartmentOperation:
+                case Common.StoreInteractionCodes.CompartmentSearch:
+                case Common.StoreInteractionCodes.CompartmentTypeSearch:
+                case Common.StoreInteractionCodes.InstanceDeleteHistory:
+                case Common.StoreInteractionCodes.InstanceDeleteVersion:
+                case Common.StoreInteractionCodes.InstancePatch:
+                case Common.StoreInteractionCodes.InstanceReadHistory:
+                case Common.StoreInteractionCodes.InstanceReadVersion:
+                case Common.StoreInteractionCodes.TypeHistory:
+                case Common.StoreInteractionCodes.SystemHistory:
+                    {
+                        response.Entry.Add(new Bundle.EntryComponent()
+                        {
+                            FullUrl = entry.FullUrl,
+                            Response = new Bundle.ResponseComponent()
+                            {
+                                Status = HttpStatusCode.BadRequest.ToString(),
+                                Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Unsupported interaction: {interaction}"),
+                            },
+                        });
+
+                        continue;
+                    }
+
+                case null:
+                    {
+                        response.Entry.Add(new Bundle.EntryComponent()
+                        {
+                            FullUrl = entry.FullUrl,
+                            Response = new Bundle.ResponseComponent()
+                            {
+                                Status = HttpStatusCode.BadRequest.ToString(),
+                                Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Could not parse request: {message}"),
+                            },
+                        });
+
+                        continue;
+                    }
+            }
         }
     }
 
     /// <summary>Determine interaction.</summary>
-    /// <param name="verb">   The HTTP verb.</param>
-    /// <param name="url">    URL of the request.</param>
-    /// <param name="message">[out] The message.</param>
+    /// <param name="verb">          The HTTP verb.</param>
+    /// <param name="url">           URL of the request.</param>
+    /// <param name="message">       [out] The message.</param>
+    /// <param name="pathComponents">[out] The path components.</param>
     /// <returns>A Common.StoreInteractionCodes?</returns>
     public Common.StoreInteractionCodes? DetermineInteraction(
         string verb,
         string url,
-        out string message)
+        out string message,
+        out string requestUrlPath,
+        out string requestUrlQuery,
+        out string resourceType,
+        out string id,
+        out string operationName,
+        out string compartmentType,
+        out string version)
     {
         string[] pathAndQuery = url.Split('?', StringSplitOptions.RemoveEmptyEntries);
-
-        string path;
-        string query;
 
         switch (pathAndQuery.Length)
         {
             case 0:
-                path = string.Empty;
-                query = string.Empty;
+                requestUrlPath = string.Empty;
+                requestUrlQuery = string.Empty;
                 break;
 
             case 1:
                 if (url.StartsWith('?'))
                 {
-                    path = string.Empty;
-                    query = pathAndQuery[0];
+                    requestUrlPath = string.Empty;
+                    requestUrlQuery = pathAndQuery[0];
                 }
                 else
                 {
-                    path = pathAndQuery[0];
-                    query = string.Empty;
+                    requestUrlPath = pathAndQuery[0];
+                    requestUrlQuery = string.Empty;
                 }
                 break;
 
             case 2:
-                path = pathAndQuery[0];
-                query = pathAndQuery[1];
+                requestUrlPath = pathAndQuery[0];
+                requestUrlQuery = pathAndQuery[1];
                 break;
 
             default:
@@ -2724,180 +2919,350 @@ public partial class VersionedFhirStore : IFhirStore
                     message = $"DetermineInteraction: Malformed URL: {url} cannot be parsed!";
                     Console.WriteLine(message);
 
+                    requestUrlPath = string.Empty;
+                    requestUrlQuery = string.Empty;
+                    resourceType = string.Empty;
+                    id = string.Empty;
+                    operationName = string.Empty;
+                    compartmentType = string.Empty;
+                    version = string.Empty;
+
                     return null;
                 }
         }
 
-        string[] pathComponents = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        string[] pathComponents = requestUrlPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         message = string.Empty;
+        resourceType = string.Empty;
+        id = string.Empty;
+        operationName = string.Empty;
+        compartmentType = string.Empty;
+        version = string.Empty;
+
+        bool hasValidResourceType = pathComponents.Any()
+            ? _store.Keys.Contains(pathComponents[0])
+            : false;
+
+        if (hasValidResourceType)
+        {
+            resourceType = pathComponents[0];
+        }
 
         switch (verb)
         {
             case "GET":
                 {
-                    // check for system-level search
-                    if (pathComponents.Length == 0)
+                    switch (pathComponents.Length)
                     {
-                        return Common.StoreInteractionCodes.SystemSearch;
-                    }
-
-                    if (pathComponents[0].Equals("metadata", StringComparison.Ordinal))
-                    {
-                        return Common.StoreInteractionCodes.SystemCapabilities;
-                    }
-
-                    if (pathComponents[0].Equals("_history", StringComparison.Ordinal))
-                    {
-                        return Common.StoreInteractionCodes.SystemHistory;
-                    }
-
-                    if (pathComponents[0].StartsWith('$'))
-                    {
-                        return Common.StoreInteractionCodes.SystemOperation;
-                    }
-
-                    if (_store.Keys.Contains(pathComponents[0]))
-                    {
-                        if (pathComponents[0].StartsWith('$'))
-                        {
-                            return Common.StoreInteractionCodes.SystemOperation;
-                        }
-
-                        if (pathComponents.Length == 1)
-                        {
-                            return Common.StoreInteractionCodes.TypeSearch;
-                        }
-
-                        if (pathComponents[1].StartsWith('$'))
-                        {
-                            return Common.StoreInteractionCodes.TypeOperation;
-                        }
-
-                        if (pathComponents.Length == 2)
-                        {
-                            return Common.StoreInteractionCodes.InstanceRead;
-                        }
-
-                        if (pathComponents[2].StartsWith('$'))
-                        {
-                            return Common.StoreInteractionCodes.InstanceOperation;
-                        }
-
-                        if (pathComponents[2].Equals("_history", StringComparison.Ordinal))
-                        {
-                            if (pathComponents.Length > 3)
+                        case 0:
                             {
-                                return Common.StoreInteractionCodes.InstanceVersionRead;
+                                return Common.StoreInteractionCodes.SystemSearch;
                             }
-                            else
+
+                        case 1:
                             {
-                                return Common.StoreInteractionCodes.InstanceHistory;
+                                if (hasValidResourceType)
+                                {
+                                    return Common.StoreInteractionCodes.TypeSearch;
+                                }
+
+                                if (pathComponents[0].Equals("metadata", StringComparison.Ordinal))
+                                {
+                                    return Common.StoreInteractionCodes.SystemCapabilities;
+                                }
+
+                                if (pathComponents[0].Equals("_history", StringComparison.Ordinal))
+                                {
+                                    return Common.StoreInteractionCodes.SystemHistory;
+                                }
+
+                                if (pathComponents[0].StartsWith('$'))
+                                {
+                                    return Common.StoreInteractionCodes.SystemOperation;
+                                }
                             }
-                        }
+                            break;
 
-                        if (pathComponents[2].Equals("*", StringComparison.Ordinal))
-                        {
-                            return Common.StoreInteractionCodes.CompartmentSearch;
-                        }
+                        case 2:
+                            {
+                                if (hasValidResourceType)
+                                {
+                                    if (pathComponents[1].StartsWith('$'))
+                                    {
+                                        operationName = pathComponents[1];
+                                        return Common.StoreInteractionCodes.TypeOperation;
+                                    }
 
-                        if (_store.Keys.Contains(pathComponents[2]))
-                        {
-                            return Common.StoreInteractionCodes.CompartmentTypeSearch;
-                        }
+                                    id = pathComponents[1];
+                                    return Common.StoreInteractionCodes.InstanceRead;
+                                }
+                            }
+                            break;
+
+                        case 3:
+                            {
+                                if (hasValidResourceType)
+                                {
+                                    if (pathComponents[2].StartsWith('$'))
+                                    {
+                                        id = pathComponents[1];
+                                        operationName = pathComponents[2];
+                                        return Common.StoreInteractionCodes.InstanceOperation;
+                                    }
+
+                                    if (pathComponents[2].Equals("_history", StringComparison.Ordinal))
+                                    {
+                                        id = pathComponents[1];
+                                        return Common.StoreInteractionCodes.InstanceReadHistory;
+                                    }
+
+                                    if (pathComponents[2].Equals("*", StringComparison.Ordinal))
+                                    {
+                                        id = pathComponents[1];
+                                        compartmentType = pathComponents[2];
+                                        return Common.StoreInteractionCodes.CompartmentSearch;
+                                    }
+
+                                    if (_store.Keys.Contains(pathComponents[2]))
+                                    {
+                                        id = pathComponents[1];
+                                        compartmentType = pathComponents[2];
+                                        return Common.StoreInteractionCodes.CompartmentTypeSearch;
+                                    }
+                                }
+                            }
+                            break;
+
+                        case 4:
+                            {
+                                if (hasValidResourceType &&
+                                    pathComponents[2].Equals("_history", StringComparison.Ordinal) &&
+                                    (!pathComponents[3].StartsWith('$')))
+                                {
+                                    id = pathComponents[1];
+                                    version = pathComponents[3];
+                                    return Common.StoreInteractionCodes.InstanceReadVersion;
+                                }
+                            }
+                            break;
                     }
-
                 }
                 break;
+
+            // head is allowed on a subset of GET requests - specifically cacheable reads (instance/capabilities)
+            case "HEAD":
+                {
+                    switch (pathComponents.Length)
+                    {
+                        case 1:
+                            {
+                                if (pathComponents[0].Equals("metadata", StringComparison.Ordinal))
+                                {
+                                    return Common.StoreInteractionCodes.SystemCapabilities;
+                                }
+                            }
+                            break;
+
+                        case 2:
+                            {
+                                if (hasValidResourceType &&
+                                    (!pathComponents[1].StartsWith('$')))
+                                {
+                                    operationName = pathComponents[1];
+                                    return Common.StoreInteractionCodes.InstanceRead;
+                                }
+                            }
+                            break;
+
+                        case 4:
+                            {
+                                if (hasValidResourceType &&
+                                    pathComponents[2].Equals("_history", StringComparison.Ordinal) &&
+                                    (!pathComponents[3].StartsWith('$')))
+                                {
+                                    id = pathComponents[1];
+                                    version = pathComponents[3];
+                                    return Common.StoreInteractionCodes.InstanceReadVersion;
+                                }
+                            }
+                            break;
+                    }
+                }
+                break;
+
 
             case "POST":
                 {
-                    // check for system-level bundle
-                    if (pathComponents.Length == 0)
+                    switch (pathComponents.Length)
                     {
-                        return Common.StoreInteractionCodes.SystemBundle;
-                    }
+                        case 0:
+                            {
+                                return Common.StoreInteractionCodes.SystemBundle;
+                            }
 
-                    if (pathComponents[0].Equals("_search", StringComparison.Ordinal))
-                    {
-                        return Common.StoreInteractionCodes.SystemSearch;
-                    }
+                        case 1:
+                            {
+                                if (hasValidResourceType)
+                                {
+                                    return Common.StoreInteractionCodes.TypeCreate;
+                                }
 
-                    if (pathComponents[0].StartsWith('$'))
-                    {
-                        return Common.StoreInteractionCodes.SystemOperation;
-                    }
+                                if (pathComponents[0].Equals("_search", StringComparison.Ordinal))
+                                {
+                                    return Common.StoreInteractionCodes.SystemSearch;
+                                }
 
-                    if (_store.Keys.Contains(pathComponents[0]))
-                    {
-                        if (pathComponents.Length == 1)
-                        {
-                            return Common.StoreInteractionCodes.TypeCreate;
-                        }
+                                if (pathComponents[0].StartsWith('$'))
+                                {
+                                    operationName = pathComponents[0];
+                                    return Common.StoreInteractionCodes.SystemOperation;
+                                }
+                            }
+                            break;
 
-                        if (pathComponents[1].Equals("_search", StringComparison.Ordinal))
-                        {
-                            return Common.StoreInteractionCodes.TypeSearch;
-                        }
+                        case 2:
+                            {
+                                if (hasValidResourceType)
+                                {
+                                    if (pathComponents[1].Equals("_search", StringComparison.Ordinal))
+                                    {
+                                        return Common.StoreInteractionCodes.TypeSearch;
+                                    }
 
-                        if (pathComponents[1].StartsWith('$'))
-                        {
-                            return Common.StoreInteractionCodes.TypeOperation;
-                        }
+                                    if (pathComponents[1].StartsWith('$'))
+                                    {
+                                        operationName = pathComponents[1];
+                                        return Common.StoreInteractionCodes.TypeOperation;
+                                    }
+                                }
+                            }
+                            break;
 
-                        if (pathComponents.Length == 2)
-                        {
-                            message = $"DetermineInteraction: {verb}+{url} cannot be parsed!";
-                            Console.WriteLine(message);
+                        case 3:
+                            {
+                                if (hasValidResourceType)
+                                {
+                                    if (pathComponents[2].StartsWith('$'))
+                                    {
+                                        id = pathComponents[1];
+                                        operationName = pathComponents[2];
+                                        return Common.StoreInteractionCodes.InstanceOperation;
+                                    }
 
-                            return null;
-                        }
+                                    if (pathComponents[2].Equals("_search", StringComparison.Ordinal))
+                                    {
+                                        id = pathComponents[1];
+                                        return Common.StoreInteractionCodes.CompartmentSearch;
+                                    }
+                                }
+                            }
+                            break;
 
-                        if (pathComponents[2].Equals("_search", StringComparison.Ordinal))
-                        {
-                            return Common.StoreInteractionCodes.CompartmentSearch;
-                        }
-
-                        if (pathComponents[2].StartsWith('$'))
-                        {
-                            return Common.StoreInteractionCodes.InstanceOperation;
-                        }
-
-                        if (_store.Keys.Contains(pathComponents[2]) &&
-                            (pathComponents.Length > 3) &&
-                            pathComponents[3].Equals("_search", StringComparison.Ordinal))
-                        {
-                            return Common.StoreInteractionCodes.CompartmentTypeSearch;
-                        }
-                    }
-                }
-                break;
-
-            case "PUT":
-                {
-                    if ((pathComponents.Length == 2) &&
-                        _store.Keys.Contains(pathComponents[0]) &&
-                        (!pathComponents[1].StartsWith('$')))
-                    {
-                        return Common.StoreInteractionCodes.InstanceUpdate;
+                        case 4:
+                            {
+                                if (hasValidResourceType &&
+                                    pathComponents[3].Equals("_search", StringComparison.Ordinal) &&
+                                    _store.Keys.Contains(pathComponents[3]))
+                                {
+                                    id = pathComponents[1];
+                                    compartmentType = pathComponents[3];
+                                    return Common.StoreInteractionCodes.CompartmentTypeSearch;
+                                }
+                            }
+                            break;
                     }
                 }
                 break;
 
             case "DELETE":
                 {
+                    switch (pathComponents.Length)
+                    {
+                        case 0:
+                            {
+                                return Common.StoreInteractionCodes.SystemDeleteConditional;
+                            }
 
+                        case 1:
+                            {
+                                if (hasValidResourceType)
+                                {
+                                    return Common.StoreInteractionCodes.TypeDeleteConditional;
+                                }
+                            }
+                            break;
+
+                        case 2:
+                            {
+                                if (hasValidResourceType &&
+                                    (!pathComponents[1].StartsWith('$')))
+                                {
+                                    id = pathComponents[1];
+                                    return Common.StoreInteractionCodes.InstanceDelete;
+                                }
+                            }
+                            break;
+
+                        case 3:
+                            {
+                                if (hasValidResourceType &&
+                                    pathComponents[2].Equals("_history", StringComparison.Ordinal))
+                                {
+                                    id = pathComponents[1];
+                                    return Common.StoreInteractionCodes.InstanceDeleteHistory;
+                                }
+                            }
+                            break;
+
+                        case 4:
+                            {
+                                if (hasValidResourceType &&
+                                    pathComponents[2].Equals("_history", StringComparison.Ordinal) &&
+                                    (!pathComponents[3].StartsWith('$')))
+                                {
+                                    id = pathComponents[1];
+                                    version = pathComponents[3];
+                                    return Common.StoreInteractionCodes.InstanceDeleteVersion;
+                                }
+                            }
+                            break;
+                    }
+                }
+                break;
+
+            case "PUT":
+                {
+                    switch (pathComponents.Length)
+                    {
+                        case 2:
+                            {
+                                if (hasValidResourceType &&
+                                    (!pathComponents[1].StartsWith('$')))
+                                {
+                                    id = pathComponents[1];
+                                    return Common.StoreInteractionCodes.InstanceUpdate;
+                                }
+                            }
+                            break;
+                    }
                 }
                 break;
 
             case "PATCH":
                 {
-
-                }
-                break;
-
-            case "HEAD":
-                {
-
+                    switch (pathComponents.Length)
+                    {
+                        case 2:
+                            {
+                                if (hasValidResourceType &&
+                                    (!pathComponents[1].StartsWith('$')))
+                                {
+                                    id = pathComponents[1];
+                                    return Common.StoreInteractionCodes.InstancePatch;
+                                }
+                            }
+                            break;
+                    }
                 }
                 break;
         }

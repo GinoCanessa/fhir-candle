@@ -487,6 +487,7 @@ public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
     [Theory]
     [InlineData("GET", "", StoreInteractionCodes.SystemSearch)]
     [InlineData("GET", "?withParams=true", StoreInteractionCodes.SystemSearch)]
+    [InlineData("GET", "?withParams=true/false", StoreInteractionCodes.SystemSearch)]
     [InlineData("GET", "metadata", StoreInteractionCodes.SystemCapabilities)]
     [InlineData("GET", "_history", StoreInteractionCodes.SystemHistory)]
     [InlineData("GET", "$test", StoreInteractionCodes.SystemOperation)]
@@ -499,11 +500,30 @@ public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
     [InlineData("GET", "Invalid/id", null)]
     [InlineData("GET", "Patient/id/$test", StoreInteractionCodes.InstanceOperation)]
     [InlineData("GET", "Invalid/id/$test", null)]
-    [InlineData("GET", "Patient/id/_history", StoreInteractionCodes.InstanceHistory)]
-    [InlineData("GET", "Patient/id/_history/version", StoreInteractionCodes.InstanceVersionRead)]
+    [InlineData("GET", "Patient/id/_history", StoreInteractionCodes.InstanceReadHistory)]
+    [InlineData("GET", "Patient/id/_history/version", StoreInteractionCodes.InstanceReadVersion)]
     [InlineData("GET", "Patient/id/*", StoreInteractionCodes.CompartmentSearch)]
     [InlineData("GET", "Patient/id/Patient", StoreInteractionCodes.CompartmentTypeSearch)]
-    [InlineData("GET", "get/with/too/many/path/segments", null)]
+    [InlineData("GET", "request/with/too/many/path/segments", null)]
+    [InlineData("HEAD", "", null)]
+    [InlineData("HEAD", "?withParams=true", null)]
+    [InlineData("HEAD", "metadata", StoreInteractionCodes.SystemCapabilities)]
+    [InlineData("HEAD", "_history", null)]
+    [InlineData("HEAD", "$test", null)]
+    [InlineData("HEAD", "$test?withParams=true", null)]
+    [InlineData("HEAD", "Patient", null)]
+    [InlineData("HEAD", "Invalid", null)]
+    [InlineData("HEAD", "Patient/$test", null)]
+    [InlineData("HEAD", "Invalid/$test", null)]
+    [InlineData("HEAD", "Patient/id", StoreInteractionCodes.InstanceRead)]
+    [InlineData("HEAD", "Invalid/id", null)]
+    [InlineData("HEAD", "Patient/id/$test", null)]
+    [InlineData("HEAD", "Invalid/id/$test", null)]
+    [InlineData("HEAD", "Patient/id/_history", null)]
+    [InlineData("HEAD", "Patient/id/_history/version", StoreInteractionCodes.InstanceReadVersion)]
+    [InlineData("HEAD", "Patient/id/*", null)]
+    [InlineData("HEAD", "Patient/id/Patient", null)]
+    [InlineData("HEAD", "request/with/too/many/path/segments", null)]
     [InlineData("POST", "", StoreInteractionCodes.SystemBundle)]
     [InlineData("POST", "?withParams=true", StoreInteractionCodes.SystemBundle)]
     [InlineData("POST", "_search", StoreInteractionCodes.SystemSearch)]
@@ -527,13 +547,48 @@ public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
     [InlineData("PUT", "Patient", null)]
     [InlineData("PUT", "Patient/id", StoreInteractionCodes.InstanceUpdate)]
     [InlineData("PUT", "Patient/$test", null)]
-
+    [InlineData("PATCH", "", null)]
+    [InlineData("PATCH", "?withParams=true", null)]
+    [InlineData("PATCH", "_search", null)]
+    [InlineData("PATCH", "$test", null)]
+    [InlineData("PATCH", "Patient", null)]
+    [InlineData("PATCH", "Patient/id", StoreInteractionCodes.InstancePatch)]
+    [InlineData("PATCH", "Patient/$test", null)]
+    [InlineData("DELETE", "", StoreInteractionCodes.SystemDeleteConditional)]
+    [InlineData("DELETE", "?withParams=true", StoreInteractionCodes.SystemDeleteConditional)]
+    [InlineData("DELETE", "metadata", null)]
+    [InlineData("DELETE", "_history", null)]
+    [InlineData("DELETE", "$test", null)]
+    [InlineData("DELETE", "$test?withParams=true", null)]
+    [InlineData("DELETE", "Patient", StoreInteractionCodes.TypeDeleteConditional)]
+    [InlineData("DELETE", "Invalid", null)]
+    [InlineData("DELETE", "Patient/$test", null)]
+    [InlineData("DELETE", "Invalid/$test", null)]
+    [InlineData("DELETE", "Patient/id", StoreInteractionCodes.InstanceDelete)]
+    [InlineData("DELETE", "Invalid/id", null)]
+    [InlineData("DELETE", "Patient/id/$test", null)]
+    [InlineData("DELETE", "Invalid/id/$test", null)]
+    [InlineData("DELETE", "Patient/id/_history", StoreInteractionCodes.InstanceDeleteHistory)]
+    [InlineData("DELETE", "Patient/id/_history/version", StoreInteractionCodes.InstanceDeleteVersion)]
+    [InlineData("DELETE", "Patient/id/*", null)]
+    [InlineData("DELETE", "Patient/id/Patient", null)]
+    [InlineData("DELETE", "request/with/too/many/path/segments", null)]
 
     public void DetermineInteraction(string verb, string url, StoreInteractionCodes? expected)
     {
         foreach (IFhirStore store in _fixture._stores.Values)
         {
-            store.DetermineInteraction(verb, url, out string _).Should().Be(expected);
+            store.DetermineInteraction(
+                verb, 
+                url, 
+                out string _,
+                out string _,
+                out string _,
+                out string _,
+                out string _,
+                out string _,
+                out string _,
+                out string _).Should().Be(expected);
         }
     }
 }

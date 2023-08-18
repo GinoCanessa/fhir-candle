@@ -14,31 +14,33 @@ public static partial class Common
     /// <summary>Values that represent store interactions.</summary>
     public enum StoreInteractionCodes
     {
+        CompartmentOperation,
         CompartmentSearch,
         CompartmentTypeSearch,
-        CompartmentOperation,
 
-        InstanceRead,
-        InstanceVersionRead,
-        InstanceUpdate,
-        InstancePatch,
         InstanceDelete,
-        InstanceHistory,
+        InstanceDeleteHistory,
+        InstanceDeleteVersion,
         InstanceOperation,
+        InstancePatch,
+        InstanceRead,
+        InstanceReadHistory,
+        InstanceReadVersion,
+        InstanceUpdate,
 
         TypeCreate,
-        TypeSearch,
+        TypeCreateConditional,
         TypeDelete,
+        TypeDeleteConditional,
         TypeHistory,
         TypeOperation,
+        TypeSearch,
 
         SystemCapabilities,
         SystemBundle,
-        SystemDelete,
+        SystemDeleteConditional,
         SystemHistory,
-        SystemSearch,
         SystemOperation,
+        SystemSearch,
     }
-
-
 }

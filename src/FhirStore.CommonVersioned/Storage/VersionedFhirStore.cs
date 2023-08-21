@@ -23,6 +23,7 @@ using System.Text.Json;
 using System.Xml;
 using static FhirCandle.Search.SearchDefinitions;
 using FhirCandle.Serialization;
+using Hl7.Fhir.Language.Debugging;
 
 namespace FhirCandle.Storage;
 
@@ -747,18 +748,62 @@ public partial class VersionedFhirStore : IFhirStore
             return sc;
         }
 
-        if (string.IsNullOrEmpty(resourceType))
-        {
-            resourceType = r.TypeName;
-        }
+        sc = DoInstanceCreate(
+            resourceType,
+            r,
+            ifNoneExist,
+            allowExistingId,
+            out Resource? resource,
+            out OperationOutcome outcome,
+            out eTag,
+            out lastModified,
+            out location);
 
-        if (r.TypeName != resourceType)
+        if (resource == null)
         {
             serializedResource = string.Empty;
+        }
+        else
+        {
+            serializedResource = Utils.SerializeFhir(resource, destFormat, pretty);
+        }
 
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {r.TypeName} does not match request: {resourceType}");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
+        return sc;
+    }
+
+    /// <summary>Executes the instance create operation.</summary>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="content">        The content.</param>
+    /// <param name="ifNoneExist">    if none exist.</param>
+    /// <param name="allowExistingId">True to allow an existing id.</param>
+    /// <param name="stored">         [out] The stored.</param>
+    /// <param name="outcome">        [out] The outcome.</param>
+    /// <param name="eTag">           [out] The tag.</param>
+    /// <param name="lastModified">   [out] The last modified.</param>
+    /// <param name="location">       [out] The location.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    private HttpStatusCode DoInstanceCreate(
+        string resourceType,
+        Resource content,
+        string ifNoneExist,
+        bool allowExistingId,
+        out Resource? stored,
+        out OperationOutcome outcome,
+        out string eTag,
+        out string lastModified,
+        out string location)
+    {
+        if (string.IsNullOrEmpty(resourceType))
+        {
+            resourceType = content.TypeName;
+        }
+
+        if (content.TypeName != resourceType)
+        {
+            stored = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {content.TypeName} does not match request: {resourceType}");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
@@ -767,26 +812,19 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (!_store.ContainsKey(resourceType))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            stored = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
             return HttpStatusCode.UnprocessableEntity;
         }
 
-        Resource? stored = _store[resourceType].InstanceCreate(r, allowExistingId);
+        stored = _store[resourceType].InstanceCreate(content, allowExistingId);
 
         if (stored == null)
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to create resource");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to create resource");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
@@ -795,17 +833,14 @@ public partial class VersionedFhirStore : IFhirStore
 
         if ((_loadState != LoadStateCodes.None) && _hasProtected)
         {
-            _protectedResources.Add(resourceType + "/" + r.Id);
+            _protectedResources.Add(resourceType + "/" + stored.Id);
         }
         else if (_maxResourceCount != 0)
         {
-            _resourceQ.Enqueue(resourceType + "/" + r.Id + "/" + stored.Meta.VersionId);
+            _resourceQ.Enqueue(resourceType + "/" + stored.Id + "/" + stored.Meta.VersionId);
         }
 
-        serializedResource = Utils.SerializeFhir(stored, destFormat, pretty, string.Empty);
-        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
-        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
-
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
         eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
         lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
@@ -993,13 +1028,57 @@ public partial class VersionedFhirStore : IFhirStore
         out string eTag,
         out string lastModified)
     {
-        if (string.IsNullOrEmpty(resourceType))
+        HttpStatusCode sc = DoInstanceRead(
+            resourceType,
+            id,
+            ifMatch,
+            ifModifiedSince,
+            ifNoneMatch,
+            out Resource? resource,
+            out OperationOutcome outcome,
+            out eTag,
+            out lastModified);
+
+        if (resource == null)
         {
             serializedResource = string.Empty;
+        }
+        else
+        {
+            serializedResource = Utils.SerializeFhir(resource, destFormat, pretty);
+        }
 
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Resource type is required");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
+        return sc;
+    }
+
+    /// <summary>Executes the instance read operation.</summary>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="id">             [out] The identifier.</param>
+    /// <param name="ifMatch">        A match specifying if.</param>
+    /// <param name="ifModifiedSince">if modified since.</param>
+    /// <param name="ifNoneMatch">    A match specifying if none.</param>
+    /// <param name="resource">       [out] The resource.</param>
+    /// <param name="outcome">        [out] The outcome.</param>
+    /// <param name="eTag">           [out] The tag.</param>
+    /// <param name="lastModified">   [out] The last modified.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    private HttpStatusCode DoInstanceRead(
+        string resourceType,
+        string id,
+        string ifMatch,
+        string ifModifiedSince,
+        string ifNoneMatch,
+        out Resource? resource,
+        out OperationOutcome outcome,
+        out string eTag,
+        out string lastModified)
+    {
+        if (string.IsNullOrEmpty(resourceType))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Resource type is required");
             eTag = string.Empty;
             lastModified = string.Empty;
             return HttpStatusCode.BadRequest;
@@ -1007,11 +1086,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (!_store.ContainsKey(resourceType))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
             eTag = string.Empty;
             lastModified = string.Empty;
             return HttpStatusCode.BadRequest;
@@ -1019,36 +1095,26 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (string.IsNullOrEmpty(id))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "ID required for instance-level read.");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "ID required for instance level read.");
             eTag = string.Empty;
             lastModified = string.Empty;
             return HttpStatusCode.UnsupportedMediaType;
         }
 
-        Resource? stored = _store[resourceType].InstanceRead(id);
+        resource = _store[resourceType].InstanceRead(id);
 
-        if (stored == null)
+        if (resource == null)
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource: {resourceType}/{id} not found");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource: {resourceType}/{id} not found");
             eTag = string.Empty;
             lastModified = string.Empty;
             return HttpStatusCode.NotFound;
         }
 
-        serializedResource = Utils.SerializeFhir(stored, destFormat, pretty, summaryFlag);
-        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {stored.TypeName}/{stored.Id}");
-        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
-
-        eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
-        lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {resource.TypeName}/{resource.Id}");
+        eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
+        lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         return HttpStatusCode.OK;
     }
 
@@ -1101,13 +1167,63 @@ public partial class VersionedFhirStore : IFhirStore
             return sc;
         }
 
-        if (r.TypeName != resourceType)
+        sc = DoInstanceUpdate(
+            resourceType,
+            id,
+            r,
+            ifMatch,
+            ifNoneMatch,
+            allowCreate,
+            out Resource? resource,
+            out OperationOutcome outcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        if (resource == null)
         {
             serializedResource = string.Empty;
+        }
+        else
+        {
+            serializedResource = Utils.SerializeFhir(resource, destFormat, pretty);
+        }
 
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {r.TypeName} does not match request: {resourceType}");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
+        serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
+        return sc;
+    }
+
+    /// <summary>Executes the instance update operation.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="content">     The content.</param>
+    /// <param name="ifMatch">     A match specifying if.</param>
+    /// <param name="ifNoneMatch"> A match specifying if none.</param>
+    /// <param name="allowCreate"> If the operation should allow a create as an update.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <param name="outcome">     [out] The outcome.</param>
+    /// <param name="eTag">        [out] The tag.</param>
+    /// <param name="lastModified">[out] The last modified.</param>
+    /// <param name="location">    [out] The location.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    private HttpStatusCode DoInstanceUpdate(
+        string resourceType,
+        string id,
+        Resource content,
+        string ifMatch,
+        string ifNoneMatch,
+        bool allowCreate,
+        out Resource? resource,
+        out OperationOutcome outcome,
+        out string eTag,
+        out string lastModified,
+        out string location)
+    {
+        if (content.TypeName != resourceType)
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {content.TypeName} does not match request: {resourceType}");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
@@ -1116,39 +1232,29 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (!_store.ContainsKey(resourceType))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Resource type: {resourceType} is not supported");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
             return HttpStatusCode.UnprocessableEntity;
         }
 
-        Resource? updated = _store[resourceType].InstanceUpdate(r, allowCreate, _protectedResources);
+        resource = _store[resourceType].InstanceUpdate(content, allowCreate, _protectedResources);
 
-        if (updated == null)
+        if (resource == null)
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to update resource");
-            serializedOutcome = Utils.SerializeFhir(oo, destFormat, pretty);
-
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to update resource");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
             return HttpStatusCode.InternalServerError;
         }
 
-        serializedResource = Utils.SerializeFhir(updated, destFormat, pretty, string.Empty);
-        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Updated {updated.TypeName}/{updated.Id}");
-        serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
-
-        eTag = string.IsNullOrEmpty(updated.Meta?.VersionId) ? string.Empty : $"W/\"{updated.Meta.VersionId}\"";
-        lastModified = updated.Meta?.LastUpdated == null ? string.Empty : updated.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
-        location = $"{_config.BaseUrl}/{resourceType}/{updated.Id}";
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Updated {resource.TypeName}/{resource.Id}");
+        eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
+        lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        location = $"{_config.BaseUrl}/{resourceType}/{resource.Id}";
         return HttpStatusCode.OK;
     }
 
@@ -2801,9 +2907,70 @@ public partial class VersionedFhirStore : IFhirStore
                     }
 
                 case Common.StoreInteractionCodes.InstanceRead:
-                    break;
+                    {
+                        sc = DoInstanceRead(
+                            requestResourceType,
+                            requestId,
+                            entry.Request.IfMatch,
+                            entry.Request.IfModifiedSince?.ToFhirDateTime() ?? string.Empty,
+                            entry.Request.IfNoneMatch,
+                            out resource,
+                            out outcome,
+                            out string eTag,
+                            out string lastModified);
+
+                        response.Entry.Add(new Bundle.EntryComponent()
+                        {
+                            FullUrl = entry.FullUrl,
+                            Resource = resource,
+                            Response = new Bundle.ResponseComponent()
+                            {
+                                Status = sc.ToString(),
+                                Outcome = outcome,
+                                Etag = eTag,
+                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
+                                    ? dto
+                                    : null,
+                            },
+                        });
+
+                        continue;
+                    }
+
                 case Common.StoreInteractionCodes.InstanceUpdate:
-                    break;
+                    {
+                        sc = DoInstanceUpdate(
+                            requestResourceType,
+                            requestId,
+                            entry.Resource,
+                            entry.Request.IfMatch,
+                            entry.Request.IfNoneMatch,
+                            true,
+                            out resource,
+                            out outcome,
+                            out string eTag,
+                            out string lastModified,
+                            out string location);
+
+                        response.Entry.Add(new Bundle.EntryComponent()
+                        {
+                            FullUrl = entry.FullUrl,
+                            Resource = resource,
+                            Response = new Bundle.ResponseComponent()
+                            {
+                                Status = sc.ToString(),
+                                Outcome = outcome,
+                                Etag = eTag,
+                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
+                                    ? dto
+                                    : null,
+                                Location = location,
+                            },
+                        });
+
+                        continue;
+                    }
+
                 case Common.StoreInteractionCodes.TypeCreate:
                     break;
                 case Common.StoreInteractionCodes.TypeCreateConditional:
@@ -2843,8 +3010,8 @@ public partial class VersionedFhirStore : IFhirStore
                             FullUrl = entry.FullUrl,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = HttpStatusCode.BadRequest.ToString(),
-                                Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Unsupported interaction: {interaction}"),
+                                Status = HttpStatusCode.InternalServerError.ToString(),
+                                Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Unsupported interaction: {interaction}"),
                             },
                         });
 

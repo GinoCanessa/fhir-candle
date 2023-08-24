@@ -56,12 +56,15 @@ public static class Utils
     /// <summary>The XML serializer.</summary>
     private static FhirXmlPocoSerializer _xmlSerializer = new();
 
-
     /// <summary>Builds outcome for request.</summary>
-    /// <param name="sc">     The screen.</param>
-    /// <param name="message">(Optional) The message.</param>
+    /// <param name="sc">       The screen.</param>
+    /// <param name="message">  (Optional) The message.</param>
+    /// <param name="issueType">(Optional) Type of the issue.</param>
     /// <returns>An OperationOutcome.</returns>
-    public static OperationOutcome BuildOutcomeForRequest(HttpStatusCode sc, string message = "")
+    public static OperationOutcome BuildOutcomeForRequest(
+        HttpStatusCode sc, 
+        string message = "",
+        OperationOutcome.IssueType? issueType = null)
     {
         if (sc.IsSuccessful())
         {
@@ -73,9 +76,28 @@ public static class Utils
                     new OperationOutcome.IssueComponent()
                     {
                         Severity = OperationOutcome.IssueSeverity.Information,
-                        Code = OperationOutcome.IssueType.Unknown,
+                        Code = issueType ?? OperationOutcome.IssueType.Success,
                         Diagnostics = string.IsNullOrEmpty(message)
                             ? "Request processed successfully"
+                            : message,
+                    },
+                },
+            };
+        }
+
+        if (sc == HttpStatusCode.NotFound)
+        {
+            return new OperationOutcome()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Issue = new List<OperationOutcome.IssueComponent>()
+                {
+                    new OperationOutcome.IssueComponent()
+                    {
+                        Severity = OperationOutcome.IssueSeverity.Error,
+                        Code = issueType ?? OperationOutcome.IssueType.NotFound,
+                        Diagnostics = string.IsNullOrEmpty(message)
+                            ? $"Not found: {sc.ToString()}"
                             : message,
                     },
                 },
@@ -90,7 +112,7 @@ public static class Utils
                 new OperationOutcome.IssueComponent()
                 {
                     Severity = OperationOutcome.IssueSeverity.Error,
-                    Code = OperationOutcome.IssueType.Unknown,
+                    Code = issueType ?? OperationOutcome.IssueType.Exception,
                     Diagnostics = string.IsNullOrEmpty(message)
                         ? $"Request failed with status code {sc.ToString()}"
                         : message,
@@ -159,14 +181,14 @@ public static class Utils
                     {
                         resource = null;
                         exMessage = string.Empty;
-                        return HttpStatusCode.BadRequest;
+                        return HttpStatusCode.UnprocessableEntity;
                     }
                 }
                 catch (Exception ex)
                 {
                     resource = null;
                     exMessage = ex.Message;
-                    return HttpStatusCode.BadRequest;
+                    return HttpStatusCode.UnprocessableEntity;
                 }
 
             case "xml":
@@ -186,18 +208,43 @@ public static class Utils
                     {
                         resource = null;
                         exMessage = string.Empty;
-                        return HttpStatusCode.BadRequest;
+                        return HttpStatusCode.UnprocessableEntity;
                     }
                 }
                 catch (Exception ex)
                 {
                     resource = null;
                     exMessage = ex.Message;
-                    return HttpStatusCode.BadRequest;
+                    return HttpStatusCode.UnprocessableEntity;
                 }
 
             default:
                 {
+                    // try and see if this has JSON contents, e.g., text/plain but has FHIR JSON
+                    HttpStatusCode sc = TryDeserializeFhir(
+                        content,
+                        "application/fhir+json",
+                        out resource,
+                        out exMessage);
+
+                    if (sc == HttpStatusCode.OK)
+                    {
+                        return sc;
+                    }
+
+                    // next, try and see if this has XML contents, e.g., text/plain but has FHIR XML
+                    sc = TryDeserializeFhir(
+                        content,
+                        "application/fhir+xml",
+                        out resource,
+                        out exMessage);
+
+                    if (sc == HttpStatusCode.OK)
+                    {
+                        return sc;
+                    }
+
+                    // still here means we don't know what this is
                     resource = null;
                     exMessage = string.Empty;
                     return HttpStatusCode.UnsupportedMediaType;

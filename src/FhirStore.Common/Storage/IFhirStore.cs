@@ -174,6 +174,53 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedResource,
         out string serializedOutcome);
 
+    /// <summary>System delete.</summary>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    public HttpStatusCode SystemDelete(
+        string queryString,
+        string destFormat,
+        bool pretty,
+        out string serializedResource,
+        out string serializedOutcome);
+
+    /// <summary>Type delete (based on search).</summary>
+    /// <param name="resourceType">      Type of the resource.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="serializedResource">[out] The serialized resource.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    public HttpStatusCode TypeDelete(
+        string resourceType,
+        string queryString,
+        string destFormat,
+        bool pretty,
+        out string serializedResource,
+        out string serializedOutcome);
+
+    /// <summary>System search.</summary>
+    /// <param name="queryString">      The query string.</param>
+    /// <param name="destFormat">       Destination format.</param>
+    /// <param name="summaryFlag">      The summary flag.</param>
+    /// <param name="pretty">           If the output should be 'pretty' formatted.</param>
+    /// <param name="serializedBundle"> [out] The serialized bundle.</param>
+    /// <param name="serializedOutcome">[out] The serialized outcome.</param>
+    /// <returns>A HttpStatusCode.</returns>
+    HttpStatusCode SystemSearch(
+        string queryString,
+        string destFormat,
+        string summaryFlag,
+        bool pretty,
+        out string serializedBundle,
+        out string serializedOutcome);
+
+
     /// <summary>Type search.</summary>
     /// <param name="resourceType">     Type of the resource.</param>
     /// <param name="queryString">      The query string.</param>

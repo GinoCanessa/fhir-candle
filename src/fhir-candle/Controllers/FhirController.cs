@@ -4,7 +4,9 @@
 // </copyright>
 
 using System.Net;
+using Fhir.Metrics;
 using FhirCandle.Storage;
+using Hl7.Fhir.Rest;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
@@ -170,10 +172,7 @@ public class FhirController : ControllerBase
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(resource))
-        {
-            await Response.WriteAsync(resource);
-        }
+        await AddBody(Response, null, resource, outcome);
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets type operation.</summary>
@@ -183,6 +182,7 @@ public class FhirController : ControllerBase
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer">      The prefer.</param>
     /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/{resourceName}/${opName}")]
     public async Task GetTypeOperation(
@@ -191,7 +191,8 @@ public class FhirController : ControllerBase
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
-        [FromQuery(Name = "_pretty")] string? pretty)
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -216,14 +217,7 @@ public class FhirController : ControllerBase
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(resource))
-        {
-            await Response.WriteAsync(resource);
-        }
-        else if (!string.IsNullOrEmpty(outcome))
-        {
-            await Response.WriteAsync(outcome);
-        }
+        await AddBody(Response, prefer, resource, outcome);
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets resource instance.</summary>
@@ -279,14 +273,7 @@ public class FhirController : ControllerBase
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(resource))
-        {
-            await Response.WriteAsync(resource);
-        }
-        else if (!string.IsNullOrEmpty(outcome))
-        {
-            await Response.WriteAsync(outcome);
-        }
+        await AddBody(Response, null, resource, outcome);
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets instance operation.</summary>
@@ -306,7 +293,8 @@ public class FhirController : ControllerBase
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
-        [FromQuery(Name = "_pretty")] string? pretty)
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -336,14 +324,7 @@ public class FhirController : ControllerBase
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(resource))
-        {
-            await Response.WriteAsync(resource);
-        }
-        else if (!string.IsNullOrEmpty(outcome))
-        {
-            await Response.WriteAsync(outcome);
-        }
+        await AddBody(Response, prefer, resource, outcome);
     }
 
     /// <summary>
@@ -357,8 +338,8 @@ public class FhirController : ControllerBase
     /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/{resourceName}/{id}/{opName}")]
-    [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    [HttpPost, Route("{store}/{resourceName}/{id}/${opName}")]
+    //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostInstanceOperation(
         [FromRoute] string store,
         [FromRoute] string resourceName,
@@ -366,7 +347,8 @@ public class FhirController : ControllerBase
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
-        [FromQuery(Name = "_pretty")] string? pretty)
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -380,12 +362,6 @@ public class FhirController : ControllerBase
         HttpStatusCode sc;
         string resource, outcome;
 
-        if (opName[0] != '$')
-        {
-            Response.StatusCode = 404;
-            return;
-        }
-
         try
         {
             // read the post body to process
@@ -396,11 +372,11 @@ public class FhirController : ControllerBase
                 // operation
                 sc = _fhirStoreManager[store].InstanceOperation(
                     resourceName,
-                    opName,
+                    "$" + opName,
                     id,
                     Request.QueryString.ToString(),
                     content,
-                    format,
+                    Request.ContentType ?? string.Empty,
                     format,
                     pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out resource,
@@ -422,33 +398,111 @@ public class FhirController : ControllerBase
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(resource))
-        {
-            await Response.WriteAsync(resource);
-        }
-        else if (!string.IsNullOrEmpty(outcome))
-        {
-            await Response.WriteAsync(outcome);
-        }
+        await AddBody(Response, prefer, resource, outcome);
     }
 
-    /// <summary>(An Action that handles HTTP POST requests) posts a type operation.</summary>
+
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts a resource type search.
+    /// </summary>
     /// <param name="store">       The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
-    /// <param name="opName">      Name of the operation.</param>
     /// <param name="format">      Describes the format to use.</param>
-    /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
+    /// <param name="summary">     The summary.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/{resourceName}/{opName}")]
-    [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    [HttpPost, Route("{store}/{resourceName}/_search")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task PostResourceTypeSearch(
+        [FromRoute] string store,
+        [FromRoute] string resourceName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if ((!_fhirStoreManager.ContainsKey(store)) ||
+            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, Request);
+
+        // sanity check
+        if (Request == null)
+        {
+            System.Console.WriteLine("PostResourceTypeSearch <<< cannot process a POST search without a Request!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+                string queryString = Request.QueryString.ToString();
+
+                if (!string.IsNullOrEmpty(queryString))
+                {
+                    if (string.IsNullOrEmpty(content))
+                    {
+                        content = queryString;
+                    }
+                    else
+                    {
+                        content += $"&{queryString}";
+                    }
+                }
+
+                HttpStatusCode sc = _fhirStoreManager[store].TypeSearch(
+                    resourceName,
+                    content,
+                    format,
+                    summary ?? string.Empty,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    out string resource,
+                    out string outcome);
+
+                Response.ContentType = format;
+                Response.StatusCode = (int)sc;
+
+                await AddBody(Response, null, resource, outcome);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"PostResourceTypeSearch <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+    }
+    
+    /// <summary>(An Action that handles HTTP POST requests) posts a type operation.</summary>
+         /// <param name="store">       The store.</param>
+         /// <param name="resourceName">Name of the resource.</param>
+         /// <param name="opName">      Name of the operation.</param>
+         /// <param name="format">      Describes the format to use.</param>
+         /// <param name="summary">     The summary.</param>
+         /// <param name="pretty">      The pretty.</param>
+         /// <returns>An asynchronous result.</returns>
+    [HttpPost, Route("{store}/{resourceName}/${opName}")]
+    //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostTypeOperation(
         [FromRoute] string store,
         [FromRoute] string resourceName,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
-        [FromQuery(Name = "_pretty")] string? pretty)
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -462,12 +516,6 @@ public class FhirController : ControllerBase
         HttpStatusCode sc;
         string resource, outcome;
 
-        if (opName[0] != '$')
-        {
-            Response.StatusCode = 404;
-            return;
-        }
-
         try
         {
             // read the post body to process
@@ -478,10 +526,10 @@ public class FhirController : ControllerBase
                 // operation
                 sc = _fhirStoreManager[store].TypeOperation(
                     resourceName,
-                    opName,
+                    "$" + opName,
                     Request.QueryString.ToString(),
                     content,
-                    format,
+                    Request.ContentType ?? string.Empty,
                     format,
                     pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out resource,
@@ -503,13 +551,83 @@ public class FhirController : ControllerBase
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(resource))
+        await AddBody(Response, prefer, resource, outcome);
+    }
+
+    /// <summary>(An Action that handles HTTP POST requests) posts a system search.</summary>
+    /// <param name="store">  The store.</param>
+    /// <param name="format"> Describes the format to use.</param>
+    /// <param name="pretty"> The pretty.</param>
+    /// <param name="summary">The summary.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpPost, Route("{store}/_search")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task PostSystemSearch(
+        [FromRoute] string store,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if (!_fhirStoreManager.ContainsKey(store))
         {
-            await Response.WriteAsync(resource);
+            Response.StatusCode = 404;
+            return;
         }
-        else if (!string.IsNullOrEmpty(outcome))
+
+        format = GetMimeType(format, Request);
+
+        // sanity check
+        if (Request == null)
         {
-            await Response.WriteAsync(outcome);
+            System.Console.WriteLine("PostSystemSearch <<< cannot process a POST search without a Request!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+                string queryString = Request.QueryString.ToString();
+
+                if (!string.IsNullOrEmpty(queryString))
+                {
+                    if (string.IsNullOrEmpty(content))
+                    {
+                        content = queryString;
+                    }
+                    else
+                    {
+                        content += $"&{queryString}";
+                    }
+                }
+
+                HttpStatusCode sc = _fhirStoreManager[store].SystemSearch(
+                    content,
+                    format,
+                    summary ?? string.Empty,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    out string resource,
+                    out string outcome);
+
+                Response.ContentType = format;
+                Response.StatusCode = (int)sc;
+
+                await AddBody(Response, null, resource, outcome);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"PostSystemSearch <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
         }
     }
 
@@ -521,7 +639,7 @@ public class FhirController : ControllerBase
     /// <param name="prefer">The prefer.</param>
     /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/${opName}")]
-    [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostSystemOperation(
         [FromRoute] string store,
         [FromRoute] string opName,
@@ -538,9 +656,9 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, HttpContext.Request);
 
         // sanity check
-        if ((Request == null) || (Request.Body == null))
+        if (Request == null)
         {
-            System.Console.WriteLine("PostResourceType <<< cannot process a POST without data!");
+            System.Console.WriteLine("PostResourceType <<< cannot process an operation POST without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -558,7 +676,7 @@ public class FhirController : ControllerBase
                         "$" + opName,
                         Request.QueryString.ToString(),
                         content,
-                        format,
+                        Request.ContentType ?? string.Empty,
                         format,
                         pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                         out string resource,
@@ -626,48 +744,33 @@ public class FhirController : ControllerBase
                 HttpStatusCode sc;
                 string resource, outcome;
 
-                if (resourceName[0] == '$')
+                sc = _fhirStoreManager[store].InstanceCreate(
+                    resourceName,
+                    content,
+                    Request.ContentType ?? string.Empty,
+                    format,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    string.Empty,
+                    true,
+                    out resource,
+                    out outcome,
+                    out string eTag,
+                    out string lastModified,
+                    out string location);
+
+                if (!string.IsNullOrEmpty(eTag))
                 {
-                    sc = _fhirStoreManager[store].SystemOperation(
-                        resourceName,
-                        Request.QueryString.ToString(),
-                        string.Empty,
-                        string.Empty,
-                        format,
-                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                        out resource,
-                        out outcome);
+                    Response.Headers.Add(HeaderNames.ETag, eTag);
                 }
-                else
+
+                if (!string.IsNullOrEmpty(lastModified))
                 {
-                    sc = _fhirStoreManager[store].InstanceCreate(
-                        resourceName,
-                        content,
-                        Request.ContentType ?? string.Empty,
-                        format,
-                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                        string.Empty,
-                        true,
-                        out resource,
-                        out outcome,
-                        out string eTag,
-                        out string lastModified,
-                        out string location);
+                    Response.Headers.Add(HeaderNames.LastModified, lastModified);
+                }
 
-                    if (!string.IsNullOrEmpty(eTag))
-                    {
-                        Response.Headers.Add(HeaderNames.ETag, eTag);
-                    }
-
-                    if (!string.IsNullOrEmpty(lastModified))
-                    {
-                        Response.Headers.Add(HeaderNames.LastModified, lastModified);
-                    }
-
-                    if (!string.IsNullOrEmpty(location))
-                    {
-                        Response.Headers.Add(HeaderNames.Location, location);
-                    }
+                if (!string.IsNullOrEmpty(location))
+                {
+                    Response.Headers.Add(HeaderNames.Location, location);
                 }
 
                 Response.ContentType = format;
@@ -854,35 +957,33 @@ public class FhirController : ControllerBase
             format,
             summary ?? string.Empty,
             pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-            out string results,
+            out string resource,
             out string outcome);
 
         Response.ContentType = format;
         Response.StatusCode = (int)sc;
 
-        if (!string.IsNullOrEmpty(results))
-        {
-            await Response.WriteAsync(results);
-        }
+        await AddBody(Response, null, resource, outcome);
     }
 
     /// <summary>
-    /// (An Action that handles HTTP POST requests) posts a resource type search.
+    /// (An Action that handles HTTP DELETE requests) deletes a resource based on type search.
     /// </summary>
     /// <param name="store">       The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="summary">     The summary.</param>
+    /// <param name="prefer">      The prefer.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/{resourceName}/_search")]
-    [Consumes("application/x-www-form-urlencoded")]
-    public async Task PostResourceTypeSearch(
+    [HttpDelete, Route("{store}/{resourceName}")]
+    public async Task DeleteResourceConditional(
         [FromRoute] string store,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromHeader(Name = "Prefer")] string? prefer)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -894,41 +995,33 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, Request);
 
         // sanity check
-        if ((Request == null) || (Request.Body == null))
+        if (Request == null)
         {
-            System.Console.WriteLine("PostResourceTypeSearch <<< cannot process a PUT without data!");
+            System.Console.WriteLine("DeleteResourceConditional <<< cannot process a conditional delete without a Request!");
             Response.StatusCode = 400;
             return;
         }
 
         try
         {
-            // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
-            {
-                string content = await reader.ReadToEndAsync();
+            string queryString = Request.QueryString.ToString();
 
-                HttpStatusCode sc = _fhirStoreManager[store].TypeSearch(
-                    resourceName,
-                    content,
-                    format,
-                    summary ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    out string results,
-                    out string outcome);
+            HttpStatusCode sc = _fhirStoreManager[store].TypeDelete(
+                resourceName,
+                queryString,
+                format,
+                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                out string resource,
+                out string outcome);
 
-                Response.ContentType = format;
-                Response.StatusCode = (int)sc;
+            Response.ContentType = format;
+            Response.StatusCode = (int)sc;
 
-                if (!string.IsNullOrEmpty(results))
-                {
-                    await Response.WriteAsync(results);
-                }
-            }
+            await AddBody(Response, prefer, resource, outcome);
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostResourceTypeSearch <<< caught: {ex.Message}");
+            System.Console.WriteLine($"DeleteResourceConditional <<< caught: {ex.Message}");
             if (ex.InnerException != null)
             {
                 System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
@@ -938,7 +1031,6 @@ public class FhirController : ControllerBase
             return;
         }
     }
-
 
     /// <summary>(An Action that handles HTTP POST requests) posts to the server root.</summary>
     /// <param name="store">       The store.</param>
@@ -951,13 +1043,11 @@ public class FhirController : ControllerBase
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostSystemBundle(
         [FromRoute] string store,
-        [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
             Response.StatusCode = 404;
             return;
@@ -968,7 +1058,7 @@ public class FhirController : ControllerBase
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
-            System.Console.WriteLine("PostSystemBundle <<< cannot process a POST without data!");
+            System.Console.WriteLine("PostSystemBundle <<< cannot process a bundle POST without data!");
             Response.StatusCode = 400;
             return;
         }
@@ -980,52 +1070,13 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
-                HttpStatusCode sc;
-                string resource, outcome;
-
-                if (resourceName[0] == '$')
-                {
-                    sc = _fhirStoreManager[store].SystemOperation(
-                        resourceName,
-                        Request.QueryString.ToString(),
-                        string.Empty,
-                        string.Empty,
-                        format,
-                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                        out resource,
-                        out outcome);
-                }
-                else
-                {
-                    sc = _fhirStoreManager[store].InstanceCreate(
-                        resourceName,
-                        content,
-                        Request.ContentType ?? string.Empty,
-                        format,
-                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                        string.Empty,
-                        true,
-                        out resource,
-                        out outcome,
-                        out string eTag,
-                        out string lastModified,
-                        out string location);
-
-                    if (!string.IsNullOrEmpty(eTag))
-                    {
-                        Response.Headers.Add(HeaderNames.ETag, eTag);
-                    }
-
-                    if (!string.IsNullOrEmpty(lastModified))
-                    {
-                        Response.Headers.Add(HeaderNames.LastModified, lastModified);
-                    }
-
-                    if (!string.IsNullOrEmpty(location))
-                    {
-                        Response.Headers.Add(HeaderNames.Location, location);
-                    }
-                }
+                HttpStatusCode sc = _fhirStoreManager[store].ProcessBundle(
+                    content,
+                    Request.ContentType ?? string.Empty,
+                    format,
+                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    out string resource,
+                    out string outcome);
 
                 Response.ContentType = format;
                 Response.StatusCode = (int)sc;
@@ -1036,6 +1087,103 @@ public class FhirController : ControllerBase
         catch (Exception ex)
         {
             System.Console.WriteLine($"PostSystemBundle <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+    }
+
+    /// <summary>(An Action that handles HTTP GET requests) gets system search.</summary>
+    /// <param name="store">  The store.</param>
+    /// <param name="format"> Describes the format to use.</param>
+    /// <param name="pretty"> The pretty.</param>
+    /// <param name="summary">The summary.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpGet, Route("{store}")]
+    public async Task GetSystemSearch(
+        [FromRoute] string store,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromQuery(Name = "_summary")] string? summary)
+    {
+        if (!_fhirStoreManager.ContainsKey(store))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, Request);
+
+        HttpStatusCode sc = _fhirStoreManager[store].SystemSearch(
+            Request.QueryString.ToString(),
+            format,
+            summary ?? string.Empty,
+            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            out string resource,
+            out string outcome);
+
+        Response.ContentType = format;
+        Response.StatusCode = (int)sc;
+
+        await AddBody(Response, null, resource, outcome);
+    }
+
+    /// <summary>
+    /// (An Action that handles HTTP DELETE requests) deletes the system conditional.
+    /// </summary>
+    /// <param name="store">  The store.</param>
+    /// <param name="format"> Describes the format to use.</param>
+    /// <param name="pretty"> The pretty.</param>
+    /// <param name="summary">The summary.</param>
+    /// <param name="prefer"> The prefer.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpDelete, Route("{store}")]
+    public async Task DeleteSystemConditional(
+        [FromRoute] string store,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromHeader(Name = "Prefer")] string? prefer)
+    {
+        if (!_fhirStoreManager.ContainsKey(store))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        format = GetMimeType(format, Request);
+
+        // sanity check
+        if (Request == null)
+        {
+            System.Console.WriteLine("DeleteSystemConditional <<< cannot process a conditional delete without a Request!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            string queryString = Request.QueryString.ToString();
+
+            HttpStatusCode sc = _fhirStoreManager[store].SystemDelete(
+                queryString,
+                format,
+                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                out string resource,
+                out string outcome);
+
+            Response.ContentType = format;
+            Response.StatusCode = (int)sc;
+
+            await AddBody(Response, prefer, resource, outcome);
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"DeleteSystemConditional <<< caught: {ex.Message}");
             if (ex.InnerException != null)
             {
                 System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");

@@ -30,7 +30,6 @@ public static partial class Common
 
         TypeCreate,
         TypeCreateConditional,
-        TypeDelete,
         TypeDeleteConditional,
         TypeHistory,
         TypeOperation,

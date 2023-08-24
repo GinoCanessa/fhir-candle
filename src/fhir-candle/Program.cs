@@ -306,7 +306,6 @@ public static partial class Program
             AfterServerStart(app, config);
             await app.WaitForShutdownAsync(cancellationToken);
 
-
             return 0;
         }
         catch (OperationCanceledException)

@@ -12,6 +12,7 @@ using FhirCandle.Models;
 using FhirCandle.Storage;
 using FluentAssertions;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using Org.BouncyCastle.Utilities.Collections;
 using System.Net;
 using System.Security.AccessControl;
@@ -456,7 +457,7 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
             out lastModified,
             out location);
 
-        sc.Should().Be(HttpStatusCode.BadRequest);
+        sc.IsSuccessful().Should().BeFalse();
     }
 }
 

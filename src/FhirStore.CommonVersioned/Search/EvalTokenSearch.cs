@@ -344,6 +344,58 @@ public static class EvalTokenSearch
         return false;
     }
 
+    /// <summary>Tests token in codeable concept.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <returns>True if the test passes, false if the test fails.</returns>
+    public static bool TestTokenInCodeableConcept(ITypedElement valueNode, ParsedSearchParameter sp)
+    {
+        if ((valueNode == null) ||
+            (sp.ValueFhirCodes == null))
+        {
+            return false;
+        }
+
+        switch (valueNode.InstanceType)
+        {
+            case "CodeableConcept":
+                {
+                    Hl7.Fhir.Model.CodeableConcept cc = valueNode.ToPoco<Hl7.Fhir.Model.CodeableConcept>();
+
+                    if (cc.Coding != null)
+                    {
+                        foreach (Hl7.Fhir.Model.Coding c in cc.Coding)
+                        {
+                            for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
+                            {
+                                if (sp.IgnoredValueFlags[i])
+                                {
+                                    continue;
+                                }
+
+                                if (CompareCodeWithSystem(
+                                        c.System ?? string.Empty,
+                                        c.Code ?? string.Empty,
+                                        sp.ValueFhirCodes[i].System ?? string.Empty,
+                                        sp.ValueFhirCodes[i].Value))
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+
+
+            default:
+                throw new Exception($"Cannot test token against type: {valueNode.GetType()} as CodeableConcept");
+        }
+
+        return false;
+    }
+
     /// <summary>Tests token not against coding.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
     /// <param name="valueNode">The value node.</param>

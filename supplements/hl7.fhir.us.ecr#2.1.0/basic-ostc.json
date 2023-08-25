@@ -1,0 +1,110 @@
+{
+  "resourceType" : "Basic",
+  "id" : "basic-subscription-topic-ostc",
+  "extension" : [{
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
+    "valueUri" : "http://ginoc.io/FHIR/SubscriptionTopic/converted/hl7-fhir-us-ecr-2-1-0/subscription-ostc"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.version",
+    "valueString" : "2.0.1-v01"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.name",
+    "valueString" : "Example subscription for Organism_Substance trigger codes"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.title",
+    "valueString" : "subscription-topic-ostc"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
+    "valueCode" : "draft"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",
+    "valueDateTime" : "2023-08-25"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.description",
+    "valueMarkdown" : "Example subscription for Organism_Substance trigger codes. Review http://hl7.org/fhir/subscription.html and modify status, channel, endpoint, etc. before using."
+  },
+  {
+    "extension" : [{
+      "url" : "description",
+      "valueMarkdown" : "An condition with a desired trigger code has been created or updated"
+    },
+    {
+      "url" : "resource",
+      "valueUri" : "http://hl7.org/fhir/StructureDefinition/Condition"
+    },
+    {
+      "url" : "supportedInteraction",
+      "valueCode" : "create"
+    },
+    {
+      "extension" : [{
+        "url" : "previous",
+        "valueString" : ""
+      },
+      {
+        "url" : "resultForCreate",
+        "valueCode" : "test-passes"
+      },
+      {
+        "url" : "current",
+        "valueString" : "code:in=http://hl7.org/fhir/us/ecr/ValueSet/valueset-ostc-example"
+      },
+      {
+        "url" : "resultForDelete",
+        "valueCode" : "test-fails"
+      },
+      {
+        "url" : "requireBoth",
+        "valueBoolean" : true
+      }],
+      "url" : "queryCriteria"
+    },
+    {
+      "url" : "fhirPathCriteria",
+      "valueString" : "%previous.empty() and %current.code.memberOf('http://hl7.org/fhir/us/ecr/ValueSet/valueset-ostc-example')"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.resourceTrigger"
+  },
+  {
+    "extension" : [{
+      "url" : "description",
+      "valueMarkdown" : "Filter based on the clinical status of a condition."
+    },
+    {
+      "url" : "resource",
+      "valueUri" : "Condition"
+    },
+    {
+      "url" : "filterParameter",
+      "valueString" : "clinical-status"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.canFilterBy"
+  },
+  {
+    "extension" : [{
+      "url" : "resource",
+      "valueUri" : "Condition"
+    },
+    {
+      "url" : "include",
+      "valueString" : "Condition:patient&iterate=Patient.link"
+    },
+    {
+      "url" : "include",
+      "valueString" : "Condition:subject"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.notificationShape"
+  }],
+  "code" : {
+    "coding" : [{
+      "system" : "http://hl7.org/fhir/fhir-types",
+      "code" : "SubscriptionTopic"
+    }]
+  }
+}

@@ -536,6 +536,14 @@ public class SearchTester
                         }
                         break;
 
+                    case "token-in-codeableconcept":
+                        if (EvalTokenSearch.TestTokenInCodeableConcept(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
                     case "uri-canonical":
                     case "uri-uri":
                     case "uri-url":
@@ -647,7 +655,7 @@ public class SearchTester
                     case "token-codetext-url":
                     case "token-codetext-uuid":
                     case "token-codetext-string":
-                    case "token-in-codeableconcept":
+                    //case "token-in-codeableconcept":
                     case "token-in-identifier":
                     case "token-in-contactpoint":
                     case "token-in-canonical":

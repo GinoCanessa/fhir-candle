@@ -20,8 +20,6 @@ using System.Collections;
 using System.Collections.Concurrent;
 using static FhirCandle.Search.SearchDefinitions;
 using FhirCandle.Serialization;
-using System.Security.AccessControl;
-using static Hl7.Fhir.Model.OperationOutcome;
 
 namespace FhirCandle.Storage;
 

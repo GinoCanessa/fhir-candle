@@ -350,6 +350,8 @@ public static class SearchDefinitions
         "uri-url",
         "uri-oid",
         "uri-uuid",
+
+        "token-in-codeableconcept",
     };
 
     /// <summary>(Immutable) The unsupported search combinations.</summary>
@@ -441,7 +443,6 @@ public static class SearchDefinitions
         "token-code-text-url",
         "token-code-text-uuid",
         "token-code-text-string",
-        "token-in-codeableconcept",
         "token-in-identifier",
         "token-in-contactpoint",
         "token-in-canonical",

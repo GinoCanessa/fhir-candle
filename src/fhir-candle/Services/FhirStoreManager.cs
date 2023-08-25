@@ -8,6 +8,7 @@ extern alias candleR4B;
 extern alias candleR5;
 
 using System.Collections;
+using fhir.candle.Models;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 
@@ -24,6 +25,12 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
     /// <summary>The tenants.</summary>
     private Dictionary<string, TenantConfiguration> _tenants;
+
+    /// <summary>The server configuration.</summary>
+    private ServerConfiguration _serverConfig;
+
+    /// <summary>The package service.</summary>
+    private IFhirPackageService _packageService;
 
     /// <summary>Occurs when On Changed.</summary>
     public event EventHandler<EventArgs>? OnChanged;
@@ -99,14 +106,20 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     IEnumerator IEnumerable.GetEnumerator() => (IEnumerator)_storesByController.GetEnumerator();
 
     /// <summary>Initializes a new instance of the <see cref="FhirStoreManager"/> class.</summary>
-    /// <param name="tenants">The tenants.</param>
-    /// <param name="logger"> The logger.</param>
+    /// <param name="tenants">            The tenants.</param>
+    /// <param name="logger">             The logger.</param>
+    /// <param name="serverConfiguration">The server configuration.</param>
+    /// <param name="fhirPackageService"> The FHIR package service.</param>
     public FhirStoreManager(
         Dictionary<string, TenantConfiguration> tenants,
-        ILogger<FhirStoreManager> logger)
+        ILogger<FhirStoreManager> logger,
+        ServerConfiguration serverConfiguration,
+        IFhirPackageService fhirPackageService)
     {
         _tenants = tenants;
         _logger = logger;
+        _serverConfig = serverConfiguration;
+        _packageService = fhirPackageService;
     }
 
     /// <summary>State has changed.</summary>
@@ -155,6 +168,61 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>Loads requested packages.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <returns>An asynchronous result.</returns>
+    public async Task LoadRequestedPackages()
+    {
+        // check for requested packages
+        int waitCount = 0;
+        while (!_packageService.IsReady)
+        {
+            await Task.Delay(1000);
+            waitCount++;
+
+            if (waitCount > 20)
+            {
+                throw new Exception("Package service is not responding!");
+            }
+        }
+
+        foreach (string directive in _serverConfig.PublishedPackages)
+        {
+            if (!_packageService.FindOrDownload(directive, out string dir, out FhirPackageService.FhirSequenceEnum fhirVersion, false, string.Empty))
+            {
+                throw new Exception($"Unable to find or download package: {directive}");
+            }
+
+            // loop over controllers to see where we can add this
+            foreach ((string name, TenantConfiguration config) in _tenants)
+            {
+                switch (config.FhirVersion)
+                {
+                    case TenantConfiguration.SupportedFhirVersions.R4:
+                        if (fhirVersion == FhirPackageService.FhirSequenceEnum.R4)
+                        {
+                            _storesByController[name].LoadPackage(directive, dir);
+                        }
+                        break;
+                    case TenantConfiguration.SupportedFhirVersions.R4B:
+                        if (fhirVersion == FhirPackageService.FhirSequenceEnum.R4B)
+                        {
+                            _storesByController[name].LoadPackage(directive, dir);
+                        }
+                        break;
+                    case TenantConfiguration.SupportedFhirVersions.R5:
+                        if (fhirVersion == FhirPackageService.FhirSequenceEnum.R5)
+                        {
+                            _storesByController[name].LoadPackage(directive, dir);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
     }
 
     /// <summary>Triggered when the application host is performing a graceful shutdown.</summary>

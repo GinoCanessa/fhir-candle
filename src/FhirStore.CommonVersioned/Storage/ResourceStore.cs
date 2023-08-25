@@ -204,7 +204,8 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <returns>The created resource, or null if it could not be created.</returns>
     public Resource? InstanceCreate(Resource source, bool allowExistingId)
     {
-        if (source == null)
+        if ((source == null) ||
+            (source is not T))
         {
             return null;
         }
@@ -214,14 +215,49 @@ public class ResourceStore<T> : IVersionedResourceStore
             source.Id = Guid.NewGuid().ToString();
         }
 
+        ParsedSubscriptionTopic? parsedSubscriptionTopic = null;
+        ParsedSubscription? parsedSubscription = null;
+        
+        // perform any mandatory validation
+        switch (source.TypeName)
+        {
+            case "Basic":
+                {
+                    // fail the request if this fails
+                    if ((source is Hl7.Fhir.Model.Basic b) &&
+                        (b.Code?.Coding?.Any() ?? false) &&
+                        (b.Code.Coding.Any(c =>
+                            c.Code.Equals("SubscriptionTopic", StringComparison.Ordinal) &&
+                            c.System.Equals("http://hl7.org/fhir/fhir-types", StringComparison.Ordinal))))
+                    {
+                        if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                        {
+                            return null;
+                        }
+                    }
+                }
+                break;
+
+            case "SubscriptionTopic":
+                // fail the request if this fails
+                if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                {
+                    return null;
+                }
+                break;
+
+            case "Subscription":
+                // fail the request if this fails
+                if (!_subscriptionConverter.TryParse((Subscription)source, out parsedSubscription))
+                {
+                    return null;
+                }
+                break;
+        }
+
         lock (_lockObject)
         {
             if (_resourceStore.ContainsKey(source.Id))
-            {
-                return null;
-            }
-
-            if (source is not T)
             {
                 return null;
             }
@@ -242,34 +278,20 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         TestCreateAgainstSubscriptions((T)source);
 
+        if (parsedSubscriptionTopic != null)
+        {
+            _ = TryProcessSubscriptionTopic(parsedSubscriptionTopic);
+        }
+
+        if (parsedSubscription != null)
+        {
+            _ = TryProcessSubscription(parsedSubscription!);
+        }
+
         switch (source.TypeName)
         {
-            case "Basic":
-                {
-                    if ((source != null) &&
-                        (source is Hl7.Fhir.Model.Basic b) &&
-                        (b.Code?.Coding?.Any() ?? false) &&
-                        (b.Code.Coding.Any(c =>
-                            c.Code.Equals("SubscriptionTopic", StringComparison.Ordinal) &&
-                            c.System.Equals("http://hl7.org/fhir/fhir-types", StringComparison.Ordinal))))
-                    {
-                        _ = TryProcessSubscriptionTopic(source);
-                    }
-                }
-                break;
-
             case "SearchParameter":
                 SetExecutableSearchParameter((SearchParameter)source);
-                break;
-
-            case "SubscriptionTopic":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscriptionTopic(source);
-                break;
-
-            case "Subscription":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscription(source);
                 break;
         }
 
@@ -283,12 +305,13 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <returns>The updated resource, or null if it could not be performed.</returns>
     public Resource? InstanceUpdate(Resource source, bool allowCreate, HashSet<string> protectedResources)
     {
-        if (string.IsNullOrEmpty(source?.Id))
+        if (string.IsNullOrEmpty(source?.Id) ||
+            (source is not T))
         {
             return null;
         }
 
-        if (source is not T)
+        if (string.IsNullOrEmpty(source?.Id))
         {
             return null;
         }
@@ -301,6 +324,46 @@ public class ResourceStore<T> : IVersionedResourceStore
         if (protectedResources.Any() && protectedResources.Contains(_resourceName + "/" + source.Id))
         {
             return null;
+        }
+
+        ParsedSubscriptionTopic? parsedSubscriptionTopic = null;
+        ParsedSubscription? parsedSubscription = null;
+
+        // perform any mandatory validation
+        switch (source.TypeName)
+        {
+            case "Basic":
+                {
+                    // fail the request if this fails
+                    if ((source is Hl7.Fhir.Model.Basic b) &&
+                        (b.Code?.Coding?.Any() ?? false) &&
+                        (b.Code.Coding.Any(c =>
+                            c.Code.Equals("SubscriptionTopic", StringComparison.Ordinal) &&
+                            c.System.Equals("http://hl7.org/fhir/fhir-types", StringComparison.Ordinal))))
+                    {
+                        if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                        {
+                            return null;
+                        }
+                    }
+                }
+                break;
+
+            case "SubscriptionTopic":
+                // fail the request if this fails
+                if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                {
+                    return null;
+                }
+                break;
+
+            case "Subscription":
+                // fail the request if this fails
+                if (!_subscriptionConverter.TryParse((Subscription)source, out parsedSubscription))
+                {
+                    return null;
+                }
+                break;
         }
 
         T? previous;
@@ -344,20 +407,20 @@ public class ResourceStore<T> : IVersionedResourceStore
             TestUpdateAgainstSubscriptions((T)source, previous);
         }
 
+        if (parsedSubscriptionTopic != null)
+        {
+            _ = TryProcessSubscriptionTopic(parsedSubscriptionTopic);
+        }
+
+        if (parsedSubscription != null)
+        {
+            _ = TryProcessSubscription(parsedSubscription);
+        }
+
         switch (source.TypeName)
         {
             case "SearchParameter":
                 SetExecutableSearchParameter((SearchParameter)source);
-                break;
-
-            case "SubscriptionTopic":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscriptionTopic(source);
-                break;
-
-            case "Subscription":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscription(source);
                 break;
         }
 
@@ -421,20 +484,10 @@ public class ResourceStore<T> : IVersionedResourceStore
     }
 
     /// <summary>Process the subscription topic.</summary>
-    /// <param name="st">The versioned FHIR subscription topic object.</param>
-    private bool TryProcessSubscriptionTopic(object st)
+    /// <param name="topic">The versioned FHIR subscription topic object.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    private bool TryProcessSubscriptionTopic(ParsedSubscriptionTopic topic)
     {
-        if (st == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_topicConverter.TryParse(st, out ParsedSubscriptionTopic topic))
-        {
-            return false;
-        }
-
         // process this at the store level
         return _store.SetExecutableSubscriptionTopic(topic);
     }
@@ -460,20 +513,10 @@ public class ResourceStore<T> : IVersionedResourceStore
     }
 
     /// <summary>Process the subscription described by sub.</summary>
-    /// <param name="sub">The versioned FHIR subscription object.</param>
-    private bool TryProcessSubscription(object sub)
+    /// <param name="subscription">The versioned FHIR subscription object.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    private bool TryProcessSubscription(ParsedSubscription subscription)
     {
-        if (sub == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_subscriptionConverter.TryParse(sub, out ParsedSubscription subscription))
-        {
-            return false;
-        }
-
         // process this at the store level
         return _store.SetExecutableSubscription(subscription);
     }

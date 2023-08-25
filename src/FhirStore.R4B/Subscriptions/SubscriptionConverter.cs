@@ -48,7 +48,8 @@ public class SubscriptionConverter
         if ((subscription == null) ||
             (subscription is not Hl7.Fhir.Model.Subscription sub) ||
             string.IsNullOrEmpty(sub.Id) ||
-            string.IsNullOrEmpty(sub.Criteria))
+            string.IsNullOrEmpty(sub.Criteria) ||
+            (!sub.Criteria.StartsWith("http", StringComparison.Ordinal)))
         {
             common = null!;
             return false;

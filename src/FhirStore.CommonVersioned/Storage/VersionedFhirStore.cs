@@ -332,6 +332,89 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
+    /// <summary>Loads a package.</summary>
+    /// <param name="directive">The directive.</param>
+    /// <param name="directory">Pathname of the directory.</param>
+    public void LoadPackage(string directive, string directory)
+    {
+        _loadReprocess = new();
+        _loadState = LoadStateCodes.Read;
+
+        string serializedResource, serializedOutcome, eTag, lastModified, location;
+        HttpStatusCode sc;
+
+        DirectoryInfo di = new(directory);
+
+        Console.WriteLine($"Store[{_config.ControllerName}] loading {directive}");
+
+        foreach (FileInfo file in di.GetFiles("*.*", SearchOption.AllDirectories))
+        {
+            switch (file.Extension.ToLowerInvariant())
+            {
+                case ".json":
+                    sc = InstanceCreate(
+                        string.Empty,
+                        File.ReadAllText(file.FullName),
+                        "application/fhir+json",
+                        "application/fhir+json",
+                        false,
+                        string.Empty,
+                        true,
+                        out serializedResource,
+                        out serializedOutcome,
+                        out eTag,
+                        out lastModified,
+                        out location);
+                    break;
+
+                case ".xml":
+                    sc = InstanceCreate(
+                        string.Empty,
+                        File.ReadAllText(file.FullName),
+                        "application/fhir+xml",
+                        "application/fhir+xml",
+                        false,
+                        string.Empty,
+                        true,
+                        out serializedResource,
+                        out serializedOutcome,
+                        out eTag,
+                        out lastModified,
+                        out location);
+                    break;
+
+                default:
+                    continue;
+            }
+
+            Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+        }
+
+        _loadState = LoadStateCodes.Process;
+
+        // reload any subscriptions in case they loaded before topics
+        if (_loadReprocess.Any())
+        {
+            foreach ((string key, List<object> list) in _loadReprocess)
+            {
+                switch (key)
+                {
+                    case "Subscription":
+                        {
+                            foreach (object sub in list)
+                            {
+                                _ = SetExecutableSubscription((ParsedSubscription)sub);
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        _loadState = LoadStateCodes.None;
+        _loadReprocess = null;
+    }
+
     /// <summary>Gets the configuration.</summary>
     public TenantConfiguration Config => _config;
 

@@ -3,6 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using static fhir.candle.Services.FhirPackageService;
+
 namespace fhir.candle.Services;
 
 /// <summary>Interface for FHIR package service.</summary>
@@ -10,6 +12,12 @@ public interface IFhirPackageService : IHostedService
 {
     /// <summary>Occurs when On Changed.</summary>
     event EventHandler<EventArgs>? OnChanged;
+
+    /// <summary>Gets a value indicating whether this service is configured.</summary>
+    bool IsConfigured { get; }
+
+    /// <summary>Gets a value indicating whether the package service is ready.</summary>
+    bool IsReady { get; }
 
     /// <summary>Deletes the package described by packageDirective.</summary>
     /// <param name="packageDirective">The package directive.</param>
@@ -24,6 +32,7 @@ public interface IFhirPackageService : IHostedService
     bool FindOrDownload(
         string directive,
         out string directory,
+        out FhirSequenceEnum fhirVersion,
         bool offlineMode,
         string branchName);
 

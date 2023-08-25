@@ -258,6 +258,11 @@ public class FhirNpmPackageDetails
             }
         }
 
+        if (string.IsNullOrEmpty(details.FhirVersion))
+        {
+            details.FhirVersion = details.FhirVersionList.First() ?? details.FhirVersions.First() ?? string.Empty;
+        }
+
         if (details.Dependencies == null)
         {
             details.Dependencies = new();

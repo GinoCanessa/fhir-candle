@@ -83,6 +83,11 @@ public static partial class Program
             getDefaultValue: () => null,
             "Location of the FHIR package cache, for use with registries and IG packages.  Use empty quoted string to disable cache.");
 
+        Option<List<string>> optPublishedPackages = new(
+            name: "--load-package",
+            getDefaultValue: () => new(),
+            "Published packages to load. Specifying package name alone loads highest version.");
+
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
@@ -151,6 +156,7 @@ public static partial class Program
             optMaxResourceCount,
             optUiMode,
             optPackageCache,
+            optPublishedPackages,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -176,7 +182,8 @@ public static partial class Program
                 OpenBrowser = context.ParseResult.GetValueForOption(optOpenBrowser) ?? false,
                 MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
                 UiMode = context.ParseResult.GetValueForOption(optUiMode) ?? ServerConfiguration.UiModes.Default,
-                FhirCacheDirectory = context.ParseResult.GetValueForOption(optPackageCache) ?? string.Empty,
+                FhirCacheDirectory = context.ParseResult.GetValueForOption(optPackageCache),
+                PublishedPackages = context.ParseResult.GetValueForOption(optPublishedPackages) ?? new(),
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -309,7 +316,6 @@ public static partial class Program
                 app.MapFallbackToPage("/_Host");
             }
 
-            // specifically check for null - empty string is used to indicate no cache
             if (config.FhirCacheDirectory == null)
             {
                 config.FhirCacheDirectory = Path.Combine(
@@ -317,13 +323,21 @@ public static partial class Program
                     ".fhir");
             }
 
-            app.Services.GetRequiredService<IFhirPackageService>().Init(config.FhirCacheDirectory);
+            IFhirPackageService ps = app.Services.GetRequiredService<IFhirPackageService>();
+            IFhirStoreManager sm = app.Services.GetRequiredService<IFhirStoreManager>();
+
+            ps.Init(config.FhirCacheDirectory);
 
             // run the server
             //await app.RunAsync(cancellationToken);
             _ = app.StartAsync();
 
-            //_ = app.RunAsync(cancellationToken);
+            if (ps.IsConfigured &&
+                config.PublishedPackages.Any())
+            {
+                _ = sm.LoadRequestedPackages();
+            }
+
             AfterServerStart(app, config);
             await app.WaitForShutdownAsync(cancellationToken);
 
@@ -340,6 +354,9 @@ public static partial class Program
         }
     }
 
+    /// <summary>After server start.</summary>
+    /// <param name="app">   The application.</param>
+    /// <param name="config">The configuration.</param>
     private static void AfterServerStart(WebApplication app, ServerConfiguration config)
     {
         Console.WriteLine("Press CTRL+C to exit");

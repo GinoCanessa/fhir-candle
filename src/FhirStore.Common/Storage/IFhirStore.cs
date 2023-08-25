@@ -34,6 +34,11 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="config">The configuration.</param>
     void Init(TenantConfiguration config);
 
+    /// <summary>Loads a package.</summary>
+    /// <param name="directive">The directive.</param>
+    /// <param name="directory">Pathname of the directory.</param>
+    void LoadPackage(string directive, string directory);
+
     public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>

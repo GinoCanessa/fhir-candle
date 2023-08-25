@@ -13,6 +13,10 @@ public interface IFhirStoreManager : IHostedService, IReadOnlyDictionary<string,
     /// <summary>Occurs when On Changed.</summary>
     event EventHandler<EventArgs>? OnChanged;
 
+    /// <summary>Loads requested packages.</summary>
+    /// <returns>An asynchronous result.</returns>
+    Task LoadRequestedPackages();
+
     /// <summary>State has changed.</summary>
     void StateHasChanged();
 }

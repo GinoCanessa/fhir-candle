@@ -78,7 +78,7 @@ public class RegistryPackageManifest
                     (manifest.Versions[key].FhirVersion == "??"))
                 {
                     if (manifest.Versions[key].PackageKind.Equals("core", StringComparison.OrdinalIgnoreCase) &&
-                        (sequence != FhirPackageService.FhirSequenceEnum.Uknown))
+                        (sequence != FhirPackageService.FhirSequenceEnum.Unknown))
                     {
                         manifest.Versions[key].FhirVersion = FhirPackageService.LiteralForSequence(sequence);
                     }

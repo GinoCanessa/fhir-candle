@@ -45,7 +45,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     public enum FhirSequenceEnum : int
     {
         /// <summary>An enum constant representing the uknown option.</summary>
-        Uknown = 0,
+        Unknown = 0,
 
         /// <summary>An enum constant representing the DSTU2 option.</summary>
         DSTU2 = 2,
@@ -69,6 +69,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         PackageLoadStateEnum PackageState,
         string PackageName,
         string Version,
+        FhirSequenceEnum FhirVersion,
         string DownloadDateTime,
         long PackageSize,
         FhirNpmPackageDetails Details);
@@ -90,7 +91,10 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     private ILogger _logger;
 
     /// <summary>True if this service is available.</summary>
-    private bool _available = false;
+    private bool _hasCacheDirectory = false;
+
+    /// <summary>True if is initialized, false if not.</summary>
+    private bool _isInitialized = false;
 
     /// <summary>Pathname of the cache directory.</summary>
     private string _cacheDirectory = string.Empty;
@@ -127,10 +131,10 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Test if a name matches known core packages.</summary>
     private static Regex _matchCorePackageNames = MatchCorePackageNames();
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="FhirPackageService"/> class.
-    /// </summary>
-    public FhirPackageService(ILogger<FhirPackageService> logger) 
+    /// <summary>Initializes a new instance of the <see cref="FhirPackageService"/> class.</summary>
+    /// <param name="logger">The logger.</param>
+    public FhirPackageService(
+        ILogger<FhirPackageService> logger) 
     {
         _logger = logger;
         _singleton = this;
@@ -142,6 +146,12 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Gets the packages by directive.</summary>
     public Dictionary<string, PackageCacheRecord> PackagesByDirective => _packagesByDirective;
 
+    /// <summary>Gets a value indicating whether this object is available.</summary>
+    public bool IsConfigured => _hasCacheDirectory;
+
+    /// <summary>Gets a value indicating whether the package service is ready.</summary>
+    public bool IsReady => _isInitialized;
+
     /// <summary>Initializes the FhirPackageService to a specific cache directory.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="cacheDirectory">Pathname of the cache directory.</param>
@@ -149,20 +159,20 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     {
         if (string.IsNullOrEmpty(cacheDirectory))
         {
-            _available = false;
+            _hasCacheDirectory = false;
             return;
         }
 
         _cacheDirectory = cacheDirectory;
+        _hasCacheDirectory = true;
     }
-
 
     /// <summary>Triggered when the application host is ready to start the service.</summary>
     /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
     /// <returns>An asynchronous result.</returns>
     Task IHostedService.StartAsync(CancellationToken cancellationToken)
     {
-        if (!_available)
+        if (!_hasCacheDirectory)
         {
             _logger.LogInformation("Disabling FhirPackageService, --fhir-package-cache set to empty.");
             return Task.CompletedTask;
@@ -189,6 +199,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         }
 
         SynchronizeCache();
+        _isInitialized = true;
 
         return Task.CompletedTask;
     }
@@ -205,18 +216,21 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Attempts to find locally or download a given package.</summary>
     /// <param name="directive">  The directive.</param>
     /// <param name="directory">  [out] Pathname of the directory.</param>
+    /// <param name="fhirVersion">[out] The FHIR version.</param>
     /// <param name="offlineMode">True to enable offline mode, false to disable it.</param>
     /// <param name="branchName"> (Optional) Name of the branch.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool FindOrDownload(
         string directive,
         out string directory,
+        out FhirSequenceEnum fhirVersion,
         bool offlineMode,
         string branchName = "")
     {
-        if (!_available)
+        if (!_hasCacheDirectory)
         {
             directory = string.Empty;
+            fhirVersion = FhirSequenceEnum.Unknown;
             return false;
         }
 
@@ -241,7 +255,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
         if (version.Equals("dev", StringComparison.OrdinalIgnoreCase))
         {
-            if (TryDownloadCoreViaCI(name, branchName, out directory))
+            if (TryDownloadCoreViaCI(name, branchName, out directory, out fhirVersion))
             {
                 return true;
             }
@@ -251,16 +265,18 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             {
                 _logger.LogInformation($"FindOrDownload <<< package: {directive} not found in cache!");
                 directory = string.Empty;
+                fhirVersion = FhirSequenceEnum.Unknown;
                 return false;
             }
 
+            fhirVersion = SequenceForVersion(_packagesByDirective[directive].Details.FhirVersion);
             return true;
         }
 
         if (version.Equals("current", StringComparison.OrdinalIgnoreCase))
         {
             // resolve CI build (online or local) or fail
-            return TryDownloadViaCI(name, branchName, out directory);
+            return TryDownloadViaCI(name, branchName, out directory, out fhirVersion);
         }
 
         if (string.IsNullOrEmpty(version) || version.Equals("latest", StringComparison.OrdinalIgnoreCase))
@@ -270,6 +286,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
         if (isLocal || HasCachedVersion(name, version, out directory))
         {
+            fhirVersion = _packagesByDirective[$"{name}#{version}"].FhirVersion;
             return true;
         }
 
@@ -277,32 +294,37 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         {
             _logger.LogInformation($"FindOrDownload <<< cannot resolve requested package while offline: {name}#{version}");
             directory = string.Empty;
+            fhirVersion = FhirSequenceEnum.Unknown;
             return false;
         }
 
-        if (TryDownloadViaRegistry(name, version, out directory))
+        if (TryDownloadViaRegistry(name, version, out directory, out fhirVersion))
         {
             return true;
         }
 
-        if (TryDownloadCoreViaPublication(name, version, out directory))
+        if (TryDownloadCoreViaPublication(name, version, out directory, out fhirVersion))
         {
             return true;
         }
 
         _logger.LogInformation($"FindOrDownload <<< unable to resolve a directive: {directive}");
         directory = string.Empty;
+        fhirVersion = FhirSequenceEnum.Unknown;
         return false;
     }
 
     /// <summary>Attempts to download via registry a string from the given string.</summary>
-    /// <param name="name">   The name.</param>
-    /// <param name="version">[out] The version string (e.g., 4.0.1).</param>
+    /// <param name="name">       The name.</param>
+    /// <param name="version">    [out] The version string (e.g., 4.0.1).</param>
+    /// <param name="directory">  [out] Pathname of the directory.</param>
+    /// <param name="fhirVersion">[out] The FHIR version.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     private bool TryDownloadViaRegistry(
         string name,
         string version,
-        out string directory)
+        out string directory,
+        out FhirSequenceEnum fhirVersion)
     {
         foreach (Uri registryUri in PackageRegistryUris)
         {
@@ -311,7 +333,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
             string directive = name + "#" + version;
 
-            if (TryDownloadAndExtract(uri, directory, directive))
+            if (TryDownloadAndExtract(uri, directory, directive, out fhirVersion))
             {
                 UpdatePackageCacheIndex(directive, directory);
 
@@ -320,6 +342,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         }
 
         directory = string.Empty;
+        fhirVersion = FhirSequenceEnum.Unknown;
         return false;
     }
 
@@ -420,6 +443,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                 PackageLoadStateEnum.NotLoaded,
                 name,
                 npmDetails.Version,
+                SequenceForVersion(npmDetails.FhirVersion),
                 packageDate,
                 size,
                 npmDetails);
@@ -481,7 +505,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <param name="packageDirective">The package directive.</param>
     public void DeletePackage(string packageDirective)
     {
-        if (!_available) { return; }
+        if (!_hasCacheDirectory) { return; }
 
         string directory = Path.Combine(_cachePackageDirectory, packageDirective);
 
@@ -508,14 +532,16 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
     /// <summary>Attempts to download and extract a string from the given URI.</summary>
     /// <param name="uri">             URI of the resource.</param>
-    /// <param name="directory">       [out] Pathname of the directory.</param>
+    /// <param name="directory">       Pathname of the directory.</param>
     /// <param name="packageDirective">The package directive.</param>
+    /// <param name="fhirVersion">     [out] The FHIR version.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     private bool TryDownloadAndExtract(
         Uri uri,
         string directory,
-        string packageDirective)
-    {
+        string packageDirective,
+        out FhirSequenceEnum fhirVersion)
+    { 
         try
         {
             using (Stream rawStream = _httpClient.GetStreamAsync(uri).Result)
@@ -532,6 +558,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
             UpdatePackageCacheIndex(packageDirective, directory);
 
+            fhirVersion = _packagesByDirective[packageDirective].FhirVersion;
             return true;
         }
         catch (Exception ex)
@@ -543,6 +570,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             }
         }
 
+        fhirVersion = FhirSequenceEnum.Unknown;
         return false;
     }
 
@@ -566,13 +594,14 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     public bool TryDownloadViaCI(
         string name,
         string branchName,
-        out string directory)
+        out string directory,
+        out FhirSequenceEnum fhirVersion)
     {
         string directive = name + "#current";
 
         if (PackageIsFhirCore(name))
         {
-            if (TryDownloadCoreViaCI(name, branchName, out directory))
+            if (TryDownloadCoreViaCI(name, branchName, out directory, out fhirVersion))
             {
                 UpdatePackageCacheIndex(directive, directory);
 
@@ -582,7 +611,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             return false;
         }
 
-        if (TryDownloadGuideViaCI(name, branchName, out directory))
+        if (TryDownloadGuideViaCI(name, branchName, out directory, out fhirVersion))
         {
             UpdatePackageCacheIndex(directive, directory);
 
@@ -593,14 +622,16 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     }
 
     /// <summary>Attempts to download core via ci a string from the given string.</summary>
-    /// <param name="name">      The name.</param>
-    /// <param name="branchName">Name of the branch.</param>
-    /// <param name="directory"> [out] Pathname of the directory.</param>
+    /// <param name="name">       The name.</param>
+    /// <param name="branchName"> Name of the branch.</param>
+    /// <param name="directory">  [out] Pathname of the directory.</param>
+    /// <param name="fhirVersion">[out] The FHIR version.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryDownloadCoreViaCI(
         string name,
         string branchName,
-        out string directory)
+        out string directory,
+        out FhirSequenceEnum fhirVersion)
     {
         branchName = GetCoreBranchFromInput(branchName);
 
@@ -652,6 +683,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 if (cachedNpm.BuildDate.CompareTo(ciBuildDate) > 0)
                 {
+                    fhirVersion = SequenceForVersion(ciFhirVersion);
                     return true;
                 }
             }
@@ -663,18 +695,20 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
         Uri uri = new Uri(branchUri, $"{name}.tgz");
 
-        return TryDownloadAndExtract(uri, directory, $"{name}#current");
+        return TryDownloadAndExtract(uri, directory, $"{name}#current", out fhirVersion);
     }
 
     /// <summary>Attempts to download guide via ci a string from the given string.</summary>
-    /// <param name="branchName">Name of the branch.</param>
-    /// <param name="name">      [out] The name.</param>
-    /// <param name="directory"> [out] Pathname of the directory.</param>
+    /// <param name="branchName"> Name of the branch.</param>
+    /// <param name="name">       [out] The name.</param>
+    /// <param name="directory">  [out] Pathname of the directory.</param>
+    /// <param name="fhirVersion">[out] The FHIR version.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryDownloadGuideViaCI(
         string branchName,
         out string name,
-        out string directory)
+        out string directory,
+        out FhirSequenceEnum fhirVersion)
     {
         branchName = GetIgBranchFromInput(branchName);
 
@@ -696,6 +730,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 if (cachedNpm.BuildDate.CompareTo(ciNpm.BuildDate) <= 0)
                 {
+                    fhirVersion = SequenceForVersion(cachedNpm.FhirVersion);
                     return true;
                 }
             }
@@ -705,12 +740,13 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             _logger.LogInformation($"TryDownloadCoreViaCI <<< failed to compare local to CI, forcing download ({ex.Message})");
             name = string.Empty;
             directory = string.Empty;
+            fhirVersion = FhirSequenceEnum.Unknown;
             return false;
         }
 
         Uri uri = new Uri(FhirCiUri, $"ig/{branchName}/package.tgz");
 
-        return TryDownloadAndExtract(uri, directory, $"{name}#current");
+        return TryDownloadAndExtract(uri, directory, $"{name}#current", out fhirVersion);
     }
 
     /// <summary>
@@ -769,7 +805,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     {
         if (string.IsNullOrEmpty(version))
         {
-            return FhirSequenceEnum.Uknown;
+            return FhirSequenceEnum.Unknown;
         }
 
         string val;
@@ -824,7 +860,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                 return FhirSequenceEnum.R5;
         }
 
-        return FhirSequenceEnum.Uknown;
+        return FhirSequenceEnum.Unknown;
     }
 
     /// <summary>Package base for sequence.</summary>
@@ -926,7 +962,8 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     public bool TryDownloadGuideViaCI(
         string name,
         string branchName,
-        out string directory)
+        out string directory,
+        out FhirSequenceEnum fhirVersion)
     {
         directory = Path.Combine(_cachePackageDirectory, $"{name}#current");
 
@@ -947,19 +984,21 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 if (cachedNpm.BuildDate.CompareTo(ciNpm.BuildDate) <= 0)
                 {
+                    fhirVersion = SequenceForVersion(ciNpm.FhirVersion);
                     return true;
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogInformation($"TryDownloadCoreViaCI <<< failed to compare local to CI, forcing download ({ex.Message})");
+                fhirVersion = FhirSequenceEnum.Unknown;
                 return false;
             }
         }
 
         Uri uri = new Uri(FhirCiUri, $"ig/{branchName}/package.tgz");
 
-        return TryDownloadAndExtract(uri, directory, $"{name}#current");
+        return TryDownloadAndExtract(uri, directory, $"{name}#current", out fhirVersion);
     }
 
     /// <summary>
@@ -982,7 +1021,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
         FhirSequenceEnum sequence = SequenceForVersion(version);
 
-        if (sequence == FhirSequenceEnum.Uknown)
+        if (sequence == FhirSequenceEnum.Unknown)
         {
             relative = string.Empty;
             return false;
@@ -994,18 +1033,21 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     }
 
     /// <summary>Attempts to download core via publication a string from the given string.</summary>
-    /// <param name="name">     The name.</param>
-    /// <param name="version">  [out] The version string (e.g., 4.0.1).</param>
-    /// <param name="directory">[out] Pathname of the directory.</param>
+    /// <param name="name">       The name.</param>
+    /// <param name="version">    [out] The version string (e.g., 4.0.1).</param>
+    /// <param name="directory">  [out] Pathname of the directory.</param>
+    /// <param name="fhirVersion">[out] The FHIR version.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     private bool TryDownloadCoreViaPublication(
         string name,
         string version,
-        out string directory)
+        out string directory,
+        out FhirSequenceEnum fhirVersion)
     {
         if (!TryGetRelativeBaseForVersion(version, out string relative))
         {
             directory = string.Empty;
+            fhirVersion = FhirSequenceEnum.Unknown;
             return false;
         }
 
@@ -1014,7 +1056,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
         // most publication versions are named with correct package information
         Uri uri = new Uri(FhirPublishedUri, $"{relative}/{name}.tgz");
-        if (TryDownloadAndExtract(uri, directory, directive))
+        if (TryDownloadAndExtract(uri, directory, directive, out fhirVersion))
         {
             UpdatePackageCacheIndex(directive, directory);
             return true;
@@ -1023,7 +1065,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         // some ballot versions are published directly as CI versions
         uri = new Uri(FhirPublishedUri, $"{relative}/package.tgz");
         directory = Path.Combine(_cachePackageDirectory, $"hl7.fhir.core#{version}");
-        if (TryDownloadAndExtract(uri, directory, directive))
+        if (TryDownloadAndExtract(uri, directory, directive, out fhirVersion))
         {
             UpdatePackageCacheIndex(directive, directory);
             return true;
@@ -1137,7 +1179,10 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <param name="version">  [out] The version string (e.g., 4.0.1).</param>
     /// <param name="directory">[out] Pathname of the directory.</param>
     /// <returns>True if cached version, false if not.</returns>
-    private bool HasCachedVersion(string name, string version, out string directory)
+    private bool HasCachedVersion(
+        string name, 
+        string version, 
+        out string directory)
     {
         directory = Path.Combine(_cachePackageDirectory, $"{name}#{version}");
 
@@ -1538,6 +1583,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                 PackageLoadStateEnum.NotLoaded,
                 name,
                 version,
+                SequenceForVersion(versionInfo.FhirVersion),
                 packageDate,
                 size,
                 versionInfo);

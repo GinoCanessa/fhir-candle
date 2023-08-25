@@ -25,7 +25,16 @@
     },
     "subscriptions": {
       "commandName": "Project",
-      "commandLineArgs": "--fhir-package-cache \"\" --fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --ui-mode subscriptionsri",
+      "commandLineArgs": "--fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --ui-mode subscriptionsri",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5826",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "ecr": {
+      "commandName": "Project",
+      "commandLineArgs": "--load-package hl7.fhir.us.ecr#2.1.0 --protect-source true -m 1000",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

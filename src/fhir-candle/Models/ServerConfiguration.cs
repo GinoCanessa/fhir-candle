@@ -32,6 +32,9 @@ public class ServerConfiguration
     /// <summary>Gets or sets the pathname of the FHIR cache directory.</summary>
     public string? FhirCacheDirectory { get; set; } = null;
 
+    /// <summary>Gets or sets the published packages to load.</summary>
+    public List<string> PublishedPackages { get; set; } = new();
+
     /// <summary>Gets or sets the pathname of the source directory.</summary>
     public string? SourceDirectory { get; set; } = null;
 

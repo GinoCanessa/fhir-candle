@@ -186,7 +186,6 @@ public class OpSubscriptionEvents : IFhirOperation
         return HttpStatusCode.OK;
     }
 
-
     /// <summary>Gets an OperationDefinition for this operation.</summary>
     /// <param name="fhirVersion">The FHIR version.</param>
     /// <returns>The definition.</returns>

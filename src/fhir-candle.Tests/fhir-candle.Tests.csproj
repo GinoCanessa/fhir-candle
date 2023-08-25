@@ -5,10 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-	<VersionPrefix>$([System.DateTime]::Now.ToString(&quot;yyyy.MMdd.HHmm&quot;))</VersionPrefix>
+	<VersionPrefix>$([System.DateTime]::Now.ToString("yyyy.MMdd.HHmm"))</VersionPrefix>
 	<Version>$(VersionPrefix)</Version>
-	<AssemblyVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</AssemblyVersion>
-	<FileVersion>$([System.DateTime]::Now.ToString(&quot;0.yyyy.MMdd.HHmm&quot;))</FileVersion>
+	<AssemblyVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</AssemblyVersion>
+	<FileVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</FileVersion>
+	<RootNamespace>fhir.candle.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

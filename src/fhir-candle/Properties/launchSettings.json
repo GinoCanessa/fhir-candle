@@ -25,7 +25,7 @@
     },
     "subscriptions": {
       "commandName": "Project",
-      "commandLineArgs": "--fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --ui-mode subscriptionsri",
+      "commandLineArgs": "--fhir-package-cache \"\" --fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --ui-mode subscriptionsri",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

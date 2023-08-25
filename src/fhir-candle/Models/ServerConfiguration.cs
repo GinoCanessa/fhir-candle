@@ -29,6 +29,9 @@ public class ServerConfiguration
     /// <summary>Gets or sets the UI Mode.</summary>
     public UiModes UiMode { get; set; } = UiModes.Default;
 
+    /// <summary>Gets or sets the pathname of the FHIR cache directory.</summary>
+    public string? FhirCacheDirectory { get; set; } = null;
+
     /// <summary>Gets or sets the pathname of the source directory.</summary>
     public string? SourceDirectory { get; set; } = null;
 

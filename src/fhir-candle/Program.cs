@@ -78,10 +78,15 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<ServerConfiguration.UiModes>("Mode", ServerConfiguration.UiModes.Default)!,
             "UI content mode: " + string.Join(", ", Enum.GetNames(typeof(ServerConfiguration.UiModes))));
 
+        Option<string?> optPackageCache = new(
+            name: "--fhir-package-cache",
+            getDefaultValue: () => null,
+            "Location of the FHIR package cache, for use with registries and IG packages.  Use empty quoted string to disable cache.");
+
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
-            "FHIR Contents to load, either in this directory or by subdirectories named per tenant");
+            "FHIR Contents to load, either in this directory or by subdirectories named per tenant.");
 
         Option<bool?> optProtectLoadedContent = new(
             name: "--protect-source",
@@ -145,6 +150,7 @@ public static partial class Program
             optOpenBrowser,
             optMaxResourceCount,
             optUiMode,
+            optPackageCache,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -170,6 +176,7 @@ public static partial class Program
                 OpenBrowser = context.ParseResult.GetValueForOption(optOpenBrowser) ?? false,
                 MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
                 UiMode = context.ParseResult.GetValueForOption(optUiMode) ?? ServerConfiguration.UiModes.Default,
+                FhirCacheDirectory = context.ParseResult.GetValueForOption(optPackageCache) ?? string.Empty,
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -254,9 +261,13 @@ public static partial class Program
             builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();
             builder.Services.AddHostedService<IFhirStoreManager>(sp => sp.GetRequiredService<IFhirStoreManager>());
 
-            // add a FHIR-Store singleton, then register as a hosted service
+            // add a notification mananger singleton, then register as a hosted service
             builder.Services.AddSingleton<INotificationManager, NotificationManager>();
             builder.Services.AddHostedService<INotificationManager>(sp => sp.GetRequiredService<INotificationManager>());
+
+            // add a package service singleton, then register as a hosted service
+            builder.Services.AddSingleton<IFhirPackageService, FhirPackageService>();
+            builder.Services.AddHostedService<IFhirPackageService>(sp => sp.GetRequiredService<IFhirPackageService>());
 
             builder.Services.AddControllers();
 
@@ -297,6 +308,16 @@ public static partial class Program
                 app.MapBlazorHub();
                 app.MapFallbackToPage("/_Host");
             }
+
+            // specifically check for null - empty string is used to indicate no cache
+            if (config.FhirCacheDirectory == null)
+            {
+                config.FhirCacheDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".fhir");
+            }
+
+            app.Services.GetRequiredService<IFhirPackageService>().Init(config.FhirCacheDirectory);
 
             // run the server
             //await app.RunAsync(cancellationToken);

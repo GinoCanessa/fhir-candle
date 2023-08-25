@@ -73,6 +73,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <PackageReference Include="ini-parser-netcore" Version="3.0.0" />
 	  <PackageReference Include="MailKit" Version="4.1.0" />
 	  <PackageReference Include="MudBlazor" Version="6.8.0" IncludeAssets="all" />
 	  <PackageReference Include="BlazorMonaco" Version="3.0.0" IncludeAssets="all" />

@@ -2098,7 +2098,18 @@ public partial class VersionedFhirStore : IFhirStore
         }
         else if (!string.IsNullOrEmpty(content))
         {
-            _ = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+            HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+
+            if ((!deserializeSc.IsSuccessful()) &&
+                (!op.AcceptsNonFhir))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnsupportedMediaType,
+                    $"Operation {operationName} does not consume non-FHIR content.",
+                    OperationOutcome.IssueType.Invalid);
+                return HttpStatusCode.UnsupportedMediaType;
+            }
         }
 
         HttpStatusCode sc = op.DoOperation(
@@ -2115,7 +2126,7 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"System Operation {operationName} complete") : responseOutcome;
+        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"System-Level Operation {operationName} returned {sc}");
 
         return sc;
     }
@@ -2234,7 +2245,18 @@ public partial class VersionedFhirStore : IFhirStore
         }
         else if (!string.IsNullOrEmpty(content))
         {
-            _ = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+            HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+
+            if ((!deserializeSc.IsSuccessful()) &&
+                (!op.AcceptsNonFhir))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnsupportedMediaType,
+                    $"Operation {operationName} does not consume non-FHIR content.",
+                    OperationOutcome.IssueType.Invalid);
+                return HttpStatusCode.UnsupportedMediaType;
+            }
         }
 
         HttpStatusCode sc = op.DoOperation(
@@ -2251,7 +2273,7 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} complete") : responseOutcome;
+        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Resource-Level Operation {resourceType}/{operationName} returned {sc}");
         return sc;
     }
 
@@ -2386,7 +2408,18 @@ public partial class VersionedFhirStore : IFhirStore
         }
         else if (!string.IsNullOrEmpty(content))
         {
-            _ = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+            HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+
+            if ((!deserializeSc.IsSuccessful()) &&
+                (!op.AcceptsNonFhir))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnsupportedMediaType,
+                    $"Operation {operationName} does not consume non-FHIR content.",
+                    OperationOutcome.IssueType.Invalid);
+                return HttpStatusCode.UnsupportedMediaType;
+            }
         }
 
         HttpStatusCode sc = op.DoOperation(
@@ -2403,7 +2436,7 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Instance Operation {resourceType}/{id}/{operationName} returned {sc}");
+        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Instance-Level Operation {resourceType}/{id}/{operationName} returned {sc}");
         return sc;
     }
 

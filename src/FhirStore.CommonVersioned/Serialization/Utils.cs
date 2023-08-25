@@ -11,6 +11,9 @@ using System.Xml.Serialization;
 using System.Xml;
 using System.Net;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Language.Debugging;
+using Hl7.Fhir.Utility;
+using System.Diagnostics;
 
 namespace FhirCandle.Serialization;
 

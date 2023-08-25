@@ -392,8 +392,6 @@ public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
 
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
-        string serializedResource, serializedOutcome, eTag, lastModified, location;
-
         HttpStatusCode sc = fhirStore.InstanceCreate(
             _resourceType2,
             json,
@@ -402,11 +400,11 @@ public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
             false,
             string.Empty,
             true,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out _,
+            out _,
+            out _,
+            out _,
+            out _);
 
         sc.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
@@ -441,8 +439,6 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
 
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
-        string serializedResource, serializedOutcome, eTag, lastModified, location;
-
         HttpStatusCode sc = fhirStore.InstanceCreate(
             _resourceType,
             json,
@@ -451,11 +447,11 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
             false,
             string.Empty,
             true,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out _,
+            out _,
+            out _,
+            out _,
+            out _);
 
         sc.IsSuccessful().Should().BeFalse();
     }
@@ -468,9 +464,6 @@ public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
 
     /// <summary>Gets the configurations.</summary>
     public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
-
-    private const string _resourceType = "Patient";
-    private const string _id = "invalid";
 
     /// <summary>(Immutable) The fixture.</summary>
     private readonly FhirStoreTests _fixture;

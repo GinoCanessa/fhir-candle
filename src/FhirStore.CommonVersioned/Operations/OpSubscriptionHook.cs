@@ -46,6 +46,12 @@ public class OpSubscriptionHook : IFhirOperation
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
     public bool AllowInstanceLevel => false;
 
+    /// <summary>Gets a value indicating whether the accepts non FHIR.</summary>
+    public bool AcceptsNonFhir => false;
+
+    /// <summary>Gets a value indicating whether the returns non FHIR.</summary>
+    public bool ReturnsNonFhir => false;
+
     /// <summary>Gets the supported resources.</summary>
     public HashSet<string> SupportedResources => new();
 
@@ -76,17 +82,18 @@ public class OpSubscriptionHook : IFhirOperation
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation)
     {
-        if ((store == null) ||
-            (bodyResource == null) ||
+        if ((bodyResource == null) ||
             (!(bodyResource is Hl7.Fhir.Model.Bundle bundle)) ||
             (!bundle.Entry.Any()) ||
             (bundle.Entry.First().Resource == null))
         {
             responseResource = null;
-            responseOutcome = null;
+            responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                HttpStatusCode.UnprocessableEntity,
+                "Posted content is not a valid Subscription notification bundle");
             contentLocation = string.Empty;
 
-            return HttpStatusCode.BadRequest;
+            return HttpStatusCode.UnprocessableEntity;
         }
 
         if (string.IsNullOrEmpty(bundle.Id))
@@ -99,10 +106,12 @@ public class OpSubscriptionHook : IFhirOperation
         if (status == null)
         {
             responseResource = null;
-            responseOutcome = null;
+            responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                HttpStatusCode.UnprocessableEntity,
+                "Posted content is not a valid Subscription notification bundle");
             contentLocation = string.Empty;
 
-            return HttpStatusCode.BadRequest;
+            return HttpStatusCode.UnprocessableEntity;
         }
 
         // TODO: Clean up interfaces and types so we can avoid casts like this

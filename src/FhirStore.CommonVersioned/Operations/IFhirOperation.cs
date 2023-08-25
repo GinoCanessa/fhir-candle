@@ -37,6 +37,12 @@ public interface IFhirOperation
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
     bool AllowInstanceLevel { get; }
 
+    /// <summary>Gets a value indicating whether we can accept non-FHIR formats.</summary>
+    bool AcceptsNonFhir { get; }
+
+    /// <summary>Gets a value indicating whether we can return non-FHIR formats.</summary>
+    bool ReturnsNonFhir { get; }
+
     /// <summary>Gets the supported resources.</summary>
     HashSet<string> SupportedResources { get; }
 

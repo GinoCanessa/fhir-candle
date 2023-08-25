@@ -59,11 +59,12 @@ public class FhirController : ControllerBase
     /// <param name="queryParam">The query parameter.</param>
     /// <param name="request">   The request.</param>
     /// <returns>The mime type.</returns>
-    private string GetMimeType(string? queryParam, HttpRequest request)
+    private string GetMimeType(string? queryParam, HttpRequest request, bool allowNonFhirReturn = false)
     {
         if (!string.IsNullOrEmpty(queryParam))
         {
-            if (_acceptMimeTypes.Contains(queryParam))
+            if (_acceptMimeTypes.Contains(queryParam) ||
+                allowNonFhirReturn)
             {
                 return queryParam;
             }
@@ -86,12 +87,11 @@ public class FhirController : ControllerBase
                 continue;
             }
 
-            if (!_acceptMimeTypes.Contains(accept))
+            if (_acceptMimeTypes.Contains(accept) ||
+                allowNonFhirReturn)
             {
-                continue;
+                return accept;
             }
-
-            return accept;
         }
 
         return "application/fhir+json";
@@ -201,7 +201,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        format = GetMimeType(format, Request);
+        format = GetMimeType(format, Request, true);
 
         HttpStatusCode sc = _fhirStoreManager[store].TypeOperation(
             resourceName,
@@ -303,7 +303,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        format = GetMimeType(format, Request);
+        format = GetMimeType(format, Request, true);
 
         HttpStatusCode sc;
         string resource, outcome;
@@ -653,7 +653,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        format = GetMimeType(format, HttpContext.Request);
+        format = GetMimeType(format, HttpContext.Request, true);
 
         // sanity check
         if (Request == null)

@@ -46,6 +46,12 @@ public class OpSubscriptionStatus : IFhirOperation
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
     public bool AllowInstanceLevel => true;
 
+    /// <summary>Gets a value indicating whether the accepts non FHIR.</summary>
+    public bool AcceptsNonFhir => false;
+
+    /// <summary>Gets a value indicating whether the returns non FHIR.</summary>
+    public bool ReturnsNonFhir => false;
+
     /// <summary>Gets the supported resources.</summary>
     public HashSet<string> SupportedResources => new()
     {

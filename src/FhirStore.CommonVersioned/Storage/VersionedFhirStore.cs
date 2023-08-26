@@ -272,7 +272,7 @@ public partial class VersionedFhirStore : IFhirStore
                             {
                                 foreach (object sub in list)
                                 {
-                                    _ = SetExecutableSubscription((ParsedSubscription)sub);
+                                    _ = StoreProcessSubscription((ParsedSubscription)sub);
                                 }
                             }
                             break;
@@ -401,7 +401,7 @@ public partial class VersionedFhirStore : IFhirStore
                         {
                             foreach (object sub in list)
                             {
-                                _ = SetExecutableSubscription((ParsedSubscription)sub);
+                                _ = StoreProcessSubscription((ParsedSubscription)sub);
                             }
                         }
                         break;
@@ -1448,30 +1448,28 @@ public partial class VersionedFhirStore : IFhirStore
         return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
     }
 
-    /// <summary>Removes the executable subscription topic described by topic.</summary>
-    /// <param name="topic">The topic.</param>
+    /// <summary>Processes a parsed SubscriptionTopic resource.</summary>
+    /// <param name="topic"> The topic.</param>
+    /// <param name="remove">(Optional) True to remove.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool RemoveExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
+    public bool StoreProcessSubscriptionTopic(ParsedSubscriptionTopic topic, bool remove = false)
     {
-        if (!_topics.ContainsKey(topic.Url))
+        if (remove)
         {
-            return false;
+            if (!_topics.ContainsKey(topic.Url))
+            {
+                return false;
+            }
+
+            // remove from all resources
+            foreach (IVersionedResourceStore rs in _store.Values)
+            {
+                rs.RemoveExecutableSubscriptionTopic(topic.Url);
+            }
+
+            return true;
         }
 
-        // remove from all resources
-        foreach (IVersionedResourceStore rs in _store.Values)
-        {
-            rs.RemoveExecutableSubscriptionTopic(topic.Url);
-        }
-
-        return true;
-    }
-
-
-    /// <summary>Sets an executable subscription topic.</summary>
-    /// <param name="topic">The topic.</param>
-    public bool SetExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
-    {
         bool priorExisted = _topics.ContainsKey(topic.Url);
 
         // set our local reference
@@ -1949,33 +1947,32 @@ public partial class VersionedFhirStore : IFhirStore
         return null;
     }
 
-    /// <summary>Removes the executable subscription described by subscription.</summary>
+    /// <summary>Process the subscription.</summary>
     /// <param name="subscription">The subscription.</param>
+    /// <param name="remove">      (Optional) True to remove.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool RemoveExecutableSubscription(ParsedSubscription subscription)
+    internal bool StoreProcessSubscription(ParsedSubscription subscription, bool remove = false)
     {
-        if (!_subscriptions.ContainsKey(subscription.Id))
+        if (remove)
         {
-            return false;
+            if (!_subscriptions.ContainsKey(subscription.Id))
+            {
+                return false;
+            }
+
+            // remove from all resources
+            foreach (IVersionedResourceStore rs in _store.Values)
+            {
+                rs.RemoveExecutableSubscription(subscription.TopicUrl, subscription.Id);
+            }
+
+            _ = _subscriptions.TryRemove(subscription.Id, out _);
+
+            RegisterSubscriptionsChanged(subscription, true);
+
+            return true;
         }
 
-        // remove from all resources
-        foreach (IVersionedResourceStore rs in _store.Values)
-        {
-            rs.RemoveExecutableSubscription(subscription.TopicUrl, subscription.Id);
-        }
-
-        _ = _subscriptions.TryRemove(subscription.Id, out _);
-
-        RegisterSubscriptionsChanged(subscription, true);
-
-        return true;
-    }
-
-    /// <summary>Sets executable subscription.</summary>
-    /// <param name="subscription">The subscription.</param>
-    public bool SetExecutableSubscription(ParsedSubscription subscription)
-    {
         // check for existing record
         bool priorExisted = _subscriptions.ContainsKey(subscription.Id);
         string priorState;

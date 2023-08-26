@@ -33,6 +33,9 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>The resource store.</summary>
     private readonly ConcurrentDictionary<string, T> _resourceStore = new();
 
+    /// <summary>(Immutable) Conformance URL to ID Map.</summary>
+    internal readonly ConcurrentDictionary<string, string> _conformanceUrlToId = new();
+
     /// <summary>The lock object.</summary>
     private object _lockObject = new();
 
@@ -276,16 +279,24 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
         }
 
+        if (source is IConformanceResource cr)
+        {
+            if (!string.IsNullOrEmpty(cr.Url))
+            {
+                _ = _conformanceUrlToId.TryAdd(cr.Url, source.Id);
+            }
+        }
+
         TestCreateAgainstSubscriptions((T)source);
 
         if (parsedSubscriptionTopic != null)
         {
-            _ = TryProcessSubscriptionTopic(parsedSubscriptionTopic);
+            _ = _store.StoreProcessSubscriptionTopic(parsedSubscriptionTopic);
         }
 
         if (parsedSubscription != null)
         {
-            _ = TryProcessSubscription(parsedSubscription!);
+            _ = _store.StoreProcessSubscription(parsedSubscription);
         }
 
         switch (source.TypeName)
@@ -398,6 +409,22 @@ public class ResourceStore<T> : IVersionedResourceStore
             _resourceStore[source.Id] = (T)source;
         }
 
+        if (source is IConformanceResource cr)
+        {
+            if (previous is IConformanceResource pcr)
+            {
+                if (!string.IsNullOrEmpty(pcr.Url))
+                {
+                    _ = _conformanceUrlToId.TryRemove(pcr.Url, out _);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(cr.Url))
+            {
+                _ = _conformanceUrlToId.TryAdd(cr.Url, source.Id);
+            }
+        }
+
         if (previous == null)
         {
             TestCreateAgainstSubscriptions((T)source);
@@ -409,12 +436,12 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         if (parsedSubscriptionTopic != null)
         {
-            _ = TryProcessSubscriptionTopic(parsedSubscriptionTopic);
+            _ = _store.StoreProcessSubscriptionTopic(parsedSubscriptionTopic);
         }
 
         if (parsedSubscription != null)
         {
-            _ = TryProcessSubscription(parsedSubscription);
+            _ = _store.StoreProcessSubscription(parsedSubscription);
         }
 
         switch (source.TypeName)
@@ -460,87 +487,45 @@ public class ResourceStore<T> : IVersionedResourceStore
             return null;
         }
 
+        if (previous is IConformanceResource pcr)
+        {
+            if (!string.IsNullOrEmpty(pcr.Url))
+            {
+                _ = _conformanceUrlToId.TryRemove(pcr.Url, out _);
+            }
+        }
+
         TestDeleteAgainstSubscriptions(previous);
 
-        switch (previous.TypeName)
+        switch (previous?.TypeName)
         {
             case "SearchParameter":
                 RemoveExecutableSearchParameter((SearchParameter)(Resource)previous);
                 break;
 
             case "SubscriptionTopic":
-                // TODO: should fail the request if this fails
-                _ = TryRemoveSubscriptionTopic(previous);
+                {
+                    // get a common subscription topic for execution
+                    if (_topicConverter.TryParse(previous, out ParsedSubscriptionTopic topic))
+                    {
+                        _ = _store.StoreProcessSubscriptionTopic(topic, true);
+                    }
+
+                }
                 break;
 
             case "Subscription":
-                // TODO: should fail the request if this fails
-                _ = TryRemoveSubscription(previous);
+                {
+                    if (_subscriptionConverter.TryParse(previous, out ParsedSubscription subscription))
+                    {
+                        _ = _store.StoreProcessSubscription(subscription, true);
+                    }
+                }
                 break;
         }
 
-
         return previous;
     }
-
-    /// <summary>Process the subscription topic.</summary>
-    /// <param name="topic">The versioned FHIR subscription topic object.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool TryProcessSubscriptionTopic(ParsedSubscriptionTopic topic)
-    {
-        // process this at the store level
-        return _store.SetExecutableSubscriptionTopic(topic);
-    }
-
-    /// <summary>Attempts to remove subscription topic.</summary>
-    /// <param name="st">The versioned FHIR subscription topic object.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool TryRemoveSubscriptionTopic(object st)
-    {
-        if (st == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_topicConverter.TryParse(st, out ParsedSubscriptionTopic topic))
-        {
-            return false;
-        }
-
-        // process this at the store level
-        return _store.RemoveExecutableSubscriptionTopic(topic);
-    }
-
-    /// <summary>Process the subscription described by sub.</summary>
-    /// <param name="subscription">The versioned FHIR subscription object.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool TryProcessSubscription(ParsedSubscription subscription)
-    {
-        // process this at the store level
-        return _store.SetExecutableSubscription(subscription);
-    }
-
-    /// <summary>Attempts to remove subscription.</summary>
-    /// <param name="sub">The versioned FHIR subscription object.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool TryRemoveSubscription(object sub)
-    {
-        if (sub == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_subscriptionConverter.TryParse(sub, out ParsedSubscription subscription))
-        {
-            return false;
-        }
-
-        // process this at the store level
-        return _store.RemoveExecutableSubscription(subscription);
-    }
-
 
     /// <summary>Sets executable subscription topic.</summary>
     /// <param name="url">             URL of the resource.</param>

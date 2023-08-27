@@ -26,6 +26,13 @@ namespace FhirCandle.Storage;
 /// <summary>A FHIR store.</summary>
 public partial class VersionedFhirStore : IFhirStore
 {
+    internal record class ValueSetContents
+    {
+        public HashSet<string> Codes { get; init; } = new();
+
+        public HashSet<string> SystemAndCodes { get; init; } = new();
+    }
+
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
 
@@ -73,6 +80,8 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>(Immutable) The subscriptions, by id.</summary>
     internal readonly ConcurrentDictionary<string, ParsedSubscription> _subscriptions = new();
+
+    internal readonly ConcurrentDictionary<string, ValueSetContents> _valueSetContents = new();
 
     /// <summary>(Immutable) The fhirpath variable matcher.</summary>
     [GeneratedRegex("[%][\\w\\-]+", RegexOptions.Compiled)]
@@ -1945,6 +1954,93 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         return null;
+    }
+
+    public bool VsContains(string vsUrl, string system, string code)
+    {
+        if (!_valueSetContents.ContainsKey(vsUrl))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(system))
+        {
+            return _valueSetContents[vsUrl].Codes.Contains(code);
+        }
+
+        return _valueSetContents[vsUrl].SystemAndCodes.Contains($"{system}|{code}");
+    }
+
+    internal bool StoreProcessValueSet(ValueSet vs, bool remove = false)
+    {
+        if (remove)
+        {
+            if (_valueSetContents.ContainsKey(vs.Url))
+            {
+                _ = _valueSetContents.TryRemove(vs.Url, out _);
+            }
+
+            return true;
+        }
+
+        HashSet<string> codes = new();
+        HashSet<string> systemAndCodes = new();
+
+        if (vs.Expansion?.Contains?.Any() ?? false)
+        {
+            AddContains(vs.Expansion.Contains, codes, systemAndCodes);
+        }
+        else if (vs.Compose?.Include?.Any() ?? false)
+        {
+            foreach (ValueSet.ConceptSetComponent csc in vs.Compose.Include)
+            {
+                string system = csc.System ?? string.Empty;
+
+                if (csc.Concept?.Any() ?? false)
+                {
+                    foreach (ValueSet.ConceptReferenceComponent crc in csc.Concept)
+                    {
+                        if (!codes.Contains(crc.Code))
+                        {
+                            codes.Add(crc.Code);
+                        }
+
+                        string sc = $"{system}|{crc.Code}";
+
+                        if (!systemAndCodes.Contains(sc))
+                        {
+                            systemAndCodes.Add(sc);
+                        }
+                    }
+                }
+            }
+        }
+
+        _ = _valueSetContents.TryAdd(vs.Url, new() { Codes = codes, SystemAndCodes = systemAndCodes });
+
+        return true;
+
+        void AddContains(IEnumerable<ValueSet.ContainsComponent> contains, HashSet<string> codes, HashSet<string> systemAndCodes)
+        {
+            foreach (ValueSet.ContainsComponent c in contains)
+            {
+                if (!codes.Contains(c.Code))
+                {
+                    codes.Add(c.Code);
+                }
+
+                string sc = $"{c.System}|{c.Code}";
+                if (!systemAndCodes.Contains(sc))
+                {
+                    systemAndCodes.Add(sc);
+                }
+
+                if (c.Contains?.Any() ?? false)
+                {
+                    AddContains(c.Contains, codes, systemAndCodes);
+                }
+            }
+        }
     }
 
     /// <summary>Process the subscription.</summary>

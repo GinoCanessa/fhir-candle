@@ -18,7 +18,7 @@ public class SearchTester
     /// <summary>Gets or sets the store.</summary>
     public required VersionedFhirStore FhirStore { get; init; }
 
-    // Build a hashset of ids that pass reverse chaining critiera
+    // Build a hashset of ids that pass reverse chaining criteria
     //public HashSet<string> BuildReverseChainIds(IEnumerable<ParsedSearchParameter> searchParameters)
     //{
     //    HashSet<string> reverseChainIds = new();
@@ -537,7 +537,18 @@ public class SearchTester
                         break;
 
                     case "token-in-codeableconcept":
-                        if (EvalTokenSearch.TestTokenInCodeableConcept(resultNode, sp))
+                        if (EvalTokenSearch.TestTokenInCodeableConcept(resultNode, sp, FhirStore))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
+                    case "token-in-code":
+                    case "token-in-coding":
+                    case "token-in-contactpoint":
+                    case "token-in-identifier":
+                        if (EvalTokenSearch.TestTokenInCoding(resultNode, sp, FhirStore))
                         {
                             found = true;
                             break;
@@ -618,8 +629,6 @@ public class SearchTester
                     case "token-below-coding":
                     case "token-codetext-code":
                     case "token-codetext-coding":
-                    case "token-in-code":
-                    case "token-in-coding":
                     case "token-notin-code":
                     case "token-notin-coding":
                     case "token-oftype-code":
@@ -655,9 +664,6 @@ public class SearchTester
                     case "token-codetext-url":
                     case "token-codetext-uuid":
                     case "token-codetext-string":
-                    //case "token-in-codeableconcept":
-                    case "token-in-identifier":
-                    case "token-in-contactpoint":
                     case "token-in-canonical":
                     case "token-in-oid":
                     case "token-in-uri":

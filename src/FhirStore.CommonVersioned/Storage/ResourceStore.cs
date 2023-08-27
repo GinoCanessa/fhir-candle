@@ -299,10 +299,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             _ = _store.StoreProcessSubscription(parsedSubscription);
         }
 
-        switch (source.TypeName)
+        switch (source)
         {
-            case "SearchParameter":
-                SetExecutableSearchParameter((SearchParameter)source);
+            case SearchParameter sp:
+                SetExecutableSearchParameter(sp);
+                break;
+
+            case ValueSet vs:
+                _ = _store.StoreProcessValueSet(vs);
                 break;
         }
 
@@ -444,10 +448,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             _ = _store.StoreProcessSubscription(parsedSubscription);
         }
 
-        switch (source.TypeName)
+        switch (source)
         {
-            case "SearchParameter":
-                SetExecutableSearchParameter((SearchParameter)source);
+            case SearchParameter sp:
+                SetExecutableSearchParameter(sp);
+                break;
+
+            case ValueSet vs:
+                _ = _store.StoreProcessValueSet(vs);
                 break;
         }
 
@@ -521,6 +529,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                         _ = _store.StoreProcessSubscription(subscription, true);
                     }
                 }
+                break;
+
+            case "ValueSet":
+                _ = _store.StoreProcessValueSet((ValueSet)(Resource)previous, true);
                 break;
         }
 

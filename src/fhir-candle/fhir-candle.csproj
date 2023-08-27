@@ -42,6 +42,7 @@
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
 	  <WarningLevel>4</WarningLevel>
 	</PropertyGroup>
+	<PropertyGroup Condition=" '$(RunConfiguration)' == 'ecr' " />
 	<ItemGroup>
 	  <Compile Remove="data\**" />
 	  <Compile Remove="Processors\**" />

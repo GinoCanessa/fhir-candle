@@ -333,6 +333,11 @@ public static class SearchDefinitions
         "token-url",
         "token-uuid",
         "token-string",
+        "token-in-code",
+        "token-in-codeableconcept",
+        "token-in-coding",
+        "token-in-contactpoint",
+        "token-in-identifier",
         "token-not-boolean",
         "token-not-canonical",
         "token-not-code",
@@ -350,8 +355,6 @@ public static class SearchDefinitions
         "uri-url",
         "uri-oid",
         "uri-uuid",
-
-        "token-in-codeableconcept",
     };
 
     /// <summary>(Immutable) The unsupported search combinations.</summary>
@@ -406,8 +409,6 @@ public static class SearchDefinitions
         "token-below-coding",
         "token-code-text-code",
         "token-code-text-coding",
-        "token-in-code",
-        "token-in-coding",
         "token-not-in-code",
         "token-not-in-coding",
         "token-of-type-code",
@@ -443,8 +444,6 @@ public static class SearchDefinitions
         "token-code-text-url",
         "token-code-text-uuid",
         "token-code-text-string",
-        "token-in-identifier",
-        "token-in-contactpoint",
         "token-in-canonical",
         "token-in-oid",
         "token-in-uri",

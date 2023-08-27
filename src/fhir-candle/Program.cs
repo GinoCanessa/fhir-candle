@@ -38,10 +38,10 @@ public static partial class Program
     /// <summary>(Immutable) The default listen port.</summary>
     private const int _defaultListenPort = 5826;
 
-    ///// <summary>Candle server delagate.</summary>
+    ///// <summary>Candle server delegate.</summary>
     ///// <param name="config">The configuration.</param>
     ///// <returns>An int.</returns>
-    //public delegate int CandleServerDelagate(ServerConfiguration config);
+    //public delegate int CandleServerDelegate(ServerConfiguration config);
 
     /// <summary>Main entry-point for this application.</summary>
     /// <param name="args">An array of command-line argument strings.</param>
@@ -228,21 +228,21 @@ public static partial class Program
                 config.TenantsR5.Add("r5");
             }
 
-            Dictionary<string, TenantConfiguration> tenants = BuildTeantConfigurations(config);
+            Dictionary<string, TenantConfiguration> tenants = BuildTenantConfigurations(config);
 
             WebApplicationBuilder builder = null!;
 
-            // when packaging as a dotnet tool, we need to do some directory shennangians for the static content root
+            // when packaging as a dotnet tool, we need to do some directory shenanigans for the static content root
             string root = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory) ?? string.Empty;
             if (!string.IsNullOrEmpty(root))
             {
-                string webroot = FindRelativeDir(root, "staticwebassets", false);
+                string webRoot = FindRelativeDir(root, "staticwebassets", false);
 
-                if ((!string.IsNullOrEmpty(webroot)) && Directory.Exists(webroot))
+                if ((!string.IsNullOrEmpty(webRoot)) && Directory.Exists(webRoot))
                 {
                     builder = WebApplication.CreateBuilder(new WebApplicationOptions()
                     {
-                        WebRootPath = webroot,
+                        WebRootPath = webRoot,
                     });
                 }
             }
@@ -268,7 +268,7 @@ public static partial class Program
             builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();
             builder.Services.AddHostedService<IFhirStoreManager>(sp => sp.GetRequiredService<IFhirStoreManager>());
 
-            // add a notification mananger singleton, then register as a hosted service
+            // add a notification manager singleton, then register as a hosted service
             builder.Services.AddSingleton<INotificationManager, NotificationManager>();
             builder.Services.AddHostedService<INotificationManager>(sp => sp.GetRequiredService<INotificationManager>());
 
@@ -291,7 +291,7 @@ public static partial class Program
                 Pages.Index.Mode = config.UiMode;
             }
 
-            string localUrl = $"http://+:{config.ListenPort}";
+            string localUrl = $"http://*:{config.ListenPort}";
 
             builder.WebHost.UseUrls(localUrl);
             //builder.WebHost.UseStaticWebAssets();
@@ -394,13 +394,13 @@ public static partial class Program
         Process.Start(psi);
     }
 
-    /// <summary>Builds an enumeration of teant configurations for this application.</summary>
+    /// <summary>Builds an enumeration of tenant configurations for this application.</summary>
     /// <param name="config">The configuration.</param>
     /// <returns>
-    /// An enumerator that allows foreach to be used to process build teant configurations in this
+    /// An enumerator that allows foreach to be used to process build tenant configurations in this
     /// collection.
     /// </returns>
-    private static Dictionary<string, TenantConfiguration> BuildTeantConfigurations(ServerConfiguration config)
+    private static Dictionary<string, TenantConfiguration> BuildTenantConfigurations(ServerConfiguration config)
     {
         Dictionary<string, TenantConfiguration> tenants = new();
 
@@ -485,12 +485,12 @@ public static partial class Program
     /// <exception cref="DirectoryNotFoundException">Thrown when the requested directory is not
     ///  present.</exception>
     /// <param name="dirName">       The name of the directory we are searching for.</param>
-    /// <param name="thowIfNotFound">(Optional) True to thow if not found.</param>
+    /// <param name="throwIfNotFound">(Optional) True to throw if not found.</param>
     /// <returns>The found FHIR directory.</returns>
     public static string FindRelativeDir(
         string startDir,
         string dirName,
-        bool thowIfNotFound = true)
+        bool throwIfNotFound = true)
     {
         string currentDir = string.IsNullOrEmpty(startDir) ? Path.GetDirectoryName(AppContext.BaseDirectory) ?? string.Empty : startDir;
         string testDir = Path.Combine(currentDir, dirName);
@@ -501,7 +501,7 @@ public static partial class Program
 
             if (currentDir == Path.GetPathRoot(currentDir))
             {
-                if (thowIfNotFound)
+                if (throwIfNotFound)
                 {
                     throw new DirectoryNotFoundException($"Could not find directory {dirName}!");
                 }

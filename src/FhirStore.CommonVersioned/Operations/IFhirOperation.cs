@@ -43,6 +43,11 @@ public interface IFhirOperation
     /// <summary>Gets a value indicating whether we can return non-FHIR formats.</summary>
     bool ReturnsNonFhir { get; }
 
+    /// <summary>
+    /// If this operation requires a specific FHIR package to be loaded, the package identifier.
+    /// </summary>
+    string RequiresPackage { get; }
+
     /// <summary>Gets the supported resources.</summary>
     HashSet<string> SupportedResources { get; }
 

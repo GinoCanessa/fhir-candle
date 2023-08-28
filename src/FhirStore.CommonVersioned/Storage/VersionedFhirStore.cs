@@ -20,6 +20,8 @@ using System.Collections;
 using System.Collections.Concurrent;
 using static FhirCandle.Search.SearchDefinitions;
 using FhirCandle.Serialization;
+using System.Drawing;
+using System.Xml.Linq;
 
 namespace FhirCandle.Storage;
 
@@ -90,6 +92,9 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The operations supported by this server, by name.</summary>
     private Dictionary<string, IFhirOperation> _operations = new();
 
+    /// <summary>The loaded directives.</summary>
+    private HashSet<string> _loadedDirectives = new();
+
     /// <summary>Values that represent load state codes.</summary>
     private enum LoadStateCodes
     {
@@ -136,6 +141,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Initializes this object.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="config">The configuration.</param>
     public void Init(TenantConfiguration config)
     {
@@ -286,6 +292,23 @@ public partial class VersionedFhirStore : IFhirStore
             _loadReprocess = null;
         }
 
+        CheckLoadedOperations();
+
+        // create a timer to check max resource count if we are monitoring that
+        _maxResourceCount = config.MaxResourceCount;
+        if (_maxResourceCount > 0)
+        {
+            _capacityMonitor = new System.Threading.Timer(
+                CheckUsage,
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(30));
+        }
+    }
+
+    /// <summary>Check loaded operations.</summary>
+    private void CheckLoadedOperations()
+    {
         // load operations for this fhir version
         IEnumerable<Type> operationTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
             .Where(t => t.GetInterfaces().Contains(typeof(IFhirOperation)));
@@ -296,6 +319,12 @@ public partial class VersionedFhirStore : IFhirStore
 
             if ((fhirOp == null) ||
                 (!fhirOp.CanonicalByFhirVersion.ContainsKey(_config.FhirVersion)))
+            {
+                continue;
+            }
+
+            if ((!string.IsNullOrEmpty(fhirOp.RequiresPackage)) &&
+                (!_loadedDirectives.Contains(fhirOp.RequiresPackage)))
             {
                 continue;
             }
@@ -319,27 +348,27 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
         }
-
-        // create a timer to check max resource count if we are monitoring that
-        _maxResourceCount = config.MaxResourceCount;
-        if (_maxResourceCount > 0)
-        {
-            _capacityMonitor = new System.Threading.Timer(
-                CheckUsage,
-                null,
-                TimeSpan.Zero,
-                TimeSpan.FromSeconds(30));
-        }
     }
 
     /// <summary>Loads a package.</summary>
     /// <param name="directive">         The directive.</param>
     /// <param name="directory">         Pathname of the directory.</param>
     /// <param name="packageSupplements">The package supplements.</param>
-    public void LoadPackage(string directive, string directory, string packageSupplements)
+    /// <param name="includeExample">    True to include, false to exclude the examples.</param>
+    public void LoadPackage(
+        string directive, 
+        string directory, 
+        string packageSupplements, 
+        bool includeExamples)
     {
         _loadReprocess = new();
         _loadState = LoadStateCodes.Read;
+
+        _loadedDirectives.Add(directive);
+        if (directive.Contains('#'))
+        {
+            _loadedDirectives.Add(directive.Split('#')[0]);
+        }
 
         string serializedResource, serializedOutcome, eTag, lastModified, location;
         HttpStatusCode sc;
@@ -348,7 +377,46 @@ public partial class VersionedFhirStore : IFhirStore
 
         Console.WriteLine($"Store[{_config.ControllerName}] loading {directive}");
 
-        foreach (FileInfo file in di.GetFiles("*.*", SearchOption.AllDirectories))
+        string libDir = string.Empty;
+
+        // look for an package.json so we can determine examples
+        foreach (FileInfo file in di.GetFiles("package.json", SearchOption.AllDirectories))
+        {
+            try
+            {
+                FhirNpmPackageDetails details = FhirNpmPackageDetails.Load(file.FullName);
+
+                if (details.Directories?.ContainsKey("lib") ?? false)
+                {
+                    libDir = details.Directories["lib"];
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {ex.Message}");
+            }
+        }
+
+        if (!includeExamples)
+        {
+        }
+
+        FileInfo[] files;
+
+        if ((!includeExamples) &&
+            (!string.IsNullOrEmpty(libDir)) &&
+            Directory.Exists(Path.Combine(directory, libDir)))
+        {
+            di = new(Path.Combine(directory, libDir));
+            files = di.GetFiles("*.*", SearchOption.TopDirectoryOnly);
+        }
+        else
+        {
+            files = di.GetFiles("*.*", SearchOption.AllDirectories);
+        }
+
+        // traverse all files
+        foreach (FileInfo file in files)
         {
             switch (file.Extension.ToLowerInvariant())
             {
@@ -460,6 +528,8 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
         }
+
+        CheckLoadedOperations();
 
         _loadState = LoadStateCodes.None;
         _loadReprocess = null;
@@ -919,7 +989,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="lastModified">   [out] The last modified.</param>
     /// <param name="location">       [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceCreate(
+    internal HttpStatusCode DoInstanceCreate(
         string resourceType,
         Resource content,
         string ifNoneExist,
@@ -1120,7 +1190,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">    [out] The resource.</param>
     /// <param name="outcome">     [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceDelete(
+    internal HttpStatusCode DoInstanceDelete(
         string resourceType,
         string id,
         string ifMatch,
@@ -1214,7 +1284,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="eTag">           [out] The tag.</param>
     /// <param name="lastModified">   [out] The last modified.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceRead(
+    internal HttpStatusCode DoInstanceRead(
         string resourceType,
         string id,
         string ifMatch,
@@ -1367,7 +1437,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="lastModified">[out] The last modified.</param>
     /// <param name="location">    [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceUpdate(
+    internal HttpStatusCode DoInstanceUpdate(
         string resourceType,
         string id,
         Resource content,
@@ -2193,7 +2263,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoSystemOperation(
+    internal HttpStatusCode DoSystemOperation(
         string operationName,
         string queryString,
         Resource? contentResource,
@@ -2319,7 +2389,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoTypeOperation(
+    internal HttpStatusCode DoTypeOperation(
         string resourceType,
         string operationName,
         string queryString,
@@ -2469,7 +2539,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceOperation(
+    internal HttpStatusCode DoInstanceOperation(
         string resourceType,
         string id,
         string operationName,
@@ -2611,7 +2681,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">   [out] The resource.</param>
     /// <param name="outcome">    [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoSystemDelete(
+    internal HttpStatusCode DoSystemDelete(
         string queryString,
         out Resource? resource,
         out OperationOutcome outcome)
@@ -2706,7 +2776,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">    [out] The resource.</param>
     /// <param name="outcome">     [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoTypeDelete(
+    internal HttpStatusCode DoTypeDelete(
         string resourceType,
         string queryString,
         out Resource? resource,
@@ -2803,7 +2873,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="bundle">      [out] The bundle.</param>
     /// <param name="outcome">     [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoTypeSearch(
+    internal HttpStatusCode DoTypeSearch(
         string resourceType,
         string queryString,
         out Bundle? bundle,
@@ -2954,7 +3024,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="bundle">     [out] The bundle.</param>
     /// <param name="outcome">    [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoSystemSearch(
+    internal HttpStatusCode DoSystemSearch(
         string queryString,
         out Bundle? bundle,
         out OperationOutcome outcome)

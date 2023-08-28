@@ -93,6 +93,11 @@ public static partial class Program
             getDefaultValue: () => new(),
             "Continuous Integration (CI) packages to load. You may specify either just the branch name or a full URL.");
 
+        Option<bool?> optLoadPackageExamples = new(
+            name: "--load-examples",
+            getDefaultValue: () => null,
+            "If package loading should include example instances.");
+
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
@@ -163,6 +168,7 @@ public static partial class Program
             optPackageCache,
             optPublishedPackages,
             optCiPackages,
+            optLoadPackageExamples,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -191,6 +197,7 @@ public static partial class Program
                 FhirCacheDirectory = context.ParseResult.GetValueForOption(optPackageCache),
                 PublishedPackages = context.ParseResult.GetValueForOption(optPublishedPackages) ?? new(),
                 CiPackages = context.ParseResult.GetValueForOption(optCiPackages) ?? new(),
+                LoadPackageExamples = context.ParseResult.GetValueForOption(optLoadPackageExamples) ?? false,
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -346,7 +353,7 @@ public static partial class Program
 
                 string supplemental = FindRelativeDir(root, "supplements", false);
 
-                _ = sm.LoadRequestedPackages(supplemental);
+                _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
             }
 
             AfterServerStart(app, config);

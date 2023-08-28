@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 
-namespace fhir.candle.Models;
+namespace FhirCandle.Models;
 
 /// <summary>Information about the FHIR npm package.</summary>
 public class FhirNpmPackageDetails

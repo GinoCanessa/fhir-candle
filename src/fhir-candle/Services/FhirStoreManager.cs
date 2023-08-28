@@ -186,8 +186,9 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     /// <summary>Loads requested packages.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
     /// <param name="supplementalRoot">The supplemental root.</param>
+    /// <param name="loadExamples">    True to load examples.</param>
     /// <returns>An asynchronous result.</returns>
-    public async Task LoadRequestedPackages(string supplementalRoot)
+    public async Task LoadRequestedPackages(string supplementalRoot, bool loadExamples)
     {
         // check for requested packages
         int waitCount = 0;
@@ -243,11 +244,19 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
                                 Directory.Exists(Path.Combine(r.supplementDirectory, "r4")))
                             {
-                                _storesByController[name].LoadPackage(r.directive, r.directory, Path.Combine(r.supplementDirectory, "r4"));
+                                _storesByController[name].LoadPackage(
+                                    r.directive, 
+                                    r.directory, 
+                                    Path.Combine(r.supplementDirectory, "r4"),
+                                    loadExamples);
                             }
                             else
                             {
-                                _storesByController[name].LoadPackage(r.directive, r.directory, r.supplementDirectory);
+                                _storesByController[name].LoadPackage(
+                                    r.directive, 
+                                    r.directory, 
+                                    r.supplementDirectory,
+                                    loadExamples);
                             }
                         }
                         break;
@@ -257,11 +266,19 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
                                 Directory.Exists(Path.Combine(r.supplementDirectory, "r4b")))
                             {
-                                _storesByController[name].LoadPackage(r.directive, r.directory, Path.Combine(r.supplementDirectory, "r4b"));
+                                _storesByController[name].LoadPackage(
+                                    r.directive, 
+                                    r.directory, 
+                                    Path.Combine(r.supplementDirectory, "r4b"),
+                                    loadExamples);
                             }
                             else
                             {
-                                _storesByController[name].LoadPackage(r.directive, r.directory, r.supplementDirectory);
+                                _storesByController[name].LoadPackage(
+                                    r.directive, 
+                                    r.directory, 
+                                    r.supplementDirectory,
+                                    loadExamples);
                             }
                         }
                         break;
@@ -271,11 +288,20 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
                                 Directory.Exists(Path.Combine(r.supplementDirectory, "r5")))
                             {
-                                _storesByController[name].LoadPackage(r.directive, r.directory, Path.Combine(r.supplementDirectory, "r5"));
+                                _storesByController[name].LoadPackage(
+                                    r.directive, 
+                                    r.directory, 
+                                    Path.Combine(r.supplementDirectory, 
+                                    "r5"),
+                                    loadExamples);
                             }
                             else
                             {
-                                _storesByController[name].LoadPackage(r.directive, r.directory, r.supplementDirectory);
+                                _storesByController[name].LoadPackage(
+                                    r.directive, 
+                                    r.directory, 
+                                    r.supplementDirectory, 
+                                    loadExamples);
                             }
                         }
                         break;

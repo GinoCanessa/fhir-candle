@@ -38,6 +38,9 @@ public class ServerConfiguration
     /// <summary>Gets or sets the list of packages to load from the CI build server.</summary>
     public List<string> CiPackages { get; set; } = new();
 
+    /// <summary>Gets or sets the load package examples.</summary>
+    public bool? LoadPackageExamples { get; set; } = null;
+
     /// <summary>Gets or sets the pathname of the source directory.</summary>
     public string? SourceDirectory { get; set; } = null;
 

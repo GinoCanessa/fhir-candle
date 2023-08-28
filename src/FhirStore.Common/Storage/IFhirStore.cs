@@ -38,7 +38,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="directive">         The directive.</param>
     /// <param name="directory">         Pathname of the directory.</param>
     /// <param name="packageSupplements">The package supplements.</param>
-    void LoadPackage(string directive, string directory, string packageSupplements);
+    /// <param name="includeExamples">   True to include, false to exclude the examples.</param>
+    void LoadPackage(
+        string directive, 
+        string directory, 
+        string packageSupplements, 
+        bool includeExamples);
 
     public TenantConfiguration Config { get; }
 

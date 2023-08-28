@@ -15,8 +15,9 @@ public interface IFhirStoreManager : IHostedService, IReadOnlyDictionary<string,
 
     /// <summary>Loads requested packages.</summary>
     /// <param name="supplementalRoot">The supplemental root.</param>
+    /// <param name="loadExamples">    True to load examples.</param>
     /// <returns>An asynchronous result.</returns>
-    Task LoadRequestedPackages(string supplementalRoot);
+    Task LoadRequestedPackages(string supplementalRoot, bool loadExamples);
 
     /// <summary>State has changed.</summary>
     void StateHasChanged();

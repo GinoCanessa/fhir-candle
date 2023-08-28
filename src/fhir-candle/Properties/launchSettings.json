@@ -41,6 +41,15 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
+    "pas": {
+      "commandName": "Project",
+      "commandLineArgs": "--ci-package HL7/davinci-pas --protect-source true -m 1000",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5826",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,

@@ -88,6 +88,11 @@ public static partial class Program
             getDefaultValue: () => new(),
             "Published packages to load. Specifying package name alone loads highest version.");
 
+        Option<List<string>> optCiPackages = new(
+            name: "--ci-package",
+            getDefaultValue: () => new(),
+            "Continuous Integration (CI) packages to load. You may specify either just the branch name or a full URL.");
+
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
@@ -157,6 +162,7 @@ public static partial class Program
             optUiMode,
             optPackageCache,
             optPublishedPackages,
+            optCiPackages,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -184,6 +190,7 @@ public static partial class Program
                 UiMode = context.ParseResult.GetValueForOption(optUiMode) ?? ServerConfiguration.UiModes.Default,
                 FhirCacheDirectory = context.ParseResult.GetValueForOption(optPackageCache),
                 PublishedPackages = context.ParseResult.GetValueForOption(optPublishedPackages) ?? new(),
+                CiPackages = context.ParseResult.GetValueForOption(optCiPackages) ?? new(),
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -333,7 +340,7 @@ public static partial class Program
             _ = app.StartAsync();
 
             if (ps.IsConfigured &&
-                config.PublishedPackages.Any())
+                (config.PublishedPackages.Any() || config.CiPackages.Any()))
             {
                 // look for a package supplemental directory
 

@@ -250,7 +250,15 @@
     {
         base.OnInitialized();
 
-        NavTracker?.NotifyNav("Subscriptions RI", "", 0);
+        if (Mode == ServerConfiguration.UiModes.SubscriptionsRI)
+        {
+            NavTracker?.NotifyNav("Subscriptions RI", "", 0);
+        }
+        else
+        {
+            NavTracker?.NotifyNav("FHIR Candle", "", 0);
+        }
+
     }
 
     /// <summary>

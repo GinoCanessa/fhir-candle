@@ -349,6 +349,7 @@ public static class EvalTokenSearch
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
     /// <param name="valueNode">The value node.</param>
     /// <param name="sp">       The sp.</param>
+    /// <param name="store">    The store.</param>
     /// <returns>True if the test passes, false if the test fails.</returns>
     public static bool TestTokenInCodeableConcept(ITypedElement valueNode, ParsedSearchParameter sp, VersionedFhirStore store)
     {
@@ -393,7 +394,12 @@ public static class EvalTokenSearch
         return false;
     }
 
-
+    /// <summary>Tests token in coding.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <param name="store">    The store.</param>
+    /// <returns>True if the test passes, false if the test fails.</returns>
     public static bool TestTokenInCoding(ITypedElement valueNode, ParsedSearchParameter sp, VersionedFhirStore store)
     {
         if ((valueNode == null) ||

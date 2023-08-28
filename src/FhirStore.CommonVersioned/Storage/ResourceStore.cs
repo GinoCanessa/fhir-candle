@@ -306,7 +306,7 @@ public class ResourceStore<T> : IVersionedResourceStore
                 break;
 
             case ValueSet vs:
-                _ = _store.StoreProcessValueSet(vs);
+                _ = _store.Terminology.StoreProcessValueSet(vs);
                 break;
         }
 
@@ -455,7 +455,7 @@ public class ResourceStore<T> : IVersionedResourceStore
                 break;
 
             case ValueSet vs:
-                _ = _store.StoreProcessValueSet(vs);
+                _ = _store.Terminology.StoreProcessValueSet(vs);
                 break;
         }
 
@@ -532,7 +532,7 @@ public class ResourceStore<T> : IVersionedResourceStore
                 break;
 
             case "ValueSet":
-                _ = _store.StoreProcessValueSet((ValueSet)(Resource)previous, true);
+                _ = _store.Terminology.StoreProcessValueSet((ValueSet)(Resource)previous, true);
                 break;
         }
 
@@ -896,7 +896,10 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         ITypedElement currentTE = current.ToTypedElement();
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode());
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        {
+            TerminologyService = _store.Terminology,
+        };
 
         FhirPathVariableResolver resolver = new FhirPathVariableResolver()
         {
@@ -934,7 +937,10 @@ public class ResourceStore<T> : IVersionedResourceStore
         ITypedElement currentTE = current.ToTypedElement();
         ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode());
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        {
+            TerminologyService = _store.Terminology,
+        };
 
         FhirPathVariableResolver resolver = new FhirPathVariableResolver()
         {
@@ -969,7 +975,10 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode());
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
+        {
+            TerminologyService = _store.Terminology,
+        };
 
         FhirPathVariableResolver resolver = new FhirPathVariableResolver()
         {

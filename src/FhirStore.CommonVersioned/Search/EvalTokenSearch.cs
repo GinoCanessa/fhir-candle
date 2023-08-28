@@ -375,7 +375,7 @@ public static class EvalTokenSearch
                                     continue;
                                 }
 
-                                if (store.VsContains(sp.ValueFhirCodes[i].Value ?? sp.ValueFhirCodes[i].System ?? string.Empty, c.System ?? string.Empty, c.Code ?? string.Empty))
+                                if (store.Terminology.VsContains(sp.ValueFhirCodes[i].Value ?? sp.ValueFhirCodes[i].System ?? string.Empty, c.System ?? string.Empty, c.Code ?? string.Empty))
                                 {
                                     return true;
                                 }
@@ -465,7 +465,7 @@ public static class EvalTokenSearch
                 continue;
             }
 
-            if (store.VsContains(sp.ValueFhirCodes[i].Value ?? sp.ValueFhirCodes[i].System ?? string.Empty, valueSystem, valueCode))
+            if (store.Terminology.VsContains(sp.ValueFhirCodes[i].Value ?? sp.ValueFhirCodes[i].System ?? string.Empty, valueSystem, valueCode))
             {
                 return true;
             }

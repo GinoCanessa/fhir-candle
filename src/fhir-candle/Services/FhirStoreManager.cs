@@ -172,8 +172,9 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
     /// <summary>Loads requested packages.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="supplementalRoot">The supplemental root.</param>
     /// <returns>An asynchronous result.</returns>
-    public async Task LoadRequestedPackages()
+    public async Task LoadRequestedPackages(string supplementalRoot)
     {
         // check for requested packages
         int waitCount = 0;
@@ -195,6 +196,19 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                 throw new Exception($"Unable to find or download package: {directive}");
             }
 
+            string packageSupplements = string.Empty;
+
+            // check for supplemental contents
+            if (!string.IsNullOrEmpty(supplementalRoot))
+            {
+                packageSupplements = Path.Combine(supplementalRoot, directive);
+
+                if (!Directory.Exists(packageSupplements))
+                {
+                    packageSupplements = string.Empty;
+                }
+            }
+
             // loop over controllers to see where we can add this
             foreach ((string name, TenantConfiguration config) in _tenants)
             {
@@ -203,19 +217,19 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                     case TenantConfiguration.SupportedFhirVersions.R4:
                         if (fhirVersion == FhirPackageService.FhirSequenceEnum.R4)
                         {
-                            _storesByController[name].LoadPackage(directive, dir);
+                            _storesByController[name].LoadPackage(directive, dir, packageSupplements);
                         }
                         break;
                     case TenantConfiguration.SupportedFhirVersions.R4B:
                         if (fhirVersion == FhirPackageService.FhirSequenceEnum.R4B)
                         {
-                            _storesByController[name].LoadPackage(directive, dir);
+                            _storesByController[name].LoadPackage(directive, dir, packageSupplements);
                         }
                         break;
                     case TenantConfiguration.SupportedFhirVersions.R5:
                         if (fhirVersion == FhirPackageService.FhirSequenceEnum.R5)
                         {
-                            _storesByController[name].LoadPackage(directive, dir);
+                            _storesByController[name].LoadPackage(directive, dir, packageSupplements);
                         }
                         break;
                     default:

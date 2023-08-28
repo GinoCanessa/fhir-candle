@@ -44,10 +44,6 @@
     },
     {
       "extension" : [{
-        "url" : "previous",
-        "valueString" : ""
-      },
-      {
         "url" : "resultForCreate",
         "valueCode" : "test-passes"
       },

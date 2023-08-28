@@ -14,8 +14,9 @@ public interface IFhirStoreManager : IHostedService, IReadOnlyDictionary<string,
     event EventHandler<EventArgs>? OnChanged;
 
     /// <summary>Loads requested packages.</summary>
+    /// <param name="supplementalRoot">The supplemental root.</param>
     /// <returns>An asynchronous result.</returns>
-    Task LoadRequestedPackages();
+    Task LoadRequestedPackages(string supplementalRoot);
 
     /// <summary>State has changed.</summary>
     void StateHasChanged();

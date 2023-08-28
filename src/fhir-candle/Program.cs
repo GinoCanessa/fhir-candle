@@ -335,7 +335,11 @@ public static partial class Program
             if (ps.IsConfigured &&
                 config.PublishedPackages.Any())
             {
-                _ = sm.LoadRequestedPackages();
+                // look for a package supplemental directory
+
+                string supplemental = FindRelativeDir(root, "supplements", false);
+
+                _ = sm.LoadRequestedPackages(supplemental);
             }
 
             AfterServerStart(app, config);

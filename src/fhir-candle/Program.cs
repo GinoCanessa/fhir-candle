@@ -357,12 +357,21 @@ public static partial class Program
                 (config.PublishedPackages.Any() || config.CiPackages.Any()))
             {
                 // look for a package supplemental directory
-
                 string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-                    ? FindRelativeDir(root, "fhirData/package", false)
-                    : FindRelativeDir(config.SourceDirectory, "package", false);
+                    ? FindRelativeDir(root, "fhirData", false)
+                    : config.SourceDirectory;
 
                 _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
+            }
+
+            if (!string.IsNullOrEmpty(config.ReferenceImplementation))
+            {
+                // look for a package supplemental directory
+                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
+                    ? FindRelativeDir(root, $"fhirData/{config.ReferenceImplementation}", false)
+                    : Path.Combine(config.SourceDirectory, config.ReferenceImplementation);
+
+                sm.LoadRiContents(supplemental);
             }
 
             AfterServerStart(app, config);

@@ -168,7 +168,7 @@
 
         Utils.GetRiPages(ServerConfig.ReferenceImplementation ?? string.Empty, out _riPagesR4, out _riPagesR4B, out _riPagesR5);
 
-        Utils.GetAdditionalIndexContent(ServerConfig.ReferenceImplementation, out _contentR4, out _contentR4B, out _contentR5);
+        Utils.GetAdditionalIndexContent(ServerConfig.ReferenceImplementation ?? string.Empty, out _contentR4, out _contentR4B, out _contentR5);
     }
 
     /// <summary>

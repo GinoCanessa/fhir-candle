@@ -364,104 +364,110 @@ public partial class VersionedFhirStore : IFhirStore
         _loadReprocess = new();
         _loadState = LoadStateCodes.Read;
 
-        _loadedDirectives.Add(directive);
-        if (directive.Contains('#'))
-        {
-            _loadedDirectives.Add(directive.Split('#')[0]);
-        }
-
         string serializedResource, serializedOutcome, eTag, lastModified, location;
         HttpStatusCode sc;
 
-        DirectoryInfo di = new(directory);
-
-        Console.WriteLine($"Store[{_config.ControllerName}] loading {directive}");
-
-        string libDir = string.Empty;
-
-        // look for an package.json so we can determine examples
-        foreach (FileInfo file in di.GetFiles("package.json", SearchOption.AllDirectories))
-        {
-            try
-            {
-                FhirNpmPackageDetails details = FhirNpmPackageDetails.Load(file.FullName);
-
-                if (details.Directories?.ContainsKey("lib") ?? false)
-                {
-                    libDir = details.Directories["lib"];
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {ex.Message}");
-            }
-        }
-
-        if (!includeExamples)
-        {
-        }
-
+        DirectoryInfo di;
         FileInfo[] files;
 
-        if ((!includeExamples) &&
-            (!string.IsNullOrEmpty(libDir)) &&
-            Directory.Exists(Path.Combine(directory, libDir)))
+        if ((!string.IsNullOrEmpty(directive)) &&
+            (!string.IsNullOrEmpty(directory)))
         {
-            di = new(Path.Combine(directory, libDir));
-            files = di.GetFiles("*.*", SearchOption.TopDirectoryOnly);
-        }
-        else
-        {
-            files = di.GetFiles("*.*", SearchOption.AllDirectories);
-        }
-
-        // traverse all files
-        foreach (FileInfo file in files)
-        {
-            switch (file.Extension.ToLowerInvariant())
+            _loadedDirectives.Add(directive);
+            if (directive.Contains('#'))
             {
-                case ".json":
-                    sc = InstanceCreate(
-                        string.Empty,
-                        File.ReadAllText(file.FullName),
-                        "application/fhir+json",
-                        "application/fhir+json",
-                        false,
-                        string.Empty,
-                        true,
-                        out serializedResource,
-                        out serializedOutcome,
-                        out eTag,
-                        out lastModified,
-                        out location);
-                    break;
-
-                case ".xml":
-                    sc = InstanceCreate(
-                        string.Empty,
-                        File.ReadAllText(file.FullName),
-                        "application/fhir+xml",
-                        "application/fhir+xml",
-                        false,
-                        string.Empty,
-                        true,
-                        out serializedResource,
-                        out serializedOutcome,
-                        out eTag,
-                        out lastModified,
-                        out location);
-                    break;
-
-                default:
-                    continue;
+                _loadedDirectives.Add(directive.Split('#')[0]);
             }
 
-            Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+            Console.WriteLine($"Store[{_config.ControllerName}] loading {directive}");
+
+            di = new(directory);
+            string libDir = string.Empty;
+
+            // look for an package.json so we can determine examples
+            foreach (FileInfo file in di.GetFiles("package.json", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    FhirNpmPackageDetails details = FhirNpmPackageDetails.Load(file.FullName);
+
+                    if (details.Directories?.ContainsKey("lib") ?? false)
+                    {
+                        libDir = details.Directories["lib"];
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {ex.Message}");
+                }
+            }
+
+            if (!includeExamples)
+            {
+            }
+
+            if ((!includeExamples) &&
+                (!string.IsNullOrEmpty(libDir)) &&
+                Directory.Exists(Path.Combine(directory, libDir)))
+            {
+                di = new(Path.Combine(directory, libDir));
+                files = di.GetFiles("*.*", SearchOption.TopDirectoryOnly);
+            }
+            else
+            {
+                files = di.GetFiles("*.*", SearchOption.AllDirectories);
+            }
+
+            // traverse all files
+            foreach (FileInfo file in files)
+            {
+                switch (file.Extension.ToLowerInvariant())
+                {
+                    case ".json":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+json",
+                            "application/fhir+json",
+                            false,
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    case ".xml":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+xml",
+                            "application/fhir+xml",
+                            false,
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    default:
+                        continue;
+                }
+
+                Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+            }
         }
 
         if ((!string.IsNullOrEmpty(packageSupplements)) &&
             Directory.Exists(packageSupplements))
         {
+            Console.WriteLine($"Store[{_config.ControllerName}] loading contents from {packageSupplements}");
+
             di = new(packageSupplements);
 
             foreach (FileInfo file in di.GetFiles("*.*", SearchOption.AllDirectories))

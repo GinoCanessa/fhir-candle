@@ -187,6 +187,81 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
         FhirPackageService.FhirSequenceEnum fhirVersion
         );
 
+    /// <summary>Loads ri contents.</summary>
+    /// <param name="dir">The dir.</param>
+    public void LoadRiContents(string dir)
+    {
+        if (string.IsNullOrEmpty(dir) ||
+            !Directory.Exists(dir))
+        {
+            return;
+        }
+
+        // loop over controllers to see where we can add this
+        foreach ((string tenantName, TenantConfiguration config) in _tenants)
+        {
+            switch (config.FhirVersion)
+            {
+                case TenantConfiguration.SupportedFhirVersions.R4:
+                    if (Directory.Exists(Path.Combine(dir, "r4")))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, "r4"),
+                            true);
+                    }
+                    else
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            dir,
+                            true);
+                    }
+                    break;
+                case TenantConfiguration.SupportedFhirVersions.R4B:
+                    if (Directory.Exists(Path.Combine(dir, "r4b")))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, "r4b"),
+                            true);
+                    }
+                    else
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            dir,
+                            true);
+                    }
+                    break;
+                case TenantConfiguration.SupportedFhirVersions.R5:
+                    if (Directory.Exists(Path.Combine(dir, "r5")))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, "r5"),
+                            true);
+                    }
+                    else
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            dir,
+                            true);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
     /// <summary>Loads requested packages.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
     /// <param name="supplementalRoot">The supplemental root.</param>

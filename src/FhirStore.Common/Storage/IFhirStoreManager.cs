@@ -13,6 +13,10 @@ public interface IFhirStoreManager : IHostedService, IReadOnlyDictionary<string,
     /// <summary>Occurs when On Changed.</summary>
     event EventHandler<EventArgs>? OnChanged;
 
+    /// <summary>Loads ri contents.</summary>
+    /// <param name="dir">The dir.</param>
+    void LoadRiContents(string dir);
+
     /// <summary>Loads requested packages.</summary>
     /// <param name="supplementalRoot">The supplemental root.</param>
     /// <param name="loadExamples">    True to load examples.</param>

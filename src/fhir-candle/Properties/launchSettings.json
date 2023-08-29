@@ -42,9 +42,9 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "pas": {
+    "davinci-pas": {
       "commandName": "Project",
-      "commandLineArgs": "--reference-implementation davinci-pas --ci-package HL7/davinci-pas --r4 r4 --protect-source true -m 1000",
+      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-pas --ci-package HL7/davinci-pas --r4 r4 --protect-source true -m 1000",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

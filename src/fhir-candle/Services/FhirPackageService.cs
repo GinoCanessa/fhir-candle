@@ -4,6 +4,7 @@
 // </copyright>
 
 using fhir.candle.Models;
+using FhirCandle.Extensions;
 using FhirCandle.Models;
 using IniParser;
 using IniParser.Configuration;
@@ -45,21 +46,27 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     public enum FhirSequenceEnum : int
     {
         /// <summary>An enum constant representing the uknown option.</summary>
+        [FhirLiteral("")]
         Unknown = 0,
 
         /// <summary>An enum constant representing the DSTU2 option.</summary>
+        [FhirLiteral("DSTU2")]
         DSTU2 = 2,
 
         /// <summary>An enum constant representing the STU3 option.</summary>
+        [FhirLiteral("STU3")]
         STU3 = 3,
 
         /// <summary>An enum constant representing the R4 option.</summary>
+        [FhirLiteral("R4")]
         R4 = 4,
 
         /// <summary>An enum constant representing the R4B option.</summary>
+        [FhirLiteral("R4B")]
         R4B = -1,
 
         /// <summary>An enum constant representing the R5 option.</summary>
+        [FhirLiteral("R5")]
         R5 = 5,
     }
 
@@ -213,34 +220,49 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         return Task.CompletedTask;
     }
 
+    /// <summary>A package cache entry.</summary>
+    /// <param name="fhirVersion">        The FHIR version.</param>
+    /// <param name="directory">          Pathname of the directory.</param>
+    /// <param name="resolvedDirective">  The resolved directive.</param>
+    /// <param name="resolvedName">       Name of the resolved.</param>
+    /// <param name="resolvedVersion">    The resolved version.</param>
+    /// <param name="umbrellaPackageName">Name of the umbrella package.</param>
+    public record struct PackageCacheEntry(
+        FhirSequenceEnum fhirVersion,
+        string directory,
+        string resolvedDirective,
+        string name,
+        string version,
+        string umbrellaPackageName);
+
     /// <summary>Attempts to find locally or download a given package.</summary>
     /// <param name="directive">        The directive.</param>
+    /// <param name="branchName">       Name of the branch.</param>
     /// <param name="directory">        [out] Pathname of the directory.</param>
     /// <param name="fhirVersion">      [out] The FHIR version.</param>
-    /// <param name="offlineMode">      True to enable offline mode, false to disable it.</param>
-    /// <param name="branchName">       Name of the branch.</param>
     /// <param name="resolvedDirective">[out] The branch directive.</param>
+    /// <param name="offlineMode">      True to enable offline mode, false to disable it.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool FindOrDownload(
         string directive,
-        out string directory,
-        out FhirSequenceEnum fhirVersion,
-        bool offlineMode,
         string branchName,
-        out string resolvedDirective)
+        out IEnumerable<PackageCacheEntry> packages,
+        bool offlineMode = false)
     {
         if (!_hasCacheDirectory)
         {
-            directory = string.Empty;
-            fhirVersion = FhirSequenceEnum.Unknown;
-            resolvedDirective = string.Empty;
+            packages = Enumerable.Empty<PackageCacheEntry>();
             return false;
         }
 
         string name;
         string version;
         bool isLocal = false;
-        directory = string.Empty;
+        List<PackageCacheEntry> packageList = new();
+
+        string directory = string.Empty;
+        FhirSequenceEnum fhirVersion;
+        string resolvedDirective;
 
         if (directive.Contains('#'))
         {
@@ -271,6 +293,17 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             {
                 if (TryDownloadCoreViaCI(name, branchName, out directory, out fhirVersion, out resolvedDirective))
                 {
+                    packageList.Add(new()
+                    {
+                        fhirVersion = fhirVersion,
+                        directory = directory,
+                        resolvedDirective = resolvedDirective,
+                        name = name,
+                        version = resolvedDirective.Contains('#') ? resolvedDirective.Split('#')[1] : version,
+                        umbrellaPackageName = name,
+                    });
+
+                    packages = packageList;
                     return true;
                 }
             }
@@ -278,6 +311,17 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             {
                 if (TryDownloadGuideViaCI(branchName, out name, out directory, out fhirVersion, out resolvedDirective))
                 {
+                    packageList.Add(new()
+                    {
+                        fhirVersion = fhirVersion,
+                        directory = directory,
+                        resolvedDirective = resolvedDirective,
+                        name = name,
+                        version = resolvedDirective.Contains('#') ? resolvedDirective.Split('#')[1] : version,
+                        umbrellaPackageName = name,
+                    });
+
+                    packages = packageList;
                     return true;
                 }
             }
@@ -294,12 +338,22 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                 {
                     _logger.LogInformation($"FindOrDownload <<< package: {directive} not accessible!");
                 }
-                directory = string.Empty;
-                fhirVersion = FhirSequenceEnum.Unknown;
+
+                packages = Enumerable.Empty<PackageCacheEntry>();
                 return false;
             }
 
-            fhirVersion = SequenceForVersion(_packagesByDirective[directive].Details.FhirVersion);
+            packageList.Add(new()
+            {
+                fhirVersion = SequenceForVersion(_packagesByDirective[directive].Details.FhirVersion),
+                directory = directory,
+                resolvedDirective = directive,
+                name = name,
+                version = directive.Contains('#') ? directive.Split('#')[1] : version,
+                umbrellaPackageName = name,
+            });
+
+            packages = packageList;
             return true;
         }
 
@@ -309,6 +363,17 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             {
                 if (TryDownloadCoreViaCI(name, branchName, out directory, out fhirVersion, out resolvedDirective))
                 {
+                    packageList.Add(new()
+                    {
+                        fhirVersion = fhirVersion,
+                        directory = directory,
+                        resolvedDirective = resolvedDirective,
+                        name = name,
+                        version = resolvedDirective.Contains('#') ? resolvedDirective.Split('#')[1] : version,
+                        umbrellaPackageName = name,
+                    });
+
+                    packages = packageList;
                     return true;
                 }
             }
@@ -316,6 +381,17 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             {
                 if (TryDownloadGuideViaCI(branchName, out name, out directory, out fhirVersion, out resolvedDirective))
                 {
+                    packageList.Add(new()
+                    {
+                        fhirVersion = fhirVersion,
+                        directory = directory,
+                        resolvedDirective = resolvedDirective,
+                        name = name,
+                        version = resolvedDirective.Contains('#') ? resolvedDirective.Split('#')[1] : version,
+                        umbrellaPackageName = name,
+                    });
+
+                    packages = packageList;
                     return true;
                 }
             }
@@ -328,46 +404,99 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             {
                 _logger.LogInformation($"FindOrDownload <<< package: {directive} not accessible!");
             }
-            directory = string.Empty;
-            fhirVersion = FhirSequenceEnum.Unknown;
+
+            packages = Enumerable.Empty<PackageCacheEntry>();
             return false;
         }
 
-        if (string.IsNullOrEmpty(version) || version.Equals("latest", StringComparison.OrdinalIgnoreCase))
+        // check to see if this package already has a version trailer
+        string lastComponent = name.Split('.').Last();
+
+        Dictionary<FhirSequenceEnum, string> sequencesToTest = new();
+
+        if (lastComponent.TryFhirEnum(out FhirSequenceEnum seq))
         {
-            TryGetHighestVersion(name, offlineMode, out version, out isLocal, out directory);
+            sequencesToTest.Add(seq, string.Empty);
+        }
+        else
+        {
+            sequencesToTest = Enum.GetValues(typeof(FhirSequenceEnum))
+                .Cast<FhirSequenceEnum>()
+                .Where(v => v >= FhirSequenceEnum.R4)
+                .ToDictionary(x => x, x => LiteralForSequence(x).ToLowerInvariant());
         }
 
-        if (isLocal || HasCachedVersion(name, version, out directory))
+        // want to check for fhir-version named packages
+        foreach ((FhirSequenceEnum seqence, string trailer) in sequencesToTest)
         {
-            fhirVersion = _packagesByDirective[$"{name}#{version}"].FhirVersion;
-            resolvedDirective = $"{name}#{version}";
+            string sequencedName = string.IsNullOrEmpty(trailer) ? name : $"{name}.{trailer}";
+
+            if (string.IsNullOrEmpty(version) || 
+                version.Equals("latest", StringComparison.OrdinalIgnoreCase))
+            {
+                TryGetHighestVersion(sequencedName, offlineMode, out version, out isLocal, out directory);
+            }
+
+            if ((isLocal && !string.IsNullOrEmpty(directory)) || 
+                HasCachedVersion(sequencedName, version, out directory))
+            {
+                packageList.Add(new()
+                {
+                    fhirVersion = _packagesByDirective[$"{sequencedName}#{version}"].FhirVersion,
+                    directory = directory,
+                    resolvedDirective = $"{sequencedName}#{version}",
+                    name = sequencedName,
+                    version = version,
+                    umbrellaPackageName = name,
+                });
+
+                continue;
+            }
+
+            if (!isLocal && offlineMode)
+            {
+                continue;
+            }
+
+            if (TryDownloadViaRegistry(sequencedName, version, out directory, out fhirVersion, out resolvedDirective))
+            {
+                packageList.Add(new()
+                {
+                    fhirVersion = fhirVersion,
+                    directory = directory,
+                    resolvedDirective = resolvedDirective,
+                    name = sequencedName,
+                    version = version,
+                    umbrellaPackageName = name,
+                });
+
+                continue;
+            }
+
+            if (TryDownloadCoreViaPublication(sequencedName, version, out directory, out fhirVersion, out resolvedDirective))
+            {
+                packageList.Add(new()
+                {
+                    fhirVersion = fhirVersion,
+                    directory = directory,
+                    resolvedDirective = resolvedDirective,
+                    name = sequencedName,
+                    version = version,
+                    umbrellaPackageName = name,
+                });
+
+                continue;
+            }
+        }
+
+        if (packageList.Any())
+        {
+            packages = packageList;
             return true;
         }
 
-        if (!isLocal && offlineMode)
-        {
-            _logger.LogInformation($"FindOrDownload <<< cannot resolve requested package while offline: {name}#{version}");
-            directory = string.Empty;
-            fhirVersion = FhirSequenceEnum.Unknown;
-            resolvedDirective = string.Empty;
-            return false;
-        }
-
-        if (TryDownloadViaRegistry(name, version, out directory, out fhirVersion, out resolvedDirective))
-        {
-            return true;
-        }
-
-        if (TryDownloadCoreViaPublication(name, version, out directory, out fhirVersion, out resolvedDirective))
-        {
-            return true;
-        }
-
-        _logger.LogInformation($"FindOrDownload <<< unable to resolve a directive: {directive}");
-        directory = string.Empty;
-        fhirVersion = FhirSequenceEnum.Unknown;
-        resolvedDirective = string.Empty;
+        _logger.LogInformation($"FindOrDownload <<< unable to resolve directive: {directive}");
+        packages = Enumerable.Empty<PackageCacheEntry>();
         return false;
     }
 
@@ -910,13 +1039,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Literal for sequence.</summary>
     /// <param name="seq">The sequence.</param>
     /// <returns>A string.</returns>
-    public static string LiteralForSequence(FhirSequenceEnum seq) => seq switch
-    {
-        FhirSequenceEnum.DSTU2 => "DSTU2",
-        FhirSequenceEnum.STU3 => "STU3",
-        FhirSequenceEnum.R4B => "R4B",
-        _ => $"R{(int)seq}",
-    };
+    public static string LiteralForSequence(FhirSequenceEnum seq) => seq.ToLiteral();
 
     /// <summary>Attempts to get core ci package details.</summary>
     /// <param name="branchName">Name of the branch.</param>

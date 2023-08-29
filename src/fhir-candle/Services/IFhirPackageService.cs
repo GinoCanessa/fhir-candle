@@ -25,19 +25,17 @@ public interface IFhirPackageService : IHostedService
 
     /// <summary>Attempts to find locally or download a given package.</summary>
     /// <param name="directive">        The directive.</param>
+    /// <param name="branchName">       Name of the branch.</param>
     /// <param name="directory">        [out] Pathname of the directory.</param>
     /// <param name="fhirVersion">      [out] The FHIR version.</param>
-    /// <param name="offlineMode">      True to enable offline mode, false to disable it.</param>
-    /// <param name="branchName">       Name of the branch.</param>
     /// <param name="resolvedDirective">[out] The resolved directive.</param>
+    /// <param name="offlineMode">      True to enable offline mode, false to disable it.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool FindOrDownload(
         string directive,
-        out string directory,
-        out FhirSequenceEnum fhirVersion,
-        bool offlineMode,
         string branchName,
-        out string resolvedDirective);
+        out IEnumerable<PackageCacheEntry> packages,
+        bool offlineMode);
 
     /// <summary>Initializes the FhirPackageService to a specific cache directory.</summary>
     /// <param name="cacheDirectory">Pathname of the cache directory.</param>

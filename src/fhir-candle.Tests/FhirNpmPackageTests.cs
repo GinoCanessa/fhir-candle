@@ -5,6 +5,7 @@
 
 using FluentAssertions;
 using fhir.candle.Models;
+using FhirCandle.Models;
 
 namespace fhir.candle.Tests;
 

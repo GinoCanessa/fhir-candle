@@ -25,7 +25,8 @@
     },
     "subscriptions": {
       "commandName": "Project",
-      "commandLineArgs": "--fhir-source fhirData/subscriptions-ri --protect-source true -m 1000 --ui-mode subscriptionsri",
+      "commandLineArgs": "--reference-implementation subscriptions --load-package hl7.fhir.uv.subscriptions-backport#1.1.0 --load-examples false --protect-source true -m 1000",
+      //"commandLineArgs": "--load-package hl7.fhir.uv.subscriptions-backport.r4#1.1.0 --load-package hl7.fhir.uv.subscriptions-backport.r4b#1.1.0 --load-examples false --protect-source true -m 1000 --ui-mode subscriptionsri",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {
@@ -34,7 +35,7 @@
     },
     "ecr": {
       "commandName": "Project",
-      "commandLineArgs": "--load-package hl7.fhir.us.ecr#2.1.0 --protect-source true -m 1000",
+      "commandLineArgs": "--load-package hl7.fhir.us.ecr#2.1.0 --r4 r4 --protect-source true -m 1000",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {
@@ -43,7 +44,7 @@
     },
     "pas": {
       "commandName": "Project",
-      "commandLineArgs": "--ci-package HL7/davinci-pas --protect-source true -m 1000",
+      "commandLineArgs": "--reference-implementation davinci-pas --ci-package HL7/davinci-pas --r4 r4 --protect-source true -m 1000",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

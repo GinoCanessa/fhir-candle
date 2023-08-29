@@ -73,30 +73,35 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<int?>("Max_Resources", null),
             "Maximum number of resources allowed per tenant.");
 
-        Option<ServerConfiguration.UiModes?> optUiMode = new(
-            name: "--ui-mode",
-            getDefaultValue: () => configuration.GetValue<ServerConfiguration.UiModes>("Mode", ServerConfiguration.UiModes.Default)!,
-            "UI content mode: " + string.Join(", ", Enum.GetNames(typeof(ServerConfiguration.UiModes))));
+        Option<bool?> optDisableUi = new(
+            name: "--disable-ui",
+            getDefaultValue: () => configuration.GetValue<bool?>("Disable_Ui", null),
+            "If the server should run headless.");
 
         Option<string?> optPackageCache = new(
             name: "--fhir-package-cache",
-            getDefaultValue: () => null,
+            getDefaultValue: () => configuration.GetValue<string?>("Fhir_Cache", null),
             "Location of the FHIR package cache, for use with registries and IG packages.  Use empty quoted string to disable cache.");
 
         Option<List<string>> optPublishedPackages = new(
             name: "--load-package",
-            getDefaultValue: () => new(),
+            getDefaultValue: () => configuration.GetValue<List<string>>("Load_Packages", new List<string>())!,
             "Published packages to load. Specifying package name alone loads highest version.");
 
         Option<List<string>> optCiPackages = new(
             name: "--ci-package",
-            getDefaultValue: () => new(),
+            getDefaultValue: () => configuration.GetValue<List<string>>("Ci_Packages", new List<string>())!,
             "Continuous Integration (CI) packages to load. You may specify either just the branch name or a full URL.");
 
         Option<bool?> optLoadPackageExamples = new(
             name: "--load-examples",
-            getDefaultValue: () => null,
+            getDefaultValue: () => configuration.GetValue<bool?>("Load_Examples", null),
             "If package loading should include example instances.");
+
+        Option<string?> optPackageReferenceImplementation = new(
+            name: "--reference-implementation",
+            getDefaultValue: () => configuration.GetValue<string?>("Reference_Implementation", null),
+            "If running as the Reference Implementation, the package directive or literal.");
 
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
@@ -164,11 +169,12 @@ public static partial class Program
             optListenPort,
             optOpenBrowser,
             optMaxResourceCount,
-            optUiMode,
+            optDisableUi,
             optPackageCache,
             optPublishedPackages,
             optCiPackages,
             optLoadPackageExamples,
+            optPackageReferenceImplementation,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -193,11 +199,12 @@ public static partial class Program
                 ListenPort = context.ParseResult.GetValueForOption(optListenPort) ?? _defaultListenPort,
                 OpenBrowser = context.ParseResult.GetValueForOption(optOpenBrowser) ?? false,
                 MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
-                UiMode = context.ParseResult.GetValueForOption(optUiMode) ?? ServerConfiguration.UiModes.Default,
+                DisableUi = context.ParseResult.GetValueForOption(optDisableUi) ?? false,
                 FhirCacheDirectory = context.ParseResult.GetValueForOption(optPackageCache),
                 PublishedPackages = context.ParseResult.GetValueForOption(optPublishedPackages) ?? new(),
                 CiPackages = context.ParseResult.GetValueForOption(optCiPackages) ?? new(),
                 LoadPackageExamples = context.ParseResult.GetValueForOption(optLoadPackageExamples) ?? false,
+                ReferenceImplementation = context.ParseResult.GetValueForOption(optPackageReferenceImplementation) ?? string.Empty,
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -292,7 +299,7 @@ public static partial class Program
 
             builder.Services.AddControllers();
 
-            if (config.UiMode != ServerConfiguration.UiModes.None)
+            if (config.DisableUi != true)
             {
                 builder.Services.AddRazorPages(options =>
                 {
@@ -302,7 +309,7 @@ public static partial class Program
                 builder.Services.AddMudServices();
 
                 // set our default UI page
-                Pages.Index.Mode = config.UiMode;
+                //Pages.Index.Mode = config.UiMode;
             }
 
             string localUrl = $"http://*:{config.ListenPort}";
@@ -324,7 +331,7 @@ public static partial class Program
 
             app.MapControllers();
 
-            if (config.UiMode != ServerConfiguration.UiModes.None)
+            if (config.DisableUi != true)
             {
                 app.MapBlazorHub();
                 app.MapFallbackToPage("/_Host");
@@ -351,7 +358,9 @@ public static partial class Program
             {
                 // look for a package supplemental directory
 
-                string supplemental = FindRelativeDir(root, "supplements", false);
+                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
+                    ? FindRelativeDir(root, "fhirData/package", false)
+                    : FindRelativeDir(config.SourceDirectory, "package", false);
 
                 _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
             }

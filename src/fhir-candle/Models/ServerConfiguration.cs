@@ -12,7 +12,6 @@ public class ServerConfiguration
     {
         Default,
         None,
-        SubscriptionsRI,
     }
 
     /// <summary>Gets or sets URL of the public.</summary>
@@ -27,7 +26,7 @@ public class ServerConfiguration
     public int MaxResourceCount { get; set; } = 0;
 
     /// <summary>Gets or sets the UI Mode.</summary>
-    public UiModes UiMode { get; set; } = UiModes.Default;
+    public bool? DisableUi { get; set; } = null;
 
     /// <summary>Gets or sets the pathname of the FHIR cache directory.</summary>
     public string? FhirCacheDirectory { get; set; } = null;
@@ -40,6 +39,9 @@ public class ServerConfiguration
 
     /// <summary>Gets or sets the load package examples.</summary>
     public bool? LoadPackageExamples { get; set; } = null;
+
+    /// <summary>Gets or sets the reference implementation package.</summary>
+    public string? ReferenceImplementation { get; set; } = null;
 
     /// <summary>Gets or sets the pathname of the source directory.</summary>
     public string? SourceDirectory { get; set; } = null;

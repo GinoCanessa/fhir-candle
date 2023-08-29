@@ -127,7 +127,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Components\" />
 	  <Folder Include="Pages\Client\" />
 	</ItemGroup>
 

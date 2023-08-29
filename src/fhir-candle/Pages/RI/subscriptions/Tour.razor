@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 
 @implements IDisposable
+@implements IRiPage
 
 <PageTitle>Subscriptions Tour</PageTitle>
 
@@ -399,18 +400,25 @@
     [SupplyParameterFromQuery(Name = "store")]
     public string StoreName { get; set; } = "";
 
+    /// <summary>The store.</summary>
     private IFhirStore _store = null!;
 
+    /// <summary>Gets or sets the on step.</summary>
     private int onStep { get; set; } = 1;
 
+    /// <summary>Gets or sets the error at step.</summary>
     private int errorAtStep { get; set; } = -1;
 
+    /// <summary>Message describing the error.</summary>
     private string errorMessage = string.Empty;
 
+    /// <summary>The subscription location.</summary>
     private string subscriptionLocation = string.Empty;
 
+    /// <summary>Identifier for the handshake bundle.</summary>
     private string handshakeBundleId = string.Empty;
 
+    /// <summary>The subscription.</summary>
     ParsedSubscription subscription = new()
     {
         Id = Guid.NewGuid().ToString(),
@@ -433,12 +441,30 @@
         }
     };
 
+    /// <summary>The encounter status.</summary>
     private string encounterStatus = "completed";
 
+    /// <summary>True to posting resource.</summary>
     private bool postingResource = false;
 
+    /// <summary>The posted encounters.</summary>
     List<string> postedEncounters = new();
 
+    /// <summary>Gets the content for package.</summary>
+    public static string ContentForPackage { get => "subscriptions"; }
+
+    /// <summary>Gets the name of the page.</summary>
+    public static string PageName { get => "Subscriptions RI Tour"; }
+
+    /// <summary>Gets the description.</summary>
+    public static string Description { get => "This page contains a tour of topic-based subscriptions."; }
+
+    /// <summary>Gets the full pathname of the route file.</summary>
+    public static string RoutePath { get => "/subscriptions/tour"; }
+
+    /// <summary>Color for step.</summary>
+    /// <param name="step">Amount to increment by.</param>
+    /// <returns>A MudBlazor.Color.</returns>
     private MudBlazor.Color ColorForStep(int step)
     {
         if (step == errorAtStep)
@@ -459,6 +485,9 @@
         return Color.Default;
     }
 
+    /// <summary>Icon for step.</summary>
+    /// <param name="step">Amount to increment by.</param>
+    /// <returns>A string.</returns>
     private string IconForStep(int step)
     {
         if (step == errorAtStep)
@@ -479,6 +508,8 @@
         return Icons.Material.Filled.LockClock;
     }
 
+    /// <summary>Move to step.</summary>
+    /// <param name="toStep">to step.</param>
     private void MoveToStep(int toStep)
     {
         errorAtStep = -1;
@@ -493,6 +524,7 @@
         InvokeAsync(() => StateHasChanged());
     }
 
+    /// <summary>Posts the subscription.</summary>
     private void PostSubscription()
     {
         if ((postingResource) || (!string.IsNullOrEmpty(subscriptionLocation)))
@@ -540,6 +572,7 @@
         return;
     }
 
+    /// <summary>Posts the encounter.</summary>
     private void PostEncounter()
     {
         if (postingResource)
@@ -593,6 +626,7 @@
         };
     }
 
+    /// <summary>Clean up.</summary>
     private void CleanUp()
     {
         if (!string.IsNullOrEmpty(subscriptionLocation))

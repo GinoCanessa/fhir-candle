@@ -173,11 +173,15 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
     /// <summary>A loaded packagage.</summary>
     /// <param name="directive">          The directive.</param>
+    /// <param name="name">               The name.</param>
+    /// <param name="version">            The version.</param>
     /// <param name="directory">          Pathname of the directory.</param>
     /// <param name="supplementDirectory">Pathname of the supplement directory.</param>
     /// <param name="fhirVersion">        The FHIR version.</param>
     private record struct LoadedPackageRec(
         string directive,
+        string name,
+        string version,
         string directory,
         string supplementDirectory,
         FhirPackageService.FhirSequenceEnum fhirVersion
@@ -205,36 +209,60 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
         List<LoadedPackageRec> loadRecs = new();
 
-        string resolvedDirective;
-
         foreach (string branchName in _serverConfig.CiPackages)
         {
-            if (!_packageService.FindOrDownload(string.Empty, out string dir, out FhirPackageService.FhirSequenceEnum fhirVersion, false, branchName, out resolvedDirective))
+            if (!_packageService.FindOrDownload(string.Empty, branchName, out IEnumerable<FhirPackageService.PackageCacheEntry> pacakges, false))
             {
                 throw new Exception($"Unable to find or download CI package: {branchName}");
             }
 
-            string supplementDir = GetSupplementDir(supplementalRoot, resolvedDirective);
+            List<LoadedPackageRec> directiveRecs = new();
 
-            loadRecs.Add(new(resolvedDirective, dir, supplementDir, fhirVersion));
+            foreach (FhirPackageService.PackageCacheEntry entry in pacakges)
+            {
+                directiveRecs.Add(EntryToRec(supplementalRoot, entry));
+            }
+
+            // single entry means single package, multiple means first is umbrella package
+            if (directiveRecs.Count == 1)
+            {
+                loadRecs.Add(directiveRecs[0]);
+            }
+            else
+            {
+                loadRecs.AddRange(directiveRecs.Skip(1));
+            }
         }
 
         foreach (string directive in _serverConfig.PublishedPackages)
         {
-            if (!_packageService.FindOrDownload(directive, out string dir, out FhirPackageService.FhirSequenceEnum fhirVersion, false, string.Empty, out resolvedDirective))
+            if (!_packageService.FindOrDownload(directive, string.Empty, out IEnumerable<FhirPackageService.PackageCacheEntry> pacakges, false))
             {
-                throw new Exception($"Unable to find or download package: {directive}");
+                throw new Exception($"Unable to find or download published package: {directive}");
             }
 
-            string supplementDir = GetSupplementDir(supplementalRoot, resolvedDirective);
+            List<LoadedPackageRec> directiveRecs = new();
 
-            loadRecs.Add(new(resolvedDirective, dir, supplementDir, fhirVersion));
+            foreach (FhirPackageService.PackageCacheEntry entry in pacakges)
+            {
+                directiveRecs.Add(EntryToRec(supplementalRoot, entry));
+            }
+
+            // single entry means single package, multiple means first is umbrella package
+            if (directiveRecs.Count == 1)
+            {
+                loadRecs.Add(directiveRecs[0]);
+            }
+            else
+            {
+                loadRecs.AddRange(directiveRecs.Skip(1));
+            }
         }
 
         foreach (LoadedPackageRec r in loadRecs)
         {
             // loop over controllers to see where we can add this
-            foreach ((string name, TenantConfiguration config) in _tenants)
+            foreach ((string tenantName, TenantConfiguration config) in _tenants)
             {
                 switch (config.FhirVersion)
                 {
@@ -244,7 +272,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
                                 Directory.Exists(Path.Combine(r.supplementDirectory, "r4")))
                             {
-                                _storesByController[name].LoadPackage(
+                                _storesByController[tenantName].LoadPackage(
                                     r.directive, 
                                     r.directory, 
                                     Path.Combine(r.supplementDirectory, "r4"),
@@ -252,7 +280,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             }
                             else
                             {
-                                _storesByController[name].LoadPackage(
+                                _storesByController[tenantName].LoadPackage(
                                     r.directive, 
                                     r.directory, 
                                     r.supplementDirectory,
@@ -266,7 +294,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
                                 Directory.Exists(Path.Combine(r.supplementDirectory, "r4b")))
                             {
-                                _storesByController[name].LoadPackage(
+                                _storesByController[tenantName].LoadPackage(
                                     r.directive, 
                                     r.directory, 
                                     Path.Combine(r.supplementDirectory, "r4b"),
@@ -274,7 +302,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             }
                             else
                             {
-                                _storesByController[name].LoadPackage(
+                                _storesByController[tenantName].LoadPackage(
                                     r.directive, 
                                     r.directory, 
                                     r.supplementDirectory,
@@ -288,7 +316,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
                                 Directory.Exists(Path.Combine(r.supplementDirectory, "r5")))
                             {
-                                _storesByController[name].LoadPackage(
+                                _storesByController[tenantName].LoadPackage(
                                     r.directive, 
                                     r.directory, 
                                     Path.Combine(r.supplementDirectory, 
@@ -297,7 +325,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             }
                             else
                             {
-                                _storesByController[name].LoadPackage(
+                                _storesByController[tenantName].LoadPackage(
                                     r.directive, 
                                     r.directory, 
                                     r.supplementDirectory, 
@@ -310,29 +338,100 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                 }
             }
         }
+
+        LoadedPackageRec EntryToRec(string supplementalRoot, FhirPackageService.PackageCacheEntry entry)
+        {
+            string supplementDir = GetSupplementDir(supplementalRoot, entry);
+
+            string[] directiveComponents = entry.resolvedDirective.Split('#');
+
+            string packageName = directiveComponents.Any() ? directiveComponents[0] : string.Empty;
+            string packageVersion = directiveComponents.Length > 1 ? directiveComponents[1] : string.Empty;
+
+            return new LoadedPackageRec(
+                entry.resolvedDirective,
+                packageName,
+                packageVersion,
+                entry.directory,
+                supplementDir,
+                entry.fhirVersion);
+        }
+
+        //bool ShouldLoadPackage(
+        //    LoadedPackageRec r,
+        //    TenantConfiguration t,
+        //    out string directive,
+        //    out string directory,
+        //    out string supplementalDirectory)
+        //{
+
+
+        //    if (!VersionsMatch(r, t))
+        //    {
+        //        // check to see if we have a non-matching supplemental package
+
+        //        directive = string.Empty;
+        //        directory = string.Empty;
+        //        supplementalDirectory = string.Empty;
+        //        return false;
+        //    }
+
+
+        //}
+
     }
+
+    /// <summary>Versions match.</summary>
+    /// <param name="r">A LoadedPackageRec to process.</param>
+    /// <param name="t">A TenantConfiguration to process.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    static bool VersionsMatch(LoadedPackageRec r, TenantConfiguration t) => t.FhirVersion switch
+    {
+        TenantConfiguration.SupportedFhirVersions.R4 => r.fhirVersion == FhirPackageService.FhirSequenceEnum.R4,
+        TenantConfiguration.SupportedFhirVersions.R4B => r.fhirVersion == FhirPackageService.FhirSequenceEnum.R4B,
+        TenantConfiguration.SupportedFhirVersions.R5 => r.fhirVersion == FhirPackageService.FhirSequenceEnum.R5,
+        _ => false,
+    };
 
     /// <summary>Gets supplement dir.</summary>
     /// <param name="supplementalRoot"> The supplemental root.</param>
     /// <param name="resolvedDirective">The resolved directive.</param>
     /// <returns>The supplement dir.</returns>
-    private string GetSupplementDir(string supplementalRoot, string resolvedDirective)
+    private string GetSupplementDir(string supplementalRoot, FhirPackageService.PackageCacheEntry entry)
     {
-        string packageSupplements = Path.Combine(supplementalRoot, resolvedDirective);
-
-        if (Directory.Exists(packageSupplements))
+        if (string.IsNullOrEmpty(supplementalRoot))
         {
-            return packageSupplements;
+            return string.Empty;
         }
 
-        if (resolvedDirective.Contains('#'))
-        {
-            packageSupplements = Path.Combine(supplementalRoot, resolvedDirective.Substring(0, resolvedDirective.IndexOf('#')));
+        string dir;
 
-            if (Directory.Exists(packageSupplements))
-            {
-                return packageSupplements;
-            }
+        // check to see if we have an exact match
+        dir = Path.Combine(supplementalRoot, entry.resolvedDirective);
+        if (Directory.Exists(dir))
+        {
+            return dir;
+        }
+
+        // check for named package without version
+        dir = Path.Combine(supplementalRoot, entry.name);
+        if (Directory.Exists(dir))
+        {
+            return dir;
+        }
+
+        // check for umbrella package with version
+        dir = Path.Combine(supplementalRoot, entry.umbrellaPackageName + "#" + entry.version);
+        if (Directory.Exists(dir))
+        {
+            return dir;
+        }
+
+        // check for umbrella package without version
+        dir = Path.Combine(supplementalRoot, entry.umbrellaPackageName);
+        if (Directory.Exists(dir))
+        {
+            return dir;
         }
 
         return string.Empty;

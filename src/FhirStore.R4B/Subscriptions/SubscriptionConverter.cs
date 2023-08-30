@@ -273,7 +273,7 @@ public class SubscriptionConverter
             subscription.Channel.AddExtension(_channelTypeUrl, new FhirString(extendedCt));
         }
 
-        subscription.Channel.AddExtension(_contentUrl, new FhirString(common.ContentLevel));
+        subscription.Channel.PayloadElement.AddExtension(_contentUrl, new Code(common.ContentLevel));
 
         // add parameters
         if (common.Parameters.Any())
@@ -362,7 +362,10 @@ public class SubscriptionConverter
             BundleId = bundleId,
             SubscriptionReference = status.Subscription?.Reference ?? string.Empty,
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
-            Status = status.Status?.ToString() ?? string.Empty,
+            Status = 
+                status.Status != null
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Status)
+                : string.Empty,
             NotificationType =
                 status.Type != null
                 ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Type).ToFhirEnum<ParsedSubscription.NotificationTypeCodes>()

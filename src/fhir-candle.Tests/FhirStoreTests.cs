@@ -457,6 +457,7 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
     }
 }
 
+/// <summary>A test bundle request parsing.</summary>
 public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
 {
     /// <summary>(Immutable) The test output helper.</summary>

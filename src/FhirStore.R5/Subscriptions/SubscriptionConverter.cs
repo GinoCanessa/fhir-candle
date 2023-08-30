@@ -46,7 +46,10 @@ public class SubscriptionConverter
             HeartbeatSeconds = sub.HeartbeatPeriod ?? 0,
             TimeoutSeconds = sub.Timeout ?? 0,
             ContentType = sub.ContentType,
-            ContentLevel = sub.Content?.ToString() ?? string.Empty,
+            ContentLevel =
+                sub.Content != null
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Content)
+                : string.Empty,
             MaxEventsPerNotification = sub.MaxCount ?? 0,
             ExpirationTicks = sub.End?.Ticks ?? (DateTime.Now.Ticks + ParsedSubscription.DefaultSubscriptionExpiration),
         };
@@ -222,7 +225,10 @@ public class SubscriptionConverter
             BundleId = bundleId,
             SubscriptionReference = status.Subscription?.Reference ?? string.Empty,
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
-            Status = status.Status?.ToString() ?? string.Empty,
+            Status =
+                status.Status != null
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Status)
+                : string.Empty,
             NotificationType =
                 status.Type != null
                 ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Type).ToFhirEnum<ParsedSubscription.NotificationTypeCodes>()

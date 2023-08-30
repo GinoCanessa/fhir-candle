@@ -13,6 +13,8 @@ using System.Text.Json;
 using Xunit.Abstractions;
 using candleR5::FhirCandle.Models;
 using candleR5::FhirCandle.Storage;
+using fhir.candle.Tests.Extensions;
+using System.Net;
 
 namespace fhir.candle.Tests;
 
@@ -344,5 +346,115 @@ public class R5TestsPatient : IClassFixture<R5Tests>
         }
 
         //_testOutputHelper.WriteLine(bundle);
+    }
+}
+
+/// <summary>A test subscription internals.</summary>
+public class R5TestSubscriptions : IClassFixture<R5Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R5Tests _fixture;
+
+    /// <summary>
+    /// Initializes a new instance of the fhir.candle.Tests.TestSubscriptionInternals class.
+    /// </summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
+    public R5TestSubscriptions(R5Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    /// <summary>Parse topic.</summary>
+    /// <param name="json">The JSON.</param>
+    [Theory]
+    [FileData("data/r5/SubscriptionTopic-encounter-complete.json")]
+    public void ParseTopic(string json)
+    {
+        HttpStatusCode sc = candleR5.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be("SubscriptionTopic");
+        candleR5.FhirCandle.Subscriptions.TopicConverter converter = new candleR5.FhirCandle.Subscriptions.TopicConverter();
+
+        bool success = converter.TryParse(r, out ParsedSubscriptionTopic s);
+
+        success.Should().BeTrue();
+        s.Should().NotBeNull();
+        s.Id.Should().Be("encounter-complete");
+        s.Url.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
+        s.ResourceTriggers.Should().HaveCount(1);
+        s.EventTriggers.Should().BeEmpty();
+        s.AllowedFilters.Should().NotBeEmpty();
+        s.NotificationShapes.Should().NotBeEmpty();
+    }
+
+    [Theory]
+    [FileData("data/r5/Subscription-encounter-complete.json")]
+    public void ParseSubscription(string json)
+    {
+        HttpStatusCode sc = candleR5.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be("Subscription");
+        candleR5.FhirCandle.Subscriptions.SubscriptionConverter converter = new candleR5.FhirCandle.Subscriptions.SubscriptionConverter();
+
+        bool success = converter.TryParse(r, out ParsedSubscription s);
+
+        success.Should().BeTrue();
+        s.Should().NotBeNull();
+        s.Id.Should().Be("e1f461cb-f41c-470e-aa75-d5223b2c943a");
+        s.TopicUrl.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
+        s.Filters.Should().HaveCount(1);
+        s.ChannelCode.Should().Be("rest-hook");
+        s.Endpoint.Should().Be("https://subscriptions.argo.run/fhir/r5/$subscription-hook");
+        s.HeartbeatSeconds.Should().Be(120);
+        s.TimeoutSeconds.Should().Be(0);
+        s.ContentType.Should().Be("application/fhir+json");
+        s.ContentLevel.Should().Be("id-only");
+        s.CurrentStatus.Should().Be("active");
+    }
+
+    [Theory]
+    [FileData("data/r5/Bundle-notification-handshake.json")]
+    public void ParseHandshake(string json)
+    {
+        HttpStatusCode sc = candleR5.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be("Bundle");
+
+        ParsedSubscriptionStatus? s = ((VersionedFhirStore)_fixture._store).ParseNotificationBundle((Hl7.Fhir.Model.Bundle)r);
+
+        s.Should().NotBeNull();
+        s!.BundleId.Should().Be("1d2910b6-ccd4-402d-bde3-912d2b4e439f");
+        s.SubscriptionReference.Should().Be("https://subscriptions.argo.run/fhir/r5/Subscription/e1f461cb-f41c-470e-aa75-d5223b2c943a");
+        s.SubscriptionTopicCanonical.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
+        s.Status.Should().Be("active");
+        s.NotificationType.Should().Be(ParsedSubscription.NotificationTypeCodes.Handshake);
+        s.NotificationEvents.Should().BeEmpty();
+        s.Errors.Should().BeEmpty();
     }
 }

@@ -13,6 +13,12 @@ using System.Text.Json;
 using Xunit.Abstractions;
 using candleR4::FhirCandle.Models;
 using candleR4::FhirCandle.Storage;
+using static FhirCandle.Storage.Common;
+using fhir.candle.Tests.Extensions;
+using Hl7.Fhir.Language.Debugging;
+using System.Net;
+using Hl7.Fhir.Model;
+using System.Reflection.Metadata;
 
 namespace fhir.candle.Tests;
 
@@ -274,5 +280,117 @@ public class R4TestsPatient : IClassFixture<R4Tests>
         }
 
         //_testOutputHelper.WriteLine(bundle);
+    }
+}
+
+/// <summary>A test subscription internals.</summary>
+public class R4TestSubscriptions : IClassFixture<R4Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R4Tests _fixture;
+
+    /// <summary>
+    /// Initializes a new instance of the fhir.candle.Tests.TestSubscriptionInternals class.
+    /// </summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
+    public R4TestSubscriptions(R4Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    /// <summary>Parse topic.</summary>
+    /// <param name="json">The JSON.</param>
+    [Theory]
+    [FileData("data/r4/Basic-topic-encounter-complete.json")]
+    public void ParseTopic(string json)
+    {
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json, 
+            "application/fhir+json", 
+            out Hl7.Fhir.Model.Resource? r, 
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be("Basic");
+
+        candleR4.FhirCandle.Subscriptions.TopicConverter converter = new candleR4.FhirCandle.Subscriptions.TopicConverter();
+
+        bool success = converter.TryParse(r, out ParsedSubscriptionTopic s);
+
+        success.Should().BeTrue();
+        s.Should().NotBeNull();
+        s.Id.Should().Be("encounter-complete");
+        s.Url.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
+        s.ResourceTriggers.Should().HaveCount(1);
+        s.EventTriggers.Should().BeEmpty();
+        s.AllowedFilters.Should().NotBeEmpty();
+        s.NotificationShapes.Should().NotBeEmpty();
+    }
+
+    [Theory]
+    [FileData("data/r4/Subscription-encounter-complete.json")]
+    public void ParseSubscription(string json)
+    {
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be("Subscription");
+
+        candleR4.FhirCandle.Subscriptions.SubscriptionConverter converter = new candleR4.FhirCandle.Subscriptions.SubscriptionConverter();
+
+        bool success = converter.TryParse(r, out ParsedSubscription s);
+
+        success.Should().BeTrue();
+        s.Should().NotBeNull();
+        s.Id.Should().Be("383c610b-8a8b-4173-b363-7b811509aadd");
+        s.TopicUrl.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
+        s.Filters.Should().HaveCount(1);
+        s.ChannelCode.Should().Be("rest-hook");
+        s.Endpoint.Should().Be("https://subscriptions.argo.run/fhir/r4/$subscription-hook");
+        s.HeartbeatSeconds.Should().Be(120);
+        s.TimeoutSeconds.Should().BeNull();
+        s.ContentType.Should().Be("application/fhir+json");
+        s.ContentLevel.Should().Be("id-only");
+        s.CurrentStatus.Should().Be("active");
+    }
+
+    [Theory]
+    [FileData("data/r4/Bundle-notification-handshake.json")]
+    public void ParseHandshake(string json)
+    {
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be("Bundle");
+
+        ParsedSubscriptionStatus? s = ((VersionedFhirStore)_fixture._store).ParseNotificationBundle((Hl7.Fhir.Model.Bundle)r);
+
+        s.Should().NotBeNull();
+        s!.BundleId.Should().Be("64578ab3-2bf6-497a-a873-7c29fa2090d6");
+        s.SubscriptionReference.Should().Be("https://subscriptions.argo.run/fhir/r4/Subscription/383c610b-8a8b-4173-b363-7b811509aadd");
+        s.SubscriptionTopicCanonical.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
+        s.Status.Should().Be("active");
+        s.NotificationType.Should().Be(ParsedSubscription.NotificationTypeCodes.Handshake);
+        s.NotificationEvents.Should().BeEmpty();
+        s.Errors.Should().BeEmpty();
     }
 }

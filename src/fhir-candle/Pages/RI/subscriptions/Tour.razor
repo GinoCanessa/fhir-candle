@@ -403,6 +403,8 @@
     /// <summary>The store.</summary>
     private IFhirStore _store = null!;
 
+    private Timer _recheckTimer = null!;
+
     /// <summary>Gets or sets the on step.</summary>
     private int onStep { get; set; } = 1;
 
@@ -736,6 +738,17 @@
     {
         if (e.ChangedSubscription?.Id.Equals(subscription.Id, StringComparison.Ordinal) ?? false)
         {
+            if (string.IsNullOrEmpty(subscriptionLocation))
+            {
+                _recheckTimer = new Timer(
+                    RecheckSubscriptionChanged,
+                    e,
+                    TimeSpan.Zero,
+                    TimeSpan.FromSeconds(1));
+
+                return;
+            }
+
             if (e.ChangedSubscription.CurrentStatus == "active")
             {
                 if ((_store.ReceivedNotifications.TryGetValue(subscriptionLocation, out List<ParsedSubscriptionStatus>? notifications)) &&
@@ -762,6 +775,19 @@
         }
     }
 
+    private void RecheckSubscriptionChanged(object? state)
+    {
+        if (string.IsNullOrEmpty(subscriptionLocation))
+        {
+            return;
+        }
+
+        _recheckTimer?.Change(Timeout.Infinite, 0);
+        _recheckTimer?.Dispose();
+
+        Store_OnSubscriptionsChanged(this, (SubscriptionChangedEventArgs)state!);
+    }
+
     /// <summary>Event handler. Called by Store for on subscription events.</summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">     Subscription event information.</param>
@@ -784,6 +810,9 @@
     /// </summary>
     public void Dispose()
     {
+        _recheckTimer?.Change(Timeout.Infinite, 0);
+        _recheckTimer?.Dispose();
+
         if (_store != null)
         {
             _store.OnChanged -= Store_OnChanged;

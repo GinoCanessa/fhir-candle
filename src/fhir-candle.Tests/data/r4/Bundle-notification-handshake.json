@@ -1,0 +1,41 @@
+{
+  "resourceType": "Bundle",
+  "id": "64578ab3-2bf6-497a-a873-7c29fa2090d6",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2023-08-30T16:59:28.7896182+00:00"
+  },
+  "type": "history",
+  "timestamp": "2023-08-30T16:59:28.7767539+00:00",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:a3671fee-b159-478b-9a96-335376d006e9",
+      "resource": {
+        "resourceType": "Parameters",
+        "id": "a3671fee-b159-478b-9a96-335376d006e9",
+        "parameter": [
+          {
+            "name": "subscription",
+            "valueString": "https://subscriptions.argo.run/fhir/r4/Subscription/383c610b-8a8b-4173-b363-7b811509aadd"
+          },
+          {
+            "name": "topic",
+            "valueCanonical": "http://example.org/FHIR/SubscriptionTopic/encounter-complete"
+          },
+          {
+            "name": "status",
+            "valueCode": "active"
+          },
+          {
+            "name": "type",
+            "valueCode": "handshake"
+          },
+          {
+            "name": "events-since-subscription-start",
+            "valueString": "0"
+          }
+        ]
+      }
+    }
+  ]
+}

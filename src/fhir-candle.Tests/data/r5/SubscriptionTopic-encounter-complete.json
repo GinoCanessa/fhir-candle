@@ -1,0 +1,69 @@
+{
+  "resourceType": "SubscriptionTopic",
+  "id": "encounter-complete",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2023-08-30T14:59:14.5130576+00:00"
+  },
+  "url": "http://example.org/FHIR/SubscriptionTopic/encounter-complete",
+  "version": "1.0.0-fhir.r5",
+  "title": "encounter-complete",
+  "status": "draft",
+  "date": "2019-01-01",
+  "description": "Example topic for completed encounters",
+  "resourceTrigger": [
+    {
+      "description": "An Encounter has been completed",
+      "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
+      "supportedInteraction": [
+        "create",
+        "update"
+      ],
+      "queryCriteria": {
+        "previous": "status:not=completed",
+        "resultForCreate": "test-passes",
+        "current": "status=completed",
+        "resultForDelete": "test-fails",
+        "requireBoth": true
+      },
+      "fhirPathCriteria": "(%previous.empty() | (%previous.status != 'completed')) and (%current.status = 'completed')"
+    }
+  ],
+  "canFilterBy": [
+    {
+      "description": "Filter based on the subject of an encounter.",
+      "resource": "Encounter",
+      "filterParameter": "patient"
+    },
+    {
+      "description": "Filter based on the group membership of the subject of an encounter.",
+      "resource": "Encounter",
+      "filterParameter": "_in"
+    },
+    {
+      "description": "Filter based on the length of an encounter.",
+      "resource": "Encounter",
+      "filterParameter": "length",
+      "comparator": [
+        "gt",
+        "lt",
+        "ge",
+        "le"
+      ]
+    }
+  ],
+  "notificationShape": [
+    {
+      "resource": "Encounter",
+      "include": [
+        "Encounter:patient&iterate=Patient.link",
+        "Encounter:practitioner",
+        "Encounter:service-provider",
+        "Encounter:account",
+        "Encounter:diagnosis",
+        "Encounter:observation",
+        "Encounter:location"
+      ]
+    }
+  ]
+}

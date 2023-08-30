@@ -336,12 +336,21 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string contentType = "",
         string contentLevel = "");
 
+    /// <summary>Attempts to serialize to subscription.</summary>
+    /// <param name="subscriptionInfo">Information describing the subscription.</param>
+    /// <param name="serialized">      [out] The serialized.</param>
+    /// <param name="pretty">          If the output should be 'pretty' formatted.</param>
+    /// <param name="destFormat">      (Optional) Destination format.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     bool TrySerializeToSubscription(
         ParsedSubscription subscriptionInfo,
         out string serialized,
         bool pretty,
         string destFormat = "");
 
+    /// <summary>Change subscription status.</summary>
+    /// <param name="id">    [out] The identifier.</param>
+    /// <param name="status">The status.</param>
     void ChangeSubscriptionStatus(string id, string status);
 
     /// <summary>Supports resource.</summary>

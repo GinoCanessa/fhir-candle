@@ -1,0 +1,66 @@
+{
+  "resourceType": "Bundle",
+  "id": "dd9601ba-c32e-4518-8a01-ebc624f9acf8",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2023-08-30T17:00:57.8299003+00:00"
+  },
+  "type": "history",
+  "timestamp": "2023-08-30T17:00:57.7724061+00:00",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:190e3522-c01f-4837-8e13-f61d978aa25f",
+      "resource": {
+        "resourceType": "Parameters",
+        "id": "190e3522-c01f-4837-8e13-f61d978aa25f",
+        "parameter": [
+          {
+            "name": "subscription",
+            "valueString": "https://subscriptions.argo.run/fhir/r4/Subscription/383c610b-8a8b-4173-b363-7b811509aadd"
+          },
+          {
+            "name": "topic",
+            "valueCanonical": "http://example.org/FHIR/SubscriptionTopic/encounter-complete"
+          },
+          {
+            "name": "status",
+            "valueCode": "active"
+          },
+          {
+            "name": "type",
+            "valueCode": "event-notification"
+          },
+          {
+            "name": "events-since-subscription-start",
+            "valueString": "1"
+          },
+          {
+            "name": "notification-event",
+            "part": [
+              {
+                "name": "event-number",
+                "valueString": "1"
+              },
+              {
+                "name": "timestamp",
+                "valueInstant": "2023-08-30T17:00:57.2076247+00:00"
+              },
+              {
+                "name": "focus",
+                "valueReference": {
+                  "reference": "https://subscriptions.argo.run/fhir/r4/Encounter/36e1c9d9-6878-4ef0-b1ff-9f5986e2def6"
+                }
+              },
+              {
+                "name": "additional-context",
+                "valueReference": {
+                  "reference": "https://subscriptions.argo.run/fhir/r4/Patient/example"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -274,7 +274,7 @@ public class SubscriptionConverter
             subscription.Channel.AddExtension(_urlBackport + _channelType, new FhirString(extendedCt));
         }
 
-        subscription.Channel.AddExtension(_urlBackport + _content, new FhirString(common.ContentLevel));
+        subscription.Channel.PayloadElement.AddExtension(_urlBackport + _content, new Code(common.ContentLevel));
 
         // add parameters
         if (common.Parameters.Any())

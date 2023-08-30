@@ -1,0 +1,39 @@
+{
+  "resourceType": "Subscription",
+  "id": "db4ce0bb-fa9c-4092-9f75-34772dc85590",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2023-08-30T17:41:54.6882171+00:00"
+  },
+  "status": "requested",
+  "end": "2023-08-30T17:51:49.4137027+00:00",
+  "reason": "Test subscription for walkthrough",
+  "criteria": "http://example.org/FHIR/SubscriptionTopic/encounter-complete",
+  "_criteria": {
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-filter-criteria",
+        "valueString": "Encounter?patient=Patient/example"
+      }
+    ]
+  },
+  "channel": {
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-heartbeat-period",
+        "valueInteger": 120
+      }
+    ],
+    "type": "rest-hook",
+    "endpoint": "https://subscriptions.argo.run/fhir/r4b/$subscription-hook",
+    "payload": "application/fhir+json",
+    "_payload": {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition/backport-payload-content",
+          "valueCode": "id-only"
+        }
+      ]
+    }
+  }
+}

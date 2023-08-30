@@ -48,7 +48,8 @@ public class SubscriptionConverter
         if ((subscription == null) ||
             (subscription is not Hl7.Fhir.Model.Subscription sub) ||
             string.IsNullOrEmpty(sub.Id) ||
-            string.IsNullOrEmpty(sub.Criteria))
+            string.IsNullOrEmpty(sub.Criteria) ||
+            (!sub.Criteria.StartsWith("http", StringComparison.Ordinal)))
         {
             common = null!;
             return false;
@@ -363,8 +364,8 @@ public class SubscriptionConverter
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
             Status = status.Status?.ToString() ?? string.Empty,
             NotificationType =
-                (status.Type?.ToString() ?? string.Empty).TryFhirEnum(out ParsedSubscription.NotificationTypeCodes nt)
-                ? nt
+                status.Type != null
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Type).ToFhirEnum<ParsedSubscription.NotificationTypeCodes>()
                 : null,
             EventsSinceSubscriptionStart =
                 long.TryParse(status.EventsSinceSubscriptionStart, out long count)

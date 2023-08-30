@@ -20,8 +20,8 @@ using System.Collections;
 using System.Collections.Concurrent;
 using static FhirCandle.Search.SearchDefinitions;
 using FhirCandle.Serialization;
-using System.Security.AccessControl;
-using static Hl7.Fhir.Model.OperationOutcome;
+using System.Drawing;
+using System.Xml.Linq;
 
 namespace FhirCandle.Storage;
 
@@ -92,6 +92,9 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The operations supported by this server, by name.</summary>
     private Dictionary<string, IFhirOperation> _operations = new();
 
+    /// <summary>The loaded directives.</summary>
+    private HashSet<string> _loadedDirectives = new();
+
     /// <summary>Values that represent load state codes.</summary>
     private enum LoadStateCodes
     {
@@ -127,6 +130,8 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The storage capacity timer.</summary>
     private System.Threading.Timer? _capacityMonitor = null;
 
+    private StoreTerminologyService _terminology = new();
+
     /// <summary>
     /// Initializes a new instance of the <see cref="VersionedFhirStore"/> class.
     /// </summary>
@@ -136,6 +141,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Initializes this object.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="config">The configuration.</param>
     public void Init(TenantConfiguration config)
     {
@@ -274,7 +280,7 @@ public partial class VersionedFhirStore : IFhirStore
                             {
                                 foreach (object sub in list)
                                 {
-                                    _ = SetExecutableSubscription((ParsedSubscription)sub);
+                                    _ = StoreProcessSubscription((ParsedSubscription)sub);
                                 }
                             }
                             break;
@@ -286,6 +292,23 @@ public partial class VersionedFhirStore : IFhirStore
             _loadReprocess = null;
         }
 
+        CheckLoadedOperations();
+
+        // create a timer to check max resource count if we are monitoring that
+        _maxResourceCount = config.MaxResourceCount;
+        if (_maxResourceCount > 0)
+        {
+            _capacityMonitor = new System.Threading.Timer(
+                CheckUsage,
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(30));
+        }
+    }
+
+    /// <summary>Check loaded operations.</summary>
+    private void CheckLoadedOperations()
+    {
         // load operations for this fhir version
         IEnumerable<Type> operationTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
             .Where(t => t.GetInterfaces().Contains(typeof(IFhirOperation)));
@@ -296,6 +319,12 @@ public partial class VersionedFhirStore : IFhirStore
 
             if ((fhirOp == null) ||
                 (!fhirOp.CanonicalByFhirVersion.ContainsKey(_config.FhirVersion)))
+            {
+                continue;
+            }
+
+            if ((!string.IsNullOrEmpty(fhirOp.RequiresPackage)) &&
+                (!_loadedDirectives.Contains(fhirOp.RequiresPackage)))
             {
                 continue;
             }
@@ -319,21 +348,204 @@ public partial class VersionedFhirStore : IFhirStore
                 }
             }
         }
+    }
 
-        // create a timer to check max resource count if we are monitoring that
-        _maxResourceCount = config.MaxResourceCount;
-        if (_maxResourceCount > 0)
+    /// <summary>Loads a package.</summary>
+    /// <param name="directive">         The directive.</param>
+    /// <param name="directory">         Pathname of the directory.</param>
+    /// <param name="packageSupplements">The package supplements.</param>
+    /// <param name="includeExample">    True to include, false to exclude the examples.</param>
+    public void LoadPackage(
+        string directive, 
+        string directory, 
+        string packageSupplements, 
+        bool includeExamples)
+    {
+        _loadReprocess = new();
+        _loadState = LoadStateCodes.Read;
+
+        string serializedResource, serializedOutcome, eTag, lastModified, location;
+        HttpStatusCode sc;
+
+        DirectoryInfo di;
+        FileInfo[] files;
+
+        if ((!string.IsNullOrEmpty(directive)) &&
+            (!string.IsNullOrEmpty(directory)))
         {
-            _capacityMonitor = new System.Threading.Timer(
-                CheckUsage,
-                null,
-                TimeSpan.Zero,
-                TimeSpan.FromSeconds(30));
+            _loadedDirectives.Add(directive);
+            if (directive.Contains('#'))
+            {
+                _loadedDirectives.Add(directive.Split('#')[0]);
+            }
+
+            Console.WriteLine($"Store[{_config.ControllerName}] loading {directive}");
+
+            di = new(directory);
+            string libDir = string.Empty;
+
+            // look for an package.json so we can determine examples
+            foreach (FileInfo file in di.GetFiles("package.json", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    FhirNpmPackageDetails details = FhirNpmPackageDetails.Load(file.FullName);
+
+                    if (details.Directories?.ContainsKey("lib") ?? false)
+                    {
+                        libDir = details.Directories["lib"];
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {ex.Message}");
+                }
+            }
+
+            if (!includeExamples)
+            {
+            }
+
+            if ((!includeExamples) &&
+                (!string.IsNullOrEmpty(libDir)) &&
+                Directory.Exists(Path.Combine(directory, libDir)))
+            {
+                di = new(Path.Combine(directory, libDir));
+                files = di.GetFiles("*.*", SearchOption.TopDirectoryOnly);
+            }
+            else
+            {
+                files = di.GetFiles("*.*", SearchOption.AllDirectories);
+            }
+
+            // traverse all files
+            foreach (FileInfo file in files)
+            {
+                switch (file.Extension.ToLowerInvariant())
+                {
+                    case ".json":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+json",
+                            "application/fhir+json",
+                            false,
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    case ".xml":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+xml",
+                            "application/fhir+xml",
+                            false,
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    default:
+                        continue;
+                }
+
+                Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+            }
         }
+
+        if ((!string.IsNullOrEmpty(packageSupplements)) &&
+            Directory.Exists(packageSupplements))
+        {
+            Console.WriteLine($"Store[{_config.ControllerName}] loading contents from {packageSupplements}");
+
+            di = new(packageSupplements);
+
+            foreach (FileInfo file in di.GetFiles("*.*", SearchOption.AllDirectories))
+            {
+                switch (file.Extension.ToLowerInvariant())
+                {
+                    case ".json":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+json",
+                            "application/fhir+json",
+                            false,
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    case ".xml":
+                        sc = InstanceCreate(
+                            string.Empty,
+                            File.ReadAllText(file.FullName),
+                            "application/fhir+xml",
+                            "application/fhir+xml",
+                            false,
+                            string.Empty,
+                            true,
+                            out serializedResource,
+                            out serializedOutcome,
+                            out eTag,
+                            out lastModified,
+                            out location);
+                        break;
+
+                    default:
+                        continue;
+                }
+
+                Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+            }
+        }
+
+        _loadState = LoadStateCodes.Process;
+
+        // reload any subscriptions in case they loaded before topics
+        if (_loadReprocess.Any())
+        {
+            foreach ((string key, List<object> list) in _loadReprocess)
+            {
+                switch (key)
+                {
+                    case "Subscription":
+                        {
+                            foreach (object sub in list)
+                            {
+                                _ = StoreProcessSubscription((ParsedSubscription)sub);
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        CheckLoadedOperations();
+
+        _loadState = LoadStateCodes.None;
+        _loadReprocess = null;
     }
 
     /// <summary>Gets the configuration.</summary>
     public TenantConfiguration Config => _config;
+
+    /// <summary>Gets the terminology service for this store.</summary>
+    public StoreTerminologyService Terminology => _terminology;
 
     /// <summary>Supports resource.</summary>
     /// <param name="resourceName">Name of the resource.</param>
@@ -783,7 +995,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="lastModified">   [out] The last modified.</param>
     /// <param name="location">       [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceCreate(
+    internal HttpStatusCode DoInstanceCreate(
         string resourceType,
         Resource content,
         string ifNoneExist,
@@ -984,7 +1196,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">    [out] The resource.</param>
     /// <param name="outcome">     [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceDelete(
+    internal HttpStatusCode DoInstanceDelete(
         string resourceType,
         string id,
         string ifMatch,
@@ -1078,7 +1290,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="eTag">           [out] The tag.</param>
     /// <param name="lastModified">   [out] The last modified.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceRead(
+    internal HttpStatusCode DoInstanceRead(
         string resourceType,
         string id,
         string ifMatch,
@@ -1231,7 +1443,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="lastModified">[out] The last modified.</param>
     /// <param name="location">    [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceUpdate(
+    internal HttpStatusCode DoInstanceUpdate(
         string resourceType,
         string id,
         Resource content,
@@ -1367,30 +1579,28 @@ public partial class VersionedFhirStore : IFhirStore
         return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
     }
 
-    /// <summary>Removes the executable subscription topic described by topic.</summary>
-    /// <param name="topic">The topic.</param>
+    /// <summary>Processes a parsed SubscriptionTopic resource.</summary>
+    /// <param name="topic"> The topic.</param>
+    /// <param name="remove">(Optional) True to remove.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool RemoveExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
+    public bool StoreProcessSubscriptionTopic(ParsedSubscriptionTopic topic, bool remove = false)
     {
-        if (!_topics.ContainsKey(topic.Url))
+        if (remove)
         {
-            return false;
+            if (!_topics.ContainsKey(topic.Url))
+            {
+                return false;
+            }
+
+            // remove from all resources
+            foreach (IVersionedResourceStore rs in _store.Values)
+            {
+                rs.RemoveExecutableSubscriptionTopic(topic.Url);
+            }
+
+            return true;
         }
 
-        // remove from all resources
-        foreach (IVersionedResourceStore rs in _store.Values)
-        {
-            rs.RemoveExecutableSubscriptionTopic(topic.Url);
-        }
-
-        return true;
-    }
-
-
-    /// <summary>Sets an executable subscription topic.</summary>
-    /// <param name="topic">The topic.</param>
-    public bool SetExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
-    {
         bool priorExisted = _topics.ContainsKey(topic.Url);
 
         // set our local reference
@@ -1868,33 +2078,32 @@ public partial class VersionedFhirStore : IFhirStore
         return null;
     }
 
-    /// <summary>Removes the executable subscription described by subscription.</summary>
+    /// <summary>Process the subscription.</summary>
     /// <param name="subscription">The subscription.</param>
+    /// <param name="remove">      (Optional) True to remove.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool RemoveExecutableSubscription(ParsedSubscription subscription)
+    internal bool StoreProcessSubscription(ParsedSubscription subscription, bool remove = false)
     {
-        if (!_subscriptions.ContainsKey(subscription.Id))
+        if (remove)
         {
-            return false;
+            if (!_subscriptions.ContainsKey(subscription.Id))
+            {
+                return false;
+            }
+
+            // remove from all resources
+            foreach (IVersionedResourceStore rs in _store.Values)
+            {
+                rs.RemoveExecutableSubscription(subscription.TopicUrl, subscription.Id);
+            }
+
+            _ = _subscriptions.TryRemove(subscription.Id, out _);
+
+            RegisterSubscriptionsChanged(subscription, true);
+
+            return true;
         }
 
-        // remove from all resources
-        foreach (IVersionedResourceStore rs in _store.Values)
-        {
-            rs.RemoveExecutableSubscription(subscription.TopicUrl, subscription.Id);
-        }
-
-        _ = _subscriptions.TryRemove(subscription.Id, out _);
-
-        RegisterSubscriptionsChanged(subscription, true);
-
-        return true;
-    }
-
-    /// <summary>Sets executable subscription.</summary>
-    /// <param name="subscription">The subscription.</param>
-    public bool SetExecutableSubscription(ParsedSubscription subscription)
-    {
         // check for existing record
         bool priorExisted = _subscriptions.ContainsKey(subscription.Id);
         string priorState;
@@ -2060,7 +2269,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoSystemOperation(
+    internal HttpStatusCode DoSystemOperation(
         string operationName,
         string queryString,
         Resource? contentResource,
@@ -2098,7 +2307,18 @@ public partial class VersionedFhirStore : IFhirStore
         }
         else if (!string.IsNullOrEmpty(content))
         {
-            _ = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+            HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+
+            if ((!deserializeSc.IsSuccessful()) &&
+                (!op.AcceptsNonFhir))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnsupportedMediaType,
+                    $"Operation {operationName} does not consume non-FHIR content.",
+                    OperationOutcome.IssueType.Invalid);
+                return HttpStatusCode.UnsupportedMediaType;
+            }
         }
 
         HttpStatusCode sc = op.DoOperation(
@@ -2115,7 +2335,7 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"System Operation {operationName} complete") : responseOutcome;
+        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"System-Level Operation {operationName} returned {sc}");
 
         return sc;
     }
@@ -2175,7 +2395,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoTypeOperation(
+    internal HttpStatusCode DoTypeOperation(
         string resourceType,
         string operationName,
         string queryString,
@@ -2234,7 +2454,18 @@ public partial class VersionedFhirStore : IFhirStore
         }
         else if (!string.IsNullOrEmpty(content))
         {
-            _ = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+            HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+
+            if ((!deserializeSc.IsSuccessful()) &&
+                (!op.AcceptsNonFhir))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnsupportedMediaType,
+                    $"Operation {operationName} does not consume non-FHIR content.",
+                    OperationOutcome.IssueType.Invalid);
+                return HttpStatusCode.UnsupportedMediaType;
+            }
         }
 
         HttpStatusCode sc = op.DoOperation(
@@ -2251,7 +2482,7 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        outcome = (responseOutcome == null) ? Utils.BuildOutcomeForRequest(sc, $"Type Operation {resourceType}/{operationName} complete") : responseOutcome;
+        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Resource-Level Operation {resourceType}/{operationName} returned {sc}");
         return sc;
     }
 
@@ -2314,7 +2545,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoInstanceOperation(
+    internal HttpStatusCode DoInstanceOperation(
         string resourceType,
         string id,
         string operationName,
@@ -2386,7 +2617,18 @@ public partial class VersionedFhirStore : IFhirStore
         }
         else if (!string.IsNullOrEmpty(content))
         {
-            _ = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+            HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(content, sourceFormat, out r, out _);
+
+            if ((!deserializeSc.IsSuccessful()) &&
+                (!op.AcceptsNonFhir))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnsupportedMediaType,
+                    $"Operation {operationName} does not consume non-FHIR content.",
+                    OperationOutcome.IssueType.Invalid);
+                return HttpStatusCode.UnsupportedMediaType;
+            }
         }
 
         HttpStatusCode sc = op.DoOperation(
@@ -2403,7 +2645,7 @@ public partial class VersionedFhirStore : IFhirStore
             out OperationOutcome? responseOutcome,
             out _);
 
-        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Instance Operation {resourceType}/{id}/{operationName} returned {sc}");
+        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Instance-Level Operation {resourceType}/{id}/{operationName} returned {sc}");
         return sc;
     }
 
@@ -2445,7 +2687,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">   [out] The resource.</param>
     /// <param name="outcome">    [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoSystemDelete(
+    internal HttpStatusCode DoSystemDelete(
         string queryString,
         out Resource? resource,
         out OperationOutcome outcome)
@@ -2540,7 +2782,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">    [out] The resource.</param>
     /// <param name="outcome">     [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoTypeDelete(
+    internal HttpStatusCode DoTypeDelete(
         string resourceType,
         string queryString,
         out Resource? resource,
@@ -2637,7 +2879,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="bundle">      [out] The bundle.</param>
     /// <param name="outcome">     [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoTypeSearch(
+    internal HttpStatusCode DoTypeSearch(
         string resourceType,
         string queryString,
         out Bundle? bundle,
@@ -2788,7 +3030,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="bundle">     [out] The bundle.</param>
     /// <param name="outcome">    [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    private HttpStatusCode DoSystemSearch(
+    internal HttpStatusCode DoSystemSearch(
         string queryString,
         out Bundle? bundle,
         out OperationOutcome outcome)

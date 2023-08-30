@@ -33,7 +33,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirCandle.Ui.R4B", "src\Fh
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirCandle.Ui.R5", "src\FhirCandle.Ui.R5\FhirCandle.Ui.R5.csproj", "{D6F90C51-D9A6-48E8-AAE8-F200C83E3F5F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FhirCandle.Ui.Common", "src\FhirCandle.Ui.Common\FhirCandle.Ui.Common.csproj", "{2276D057-68A6-4639-A821-0C028D8449D0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirCandle.Ui.Common", "src\FhirCandle.Ui.Common\FhirCandle.Ui.Common.csproj", "{2276D057-68A6-4639-A821-0C028D8449D0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

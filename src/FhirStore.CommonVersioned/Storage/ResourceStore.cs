@@ -33,6 +33,9 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>The resource store.</summary>
     private readonly ConcurrentDictionary<string, T> _resourceStore = new();
 
+    /// <summary>(Immutable) Conformance URL to ID Map.</summary>
+    internal readonly ConcurrentDictionary<string, string> _conformanceUrlToId = new();
+
     /// <summary>The lock object.</summary>
     private object _lockObject = new();
 
@@ -204,7 +207,8 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <returns>The created resource, or null if it could not be created.</returns>
     public Resource? InstanceCreate(Resource source, bool allowExistingId)
     {
-        if (source == null)
+        if ((source == null) ||
+            (source is not T))
         {
             return null;
         }
@@ -214,14 +218,49 @@ public class ResourceStore<T> : IVersionedResourceStore
             source.Id = Guid.NewGuid().ToString();
         }
 
+        ParsedSubscriptionTopic? parsedSubscriptionTopic = null;
+        ParsedSubscription? parsedSubscription = null;
+        
+        // perform any mandatory validation
+        switch (source.TypeName)
+        {
+            case "Basic":
+                {
+                    // fail the request if this fails
+                    if ((source is Hl7.Fhir.Model.Basic b) &&
+                        (b.Code?.Coding?.Any() ?? false) &&
+                        (b.Code.Coding.Any(c =>
+                            c.Code.Equals("SubscriptionTopic", StringComparison.Ordinal) &&
+                            c.System.Equals("http://hl7.org/fhir/fhir-types", StringComparison.Ordinal))))
+                    {
+                        if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                        {
+                            return null;
+                        }
+                    }
+                }
+                break;
+
+            case "SubscriptionTopic":
+                // fail the request if this fails
+                if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                {
+                    return null;
+                }
+                break;
+
+            case "Subscription":
+                // fail the request if this fails
+                if (!_subscriptionConverter.TryParse((Subscription)source, out parsedSubscription))
+                {
+                    return null;
+                }
+                break;
+        }
+
         lock (_lockObject)
         {
             if (_resourceStore.ContainsKey(source.Id))
-            {
-                return null;
-            }
-
-            if (source is not T)
             {
                 return null;
             }
@@ -240,36 +279,34 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
         }
 
+        if (source is IConformanceResource cr)
+        {
+            if (!string.IsNullOrEmpty(cr.Url))
+            {
+                _ = _conformanceUrlToId.TryAdd(cr.Url, source.Id);
+            }
+        }
+
         TestCreateAgainstSubscriptions((T)source);
 
-        switch (source.TypeName)
+        if (parsedSubscriptionTopic != null)
         {
-            case "Basic":
-                {
-                    if ((source != null) &&
-                        (source is Hl7.Fhir.Model.Basic b) &&
-                        (b.Code?.Coding?.Any() ?? false) &&
-                        (b.Code.Coding.Any(c =>
-                            c.Code.Equals("SubscriptionTopic", StringComparison.Ordinal) &&
-                            c.System.Equals("http://hl7.org/fhir/fhir-types", StringComparison.Ordinal))))
-                    {
-                        _ = TryProcessSubscriptionTopic(source);
-                    }
-                }
+            _ = _store.StoreProcessSubscriptionTopic(parsedSubscriptionTopic);
+        }
+
+        if (parsedSubscription != null)
+        {
+            _ = _store.StoreProcessSubscription(parsedSubscription);
+        }
+
+        switch (source)
+        {
+            case SearchParameter sp:
+                SetExecutableSearchParameter(sp);
                 break;
 
-            case "SearchParameter":
-                SetExecutableSearchParameter((SearchParameter)source);
-                break;
-
-            case "SubscriptionTopic":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscriptionTopic(source);
-                break;
-
-            case "Subscription":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscription(source);
+            case ValueSet vs:
+                _ = _store.Terminology.StoreProcessValueSet(vs);
                 break;
         }
 
@@ -283,12 +320,13 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <returns>The updated resource, or null if it could not be performed.</returns>
     public Resource? InstanceUpdate(Resource source, bool allowCreate, HashSet<string> protectedResources)
     {
-        if (string.IsNullOrEmpty(source?.Id))
+        if (string.IsNullOrEmpty(source?.Id) ||
+            (source is not T))
         {
             return null;
         }
 
-        if (source is not T)
+        if (string.IsNullOrEmpty(source?.Id))
         {
             return null;
         }
@@ -301,6 +339,46 @@ public class ResourceStore<T> : IVersionedResourceStore
         if (protectedResources.Any() && protectedResources.Contains(_resourceName + "/" + source.Id))
         {
             return null;
+        }
+
+        ParsedSubscriptionTopic? parsedSubscriptionTopic = null;
+        ParsedSubscription? parsedSubscription = null;
+
+        // perform any mandatory validation
+        switch (source.TypeName)
+        {
+            case "Basic":
+                {
+                    // fail the request if this fails
+                    if ((source is Hl7.Fhir.Model.Basic b) &&
+                        (b.Code?.Coding?.Any() ?? false) &&
+                        (b.Code.Coding.Any(c =>
+                            c.Code.Equals("SubscriptionTopic", StringComparison.Ordinal) &&
+                            c.System.Equals("http://hl7.org/fhir/fhir-types", StringComparison.Ordinal))))
+                    {
+                        if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                        {
+                            return null;
+                        }
+                    }
+                }
+                break;
+
+            case "SubscriptionTopic":
+                // fail the request if this fails
+                if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
+                {
+                    return null;
+                }
+                break;
+
+            case "Subscription":
+                // fail the request if this fails
+                if (!_subscriptionConverter.TryParse((Subscription)source, out parsedSubscription))
+                {
+                    return null;
+                }
+                break;
         }
 
         T? previous;
@@ -335,6 +413,22 @@ public class ResourceStore<T> : IVersionedResourceStore
             _resourceStore[source.Id] = (T)source;
         }
 
+        if (source is IConformanceResource cr)
+        {
+            if (previous is IConformanceResource pcr)
+            {
+                if (!string.IsNullOrEmpty(pcr.Url))
+                {
+                    _ = _conformanceUrlToId.TryRemove(pcr.Url, out _);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(cr.Url))
+            {
+                _ = _conformanceUrlToId.TryAdd(cr.Url, source.Id);
+            }
+        }
+
         if (previous == null)
         {
             TestCreateAgainstSubscriptions((T)source);
@@ -344,20 +438,24 @@ public class ResourceStore<T> : IVersionedResourceStore
             TestUpdateAgainstSubscriptions((T)source, previous);
         }
 
-        switch (source.TypeName)
+        if (parsedSubscriptionTopic != null)
         {
-            case "SearchParameter":
-                SetExecutableSearchParameter((SearchParameter)source);
+            _ = _store.StoreProcessSubscriptionTopic(parsedSubscriptionTopic);
+        }
+
+        if (parsedSubscription != null)
+        {
+            _ = _store.StoreProcessSubscription(parsedSubscription);
+        }
+
+        switch (source)
+        {
+            case SearchParameter sp:
+                SetExecutableSearchParameter(sp);
                 break;
 
-            case "SubscriptionTopic":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscriptionTopic(source);
-                break;
-
-            case "Subscription":
-                // TODO: should fail the request if this fails
-                _ = TryProcessSubscription(source);
+            case ValueSet vs:
+                _ = _store.Terminology.StoreProcessValueSet(vs);
                 break;
         }
 
@@ -397,107 +495,49 @@ public class ResourceStore<T> : IVersionedResourceStore
             return null;
         }
 
+        if (previous is IConformanceResource pcr)
+        {
+            if (!string.IsNullOrEmpty(pcr.Url))
+            {
+                _ = _conformanceUrlToId.TryRemove(pcr.Url, out _);
+            }
+        }
+
         TestDeleteAgainstSubscriptions(previous);
 
-        switch (previous.TypeName)
+        switch (previous?.TypeName)
         {
             case "SearchParameter":
                 RemoveExecutableSearchParameter((SearchParameter)(Resource)previous);
                 break;
 
             case "SubscriptionTopic":
-                // TODO: should fail the request if this fails
-                _ = TryRemoveSubscriptionTopic(previous);
+                {
+                    // get a common subscription topic for execution
+                    if (_topicConverter.TryParse(previous, out ParsedSubscriptionTopic topic))
+                    {
+                        _ = _store.StoreProcessSubscriptionTopic(topic, true);
+                    }
+
+                }
                 break;
 
             case "Subscription":
-                // TODO: should fail the request if this fails
-                _ = TryRemoveSubscription(previous);
+                {
+                    if (_subscriptionConverter.TryParse(previous, out ParsedSubscription subscription))
+                    {
+                        _ = _store.StoreProcessSubscription(subscription, true);
+                    }
+                }
+                break;
+
+            case "ValueSet":
+                _ = _store.Terminology.StoreProcessValueSet((ValueSet)(Resource)previous, true);
                 break;
         }
 
-
         return previous;
     }
-
-    /// <summary>Process the subscription topic.</summary>
-    /// <param name="st">The versioned FHIR subscription topic object.</param>
-    private bool TryProcessSubscriptionTopic(object st)
-    {
-        if (st == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_topicConverter.TryParse(st, out ParsedSubscriptionTopic topic))
-        {
-            return false;
-        }
-
-        // process this at the store level
-        return _store.SetExecutableSubscriptionTopic(topic);
-    }
-
-    /// <summary>Attempts to remove subscription topic.</summary>
-    /// <param name="st">The versioned FHIR subscription topic object.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool TryRemoveSubscriptionTopic(object st)
-    {
-        if (st == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_topicConverter.TryParse(st, out ParsedSubscriptionTopic topic))
-        {
-            return false;
-        }
-
-        // process this at the store level
-        return _store.RemoveExecutableSubscriptionTopic(topic);
-    }
-
-    /// <summary>Process the subscription described by sub.</summary>
-    /// <param name="sub">The versioned FHIR subscription object.</param>
-    private bool TryProcessSubscription(object sub)
-    {
-        if (sub == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_subscriptionConverter.TryParse(sub, out ParsedSubscription subscription))
-        {
-            return false;
-        }
-
-        // process this at the store level
-        return _store.SetExecutableSubscription(subscription);
-    }
-
-    /// <summary>Attempts to remove subscription.</summary>
-    /// <param name="sub">The versioned FHIR subscription object.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool TryRemoveSubscription(object sub)
-    {
-        if (sub == null)
-        {
-            return false;
-        }
-
-        // get a common subscription topic for execution
-        if (!_subscriptionConverter.TryParse(sub, out ParsedSubscription subscription))
-        {
-            return false;
-        }
-
-        // process this at the store level
-        return _store.RemoveExecutableSubscription(subscription);
-    }
-
 
     /// <summary>Sets executable subscription topic.</summary>
     /// <param name="url">             URL of the resource.</param>
@@ -856,7 +896,10 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         ITypedElement currentTE = current.ToTypedElement();
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode());
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        {
+            TerminologyService = _store.Terminology,
+        };
 
         FhirPathVariableResolver resolver = new FhirPathVariableResolver()
         {
@@ -894,7 +937,10 @@ public class ResourceStore<T> : IVersionedResourceStore
         ITypedElement currentTE = current.ToTypedElement();
         ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode());
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        {
+            TerminologyService = _store.Terminology,
+        };
 
         FhirPathVariableResolver resolver = new FhirPathVariableResolver()
         {
@@ -929,7 +975,10 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode());
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
+        {
+            TerminologyService = _store.Terminology,
+        };
 
         FhirPathVariableResolver resolver = new FhirPathVariableResolver()
         {

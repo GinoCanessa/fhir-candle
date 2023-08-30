@@ -48,6 +48,17 @@ public class OpTestIfFhir : IFhirOperation
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
     public bool AllowInstanceLevel => false;
 
+    /// <summary>Gets a value indicating whether the accepts non FHIR.</summary>
+    public bool AcceptsNonFhir => true;
+
+    /// <summary>Gets a value indicating whether the returns non FHIR.</summary>
+    public bool ReturnsNonFhir => false;
+
+    /// <summary>
+    /// If this operation requires a specific FHIR package to be loaded, the package identifier.
+    /// </summary>
+    public string RequiresPackage => string.Empty;
+
     /// <summary>Gets the supported resources.</summary>
     public HashSet<string> SupportedResources => new();
 

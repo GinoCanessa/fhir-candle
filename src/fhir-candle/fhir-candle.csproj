@@ -42,6 +42,7 @@
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
 	  <WarningLevel>4</WarningLevel>
 	</PropertyGroup>
+	<PropertyGroup Condition=" '$(RunConfiguration)' == 'ecr' " />
 	<ItemGroup>
 	  <Compile Remove="data\**" />
 	  <Compile Remove="Processors\**" />
@@ -73,6 +74,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <PackageReference Include="ini-parser-netcore" Version="3.0.0" />
 	  <PackageReference Include="MailKit" Version="4.1.0" />
 	  <PackageReference Include="MudBlazor" Version="6.8.0" IncludeAssets="all" />
 	  <PackageReference Include="BlazorMonaco" Version="3.0.0" IncludeAssets="all" />
@@ -125,7 +127,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Components\" />
 	  <Folder Include="Pages\Client\" />
 	</ItemGroup>
 

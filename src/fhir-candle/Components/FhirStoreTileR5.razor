@@ -1,0 +1,130 @@
+﻿<MudText Typo="Typo.body1">
+    FHIR R5 endpoint at <code>@Store.Config.BaseUrl</code>
+    <sup>
+        <button onclick="@($"navigator.clipboard.writeText('{Store.Config.BaseUrl}')")">
+            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
+        </button>
+    </sup>
+</MudText>
+<br />
+
+@if (AdditionalContent != null)
+{
+    <DynamicComponent Type="@AdditionalContent" Parameters="@_contentParams" />
+}
+
+@if (RiPages.Any())
+{
+    <MudText Typo="Typo.body1">
+        As a reference implementation for @RiName, this server also implements the following pages:
+    </MudText>
+
+    <MudSimpleTable>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach(RiPageInfo info in RiPages)
+            {
+                <tr>
+                    <td><MudLink Href="@($"{info.RoutePath}?store={StoreName}")" Underline="Underline.Always">@info.PageName</MudLink></td>
+                    <td>@info.Description</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+    <br />
+}
+
+<MudText Typo="Typo.body1">
+    This endpoint uses FHIR <MudLink Href="https://hl7.org/fhir/R5" Target="_" Underline="Underline.Always">R5</MudLink>
+    and Subscriptions via the
+    <MudLink Href="http://hl7.org/fhir/R5/subscriptions.html" Target="_" Underline="Underline.Always">Subscriptions Framework</MudLink>
+</MudText>
+
+<MudList>
+    <MudListItem>
+        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+        <MudLink Href="@($"/store?store={StoreName}")"
+                    Underline="Underline.Always">FHIR Contents</MudLink>: FHIR resources in this tenant
+    </MudListItem>
+
+    <MudListItem>
+        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+        <MudLink Href="@($"/subscriptions/local?store={StoreName}")"
+                    Underline="Underline.Always">Local Subscriptions</MudLink>: outgoing Subscription notifications from this server
+    </MudListItem>
+
+    <MudListItem>
+        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+        <MudLink Href="@($"/subscriptions/notifications-received?store={StoreName}")"
+                    Underline="Underline.Always">Received Notifications</MudLink>: incoming notifications received by this server
+    </MudListItem>
+</MudList>
+
+<MudText Typo="Typo.body1">
+    The endpoint also exposes a system-level operation, <code>$subscription-hook</code>
+    <sup>
+        <button onclick="@($"navigator.clipboard.writeText('{Store.Config.BaseUrl}/$subscription-hook')")">
+            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+        </button>
+    </sup>
+
+    which can be used as a notification endpoint for FHIR @Store.Config.FhirVersion notifications (e.g.,
+    if you are developing a server that sends notifications, you can point it here).
+    Any received notification bundles are stored as resources locally, and the notifications will appear on
+    the
+    <MudLink Href="@($"/subscriptions/notifications-received?store={StoreName}")"
+                Underline="Underline.Always">Received Notifications</MudLink>
+    page.
+</MudText>
+<br />
+<MudText Typo="Typo.body1">
+    Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
+    For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
+    the notifications and be visible on the
+    <MudLink Href="@($"/subscriptions/local?store={StoreName}")"
+                Underline="Underline.Always">Local Subscriptions</MudLink>
+    page, but not actually attempt to send the notification to the endpoint.
+</MudText>
+
+@code {
+
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    [Parameter]
+    public string StoreName { get; set; } = string.Empty;
+
+    [Parameter]
+    public IFhirStore Store { get; set; } = null!;
+
+    /// <summary>Gets or sets the name of the ri.</summary>
+    [Parameter]
+    public string RiName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the ri pages.</summary>
+    [Parameter]
+    public IEnumerable<RiPageInfo> RiPages { get; set; } = Enumerable.Empty<RiPageInfo>();
+
+    /// <summary>Gets or sets the additional content.</summary>
+    [Parameter]
+    public Type? AdditionalContent { get; set; } = null;
+
+    private Dictionary<string, object> _contentParams = new();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if (AdditionalContent != null)
+        {
+            _contentParams.Add("StoreName", StoreName);
+            _contentParams.Add("Store", Store);
+        }
+    }
+}

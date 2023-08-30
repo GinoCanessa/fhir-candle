@@ -45,6 +45,17 @@ public class OpSubscriptionEvents : IFhirOperation
     /// <summary>Gets a value indicating whether we allow instance level.</summary>
     public bool AllowInstanceLevel => true;
 
+    /// <summary>Gets a value indicating whether the accepts non FHIR.</summary>
+    public bool AcceptsNonFhir => false;
+
+    /// <summary>Gets a value indicating whether the returns non FHIR.</summary>
+    public bool ReturnsNonFhir => false;
+
+    /// <summary>
+    /// If this operation requires a specific FHIR package to be loaded, the package identifier.
+    /// </summary>
+    public string RequiresPackage => string.Empty;
+
     /// <summary>Gets the supported resources.</summary>
     public HashSet<string> SupportedResources => new()
     {
@@ -84,14 +95,16 @@ public class OpSubscriptionEvents : IFhirOperation
         string contentLevel = string.Empty;
 
         // check for a subscription ID
-        if ((string.IsNullOrEmpty(instanceId)) ||
+        if (string.IsNullOrEmpty(instanceId) ||
             (!store._subscriptions.ContainsKey(instanceId)))
         {
             responseResource = null;
-            responseOutcome = null;
+            responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                HttpStatusCode.NotFound,
+                $"Subscription {instanceId} was not found.");
             contentLocation = string.Empty;
 
-            return HttpStatusCode.BadRequest;
+            return HttpStatusCode.NotFound;
         }
 
         // check for query string parameters
@@ -177,7 +190,6 @@ public class OpSubscriptionEvents : IFhirOperation
 
         return HttpStatusCode.OK;
     }
-
 
     /// <summary>Gets an OperationDefinition for this operation.</summary>
     /// <param name="fhirVersion">The FHIR version.</param>

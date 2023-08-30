@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirCandle.Models;
+using FhirCandle.Storage;
 using Hl7.Fhir.ElementModel;
 
 namespace FhirCandle.Search;
@@ -339,6 +340,141 @@ public static class EvalTokenSearch
 
             default:
                 throw new Exception($"Cannot test token against type: {valueNode.GetType()} as CodeableConcept");
+        }
+
+        return false;
+    }
+
+    /// <summary>Tests token in codeable concept.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <param name="store">    The store.</param>
+    /// <returns>True if the test passes, false if the test fails.</returns>
+    public static bool TestTokenInCodeableConcept(ITypedElement valueNode, ParsedSearchParameter sp, VersionedFhirStore store)
+    {
+        if ((valueNode == null) ||
+            (sp.ValueFhirCodes == null))
+        {
+            return false;
+        }
+
+        switch (valueNode.InstanceType)
+        {
+            case "CodeableConcept":
+                {
+                    Hl7.Fhir.Model.CodeableConcept cc = valueNode.ToPoco<Hl7.Fhir.Model.CodeableConcept>();
+
+                    if (cc.Coding != null)
+                    {
+                        foreach (Hl7.Fhir.Model.Coding c in cc.Coding)
+                        {
+                            for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
+                            {
+                                if (sp.IgnoredValueFlags[i])
+                                {
+                                    continue;
+                                }
+
+                                if (store.Terminology.VsContains(sp.ValueFhirCodes[i].Value ?? sp.ValueFhirCodes[i].System ?? string.Empty, c.System ?? string.Empty, c.Code ?? string.Empty))
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+
+
+            default:
+                throw new Exception($"Cannot test token against type: {valueNode.GetType()} as CodeableConcept");
+        }
+
+        return false;
+    }
+
+    /// <summary>Tests token in coding.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <param name="store">    The store.</param>
+    /// <returns>True if the test passes, false if the test fails.</returns>
+    public static bool TestTokenInCoding(ITypedElement valueNode, ParsedSearchParameter sp, VersionedFhirStore store)
+    {
+        if ((valueNode == null) ||
+            (sp.ValueFhirCodes == null))
+        {
+            return false;
+        }
+
+        string valueSystem, valueCode;
+
+        switch (valueNode.InstanceType)
+        {
+            case "Code":
+                {
+                    Hl7.Fhir.Model.Code v = valueNode.ToPoco<Hl7.Fhir.Model.Code>();
+
+                    valueSystem = string.Empty;
+                    valueCode = v.Value;
+                }
+                break;
+
+            case "Coding":
+                {
+                    Hl7.Fhir.Model.Coding v = valueNode.ToPoco<Hl7.Fhir.Model.Coding>();
+
+                    valueSystem = v.System ?? string.Empty;
+                    valueCode = v.Code ?? string.Empty;
+                }
+                break;
+
+            case "Identifier":
+                {
+                    Hl7.Fhir.Model.Identifier v = valueNode.ToPoco<Hl7.Fhir.Model.Identifier>();
+
+                    valueSystem = v.System ?? string.Empty;
+                    valueCode = v.Value ?? string.Empty;
+                }
+                break;
+
+            case "ContactPoint":
+                {
+                    Hl7.Fhir.Model.ContactPoint v = valueNode.ToPoco<Hl7.Fhir.Model.ContactPoint>();
+
+                    valueSystem = v.System?.ToString() ?? string.Empty;
+                    valueCode = v.Value ?? string.Empty;
+                }
+                break;
+
+            default:
+                {
+                    if ((valueNode.Value != null) &&
+                        (valueNode.Value is string v))
+                    {
+                        valueSystem = string.Empty;
+                        valueCode = v;
+                    }
+                    else
+                    {
+                        throw new Exception($"Cannot test token against type: {valueNode.InstanceType} as Coding");
+                    }
+                }
+                break;
+        }
+
+        for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (store.Terminology.VsContains(sp.ValueFhirCodes[i].Value ?? sp.ValueFhirCodes[i].System ?? string.Empty, valueSystem, valueCode))
+            {
+                return true;
+            }
         }
 
         return false;

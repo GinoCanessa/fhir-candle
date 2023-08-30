@@ -135,8 +135,15 @@
     /// <summary>Handles a user refresh request.</summary>
     private void HandleRefresh()
     {
-        _displayTable?.UpdateSelection();
-        InvokeAsync(() => StateHasChanged());
+        try
+        {
+            _displayTable?.UpdateSelection();
+            InvokeAsync(() => StateHasChanged());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+        }
     }
 
     /// <summary>Handles the location changed.</summary>

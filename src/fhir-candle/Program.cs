@@ -38,10 +38,10 @@ public static partial class Program
     /// <summary>(Immutable) The default listen port.</summary>
     private const int _defaultListenPort = 5826;
 
-    ///// <summary>Candle server delagate.</summary>
+    ///// <summary>Candle server delegate.</summary>
     ///// <param name="config">The configuration.</param>
     ///// <returns>An int.</returns>
-    //public delegate int CandleServerDelagate(ServerConfiguration config);
+    //public delegate int CandleServerDelegate(ServerConfiguration config);
 
     /// <summary>Main entry-point for this application.</summary>
     /// <param name="args">An array of command-line argument strings.</param>
@@ -73,15 +73,40 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<int?>("Max_Resources", null),
             "Maximum number of resources allowed per tenant.");
 
-        Option<ServerConfiguration.UiModes?> optUiMode = new(
-            name: "--ui-mode",
-            getDefaultValue: () => configuration.GetValue<ServerConfiguration.UiModes>("Mode", ServerConfiguration.UiModes.Default)!,
-            "UI content mode: " + string.Join(", ", Enum.GetNames(typeof(ServerConfiguration.UiModes))));
+        Option<bool?> optDisableUi = new(
+            name: "--disable-ui",
+            getDefaultValue: () => configuration.GetValue<bool?>("Disable_Ui", null),
+            "If the server should run headless.");
+
+        Option<string?> optPackageCache = new(
+            name: "--fhir-package-cache",
+            getDefaultValue: () => configuration.GetValue<string?>("Fhir_Cache", null),
+            "Location of the FHIR package cache, for use with registries and IG packages.  Use empty quoted string to disable cache.");
+
+        Option<List<string>> optPublishedPackages = new(
+            name: "--load-package",
+            getDefaultValue: () => configuration.GetValue<List<string>>("Load_Packages", new List<string>())!,
+            "Published packages to load. Specifying package name alone loads highest version.");
+
+        Option<List<string>> optCiPackages = new(
+            name: "--ci-package",
+            getDefaultValue: () => configuration.GetValue<List<string>>("Ci_Packages", new List<string>())!,
+            "Continuous Integration (CI) packages to load. You may specify either just the branch name or a full URL.");
+
+        Option<bool?> optLoadPackageExamples = new(
+            name: "--load-examples",
+            getDefaultValue: () => configuration.GetValue<bool?>("Load_Examples", null),
+            "If package loading should include example instances.");
+
+        Option<string?> optPackageReferenceImplementation = new(
+            name: "--reference-implementation",
+            getDefaultValue: () => configuration.GetValue<string?>("Reference_Implementation", null),
+            "If running as the Reference Implementation, the package directive or literal.");
 
         Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
-            "FHIR Contents to load, either in this directory or by subdirectories named per tenant");
+            "FHIR Contents to load, either in this directory or by subdirectories named per tenant.");
 
         Option<bool?> optProtectLoadedContent = new(
             name: "--protect-source",
@@ -144,7 +169,12 @@ public static partial class Program
             optListenPort,
             optOpenBrowser,
             optMaxResourceCount,
-            optUiMode,
+            optDisableUi,
+            optPackageCache,
+            optPublishedPackages,
+            optCiPackages,
+            optLoadPackageExamples,
+            optPackageReferenceImplementation,
             optSourceDirectory,
             optProtectLoadedContent,
             optTenantsR4,
@@ -169,7 +199,12 @@ public static partial class Program
                 ListenPort = context.ParseResult.GetValueForOption(optListenPort) ?? _defaultListenPort,
                 OpenBrowser = context.ParseResult.GetValueForOption(optOpenBrowser) ?? false,
                 MaxResourceCount = context.ParseResult.GetValueForOption(optMaxResourceCount) ?? 0,
-                UiMode = context.ParseResult.GetValueForOption(optUiMode) ?? ServerConfiguration.UiModes.Default,
+                DisableUi = context.ParseResult.GetValueForOption(optDisableUi) ?? false,
+                FhirCacheDirectory = context.ParseResult.GetValueForOption(optPackageCache),
+                PublishedPackages = context.ParseResult.GetValueForOption(optPublishedPackages) ?? new(),
+                CiPackages = context.ParseResult.GetValueForOption(optCiPackages) ?? new(),
+                LoadPackageExamples = context.ParseResult.GetValueForOption(optLoadPackageExamples) ?? false,
+                ReferenceImplementation = context.ParseResult.GetValueForOption(optPackageReferenceImplementation) ?? string.Empty,
                 SourceDirectory = context.ParseResult.GetValueForOption(optSourceDirectory),
                 ProtectLoadedContent = context.ParseResult.GetValueForOption(optProtectLoadedContent) ?? false,
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
@@ -214,21 +249,21 @@ public static partial class Program
                 config.TenantsR5.Add("r5");
             }
 
-            Dictionary<string, TenantConfiguration> tenants = BuildTeantConfigurations(config);
+            Dictionary<string, TenantConfiguration> tenants = BuildTenantConfigurations(config);
 
             WebApplicationBuilder builder = null!;
 
-            // when packaging as a dotnet tool, we need to do some directory shennangians for the static content root
+            // when packaging as a dotnet tool, we need to do some directory shenanigans for the static content root
             string root = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory) ?? string.Empty;
             if (!string.IsNullOrEmpty(root))
             {
-                string webroot = FindRelativeDir(root, "staticwebassets", false);
+                string webRoot = FindRelativeDir(root, "staticwebassets", false);
 
-                if ((!string.IsNullOrEmpty(webroot)) && Directory.Exists(webroot))
+                if ((!string.IsNullOrEmpty(webRoot)) && Directory.Exists(webRoot))
                 {
                     builder = WebApplication.CreateBuilder(new WebApplicationOptions()
                     {
-                        WebRootPath = webroot,
+                        WebRootPath = webRoot,
                     });
                 }
             }
@@ -254,13 +289,17 @@ public static partial class Program
             builder.Services.AddSingleton<IFhirStoreManager, FhirStoreManager>();
             builder.Services.AddHostedService<IFhirStoreManager>(sp => sp.GetRequiredService<IFhirStoreManager>());
 
-            // add a FHIR-Store singleton, then register as a hosted service
+            // add a notification manager singleton, then register as a hosted service
             builder.Services.AddSingleton<INotificationManager, NotificationManager>();
             builder.Services.AddHostedService<INotificationManager>(sp => sp.GetRequiredService<INotificationManager>());
 
+            // add a package service singleton, then register as a hosted service
+            builder.Services.AddSingleton<IFhirPackageService, FhirPackageService>();
+            builder.Services.AddHostedService<IFhirPackageService>(sp => sp.GetRequiredService<IFhirPackageService>());
+
             builder.Services.AddControllers();
 
-            if (config.UiMode != ServerConfiguration.UiModes.None)
+            if (config.DisableUi != true)
             {
                 builder.Services.AddRazorPages(options =>
                 {
@@ -270,10 +309,10 @@ public static partial class Program
                 builder.Services.AddMudServices();
 
                 // set our default UI page
-                Pages.Index.Mode = config.UiMode;
+                //Pages.Index.Mode = config.UiMode;
             }
 
-            string localUrl = $"http://+:{config.ListenPort}";
+            string localUrl = $"http://*:{config.ListenPort}";
 
             builder.WebHost.UseUrls(localUrl);
             //builder.WebHost.UseStaticWebAssets();
@@ -292,17 +331,49 @@ public static partial class Program
 
             app.MapControllers();
 
-            if (config.UiMode != ServerConfiguration.UiModes.None)
+            if (config.DisableUi != true)
             {
                 app.MapBlazorHub();
                 app.MapFallbackToPage("/_Host");
             }
 
+            if (config.FhirCacheDirectory == null)
+            {
+                config.FhirCacheDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".fhir");
+            }
+
+            IFhirPackageService ps = app.Services.GetRequiredService<IFhirPackageService>();
+            IFhirStoreManager sm = app.Services.GetRequiredService<IFhirStoreManager>();
+
+            ps.Init(config.FhirCacheDirectory);
+
             // run the server
             //await app.RunAsync(cancellationToken);
             _ = app.StartAsync();
 
-            //_ = app.RunAsync(cancellationToken);
+            if (ps.IsConfigured &&
+                (config.PublishedPackages.Any() || config.CiPackages.Any()))
+            {
+                // look for a package supplemental directory
+                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
+                    ? FindRelativeDir(root, "fhirData", false)
+                    : config.SourceDirectory;
+
+                _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
+            }
+
+            if (!string.IsNullOrEmpty(config.ReferenceImplementation))
+            {
+                // look for a package supplemental directory
+                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
+                    ? FindRelativeDir(root, $"fhirData/{config.ReferenceImplementation}", false)
+                    : Path.Combine(config.SourceDirectory, config.ReferenceImplementation);
+
+                sm.LoadRiContents(supplemental);
+            }
+
             AfterServerStart(app, config);
             await app.WaitForShutdownAsync(cancellationToken);
 
@@ -319,6 +390,9 @@ public static partial class Program
         }
     }
 
+    /// <summary>After server start.</summary>
+    /// <param name="app">   The application.</param>
+    /// <param name="config">The configuration.</param>
     private static void AfterServerStart(WebApplication app, ServerConfiguration config)
     {
         Console.WriteLine("Press CTRL+C to exit");
@@ -356,13 +430,13 @@ public static partial class Program
         Process.Start(psi);
     }
 
-    /// <summary>Builds an enumeration of teant configurations for this application.</summary>
+    /// <summary>Builds an enumeration of tenant configurations for this application.</summary>
     /// <param name="config">The configuration.</param>
     /// <returns>
-    /// An enumerator that allows foreach to be used to process build teant configurations in this
+    /// An enumerator that allows foreach to be used to process build tenant configurations in this
     /// collection.
     /// </returns>
-    private static Dictionary<string, TenantConfiguration> BuildTeantConfigurations(ServerConfiguration config)
+    private static Dictionary<string, TenantConfiguration> BuildTenantConfigurations(ServerConfiguration config)
     {
         Dictionary<string, TenantConfiguration> tenants = new();
 
@@ -447,12 +521,12 @@ public static partial class Program
     /// <exception cref="DirectoryNotFoundException">Thrown when the requested directory is not
     ///  present.</exception>
     /// <param name="dirName">       The name of the directory we are searching for.</param>
-    /// <param name="thowIfNotFound">(Optional) True to thow if not found.</param>
+    /// <param name="throwIfNotFound">(Optional) True to throw if not found.</param>
     /// <returns>The found FHIR directory.</returns>
     public static string FindRelativeDir(
         string startDir,
         string dirName,
-        bool thowIfNotFound = true)
+        bool throwIfNotFound = true)
     {
         string currentDir = string.IsNullOrEmpty(startDir) ? Path.GetDirectoryName(AppContext.BaseDirectory) ?? string.Empty : startDir;
         string testDir = Path.Combine(currentDir, dirName);
@@ -463,7 +537,7 @@ public static partial class Program
 
             if (currentDir == Path.GetPathRoot(currentDir))
             {
-                if (thowIfNotFound)
+                if (throwIfNotFound)
                 {
                     throw new DirectoryNotFoundException($"Could not find directory {dirName}!");
                 }

@@ -29,7 +29,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Serialization\Utils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\IVersionedResourceStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\ResourceStore.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)storage\StoreTerminologyService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Storage\StoreTerminologyService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Storage\VersionedFhirStore.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\IFhirOperation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionStatus.cs" />

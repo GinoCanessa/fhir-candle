@@ -14,8 +14,10 @@ public class StoreTerminologyService : ITerminologyService
     /// <summary>A value set contents.</summary>
     internal record class ValueSetContents
     {
+        /// <summary>Set containing bare code values.</summary>
         public HashSet<string> Codes { get; init; } = new();
 
+        /// <summary>Set containing joined system|code values.</summary>
         public HashSet<string> SystemAndCodes { get; init; } = new();
     }
 
@@ -181,31 +183,59 @@ public class StoreTerminologyService : ITerminologyService
         return System.Threading.Tasks.Task.FromResult(retVal);
     }
 
+    /// <summary>Subsumes.</summary>
+    /// <param name="parameters">Options for controlling the operation.</param>
+    /// <param name="id">        The identifier.</param>
+    /// <param name="useGet">    True to use get.</param>
+    /// <returns>An asynchronous result that yields the Parameters.</returns>
     Task<Parameters> ICodeValidationTerminologyService.Subsumes(Parameters parameters, string id, bool useGet)
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>Code system validate code.</summary>
+    /// <param name="parameters">Options for controlling the operation.</param>
+    /// <param name="id">        The identifier.</param>
+    /// <param name="useGet">    True to use get.</param>
+    /// <returns>An asynchronous result that yields the Parameters.</returns>
     Task<Parameters> ICodeSystemTerminologyService.CodeSystemValidateCode(Parameters parameters, string id, bool useGet)
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>Looks up a given key to find its associated value.</summary>
+    /// <param name="parameters">Options for controlling the operation.</param>
+    /// <param name="useGet">    True to use get.</param>
+    /// <returns>An asynchronous result that yields the Parameters.</returns>
     Task<Parameters> ICodeSystemTerminologyService.Lookup(Parameters parameters, bool useGet)
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>Translates.</summary>
+    /// <param name="parameters">Options for controlling the operation.</param>
+    /// <param name="id">        The identifier.</param>
+    /// <param name="useGet">    True to use get.</param>
+    /// <returns>An asynchronous result that yields the Parameters.</returns>
     Task<Parameters> IMappingTerminologyService.Translate(Parameters parameters, string id, bool useGet)
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>Closures.</summary>
+    /// <param name="parameters">Options for controlling the operation.</param>
+    /// <param name="useGet">    True to use get.</param>
+    /// <returns>An asynchronous result that yields a Resource.</returns>
     Task<Resource> ITerminologyServiceWithClosure.Closure(Parameters parameters, bool useGet)
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>Expands.</summary>
+    /// <param name="parameters">Options for controlling the operation.</param>
+    /// <param name="id">        The identifier.</param>
+    /// <param name="useGet">    True to use get.</param>
+    /// <returns>An asynchronous result that yields a Resource.</returns>
     Task<Resource> IExpandingTerminologyService.Expand(Parameters parameters, string id, bool useGet)
     {
         throw new NotImplementedException();

@@ -63,7 +63,7 @@ By default, this software loads three FHIR 'tenants':
 * a FHIR R4B endpoint at `/r4b`, and
 * a FHIR R5 endpoint at `/r5`.
 
-The tenants can be controlled by command line arguments - note that manually specifying any tentants
+The tenants can be controlled by command line arguments - note that manually specifying any tenants
 overrides the default configuration and will *only* load the ones specified.  To load only an R4
 endpoint at 'fhir', the arguments would include `--r4 fhir`.  You can specify multiple tenants for
 the same version, for example `--r5 fhir --r5 also-fhir` will create two endpoints.
@@ -92,8 +92,6 @@ Note: items are unsorted within their priorities
 
 ## High priority
 * Reverse chaining (`_has`)
-* IG Package Loading
-* Server-level search
 * Feature/module definitions for selective loading
     Build interfaces for Hosted Services, etc.
     Add module tag to Operation, etc.
@@ -109,7 +107,7 @@ Note: items are unsorted within their priorities
 
 ## Mid Priority
 * SMART support
-* Batch / transaction support
+* Transaction support
 * Proxy header support
 * Conditional interaction support (e.g., `conditional-update`, `if-match`)
 * OpenAPI generation
@@ -119,7 +117,7 @@ Note: items are unsorted within their priorities
 
 ## The long tail
 * Non-terminology validation
-* Link to terminiology server for full validation
+* Link to terminology server for full validation
 * `_filter` support
 * Runtime named queries
 * GraphQL support

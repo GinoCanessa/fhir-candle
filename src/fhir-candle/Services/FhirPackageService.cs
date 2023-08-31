@@ -45,7 +45,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Values that represent FHIR major releases.</summary>
     public enum FhirSequenceEnum : int
     {
-        /// <summary>An enum constant representing the uknown option.</summary>
+        /// <summary>An enum constant representing the unknown option.</summary>
         [FhirLiteral("")]
         Unknown = 0,
 
@@ -422,13 +422,22 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         {
             sequencesToTest = Enum.GetValues(typeof(FhirSequenceEnum))
                 .Cast<FhirSequenceEnum>()
-                .Where(v => v >= FhirSequenceEnum.R4)
                 .ToDictionary(x => x, x => LiteralForSequence(x).ToLowerInvariant());
         }
 
         // want to check for fhir-version named packages
-        foreach ((FhirSequenceEnum seqence, string trailer) in sequencesToTest)
+        foreach ((FhirSequenceEnum sequence, string trailer) in sequencesToTest)
         {
+            if ((sequence == FhirSequenceEnum.DSTU2) ||
+                (sequence == FhirSequenceEnum.STU3))
+            {
+                continue;
+            }
+
+            version = string.Empty;
+            isLocal = false;
+            directory = string.Empty;
+            
             string sequencedName = string.IsNullOrEmpty(trailer) ? name : $"{name}.{trailer}";
 
             if (string.IsNullOrEmpty(version) || 

@@ -848,6 +848,12 @@ public partial class VersionedFhirStore : IFhirStore
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryResolveAsResource(string uri, out Resource? resource)
     {
+        if (string.IsNullOrEmpty(uri))
+        {
+            resource = null;
+            return false;
+        }
+        
         string[] components = uri.Split('/');
 
         if (components.Length < 2)

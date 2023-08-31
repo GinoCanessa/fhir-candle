@@ -894,32 +894,43 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        ITypedElement currentTE = current.ToTypedElement();
-
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        try
         {
-            TerminologyService = _store.Terminology,
-        };
+            ITypedElement currentTE = current.ToTypedElement();
 
-        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
-        {
-            NextResolver = _store.Resolve,
-            Variables = new()
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
             {
-                { "current", currentTE },
-                //{ "previous", Enumerable.Empty<ITypedElement>() },
-            },
-        };
+                TerminologyService = _store.Terminology,
+            };
 
-        fpContext.ElementResolver = resolver.Resolve;
+            FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+            {
+                NextResolver = _store.Resolve,
+                Variables = new()
+                {
+                    { "current", currentTE },
+                    //{ "previous", Enumerable.Empty<ITypedElement>() },
+                },
+            };
 
-        PerformSubscriptionTest(
-            current,
-            currentTE,
-            null,
-            null,
-            fpContext,
-            ExecutableSubscriptionInfo.InteractionTypes.Create);
+            fpContext.ElementResolver = resolver.Resolve;
+
+            PerformSubscriptionTest(
+                current,
+                currentTE,
+                null,
+                null,
+                fpContext,
+                ExecutableSubscriptionInfo.InteractionTypes.Create);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestCreateAgainstSubscriptions caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestCreateAgainstSubscriptions caught: {ex.InnerException.Message}");
+            }
+        }
     }
 
     /// <summary>Tests an update interaction against all subscriptions.</summary>
@@ -934,32 +945,44 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        ITypedElement currentTE = current.ToTypedElement();
-        ITypedElement previousTE = previous.ToTypedElement();
-
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        try
         {
-            TerminologyService = _store.Terminology,
-        };
+            ITypedElement currentTE = current.ToTypedElement();
+            ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
-        {
-            NextResolver = _store.Resolve,
-            Variables = new()
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
             {
-                { "current", currentTE },
-                { "previous", previousTE },
-            },
-        };
+                TerminologyService = _store.Terminology,
+            };
 
-        fpContext.ElementResolver = resolver.Resolve;
+            FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+            {
+                NextResolver = _store.Resolve,
+                Variables = new()
+                {
+                    { "current", currentTE },
+                    { "previous", previousTE },
+                },
+            };
 
-        PerformSubscriptionTest(
-            current,
-            currentTE,
-            previous,
-            previousTE,
-            fpContext, ExecutableSubscriptionInfo.InteractionTypes.Update);
+            fpContext.ElementResolver = resolver.Resolve;
+
+            PerformSubscriptionTest(
+                current,
+                currentTE,
+                previous,
+                previousTE,
+                fpContext, ExecutableSubscriptionInfo.InteractionTypes.Update);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestUpdateAgainstSubscriptions caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestUpdateAgainstSubscriptions caught: {ex.InnerException.Message}");
+            }
+        }
+
     }
 
     /// <summary>Tests a delete interaction against all subscriptions.</summary>
@@ -973,32 +996,43 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        ITypedElement previousTE = previous.ToTypedElement();
-
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
+        try
         {
-            TerminologyService = _store.Terminology,
-        };
+            ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
-        {
-            NextResolver = _store.Resolve,
-            Variables = new()
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
             {
-                //{ "current", currentTE },
-                { "previous", previousTE },
-            },
-        };
+                TerminologyService = _store.Terminology,
+            };
 
-        fpContext.ElementResolver = resolver.Resolve;
+            FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+            {
+                NextResolver = _store.Resolve,
+                Variables = new()
+                {
+                    //{ "current", currentTE },
+                    { "previous", previousTE },
+                },
+            };
 
-        PerformSubscriptionTest(
-            null,
-            null,
-            previous,
-            previousTE,
-            fpContext,
-            ExecutableSubscriptionInfo.InteractionTypes.Delete);
+            fpContext.ElementResolver = resolver.Resolve;
+
+            PerformSubscriptionTest(
+                null,
+                null,
+                previous,
+                previousTE,
+                fpContext,
+                ExecutableSubscriptionInfo.InteractionTypes.Delete);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestDeleteAgainstSubscriptions caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestDeleteAgainstSubscriptions caught: {ex.InnerException.Message}");
+            }
+        }
     }
 
     ///// <summary>Sets executable subscription topic.</summary>
@@ -1056,7 +1090,7 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception Setting Executable Search Paramter {rt}.{name}: {ex.Message}");
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< Exception Setting Executable Search Parameter {rt}.{name}: {ex.Message}");
             }
         }
     }

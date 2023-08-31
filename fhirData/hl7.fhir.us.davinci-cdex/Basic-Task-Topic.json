@@ -1,0 +1,164 @@
+{
+  "resourceType" : "Basic",
+  "id" : "cdex-task-topic",
+  "extension" : [{
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
+    "valueUri" : "http://hl7.org/fhir/us/davinci-cdex/ImplementationGuide/hl7.fhir.us.davinci-cdex"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.version",
+    "valueString" : "2.0.0-v01"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.name",
+    "valueString" : "CDexTaskSubscriptionTopic"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.title",
+    "valueString" : "CDex Task-Based SubscriptionTopic"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
+    "valueCode" : "active"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",
+    "valueDateTime" : "2023-08-08"
+  },
+  {
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.description",
+    "valueMarkdown" : "Subscription topic supporting Task-based CDex workflows."
+  },
+  {
+    "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.jurisdiction",
+    "valueCodeableConcept": {
+        "coding": [
+            {
+                "system": "urn:iso:std:iso:3166",
+                "code": "US",
+                "display": "United States of America"
+            }
+        ]
+    }
+  },
+  {
+    "extension" : [{
+      "url" : "description",
+      "valueMarkdown" : "A CDex Task has finished"
+    },
+    {
+      "url" : "resource",
+      "valueUri" : "http://hl7.org/fhir/StructureDefinition/Task"
+    },
+    {
+      "url" : "supportedInteraction",
+      "valueCode" : "create"
+    },
+    {
+      "url" : "supportedInteraction",
+      "valueCode" : "update"
+    },
+    {
+      "extension" : [{
+        "url" : "previous",
+        "valueString" : "status:not=rejected,failed,completed"
+      },
+      {
+        "url" : "resultForCreate",
+        "valueCode" : "test-passes"
+      },
+      {
+        "url" : "current",
+        "valueString" : "_tag:in=http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-work-queue&intent=order&code:in=http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-data-request-task-code&status=rejected,failed,completed"
+      },
+      {
+        "url" : "resultForDelete",
+        "valueCode" : "test-fails"
+      },
+      {
+        "url" : "requireBoth",
+        "valueBoolean" : true
+      }],
+      "url" : "queryCriteria"
+    },
+    {
+      "url" : "fhirPathCriteria",
+      "valueString" : "(%previous.empty() | ((%previous.status in ('rejected' | 'failed' | 'completed')).not())) and (%current.status in ('rejected' | 'failed' | 'completed')) and (%current.meta.tag.memberOf('http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-work-queue')) and (%current.code.memberOf('http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-data-request-task-code'))"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.resourceTrigger"
+  },
+  {
+    "extension" : [{
+      "url" : "description",
+      "valueMarkdown" : "Filter based on the Task Identifier."
+    },
+    {
+      "url" : "resource",
+      "valueUri" : "Task"
+    },
+    {
+      "url" : "filterParameter",
+      "valueString" : "identifier"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.canFilterBy"
+  },
+  {
+    "extension" : [{
+      "url" : "description",
+      "valueMarkdown" : "Filter based on the Task requester."
+    },
+    {
+      "url" : "resource",
+      "valueUri" : "Task"
+    },
+    {
+      "url" : "filterParameter",
+      "valueString" : "requester"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.canFilterBy"
+  },
+  {
+    "extension" : [{
+      "url" : "description",
+      "valueMarkdown" : "Filter based on the Task Owner."
+    },
+    {
+      "url" : "resource",
+      "valueUri" : "Task"
+    },
+    {
+      "url" : "filterParameter",
+      "valueString" : "owner"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.canFilterBy"
+  },
+  {
+    "extension" : [{
+      "url" : "resource",
+      "valueUri" : "Task"
+    },
+    {
+      "url" : "include",
+      "valueString" : "Task:focus"
+    },
+    {
+      "url" : "include",
+      "valueString" : "Task:requester"
+    },
+    {
+      "url" : "include",
+      "valueString" : "Task:requestedperformer-reference"
+    },
+    {
+      "url" : "include",
+      "valueString" : "Task:owner"
+    }],
+    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.notificationShape"
+  }],
+  "code" : {
+    "coding" : [{
+      "system" : "http://hl7.org/fhir/fhir-types",
+      "code" : "SubscriptionTopic"
+    }]
+  }
+}

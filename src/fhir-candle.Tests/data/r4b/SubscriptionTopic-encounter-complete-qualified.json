@@ -1,0 +1,65 @@
+{
+    "resourceType": "SubscriptionTopic",
+    "id": "encounter-complete",
+    "url": "http://example.org/FHIR/SubscriptionTopic/encounter-complete",
+    "version": "1.0.0-fhir.r4b",
+    "title": "encounter-complete",
+    "status": "draft",
+    "date": "2019-01-01",
+    "description": "Example topic for completed encounters",
+    "resourceTrigger": [
+      {
+        "description": "An Encounter has been completed",
+        "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
+        "supportedInteraction": [
+          "create",
+          "update"
+        ],
+        "queryCriteria": {
+          "previous": "status:not=finished",
+          "resultForCreate": "test-passes",
+          "current": "status=finished",
+          "resultForDelete": "test-fails",
+          "requireBoth": true
+        },
+        "fhirPathCriteria": "(%previous.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')"
+      }
+    ],
+    "canFilterBy": [
+      {
+        "description": "Filter based on the subject of an encounter.",
+        "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
+        "filterParameter": "subject"
+      },
+      {
+        "description": "Filter based on the group membership of the subject of an encounter.",
+        "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
+        "filterParameter": "_in"
+      },
+      {
+        "description": "Filter based on the length of an encounter.",
+        "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
+        "filterParameter": "length",
+        "modifier": [
+          "gt",
+          "lt",
+          "ge",
+          "le"
+        ]
+      }
+    ],
+    "notificationShape": [
+      {
+        "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
+        "include": [
+          "Encounter:patient&iterate=Patient.link",
+          "Encounter:practitioner",
+          "Encounter:service-provider",
+          "Encounter:account",
+          "Encounter:diagnosis",
+          "Encounter:observation",
+          "Encounter:location"
+        ]
+      }
+    ]
+  }

@@ -307,6 +307,7 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
     /// <param name="json">The JSON.</param>
     [Theory]
     [FileData("data/r4b/SubscriptionTopic-encounter-complete.json")]
+    [FileData("data/r4b/SubscriptionTopic-encounter-complete-qualified.json")]
     public void ParseTopic(string json)
     {
         HttpStatusCode sc = candleR4B.FhirCandle.Serialization.Utils.TryDeserializeFhir(
@@ -327,9 +328,12 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
         s.Id.Should().Be("encounter-complete");
         s.Url.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
         s.ResourceTriggers.Should().HaveCount(1);
+        s.ResourceTriggers.Keys.Should().Contain("Encounter");
         s.EventTriggers.Should().BeEmpty();
         s.AllowedFilters.Should().NotBeEmpty();
+        s.AllowedFilters.Keys.Should().Contain("Encounter");
         s.NotificationShapes.Should().NotBeEmpty();
+        s.NotificationShapes.Keys.Should().Contain("Encounter");
     }
 
     [Theory]
@@ -354,6 +358,7 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
         s.Id.Should().Be("db4ce0bb-fa9c-4092-9f75-34772dc85590");
         s.TopicUrl.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
         s.Filters.Should().HaveCount(1);
+        s.Filters.Keys.Should().Contain("Encounter");
         s.ChannelCode.Should().Be("rest-hook");
         s.Endpoint.Should().Be("https://subscriptions.argo.run/fhir/r4b/$subscription-hook");
         s.HeartbeatSeconds.Should().Be(120);

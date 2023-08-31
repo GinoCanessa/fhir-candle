@@ -309,6 +309,7 @@ public class R4TestSubscriptions : IClassFixture<R4Tests>
     /// <summary>Parse topic.</summary>
     /// <param name="json">The JSON.</param>
     [Theory]
+    [FileData("data/r4/Basic-topic-encounter-complete-qualified.json")]
     [FileData("data/r4/Basic-topic-encounter-complete.json")]
     public void ParseTopic(string json)
     {
@@ -331,9 +332,12 @@ public class R4TestSubscriptions : IClassFixture<R4Tests>
         s.Id.Should().Be("encounter-complete");
         s.Url.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
         s.ResourceTriggers.Should().HaveCount(1);
+        s.ResourceTriggers.Keys.Should().Contain("Encounter");
         s.EventTriggers.Should().BeEmpty();
         s.AllowedFilters.Should().NotBeEmpty();
+        s.AllowedFilters.Keys.Should().Contain("Encounter");
         s.NotificationShapes.Should().NotBeEmpty();
+        s.NotificationShapes.Keys.Should().Contain("Encounter");
     }
 
     [Theory]

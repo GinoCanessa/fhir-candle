@@ -14,7 +14,7 @@
   "resourceTrigger": [
     {
       "description": "An Encounter has been completed",
-      "resource": "http://hl7.org/fhir/StructureDefinition/Encounter",
+      "resource": "Encounter",
       "supportedInteraction": [
         "create",
         "update"

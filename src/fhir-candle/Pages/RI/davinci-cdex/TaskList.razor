@@ -16,6 +16,9 @@
     </MudText>
     <br />
 
+    <MudText Typo="Typo.body1">
+        Following is a list of properly-tagged Tasks and actions that can be taken with them.
+    </MudText>
     <MudSimpleTable>
         <thead>
             <tr>
@@ -26,7 +29,10 @@
             </tr>
         </thead>
         <tbody>
-            <FhirCandle.Ui.R4.davinci_cdex.TaskListRows StoreName="@StoreName" Store="@_store" />
+            <FhirCandle.Ui.R4.davinci_cdex.TaskListRows
+                Store="@_store"
+                StoreName="@StoreName"
+                />
         </tbody>
     </MudSimpleTable>
     <br />

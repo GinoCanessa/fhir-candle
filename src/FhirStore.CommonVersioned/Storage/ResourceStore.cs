@@ -400,12 +400,12 @@ public class ResourceStore<T> : IVersionedResourceStore
             else if (int.TryParse(_resourceStore[source.Id].Meta?.VersionId ?? string.Empty, out int version))
             {
                 source.Meta.VersionId = (version + 1).ToString();
-                previous = _resourceStore[source.Id];
+                previous = (T)_resourceStore[source.Id].DeepCopy();
             }
             else
             {
                 source.Meta.VersionId = "1";
-                previous = _resourceStore[source.Id];
+                previous = (T)_resourceStore[source.Id].DeepCopy();
             }
 
             source.Meta.LastUpdated = DateTimeOffset.UtcNow;
@@ -667,8 +667,12 @@ public class ResourceStore<T> : IVersionedResourceStore
         HashSet<string> notifiedSubscriptions = new();
         List<string> matchedTopics = new();
 
+        Dictionary<string, List<string>> topicErrors = new();
+
         foreach ((string topicUrl, ExecutableSubscriptionInfo executable) in _executableSubscriptions)
         {
+            bool matched = false;
+
             // first, check for interaction types
             if (executable.InteractionTriggers.Any())
             {
@@ -677,148 +681,202 @@ public class ResourceStore<T> : IVersionedResourceStore
                     case ExecutableSubscriptionInfo.InteractionTypes.Create:
                         if (executable.InteractionTriggers.Any(it => it.OnCreate == true))
                         {
+                            matched = true;
                             matchedTopics.Add(topicUrl);
-                            continue;
+                            break;
                         }
                         break;
 
                     case ExecutableSubscriptionInfo.InteractionTypes.Update:
                         if (executable.InteractionTriggers.Any(it => it.OnUpdate == true))
                         {
+                            matched = true;
                             matchedTopics.Add(topicUrl);
-                            continue;
+                            break;
                         }
                         break;
 
                     case ExecutableSubscriptionInfo.InteractionTypes.Delete:
                         if (executable.InteractionTriggers.Any(it => it.OnDelete == true))
                         {
+                            matched = true;
                             matchedTopics.Add(topicUrl);
-                            continue;
+                            break;
                         }
                         break;
                 }
             }
 
+            if (matched)
+            {
+                continue;
+            }
+
             // second, test FhirPath
             if (executable.FhirPathTriggers.Any())
             {
-                bool matched = false;
-
                 foreach (ExecutableSubscriptionInfo.CompiledFhirPathTrigger cfp in executable.FhirPathTriggers)
                 {
-                    ITypedElement? result;
+                    try
+                    {
+                        ITypedElement? result;
 
-                    if (currentTE != null)
-                    {
-                        result = cfp.FhirPathTrigger.Invoke(currentTE, fpContext).First() ?? null;
+                        if (currentTE != null)
+                        {
+                            result = cfp.FhirPathTrigger.Invoke(currentTE, fpContext).First() ?? null;
+                        }
+                        else if (previousTE != null)
+                        {
+                            result = cfp.FhirPathTrigger.Invoke(previousTE, fpContext).First() ?? null;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+
+                        if ((result == null) ||
+                            (result.Value == null) ||
+                            (!(result.Value is bool val)) ||
+                            (val == false))
+                        {
+                            continue;
+                        }
+
+                        matched = true;
+                        matchedTopics.Add(topicUrl);
+                        break;
                     }
-                    else if (previousTE != null)
+                    catch (Exception ex)
                     {
-                        result = cfp.FhirPathTrigger.Invoke(previousTE, fpContext).First() ?? null;
-                    }
-                    else
-                    {
+                        Console.WriteLine($"ResourceStore[{_resourceName}] <<< Error evaluating FhirPath trigger for topic {topicUrl}: {ex.Message}");
+
+                        if (!topicErrors.ContainsKey(topicUrl))
+                        {
+                            topicErrors.Add(topicUrl, new());
+                        }
+
+                        if (ex.InnerException == null)
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating FhirPath trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}");
+                        }
+                        else
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating FhirPath trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}:{ex.InnerException.Message}");
+                        }
+
                         continue;
                     }
-
-                    if ((result == null) ||
-                        (result.Value == null) ||
-                        (!(result.Value is bool val)) ||
-                        (val == false))
-                    {
-                        continue;
-                    }
-
-                    matched = true;
-                    break;
                 }
+            }
 
-                if (matched)
-                {
-                    matchedTopics.Add(topicUrl);
-                    continue;
-                }
+            if (matched)
+            {
+                continue;
             }
 
             // finally, test query
             if (executable.QueryTriggers.Any())
             {
-                bool matched = false;
                 bool previousPassed = false;
                 bool currentPassed = false;
 
                 foreach (ExecutableSubscriptionInfo.CompiledQueryTrigger cq in executable.QueryTriggers)
                 {
-                    switch (interaction)
+                    try
                     {
-                        case ExecutableSubscriptionInfo.InteractionTypes.Create:
-                            {
-                                if (!cq.OnCreate)
+
+                        switch (interaction)
+                        {
+                            case ExecutableSubscriptionInfo.InteractionTypes.Create:
                                 {
-                                    continue;
+                                    if (!cq.OnCreate)
+                                    {
+                                        continue;
+                                    }
+
+                                    previousPassed = cq.CreateAutoPasses;
+                                    currentPassed = _searchTester.TestForMatch(
+                                        currentTE!,
+                                        cq.CurrentTest,
+                                        fpContext);
                                 }
+                                break;
 
-                                previousPassed = cq.CreateAutoPasses;
-                                currentPassed = _searchTester.TestForMatch(
-                                    currentTE!,
-                                    cq.CurrentTest,
-                                    fpContext);
-                            }
-                            break;
-
-                        case ExecutableSubscriptionInfo.InteractionTypes.Update:
-                            {
-                                if (!cq.OnUpdate)
+                            case ExecutableSubscriptionInfo.InteractionTypes.Update:
                                 {
-                                    continue;
+                                    if (!cq.OnUpdate)
+                                    {
+                                        continue;
+                                    }
+
+                                    previousPassed = _searchTester.TestForMatch(
+                                        previousTE!,
+                                        cq.PreviousTest,
+                                        fpContext);
+                                    currentPassed = _searchTester.TestForMatch(
+                                        currentTE!,
+                                        cq.CurrentTest,
+                                        fpContext);
                                 }
+                                break;
 
-                                previousPassed = _searchTester.TestForMatch(
-                                    previousTE!,
-                                    cq.PreviousTest,
-                                    fpContext);
-                                currentPassed = _searchTester.TestForMatch(
-                                    currentTE!,
-                                    cq.CurrentTest,
-                                    fpContext);
-                            }
-                            break;
-
-                        case ExecutableSubscriptionInfo.InteractionTypes.Delete:
-                            {
-                                if (!cq.OnDelete)
+                            case ExecutableSubscriptionInfo.InteractionTypes.Delete:
                                 {
-                                    continue;
-                                }
+                                    if (!cq.OnDelete)
+                                    {
+                                        continue;
+                                    }
 
-                                previousPassed = _searchTester.TestForMatch(
-                                    previousTE!,
-                                    cq.PreviousTest,
-                                    fpContext);
-                                currentPassed = cq.DeleteAutoPasses;
-                            }
-                            break;
+                                    previousPassed = _searchTester.TestForMatch(
+                                        previousTE!,
+                                        cq.PreviousTest,
+                                        fpContext);
+                                    currentPassed = cq.DeleteAutoPasses;
+                                }
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"ResourceStore[{_resourceName}] <<< Error evaluating Query trigger for topic {topicUrl}: {ex.Message}");
+
+                        if (!topicErrors.ContainsKey(topicUrl))
+                        {
+                            topicErrors.Add(topicUrl, new());
+                        }
+
+                        if (ex.InnerException == null)
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating Query trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}");
+                        }
+                        else
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating Query trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}:{ex.InnerException.Message}");
+                        }
+
+                        continue;
                     }
 
                     if ((cq.RequireBothTests && previousPassed && currentPassed) ||
                         ((!cq.RequireBothTests) && (previousPassed || currentPassed)))
                     {
                         matched = true;
+                        matchedTopics.Add(topicUrl);
                         break;
                     }
                 }
+            }
 
-                if (matched)
-                {
-                    matchedTopics.Add(topicUrl);
-                    continue;
-                }
+            if (matched)
+            {
+                continue;
             }
         }
 
         Resource focus = current ?? previous!;
         ITypedElement focusTE = currentTE ?? previousTE!;
+
+        Dictionary<string, List<string>> subscriptionErrors = new();
 
         // traverse the list of matched topics to test against subscription filters
         foreach (string topicUrl in matchedTopics)
@@ -878,6 +936,22 @@ public class ResourceStore<T> : IVersionedResourceStore
                     };
 
                     _store.RegisterSendEvent(subscriptionId, subEvent);
+                }
+            }
+        }
+
+        foreach ((string topicUrl, List<string> errors) in topicErrors)
+        {
+            if (!_executableSubscriptions.ContainsKey(topicUrl))
+            {
+                continue;
+            }
+
+            foreach (string subId in _executableSubscriptions[topicUrl].FiltersBySubscription.Keys)
+            {
+                foreach (string error in errors)
+                {
+                    _store.RegisterError(subId, error);
                 }
             }
         }
@@ -982,7 +1056,6 @@ public class ResourceStore<T> : IVersionedResourceStore
                 Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestUpdateAgainstSubscriptions caught: {ex.InnerException.Message}");
             }
         }
-
     }
 
     /// <summary>Tests a delete interaction against all subscriptions.</summary>
@@ -1034,28 +1107,6 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
         }
     }
-
-    ///// <summary>Sets executable subscription topic.</summary>
-    ///// <param name="topic">The topic.</param>
-    //public void SetExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
-    //{
-    //    if (_subscriptionTopics.ContainsKey(topic.Id))
-    //    {
-    //        _subscriptionTopics.Remove(topic.Id);
-    //    }
-
-    //    _subscriptionTopics.Add(topic.Id, topic);
-    //}
-
-    ///// <summary>Removes the executable subscription topic described by ID.</summary>
-    ///// <param name="id">The identifier.</param>
-    //public void RemoveExecutableSubscriptionTopic(string id)
-    //{
-    //    if (_subscriptionTopics.ContainsKey(id))
-    //    {
-    //        _subscriptionTopics.Remove(id);
-    //    }
-    //}
 
     /// <summary>Adds or updates an executable search parameter based on a SearchParameter resource.</summary>
     /// <param name="sp">    The sp.</param>

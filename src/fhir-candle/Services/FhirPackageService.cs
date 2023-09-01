@@ -10,6 +10,7 @@ using IniParser;
 using IniParser.Configuration;
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace fhir.candle.Services;
@@ -761,9 +762,37 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             resolvedDirective = packageDirective;
             return true;
         }
+        catch (HttpRequestException hex)
+        {
+            // we have a lot of not found because of package nesting, this is reported elsewhere
+            if (hex.StatusCode == HttpStatusCode.NotFound)
+            {
+                fhirVersion = FhirSequenceEnum.Unknown;
+                resolvedDirective = string.Empty;
+                return false;
+            }
+
+            _logger.LogInformation($"TryDownloadAndExtract <<< exception downloading {uri}: {hex.Message}");
+            if (hex.InnerException != null)
+            {
+                _logger.LogInformation($" <<< inner: {hex.InnerException.Message}");
+            }
+        }
         catch (Exception ex)
         {
-            _logger.LogInformation($"TryDownloadAndExtract <<< exception downloading: {uri}, {ex.Message}");
+            if ((ex.InnerException != null) &&
+                (ex.InnerException is HttpRequestException hex))
+            {
+                // we have a lot of not found because of package nesting, this is reported elsewhere
+                if (hex.StatusCode == HttpStatusCode.NotFound)
+                {
+                    fhirVersion = FhirSequenceEnum.Unknown;
+                    resolvedDirective = string.Empty;
+                    return false;
+                }
+            }
+
+            _logger.LogInformation($"TryDownloadAndExtract <<< exception downloading: {uri}: {ex.Message}");
             if (ex.InnerException != null)
             {
                 _logger.LogInformation($" <<< inner: {ex.InnerException.Message}");
@@ -1514,10 +1543,10 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation(
-                        $"GetPackageVersionsAndUrls <<<" +
-                        $" Failed to get package info: {response.StatusCode}" +
-                        $" {requestUri.AbsoluteUri}");
+                    //_logger.LogInformation(
+                    //    $"GetPackageVersionsAndUrls <<<" +
+                    //    $" Failed to get package info: {response.StatusCode}" +
+                    //    $" {requestUri.AbsoluteUri}");
                     continue;
                 }
 
@@ -1527,19 +1556,19 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 if (!(info?.Name.Equals(packageName, StringComparison.OrdinalIgnoreCase) ?? false))
                 {
-                    _logger.LogInformation(
-                        $"GetPackageVersionsAndUrls <<<" +
-                        $" Package information mismatch: requested {requestUri.AbsoluteUri}" +
-                        $" received manifest for {info?.Name}");
+                    //_logger.LogInformation(
+                    //    $"GetPackageVersionsAndUrls <<<" +
+                    //    $" Package information mismatch: requested {requestUri.AbsoluteUri}" +
+                    //    $" received manifest for {info?.Name}");
                     continue;
                 }
 
                 if (info.Versions == null || info.Versions.Count == 0)
                 {
-                    _logger.LogInformation(
-                        $"GetPackageVersionsAndUrls <<<" +
-                        $" Package {requestUri.AbsoluteUri}" +
-                        $" contains NO versions");
+                    //_logger.LogInformation(
+                    //    $"GetPackageVersionsAndUrls <<<" +
+                    //    $" package {requestUri.AbsoluteUri}" +
+                    //    $" contains NO versions");
                     continue;
                 }
 
@@ -1565,6 +1594,9 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             return true;
         }
 
+        //_logger.LogInformation(
+        //    $"Package {packageName}" +
+        //    $" was not found on any registry.");
         manifests = Enumerable.Empty<RegistryPackageManifest>();
         return false;
     }

@@ -71,7 +71,7 @@
     },
     {
       "url" : "fhirPathCriteria",
-      "valueString" : "(%previous.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')"
+      "valueString" : "(%previous.id.empty() or (%previous.status != 'finished')) and (%current.status = 'finished')"
     }],
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.resourceTrigger"
   },

@@ -91,6 +91,7 @@ fhir-candle --reference-implementation subscriptions --load-package hl7.fhir.uv.
 Note: items are unsorted within their priorities
 
 ## High priority
+* Composite search parameter support
 * Reverse chaining (`_has`)
 * Feature/module definitions for selective loading
     Build interfaces for Hosted Services, etc.
@@ -103,7 +104,6 @@ Note: items are unsorted within their priorities
 * Resource display / edit in UI
 * Subscription RI scenario/walkthrough
 * Resource editor design improvements
-* Composite search parameters
 
 ## Mid Priority
 * SMART support

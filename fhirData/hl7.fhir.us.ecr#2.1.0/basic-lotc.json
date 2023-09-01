@@ -63,7 +63,7 @@
     },
     {
       "url" : "fhirPathCriteria",
-      "valueString" : "%previous.empty() and %current.code.memberOf('http://hl7.org/fhir/us/ecr/ValueSet/valueset-lotc-example')"
+      "valueString" : "%previous.id.empty() and %current.code.memberOf('http://hl7.org/fhir/us/ecr/ValueSet/valueset-lotc-example')"
     }],
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.resourceTrigger"
   },

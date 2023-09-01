@@ -95,6 +95,9 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The loaded directives.</summary>
     private HashSet<string> _loadedDirectives = new();
 
+    /// <summary>The loaded supplements.</summary>
+    private HashSet<string> _loadedSupplements = new();
+
     /// <summary>Values that represent load state codes.</summary>
     private enum LoadStateCodes
     {
@@ -464,10 +467,11 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         if ((!string.IsNullOrEmpty(packageSupplements)) &&
-            Directory.Exists(packageSupplements))
+            Directory.Exists(packageSupplements) &&
+            (!_loadedSupplements.Contains(packageSupplements)))
         {
             Console.WriteLine($"Store[{_config.ControllerName}] loading contents from {packageSupplements}");
-
+            _loadedSupplements.Add(packageSupplements);
             di = new(packageSupplements);
 
             foreach (FileInfo file in di.GetFiles("*.*", SearchOption.AllDirectories))
@@ -919,6 +923,37 @@ public partial class VersionedFhirStore : IFhirStore
         return resource.ToTypedElement().ToScopedNode();
     }
 
+    /// <summary>Attempts to create.</summary>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="resource">       [out] The resource.</param>
+    /// <param name="id">             [out] The identifier.</param>
+    /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryCreate(string resourceType, object resource, out string id, bool allowExistingId)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (resource == null) ||
+            (resource is not Hl7.Fhir.Model.Resource r))
+        {
+            id = string.Empty;
+            return false;
+        }
+
+        HttpStatusCode sc = DoInstanceCreate(
+            resourceType,
+            r,
+            string.Empty,
+            allowExistingId,
+            out Hl7.Fhir.Model.Resource? created,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        id = created?.Id ?? string.Empty;
+        return sc.IsSuccessful();
+    }
+
     /// <summary>Instance create.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="content">           The content.</param>
@@ -1156,6 +1191,22 @@ public partial class VersionedFhirStore : IFhirStore
         return HttpStatusCode.OK;
     }
 
+    /// <summary>Attempts to delete a string from the given string.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryDelete(string resourceType, string id)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)))
+        {
+            return false;
+        }
+
+        HttpStatusCode sc = DoInstanceDelete(resourceType, id, string.Empty, out _, out _);
+        return sc.IsSuccessful();
+    }
+
     /// <summary>Instance delete.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
@@ -1230,6 +1281,24 @@ public partial class VersionedFhirStore : IFhirStore
 
         outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}");
         return HttpStatusCode.OK;
+    }
+
+    /// <summary>Attempts to read.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryRead(string resourceType, string id, out object? resource)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)))
+        {
+            resource = null;
+            return false;
+        }
+
+        resource = ((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType])[id].DeepCopy();
+        return true;
     }
 
     /// <summary>Instance read.</summary>
@@ -1357,6 +1426,37 @@ public partial class VersionedFhirStore : IFhirStore
         eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
         lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         return HttpStatusCode.OK;
+    }
+
+    /// <summary>Attempts to update.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryUpdate(string resourceType, string id, object resource)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)) ||
+            (resource == null) ||
+            (resource is not Hl7.Fhir.Model.Resource r))
+        {
+            return false;
+        }
+
+        HttpStatusCode sc = DoInstanceUpdate(
+            resourceType, 
+            id, 
+            r,
+            string.Empty,
+            string.Empty,
+            false,
+            out _,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        return sc.IsSuccessful();
     }
 
     /// <summary>Instance update.</summary>
@@ -1901,6 +2001,19 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         //StateHasChanged();
+    }
+
+    /// <summary>Adds a subscription error.</summary>
+    /// <param name="id">          The subscription id.</param>
+    /// <param name="errorMessage">Message describing the error.</param>
+    public void RegisterError(string id, string errorMessage)
+    {
+        if (!_subscriptions.ContainsKey(id))
+        {
+            return;
+        }
+
+        _subscriptions[id].RegisterError(errorMessage);
     }
 
     /// <summary>Registers the received subscription changed.</summary>

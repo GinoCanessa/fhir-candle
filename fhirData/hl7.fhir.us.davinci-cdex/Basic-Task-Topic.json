@@ -61,7 +61,7 @@
     {
       "extension" : [{
         "url" : "previous",
-        "valueString" : "status:not=rejected,failed,completed"
+        "valueString" : "status:not=rejected,failed,completed,on-hold"
       },
       {
         "url" : "resultForCreate",
@@ -69,7 +69,7 @@
       },
       {
         "url" : "current",
-        "valueString" : "_tag:in=http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-work-queue&intent=order&code:in=http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-data-request-task-code&status=rejected,failed,completed"
+        "valueString" : "_tag:in=http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-work-queue&intent=order&code:in=http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-data-request-task-code&status=rejected,failed,completed,on-hold"
       },
       {
         "url" : "resultForDelete",
@@ -83,7 +83,7 @@
     },
     {
       "url" : "fhirPathCriteria",
-      "valueString" : "(%previous.empty() | ((%previous.status in ('rejected' | 'failed' | 'completed')).not())) and (%current.status in ('rejected' | 'failed' | 'completed')) and (%current.meta.tag.memberOf('http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-work-queue')) and (%current.code.memberOf('http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-data-request-task-code'))"
+      "valueString" : "(%previous.id.empty() or ((%previous.status in ('rejected' | 'failed' | 'completed' | 'on-hold')).not())) and (%current.status in ('rejected' | 'failed' | 'completed' | 'on-hold')) and (%current.meta.tag.memberOf('http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-work-queue')) and (%current.code.memberOf('http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-data-request-task-code'))"
     }],
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.resourceTrigger"
   },

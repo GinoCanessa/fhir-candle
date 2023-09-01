@@ -368,7 +368,7 @@ public static partial class Program
             {
                 // look for a package supplemental directory
                 string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-                    ? FindRelativeDir(root, $"fhirData/{config.ReferenceImplementation}", false)
+                    ? FindRelativeDir(root, Path.Combine("fhirData", config.ReferenceImplementation), false)
                     : Path.Combine(config.SourceDirectory, config.ReferenceImplementation);
 
                 sm.LoadRiContents(supplemental);

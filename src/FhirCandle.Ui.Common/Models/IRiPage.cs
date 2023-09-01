@@ -3,9 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using Microsoft.AspNetCore.Mvc.Razor;
-
-namespace fhir.candle.Models;
+namespace FhirCandle.Models;
 
 /// <summary>Information about the ri page.</summary>
 /// <param name="ContentForPackage"> The content for package.</param>

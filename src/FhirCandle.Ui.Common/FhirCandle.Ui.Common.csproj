@@ -15,4 +15,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="7.0.10" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Models\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Models\" />
+  </ItemGroup>
 </Project>

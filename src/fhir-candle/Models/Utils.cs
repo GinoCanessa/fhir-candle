@@ -3,6 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirCandle.Models;
+
 namespace fhir.candle.Models;
 
 /// <summary>An utilities.</summary>
@@ -25,49 +27,65 @@ public static class Utils
 
         IEnumerable<Type> riPageTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
             .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+        AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
-        foreach (Type riPageType in riPageTypes)
-        {
-            RiPageInfo info = new()
-            {
-                ContentForPackage = riPageType.GetProperty("ContentForPackage", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                PageName = riPageType.GetProperty("PageName", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                Description = riPageType.GetProperty("Description", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                RoutePath = riPageType.GetProperty("RoutePath", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                FhirVersionLiteral = riPageType.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                FhirVersionNumeric = riPageType.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-            };
+        riPageTypes = typeof(FhirCandle.Ui.R4.Subscriptions.TourUtils).Assembly.GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+        AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
-            if (!info.ContentForPackage.Equals(currentRi, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
+        riPageTypes = typeof(FhirCandle.Ui.R4B.Subscriptions.TourUtils).Assembly.GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+        AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
-            switch (info.FhirVersionLiteral)
-            {
-                case "R4":
-                    r4.Add(info);
-                    break;
-
-                case "R4B":
-                    r4b.Add(info);
-                    break;
-
-                case "R5":
-                    r5.Add(info);
-                    break;
-
-                case "":
-                    r4.Add(info);
-                    r4b.Add(info);
-                    r5.Add(info);
-                    break;
-            }
-        }
+        riPageTypes = typeof(FhirCandle.Ui.R5.Subscriptions.TourUtils).Assembly.GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+        AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
         pagesR4 = r4.AsEnumerable();
         pagesR4B = r4b.AsEnumerable();
         pagesR5 = r5.AsEnumerable();
+
+        static void AddRiPages(string currentRi, List<RiPageInfo> r4, List<RiPageInfo> r4b, List<RiPageInfo> r5, IEnumerable<Type> riPageTypes)
+        {
+            foreach (Type riPageType in riPageTypes)
+            {
+                RiPageInfo info = new()
+                {
+                    ContentForPackage = riPageType.GetProperty("ContentForPackage", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                    PageName = riPageType.GetProperty("PageName", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                    Description = riPageType.GetProperty("Description", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                    RoutePath = riPageType.GetProperty("RoutePath", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                    FhirVersionLiteral = riPageType.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                    FhirVersionNumeric = riPageType.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                };
+
+                if (!info.ContentForPackage.Equals(currentRi, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                switch (info.FhirVersionLiteral)
+                {
+                    case "R4":
+                        r4.Add(info);
+                        break;
+
+                    case "R4B":
+                        r4b.Add(info);
+                        break;
+
+                    case "R5":
+                        r5.Add(info);
+                        break;
+
+                    case "":
+                        r4.Add(info);
+                        r4b.Add(info);
+                        r5.Add(info);
+                        break;
+                }
+            }
+        }
     }
 
     /// <summary>Gets additional index content.</summary>

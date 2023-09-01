@@ -43,6 +43,8 @@
 	  <WarningLevel>4</WarningLevel>
 	</PropertyGroup>
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'ecr' " />
+	<PropertyGroup Condition=" '$(RunConfiguration)' == 'davinci-pas' " />
+	<PropertyGroup Condition=" '$(RunConfiguration)' == 'davinci-cdex' " />
 	<ItemGroup>
 	  <Compile Remove="data\**" />
 	  <Compile Remove="Processors\**" />

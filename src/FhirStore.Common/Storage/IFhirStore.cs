@@ -146,6 +146,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="queryString">       The query string.</param>
     /// <param name="ifMatch">           Criteria that must match to preform the update.</param>
     /// <param name="ifNoneMatch">       Criteria that must NOT match to preform the update.</param>
     /// <param name="allowCreate">       If the update should be allowed to create a new resource.</param>
@@ -162,6 +163,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string sourceFormat,
         string destFormat,
         bool pretty,
+        string queryString,
         string ifMatch,
         string ifNoneMatch,
         bool allowCreate,

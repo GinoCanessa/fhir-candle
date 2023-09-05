@@ -13,6 +13,8 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using System.Collections.Concurrent;
 using System.Collections;
+using System.Net;
+using FhirCandle.Serialization;
 
 namespace FhirCandle.Storage;
 
@@ -316,18 +318,33 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>Update a specific instance of a resource.</summary>
     /// <param name="source">            [out] The resource.</param>
     /// <param name="allowCreate">       True to allow, false to suppress the create.</param>
+    /// <param name="ifMatch">           A match specifying if.</param>
+    /// <param name="ifNoneMatch">       A match specifying if none.</param>
     /// <param name="protectedResources">The protected resources.</param>
+    /// <param name="sc">                [out] The screen.</param>
+    /// <param name="outcome">           [out] The outcome.</param>
     /// <returns>The updated resource, or null if it could not be performed.</returns>
-    public Resource? InstanceUpdate(Resource source, bool allowCreate, HashSet<string> protectedResources)
+    public Resource? InstanceUpdate(
+        Resource source, 
+        bool allowCreate, 
+        string ifMatch,
+        string ifNoneMatch,
+        HashSet<string> protectedResources,
+        out HttpStatusCode sc,
+        out OperationOutcome outcome)
     {
-        if (string.IsNullOrEmpty(source?.Id) ||
+        if ((source == null) ||
             (source is not T))
         {
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Invalid resource content for {_resourceName}");
+            sc = HttpStatusCode.BadRequest;
             return null;
         }
 
-        if (string.IsNullOrEmpty(source?.Id))
+        if (string.IsNullOrEmpty(source.Id))
         {
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Cannot update resources without an ID");
+            sc = HttpStatusCode.BadRequest;
             return null;
         }
 
@@ -338,6 +355,8 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         if (protectedResources.Any() && protectedResources.Contains(_resourceName + "/" + source.Id))
         {
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Unauthorized, $"Resource {_resourceName}/{source.Id} is protected and cannot be changed");
+            sc = HttpStatusCode.Unauthorized;
             return null;
         }
 
@@ -358,6 +377,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                     {
                         if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
                         {
+                            outcome = Utils.BuildOutcomeForRequest(
+                                HttpStatusCode.BadRequest,
+                                $"Basic-wrapped SubscriptionTopic could not be parsed!");
+                            sc = HttpStatusCode.BadRequest;
                             return null;
                         }
                     }
@@ -368,6 +391,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                 // fail the request if this fails
                 if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
                 {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.BadRequest,
+                        $"SubscriptionTopic could not be parsed!");
+                    sc = HttpStatusCode.BadRequest;
                     return null;
                 }
                 break;
@@ -376,6 +403,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                 // fail the request if this fails
                 if (!_subscriptionConverter.TryParse((Subscription)source, out parsedSubscription))
                 {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.BadRequest,
+                        $"Subscription could not be parsed!");
+                    sc = HttpStatusCode.BadRequest;
                     return null;
                 }
                 break;
@@ -394,6 +425,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                 }
                 else
                 {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.BadRequest,
+                        $"Update as Create is disabled");
+                    sc = HttpStatusCode.BadRequest;
                     return null;
                 }
             }
@@ -408,8 +443,44 @@ public class ResourceStore<T> : IVersionedResourceStore
                 previous = (T)_resourceStore[source.Id].DeepCopy();
             }
 
+            // check preconditions
+            if (ifNoneMatch.Equals("*", StringComparison.Ordinal))
+            {
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.PreconditionFailed,
+                    "Prior version exists, but If-None-Match is *");
+                sc = HttpStatusCode.PreconditionFailed;
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(ifNoneMatch))
+            {
+                if (ifNoneMatch.Equals($"W/\"{previous?.Meta.VersionId ?? string.Empty}\"", StringComparison.Ordinal))
+                {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.PreconditionFailed,
+                        $"Conditional update query returned a match with version: {previous?.Meta.VersionId}, If-None-Match: {ifNoneMatch}");
+                    sc = HttpStatusCode.PreconditionFailed;
+                    return null;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(ifMatch))
+            {
+                if (!ifMatch.Equals($"W/\"{previous?.Meta.VersionId}\"", StringComparison.Ordinal))
+                {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.PreconditionFailed,
+                        $"Conditional update query returned a match with version: {previous?.Meta.VersionId}, If-Match: {ifNoneMatch}");
+                    sc = HttpStatusCode.PreconditionFailed;
+                    return null;
+                }
+            }
+
+            // update the last updated time
             source.Meta.LastUpdated = DateTimeOffset.UtcNow;
 
+            // store
             _resourceStore[source.Id] = (T)source;
         }
 
@@ -459,6 +530,8 @@ public class ResourceStore<T> : IVersionedResourceStore
                 break;
         }
 
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Updated {_resourceName}/{source.Id} to version {source.Meta.VersionId}");
+        sc = HttpStatusCode.OK;
         return source;
     }
 

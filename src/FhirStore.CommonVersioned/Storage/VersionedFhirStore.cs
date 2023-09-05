@@ -22,6 +22,9 @@ using static FhirCandle.Search.SearchDefinitions;
 using FhirCandle.Serialization;
 using System.Drawing;
 using System.Xml.Linq;
+using Fhir.Metrics;
+using static Hl7.Fhir.Model.ActivityDefinition;
+using Hl7.Fhir.Language.Debugging;
 
 namespace FhirCandle.Storage;
 
@@ -803,7 +806,14 @@ public partial class VersionedFhirStore : IFhirStore
                 (resourceObj is Subscription r))
             {
                 r.Status = SubscriptionConverter.OffCode;
-                resourceStore.InstanceUpdate(r, false, _protectedResources);
+                resourceStore.InstanceUpdate(
+                    r, 
+                    false, 
+                    string.Empty, 
+                    string.Empty, 
+                    _protectedResources,
+                    out _,
+                    out _);
             }
         }
     }
@@ -1084,6 +1094,59 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.NotFound;
         }
 
+        // check for conditional create
+        if (!string.IsNullOrEmpty(ifNoneExist))
+        {
+            HttpStatusCode sc = DoTypeSearch(
+                resourceType,
+                ifNoneExist,
+                out Bundle? bundle,
+                out outcome);
+
+            if (sc.IsSuccessful())
+            {
+                switch (bundle?.Total)
+                {
+                    // no matches - continue with store as normal
+                    case 0:
+                        break;
+
+                    // one match - return the match as if just stored
+                    case 1:
+                        {
+                            stored = bundle.Entry[0].Resource;
+                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
+                            eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
+                            lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+                            location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
+                            return HttpStatusCode.Created;
+                        }
+
+                    // multiple matches - fail the request
+                    default:
+                        {
+                            stored = null;
+                            outcome = Utils.BuildOutcomeForRequest(
+                                HttpStatusCode.PreconditionFailed,
+                                $"If-None-Exist query returned too many matches: {bundle?.Total}");
+                            eTag = string.Empty;
+                            lastModified = string.Empty;
+                            location = string.Empty;
+                            return HttpStatusCode.PreconditionFailed;
+                        }
+                }
+            }
+            else
+            {
+                stored = null;
+                eTag = string.Empty;
+                lastModified = string.Empty;
+                location = string.Empty;
+                return HttpStatusCode.PreconditionFailed;
+            }
+        }
+
+        // create the resource
         stored = _store[resourceType].InstanceCreate(content, allowExistingId);
 
         if (stored == null)
@@ -1428,9 +1491,62 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.NotFound;
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {resource.TypeName}/{resource.Id}");
         eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
+
+        if ((!string.IsNullOrEmpty(ifMatch)) &&
+            (!eTag.Equals(ifMatch, StringComparison.Ordinal)))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.PreconditionFailed,
+                $"If-Match: {ifMatch} does not equal found eTag: {eTag}",
+                OperationOutcome.IssueType.BusinessRule);
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            return HttpStatusCode.PreconditionFailed;
+        }
+
         lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+
+        if ((!string.IsNullOrEmpty(ifModifiedSince)) &&
+            (lastModified.CompareTo(ifModifiedSince) < 0))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.NotModified,
+                $"Last modified: {lastModified} is prior to If-Modified-Since: {ifModifiedSince}",
+                OperationOutcome.IssueType.Informational);
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            return HttpStatusCode.NotModified;
+        }
+
+        if (ifNoneMatch.Equals("*", StringComparison.Ordinal))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.PreconditionFailed,
+                "Prior version exists, but If-None-Match is *");
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            return HttpStatusCode.PreconditionFailed;
+        }
+
+        if (!string.IsNullOrEmpty(ifNoneMatch))
+        {
+            if (ifNoneMatch.Equals(eTag, StringComparison.Ordinal))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotModified,
+                    $"Read {resourceType}/{id} found version: {eTag}, equals If-None-Match: {ifNoneMatch}");
+                eTag = string.Empty;
+                lastModified = string.Empty;
+                return HttpStatusCode.NotModified;
+            }
+        }
+
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {resource.TypeName}/{resource.Id}");
         return HttpStatusCode.OK;
     }
 
@@ -1453,6 +1569,7 @@ public partial class VersionedFhirStore : IFhirStore
             resourceType, 
             id, 
             r,
+            string.Empty,
             string.Empty,
             string.Empty,
             false,
@@ -1488,6 +1605,7 @@ public partial class VersionedFhirStore : IFhirStore
         string sourceFormat,
         string destFormat,
         bool pretty,
+        string queryString,
         string ifMatch,
         string ifNoneMatch,
         bool allowCreate,
@@ -1519,6 +1637,7 @@ public partial class VersionedFhirStore : IFhirStore
             resourceType,
             id,
             r,
+            queryString,
             ifMatch,
             ifNoneMatch,
             allowCreate,
@@ -1546,6 +1665,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <param name="content">     The content.</param>
+    /// <param name="queryString"> The query string.</param>
     /// <param name="ifMatch">     A match specifying if.</param>
     /// <param name="ifNoneMatch"> A match specifying if none.</param>
     /// <param name="allowCreate"> If the operation should allow a create as an update.</param>
@@ -1559,6 +1679,7 @@ public partial class VersionedFhirStore : IFhirStore
         string resourceType,
         string id,
         Resource content,
+        string queryString,
         string ifMatch,
         string ifNoneMatch,
         bool allowCreate,
@@ -1594,22 +1715,86 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.NotFound;
         }
 
-        resource = _store[resourceType].InstanceUpdate(content, allowCreate, _protectedResources);
+        HttpStatusCode sc;
+
+        // check for conditional update
+        if (!string.IsNullOrEmpty(queryString))
+        {
+            sc = DoTypeSearch(
+                resourceType,
+                queryString,
+                out Bundle? bundle,
+                out outcome);
+
+            if (sc.IsSuccessful())
+            {
+                switch (bundle?.Total)
+                {
+                    // no matches - continue with update as create
+                    case 0:
+                        break;
+
+                    // one match - check extra conditions and continue with update if they pass
+                    case 1:
+                        {
+                            if ((!string.IsNullOrEmpty(id)) &&
+                                (!bundle.Entry[0].Resource.Id.Equals(id, StringComparison.Ordinal)))
+                            {
+                                resource = null;
+                                outcome = Utils.BuildOutcomeForRequest(
+                                    HttpStatusCode.PreconditionFailed, 
+                                    $"Conditional update query returned a match with a id: {bundle.Entry[0].Resource.Id}, expected {id}");
+                                eTag = string.Empty;
+                                lastModified = string.Empty;
+                                location = string.Empty;
+                                return HttpStatusCode.PreconditionFailed;
+                            }
+                        }
+                        break;
+
+                    // multiple matches - fail the request
+                    default:
+                        {
+                            resource = null;
+                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.PreconditionFailed, $"Conditional update query returned too many matches: {bundle?.Total}");
+                            eTag = string.Empty;
+                            lastModified = string.Empty;
+                            location = string.Empty;
+                            return HttpStatusCode.PreconditionFailed;
+                        }
+                }
+            }
+            else
+            {
+                resource = null;
+                eTag = string.Empty;
+                lastModified = string.Empty;
+                location = string.Empty;
+                return HttpStatusCode.PreconditionFailed;
+            }
+        }
+
+        resource = _store[resourceType].InstanceUpdate(
+            content, 
+            allowCreate,
+            ifMatch,
+            ifNoneMatch,
+            _protectedResources,
+            out sc,
+            out outcome);
 
         if (resource == null)
         {
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to update resource");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.InternalServerError;
+            return sc;
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Updated {resource.TypeName}/{resource.Id}");
         eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
         lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         location = $"{_config.BaseUrl}/{resourceType}/{resource.Id}";
-        return HttpStatusCode.OK;
+        return sc;
     }
 
     /// <summary>
@@ -3683,7 +3868,14 @@ public partial class VersionedFhirStore : IFhirStore
         cs.Rest.Add(restComponent);
 
         // update our current capabilities
-        _store["CapabilityStatement"].InstanceUpdate(cs, true, _protectedResources);
+        _store["CapabilityStatement"].InstanceUpdate(
+            cs, 
+            true,
+            string.Empty,
+            string.Empty,
+            _protectedResources,
+            out _,
+            out _);
         _capabilitiesAreStale = false;
     }
 
@@ -3839,6 +4031,7 @@ public partial class VersionedFhirStore : IFhirStore
                             requestResourceType,
                             requestId,
                             entry.Resource,
+                            requestUrlQuery,
                             entry.Request.IfMatch,
                             entry.Request.IfNoneMatch,
                             true,

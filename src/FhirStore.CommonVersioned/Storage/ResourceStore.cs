@@ -959,7 +959,7 @@ public class ResourceStore<T> : IVersionedResourceStore
 
     /// <summary>Tests a create interaction against all subscriptions.</summary>
     /// <param name="current">The current resource version.</param>
-    private void TestCreateAgainstSubscriptions(T current)
+    internal void TestCreateAgainstSubscriptions(T current)
     {
         // TODO: Change this to async
 
@@ -1010,7 +1010,7 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>Tests an update interaction against all subscriptions.</summary>
     /// <param name="current"> The current resource version.</param>
     /// <param name="previous">The previous resource version.</param>
-    private void TestUpdateAgainstSubscriptions(T current, T previous)
+    internal void TestUpdateAgainstSubscriptions(T current, T previous)
     {
         // TODO: Change this to async
 
@@ -1060,7 +1060,7 @@ public class ResourceStore<T> : IVersionedResourceStore
 
     /// <summary>Tests a delete interaction against all subscriptions.</summary>
     /// <param name="previous">The previous resource version.</param>
-    private void TestDeleteAgainstSubscriptions(T previous)
+    internal void TestDeleteAgainstSubscriptions(T previous)
     {
         // TODO: Change this to async
 

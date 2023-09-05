@@ -5,7 +5,7 @@
 @inject IJSRuntime JS
 
 @implements IDisposable
-@implements IRiPage
+@implements IPackagePage
 
 <PageTitle>CDex Tasks</PageTitle>
 
@@ -52,7 +52,7 @@
     private IFhirStore _store = null!;
 
     /// <summary>Gets the content for package.</summary>
-    public static string ContentForPackage { get => "hl7.fhir.us.davinci-cdex"; }
+    public static string ContentFor { get => "hl7.fhir.us.davinci-cdex"; }
 
     /// <summary>Gets the name of the page.</summary>
     public static string PageName { get => "CDex Tasks"; }
@@ -62,6 +62,12 @@
 
     /// <summary>Gets the full pathname of the route file.</summary>
     public static string RoutePath { get => "/davinci-cdex/tasks"; }
+
+    /// <summary>Gets the FHIR version literal.</summary>
+    public static string FhirVersionLiteral { get => "R4"; }
+
+    /// <summary>Gets the FHIR version numeric.</summary>
+    public static string FhirVersionNumeric { get => "4.0"; }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>

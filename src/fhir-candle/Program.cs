@@ -14,6 +14,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using fhir.candle.Models;
 using fhir.candle.Services;
+using FhirCandle.Extensions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using Microsoft.AspNetCore;
@@ -249,6 +250,13 @@ public static partial class Program
                 config.TenantsR5.Add("r5");
             }
 
+            if (config.FhirCacheDirectory == null)
+            {
+                config.FhirCacheDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".fhir");
+            }
+
             Dictionary<string, TenantConfiguration> tenants = BuildTenantConfigurations(config);
 
             WebApplicationBuilder builder = null!;
@@ -337,42 +345,44 @@ public static partial class Program
                 app.MapFallbackToPage("/_Host");
             }
 
-            if (config.FhirCacheDirectory == null)
-            {
-                config.FhirCacheDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".fhir");
-            }
-
             IFhirPackageService ps = app.Services.GetRequiredService<IFhirPackageService>();
             IFhirStoreManager sm = app.Services.GetRequiredService<IFhirStoreManager>();
 
-            ps.Init(config.FhirCacheDirectory);
+            ////TODO: NEXT: need to have store manager load packages so that we can load pages when done
+            //throw new Exception("Need to have store manager load packages so that we can load pages when done");
+
+            //ps.Init(config.FhirCacheDirectory);
+
+            // perform slow initialization of services
+            ps.Init();          // store manager requires Package Service to be initialized
+            sm.Init();          // store manager may need to download packages
+
+            //// load requested packages
+            //if (ps.IsConfigured &&
+            //    (config.PublishedPackages.Any() || config.CiPackages.Any()))
+            //{
+            //    // look for a package supplemental directory
+            //    string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
+            //        ? FindRelativeDir(root, "fhirData", false)
+            //        : config.SourceDirectory;
+
+            //    _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
+            //}
+
+            //// sort through RI info
+            //if (!string.IsNullOrEmpty(config.ReferenceImplementation))
+            //{
+            //    // look for a package supplemental directory
+            //    string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
+            //        ? FindRelativeDir(root, Path.Combine("fhirData", config.ReferenceImplementation), false)
+            //        : Path.Combine(config.SourceDirectory, config.ReferenceImplementation);
+
+            //    sm.LoadRiContents(supplemental);
+            //}
 
             // run the server
             //await app.RunAsync(cancellationToken);
             _ = app.StartAsync();
-
-            if (ps.IsConfigured &&
-                (config.PublishedPackages.Any() || config.CiPackages.Any()))
-            {
-                // look for a package supplemental directory
-                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-                    ? FindRelativeDir(root, "fhirData", false)
-                    : config.SourceDirectory;
-
-                _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
-            }
-
-            if (!string.IsNullOrEmpty(config.ReferenceImplementation))
-            {
-                // look for a package supplemental directory
-                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-                    ? FindRelativeDir(root, Path.Combine("fhirData", config.ReferenceImplementation), false)
-                    : Path.Combine(config.SourceDirectory, config.ReferenceImplementation);
-
-                sm.LoadRiContents(supplemental);
-            }
 
             AfterServerStart(app, config);
             await app.WaitForShutdownAsync(cancellationToken);
@@ -389,6 +399,7 @@ public static partial class Program
             return -1;
         }
     }
+
 
     /// <summary>After server start.</summary>
     /// <param name="app">   The application.</param>

@@ -5,7 +5,7 @@
 @inject IJSRuntime JS
 
 @implements IDisposable
-@implements IRiPage
+@implements IPackagePage
 
 <PageTitle>Subscriptions Tour</PageTitle>
 
@@ -453,7 +453,7 @@
     List<string> postedEncounters = new();
 
     /// <summary>Gets the content for package.</summary>
-    public static string ContentForPackage { get => "subscriptions"; }
+    public static string ContentFor { get => "subscriptions"; }
 
     /// <summary>Gets the name of the page.</summary>
     public static string PageName { get => "Subscriptions RI Tour"; }

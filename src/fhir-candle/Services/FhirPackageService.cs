@@ -140,12 +140,23 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     private static Regex _matchCorePackageNames = MatchCorePackageNames();
 
     /// <summary>Initializes a new instance of the <see cref="FhirPackageService"/> class.</summary>
-    /// <param name="logger">The logger.</param>
+    /// <param name="logger">             The logger.</param>
+    /// <param name="serverConfiguration">The server configuration.</param>
     public FhirPackageService(
-        ILogger<FhirPackageService> logger) 
+        ILogger<FhirPackageService> logger,
+        ServerConfiguration serverConfiguration)
     {
         _logger = logger;
         _singleton = this;
+
+        if (string.IsNullOrEmpty(serverConfiguration.FhirCacheDirectory))
+        {
+            _hasCacheDirectory = false;
+            return;
+        }
+
+        _cacheDirectory = serverConfiguration.FhirCacheDirectory;
+        _hasCacheDirectory = true;
     }
 
     /// <summary>Gets the current singleton.</summary>
@@ -160,33 +171,22 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Gets a value indicating whether the package service is ready.</summary>
     public bool IsReady => _isInitialized;
 
-    /// <summary>Initializes the FhirPackageService to a specific cache directory.</summary>
-    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
-    /// <param name="cacheDirectory">Pathname of the cache directory.</param>
-    public void Init(string cacheDirectory)
+    /// <summary>Initializes this object.</summary>
+    public void Init()
     {
-        if (string.IsNullOrEmpty(cacheDirectory))
+        if (_isInitialized)
         {
-            _hasCacheDirectory = false;
             return;
         }
 
-        _cacheDirectory = cacheDirectory;
-        _hasCacheDirectory = true;
-    }
-
-    /// <summary>Triggered when the application host is ready to start the service.</summary>
-    /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
-    /// <returns>An asynchronous result.</returns>
-    Task IHostedService.StartAsync(CancellationToken cancellationToken)
-    {
         if (!_hasCacheDirectory)
         {
             _logger.LogInformation("Disabling FhirPackageService, --fhir-package-cache set to empty.");
-            return Task.CompletedTask;
+            return;
         }
 
-        _logger.LogInformation($"Starting FhirPackageService with cache directory: {_cacheDirectory}");
+        _logger.LogInformation($"Initializing FhirPackageService with cache: {_cacheDirectory}");
+        _isInitialized = true;
 
         _cachePackageDirectory = Path.Combine(_cacheDirectory, "packages");
         _iniFilePath = Path.Combine(_cachePackageDirectory, "packages.ini");
@@ -207,7 +207,22 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         }
 
         SynchronizeCache();
-        _isInitialized = true;
+    }
+
+    /// <summary>Triggered when the application host is ready to start the service.</summary>
+    /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
+    /// <returns>An asynchronous result.</returns>
+    Task IHostedService.StartAsync(CancellationToken cancellationToken)
+    {
+        if (!_hasCacheDirectory)
+        {
+            _logger.LogInformation("Disabling FhirPackageService, --fhir-package-cache set to empty.");
+            return Task.CompletedTask;
+        }
+
+        _logger.LogInformation($"Starting FhirPackageService...");
+
+        Init();
 
         return Task.CompletedTask;
     }
@@ -250,8 +265,18 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         out IEnumerable<PackageCacheEntry> packages,
         bool offlineMode = false)
     {
+        if (string.IsNullOrEmpty(branchName))
+        {
+            _logger.LogInformation($"FhirPackageService <<< attempting to load: {directive}");
+        }
+        else
+        {
+            _logger.LogInformation($"FhirPackageService <<< attempting to load branch: {branchName}");
+        }
+
         if (!_hasCacheDirectory)
         {
+            _logger.LogInformation($"FhirPackageService <<< Package service is unavailable, package will NOT be loaded!");
             packages = Enumerable.Empty<PackageCacheEntry>();
             return false;
         }

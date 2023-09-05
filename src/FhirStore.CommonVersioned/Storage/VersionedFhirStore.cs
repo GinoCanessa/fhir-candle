@@ -143,6 +143,12 @@ public partial class VersionedFhirStore : IFhirStore
         _searchTester = new() { FhirStore = this, };
     }
 
+    /// <summary>Gets a list of names of the loaded packages.</summary>
+    public HashSet<string> LoadedPackages { get => _loadedDirectives; }
+
+    /// <summary>Gets the loaded supplements.</summary>
+    public HashSet<string> LoadedSupplements { get => _loadedSupplements; }
+
     /// <summary>Initializes this object.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="config">The configuration.</param>

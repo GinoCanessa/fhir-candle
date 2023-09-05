@@ -37,9 +37,8 @@ public interface IFhirPackageService : IHostedService
         out IEnumerable<PackageCacheEntry> packages,
         bool offlineMode);
 
-    /// <summary>Initializes the FhirPackageService to a specific cache directory.</summary>
-    /// <param name="cacheDirectory">Pathname of the cache directory.</param>
-    void Init(string cacheDirectory);
+    /// <summary>Initializes the FhirPackageService.</summary>
+    void Init();
 
     /// <summary>State has changed.</summary>
     void StateHasChanged();

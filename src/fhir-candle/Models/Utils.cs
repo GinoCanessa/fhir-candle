@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirCandle.Models;
+using FhirCandle.Storage;
 
 namespace fhir.candle.Models;
 
@@ -17,49 +18,49 @@ public static class Utils
     /// <param name="pagesR5">  [out] The RI Pages for FHIR R5.</param>
     public static void GetRiPages(
         string currentRi,
-        out IEnumerable<RiPageInfo> pagesR4,
-        out IEnumerable<RiPageInfo> pagesR4B,
-        out IEnumerable<RiPageInfo> pagesR5)
+        out IEnumerable<PackagePageInfo> pagesR4,
+        out IEnumerable<PackagePageInfo> pagesR4B,
+        out IEnumerable<PackagePageInfo> pagesR5)
     {
-        List<RiPageInfo> r4 = new();
-        List<RiPageInfo> r4b = new();
-        List<RiPageInfo> r5 = new();
+        List<PackagePageInfo> r4 = new();
+        List<PackagePageInfo> r4b = new();
+        List<PackagePageInfo> r5 = new();
 
         IEnumerable<Type> riPageTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
-            .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)));
         AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
         riPageTypes = typeof(FhirCandle.Ui.R4.Subscriptions.TourUtils).Assembly.GetTypes()
-            .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)));
         AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
         riPageTypes = typeof(FhirCandle.Ui.R4B.Subscriptions.TourUtils).Assembly.GetTypes()
-            .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)));
         AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
         riPageTypes = typeof(FhirCandle.Ui.R5.Subscriptions.TourUtils).Assembly.GetTypes()
-            .Where(t => t.GetInterfaces().Contains(typeof(IRiPage)));
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)));
         AddRiPages(currentRi, r4, r4b, r5, riPageTypes);
 
         pagesR4 = r4.AsEnumerable();
         pagesR4B = r4b.AsEnumerable();
         pagesR5 = r5.AsEnumerable();
 
-        static void AddRiPages(string currentRi, List<RiPageInfo> r4, List<RiPageInfo> r4b, List<RiPageInfo> r5, IEnumerable<Type> riPageTypes)
+        static void AddRiPages(string currentRi, List<PackagePageInfo> r4, List<PackagePageInfo> r4b, List<PackagePageInfo> r5, IEnumerable<Type> riPageTypes)
         {
             foreach (Type riPageType in riPageTypes)
             {
-                RiPageInfo info = new()
+                PackagePageInfo info = new()
                 {
-                    ContentForPackage = riPageType.GetProperty("ContentForPackage", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                    PageName = riPageType.GetProperty("PageName", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                    Description = riPageType.GetProperty("Description", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                    RoutePath = riPageType.GetProperty("RoutePath", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                    FhirVersionLiteral = riPageType.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                    FhirVersionNumeric = riPageType.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                    ContentFor = riPageType.GetProperty("ContentFor", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                    PageName = riPageType.GetProperty("PageName", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                    Description = riPageType.GetProperty("Description", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                    RoutePath = riPageType.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                    FhirVersionLiteral = riPageType.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                    FhirVersionNumeric = riPageType.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 };
 
-                if (!info.ContentForPackage.Equals(currentRi, StringComparison.OrdinalIgnoreCase))
+                if (!info.ContentFor.Equals(currentRi, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -110,11 +111,11 @@ public static class Utils
         {
             IndexContentInfo info = new()
             {
-                ContentForPackage = contentType.GetProperty("ContentForPackage", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
-                FhirVersionLiteral = contentType.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                ContentFor = contentType.GetProperty("ContentFor", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionLiteral = contentType.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
             };
 
-            if (!info.ContentForPackage.Equals(currentRi, StringComparison.OrdinalIgnoreCase))
+            if (!info.ContentFor.Equals(currentRi, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -141,5 +142,4 @@ public static class Utils
             }
         }
     }
-
 }

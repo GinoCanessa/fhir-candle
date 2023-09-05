@@ -3,6 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirCandle.Extensions;
+
 namespace FhirCandle.Models;
 
 /// <summary>A provider configuration.</summary>
@@ -11,8 +13,13 @@ public class TenantConfiguration
     /// <summary>Values that represent supported FHIR versions.</summary>
     public enum SupportedFhirVersions : int
     {
+        [FhirLiteral("R4")]
         R4,
+
+        [FhirLiteral("R4B")]
         R4B,
+
+        [FhirLiteral("R5")]
         R5,
     }
 

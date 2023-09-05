@@ -45,6 +45,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string packageSupplements, 
         bool includeExamples);
 
+    /// <summary>Gets a list of names of the loaded packages.</summary>
+    HashSet<string> LoadedPackages { get; }
+
+    /// <summary>Gets the loaded supplements.</summary>
+    HashSet<string> LoadedSupplements { get; }
+
     public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>

@@ -4,6 +4,7 @@
 // </copyright>
 
 extern alias candleR5;
+extern alias coreR5;
 
 using FhirCandle.Models;
 using FhirCandle.Storage;
@@ -456,5 +457,153 @@ public class R5TestSubscriptions : IClassFixture<R5Tests>
         s.NotificationType.Should().Be(ParsedSubscription.NotificationTypeCodes.Handshake);
         s.NotificationEvents.Should().BeEmpty();
         s.Errors.Should().BeEmpty();
+    }
+
+    /// <summary>Tests an encounter subscription with no filters.</summary>
+    /// <param name="fpCriteria">  The criteria.</param>
+    /// <param name="onCreate">    True to on create.</param>
+    /// <param name="createResult">True to create result.</param>
+    /// <param name="onUpdate">    True to on update.</param>
+    /// <param name="updateResult">True to update result.</param>
+    /// <param name="onDelete">    True to on delete.</param>
+    /// <param name="deleteResult">True to delete the result.</param>
+    [Theory]
+    [InlineData("(%previous.empty() or (%previous.status != 'completed')) and (%current.status = 'completed')", true, true, true, true, false, false)]
+    [InlineData("(%previous.empty() | (%previous.status != 'completed')) and (%current.status = 'completed')", true, true, true, true, false, false)]
+    [InlineData("(%previous.id.empty() or (%previous.status != 'completed')) and (%current.status = 'completed')", true, true, true, true, false, false)]
+    [InlineData("(%previous.id.empty() | (%previous.status != 'completed')) and (%current.status = 'completed')", true, true, true, true, false, false)]
+    public void TestSubEncounterNoFilters(
+        string fpCriteria,
+        bool onCreate,
+        bool createResult,
+        bool onUpdate,
+        bool updateResult,
+        bool onDelete,
+        bool deleteResult)
+    {
+        VersionedFhirStore store = ((VersionedFhirStore)_fixture._store);
+        ResourceStore<coreR5.Hl7.Fhir.Model.Encounter> rs = (ResourceStore<coreR5.Hl7.Fhir.Model.Encounter>)_fixture._store["Encounter"];
+
+        string resourceType = "Encounter";
+        string topicId = "test-topic";
+        string topicUrl = "http://example.org/FHIR/TestTopic";
+        string subId = "test-subscription";
+
+        ParsedSubscriptionTopic topic = new()
+        {
+            Id = topicId,
+            Url = topicUrl,
+            ResourceTriggers = new()
+            {
+                {
+                    resourceType,
+                    new List<ParsedSubscriptionTopic.ResourceTrigger>()
+                    {
+                        new ParsedSubscriptionTopic.ResourceTrigger()
+                        {
+                            ResourceType = resourceType,
+                            OnCreate = onCreate,
+                            OnUpdate = onUpdate,
+                            OnDelete = onDelete,
+                            QueryPrevious = string.Empty,
+                            CreateAutoPass = false,
+                            CreateAutoFail = false,
+                            QueryCurrent = string.Empty,
+                            DeleteAutoPass = false,
+                            DeleteAutoFail = false,
+                            FhirPathCritiera = fpCriteria,
+                        }
+                    }
+                },
+            },
+        };
+
+        ParsedSubscription subscription = new()
+        {
+            Id = subId,
+            TopicUrl = topicUrl,
+            Filters = new()
+            {
+                { resourceType, new List<ParsedSubscription.SubscriptionFilter>() },
+            },
+            ChannelSystem = string.Empty,
+            ChannelCode = "rest-hook",
+            ContentType = "application/fhir+json",
+            ContentLevel = "full-resource",
+            CurrentStatus = "active",
+        };
+
+        store.StoreProcessSubscriptionTopic(topic, false);
+        store.StoreProcessSubscription(subscription, false);
+
+        coreR5.Hl7.Fhir.Model.Encounter previous = new()
+        {
+            Id = "object-under-test",
+            Status = coreR5.Hl7.Fhir.Model.EncounterStatus.Planned,
+        };
+        coreR5.Hl7.Fhir.Model.Encounter current = new()
+        {
+            Id = "object-under-test",
+            Status = coreR5.Hl7.Fhir.Model.EncounterStatus.Completed,
+        };
+
+        // test create current
+        if (onCreate)
+        {
+            rs.TestCreateAgainstSubscriptions(current);
+
+            subscription.NotificationErrors.Should().BeEmpty("Create test should not have errors");
+
+            if (createResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Create test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Create test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
+
+        // test update previous to current
+        if (onUpdate)
+        {
+            rs.TestUpdateAgainstSubscriptions(current, previous);
+
+            subscription.NotificationErrors.Should().BeEmpty("Update test should not have errors");
+
+            if (updateResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Update test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Update test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
+
+        // test delete previous
+        if (onDelete)
+        {
+            rs.TestDeleteAgainstSubscriptions(previous);
+            subscription.NotificationErrors.Should().BeEmpty("Delete test should not have errors");
+
+            if (deleteResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Delete test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Delete test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
     }
 }

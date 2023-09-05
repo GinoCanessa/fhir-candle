@@ -1691,6 +1691,22 @@ public partial class VersionedFhirStore : IFhirStore
         return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
     }
 
+    /// <summary>Compile FHIR path criteria.</summary>
+    /// <param name="fpc">The fpc.</param>
+    /// <returns>A CompiledExpression.</returns>
+    public static CompiledExpression CompileFhirPathCriteria(string fpc)
+    {
+        MatchCollection matches = _fhirpathVarMatcher().Matches(fpc);
+
+        // replace the variable with a resolve call
+        foreach (string matchValue in matches.Select(m => m.Value).Distinct())
+        {
+            fpc = fpc.Replace(matchValue, $"'{FhirPathVariableResolver._fhirPathPrefix}{matchValue.Substring(1)}'.resolve()");
+        }
+
+        return _compiler.Compile(fpc);
+    }
+
     /// <summary>Processes a parsed SubscriptionTopic resource.</summary>
     /// <param name="topic"> The topic.</param>
     /// <param name="remove">(Optional) True to remove.</param>
@@ -1789,21 +1805,11 @@ public partial class VersionedFhirStore : IFhirStore
                     // prefer FHIRPath if present
                     if (!string.IsNullOrEmpty(rt.FhirPathCritiera))
                     {
-                        string fpc = rt.FhirPathCritiera;
-
-                        MatchCollection matches = _fhirpathVarMatcher().Matches(fpc);
-
-                        // replace the variable with a resolve call
-                        foreach (string matchValue in matches.Select(m => m.Value).Distinct())
-                        {
-                            fpc = fpc.Replace(matchValue, $"'{FhirPathVariableResolver._fhirPathPrefix}{matchValue.Substring(1)}'.resolve()");
-                        }
-
                         fhirPathTriggers.Add(new(
                             onCreate,
                             onUpdate,
                             onDelete,
-                            _compiler.Compile(fpc)));
+                            CompileFhirPathCriteria(rt.FhirPathCritiera)));
 
                         canExecute = true;
                         executesOnResource = true;
@@ -2207,7 +2213,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="subscription">The subscription.</param>
     /// <param name="remove">      (Optional) True to remove.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    internal bool StoreProcessSubscription(ParsedSubscription subscription, bool remove = false)
+    public bool StoreProcessSubscription(ParsedSubscription subscription, bool remove = false)
     {
         if (remove)
         {

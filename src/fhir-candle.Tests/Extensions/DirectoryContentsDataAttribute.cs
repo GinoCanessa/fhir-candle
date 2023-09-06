@@ -39,7 +39,7 @@ public class DirectoryContentsDataAttribute : DataAttribute
         if (testMethod == null) { throw new ArgumentNullException(nameof(testMethod)); }
 
         // Get the absolute path to the directory
-        var path = Path.IsPathRooted(_path)
+        string path = Path.IsPathRooted(_path)
             ? _path
             : Path.GetRelativePath(Directory.GetCurrentDirectory(), _path);
 

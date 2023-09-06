@@ -288,6 +288,303 @@ public class R4TestsPatient : IClassFixture<R4Tests>
     }
 }
 
+/// <summary>A 4 test conditionals.</summary>
+public class R4TestConditionals : IClassFixture<R4Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    /// <summary>Information describing the conditional.</summary>
+    public static IEnumerable<object[]> ConditionalData;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R4Tests _fixture;
+
+    /// <summary>
+    /// Initializes a new instance of the fhir.candle.Tests.TestSubscriptionInternals class.
+    /// </summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
+    public R4TestConditionals(R4Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    /// <summary>
+    /// Initializes static members of the fhir.candle.Tests.R4TestConditionals class.
+    /// </summary>
+    static R4TestConditionals()
+    {
+        ConditionalData = new List<object[]>()
+        {
+            new object[] { "Patient", GetContents("data/r4/patient-example.json") },
+        };
+    }
+
+    /// <summary>Gets the contents.</summary>
+    /// <exception cref="ArgumentException">Thrown when one or more arguments have unsupported or
+    ///  illegal values.</exception>
+    /// <param name="filePath">Full pathname of the file.</param>
+    /// <returns>The contents.</returns>
+    private static string GetContents(string filePath)
+    {
+        // Get the absolute path to the file
+        string path = Path.IsPathRooted(filePath)
+            ? filePath
+            : Path.GetRelativePath(Directory.GetCurrentDirectory(), filePath);
+
+        if (!File.Exists(path))
+        {
+            throw new ArgumentException($"Could not find file at path: {path}");
+        }
+
+        return File.ReadAllText(path);
+    }
+
+    /// <summary>Change identifier.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
+    /// <exception cref="ArgumentException">    Thrown when one or more arguments have unsupported or
+    ///  illegal values.</exception>
+    /// <param name="json">The JSON.</param>
+    /// <param name="id">  The identifier.</param>
+    /// <returns>A string.</returns>
+    private static string ChangeId(string json, string id)
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            throw new ArgumentNullException(nameof(json));
+        }
+
+        if (string.IsNullOrEmpty(id))
+        {
+            throw new ArgumentNullException(nameof(id));
+        }
+
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        if (sc != HttpStatusCode.OK)
+        {
+            throw new ArgumentException($"Could not deserialize json: {json}");
+        }
+
+        if (r == null)
+        {
+            throw new ArgumentException($"Could not deserialize json: {json}");
+        }
+
+        r.Id = id;
+
+        return candleR4.FhirCandle.Serialization.Utils.SerializeFhir(r, "application/fhir+json", false);
+    }
+
+    /// <summary>Conditional create no match.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="json">        The JSON.</param>
+    [Theory]
+    [MemberData(nameof(ConditionalData))]
+    public void ConditionalCreateNoMatch(string resourceType, string json)
+    {
+        string id = Guid.NewGuid().ToString();
+
+        // test conditional that has no matches
+        HttpStatusCode sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            $"_id={id}",
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id}");
+
+        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            serializedResource,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be(resourceType);
+        r!.Id.Should().Be(id);
+    }
+
+    /// <summary>Conditional create one match.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="json">        The JSON.</param>
+    [Theory]
+    [MemberData(nameof(ConditionalData))]
+    public void ConditionalCreateOneMatch(string resourceType, string json)
+    {
+        string id = Guid.NewGuid().ToString();
+
+        // first, store our resource
+        HttpStatusCode sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            string.Empty,
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id}");
+
+        // now, store it conditionally with a single match
+        sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            $"_id={id}",
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        // all contents should match original - not a new version
+        sc.Should().Be(HttpStatusCode.OK);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id}");
+
+        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            serializedResource,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be(resourceType);
+        r!.Id.Should().Be(id);
+    }
+
+    /// <summary>Conditional create multiple matches.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="json">        The JSON.</param>
+    [Theory]
+    [MemberData(nameof(ConditionalData))]
+    public void ConditionalCreateMultipleMatches(string resourceType, string json)
+    {
+        string id1 = Guid.NewGuid().ToString();
+        string id2 = Guid.NewGuid().ToString();
+        string id3 = Guid.NewGuid().ToString();
+
+        // first, store our resource
+        HttpStatusCode sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id1),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            string.Empty,
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id1}");
+
+        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            serializedResource,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be(resourceType);
+        r!.Id.Should().Be(id1);
+
+        // now store the second resource
+        sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id2),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            string.Empty,
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id2}");
+
+        // now attempt to store with a conditional create that matches both
+        sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id3),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            $"_id={id1},{id2}",
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        // this should fail
+        sc.Should().Be(HttpStatusCode.PreconditionFailed);
+        serializedResource.Should().BeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().BeNullOrEmpty();
+        lastModified.Should().BeNullOrEmpty();
+        location.Should().BeNullOrEmpty();
+    }
+}
+
 /// <summary>A test subscription internals.</summary>
 public class R4TestSubscriptions : IClassFixture<R4Tests>
 {

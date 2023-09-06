@@ -1111,15 +1111,15 @@ public partial class VersionedFhirStore : IFhirStore
                     case 0:
                         break;
 
-                    // one match - return the match as if just stored
+                    // one match - return the match as if just stored except with OK instead of Created
                     case 1:
                         {
                             stored = bundle.Entry[0].Resource;
-                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
+                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Created {stored.TypeName}/{stored.Id}");
                             eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
                             lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
                             location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
-                            return HttpStatusCode.Created;
+                            return HttpStatusCode.OK;
                         }
 
                     // multiple matches - fail the request

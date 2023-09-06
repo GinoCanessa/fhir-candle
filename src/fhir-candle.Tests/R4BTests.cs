@@ -4,6 +4,7 @@
 // </copyright>
 
 extern alias candleR4B;
+extern alias coreR4B;
 
 using FhirCandle.Models;
 using FhirCandle.Storage;
@@ -307,6 +308,7 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
     /// <param name="json">The JSON.</param>
     [Theory]
     [FileData("data/r4b/SubscriptionTopic-encounter-complete.json")]
+    [FileData("data/r4b/SubscriptionTopic-encounter-complete-qualified.json")]
     public void ParseTopic(string json)
     {
         HttpStatusCode sc = candleR4B.FhirCandle.Serialization.Utils.TryDeserializeFhir(
@@ -327,9 +329,12 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
         s.Id.Should().Be("encounter-complete");
         s.Url.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
         s.ResourceTriggers.Should().HaveCount(1);
+        s.ResourceTriggers.Keys.Should().Contain("Encounter");
         s.EventTriggers.Should().BeEmpty();
         s.AllowedFilters.Should().NotBeEmpty();
+        s.AllowedFilters.Keys.Should().Contain("Encounter");
         s.NotificationShapes.Should().NotBeEmpty();
+        s.NotificationShapes.Keys.Should().Contain("Encounter");
     }
 
     [Theory]
@@ -354,6 +359,7 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
         s.Id.Should().Be("db4ce0bb-fa9c-4092-9f75-34772dc85590");
         s.TopicUrl.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
         s.Filters.Should().HaveCount(1);
+        s.Filters.Keys.Should().Contain("Encounter");
         s.ChannelCode.Should().Be("rest-hook");
         s.Endpoint.Should().Be("https://subscriptions.argo.run/fhir/r4b/$subscription-hook");
         s.HeartbeatSeconds.Should().Be(120);
@@ -387,5 +393,153 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
         s.NotificationType.Should().Be(ParsedSubscription.NotificationTypeCodes.Handshake);
         s.NotificationEvents.Should().BeEmpty();
         s.Errors.Should().BeEmpty();
+    }
+
+    /// <summary>Tests an encounter subscription with no filters.</summary>
+    /// <param name="fpCriteria">  The criteria.</param>
+    /// <param name="onCreate">    True to on create.</param>
+    /// <param name="createResult">True to create result.</param>
+    /// <param name="onUpdate">    True to on update.</param>
+    /// <param name="updateResult">True to update result.</param>
+    /// <param name="onDelete">    True to on delete.</param>
+    /// <param name="deleteResult">True to delete the result.</param>
+    [Theory]
+    [InlineData("(%previous.empty() or (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    [InlineData("(%previous.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    [InlineData("(%previous.id.empty() or (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    [InlineData("(%previous.id.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    public void TestSubEncounterNoFilters(
+        string fpCriteria,
+        bool onCreate,
+        bool createResult,
+        bool onUpdate,
+        bool updateResult,
+        bool onDelete,
+        bool deleteResult)
+    {
+        VersionedFhirStore store = ((VersionedFhirStore)_fixture._store);
+        ResourceStore<coreR4B.Hl7.Fhir.Model.Encounter> rs = (ResourceStore<coreR4B.Hl7.Fhir.Model.Encounter>)_fixture._store["Encounter"];
+
+        string resourceType = "Encounter";
+        string topicId = "test-topic";
+        string topicUrl = "http://example.org/FHIR/TestTopic";
+        string subId = "test-subscription";
+
+        ParsedSubscriptionTopic topic = new()
+        {
+            Id = topicId,
+            Url = topicUrl,
+            ResourceTriggers = new()
+            {
+                {
+                    resourceType,
+                    new List<ParsedSubscriptionTopic.ResourceTrigger>()
+                    {
+                        new ParsedSubscriptionTopic.ResourceTrigger()
+                        {
+                            ResourceType = resourceType,
+                            OnCreate = onCreate,
+                            OnUpdate = onUpdate,
+                            OnDelete = onDelete,
+                            QueryPrevious = string.Empty,
+                            CreateAutoPass = false,
+                            CreateAutoFail = false,
+                            QueryCurrent = string.Empty,
+                            DeleteAutoPass = false,
+                            DeleteAutoFail = false,
+                            FhirPathCritiera = fpCriteria,
+                        }
+                    }
+                },
+            },
+        };
+
+        ParsedSubscription subscription = new()
+        {
+            Id = subId,
+            TopicUrl = topicUrl,
+            Filters = new()
+            {
+                { resourceType, new List<ParsedSubscription.SubscriptionFilter>() },
+            },
+            ChannelSystem = string.Empty,
+            ChannelCode = "rest-hook",
+            ContentType = "application/fhir+json",
+            ContentLevel = "full-resource",
+            CurrentStatus = "active",
+        };
+
+        store.StoreProcessSubscriptionTopic(topic, false);
+        store.StoreProcessSubscription(subscription, false);
+
+        coreR4B.Hl7.Fhir.Model.Encounter previous = new()
+        {
+            Id = "object-under-test",
+            Status = coreR4B.Hl7.Fhir.Model.Encounter.EncounterStatus.Planned,
+        };
+        coreR4B.Hl7.Fhir.Model.Encounter current = new()
+        {
+            Id = "object-under-test",
+            Status = coreR4B.Hl7.Fhir.Model.Encounter.EncounterStatus.Finished,
+        };
+
+        // test create current
+        if (onCreate)
+        {
+            rs.TestCreateAgainstSubscriptions(current);
+
+            subscription.NotificationErrors.Should().BeEmpty("Create test should not have errors");
+
+            if (createResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Create test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Create test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
+
+        // test update previous to current
+        if (onUpdate)
+        {
+            rs.TestUpdateAgainstSubscriptions(current, previous);
+
+            subscription.NotificationErrors.Should().BeEmpty("Update test should not have errors");
+
+            if (updateResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Update test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Update test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
+
+        // test delete previous
+        if (onDelete)
+        {
+            rs.TestDeleteAgainstSubscriptions(previous);
+            subscription.NotificationErrors.Should().BeEmpty("Delete test should not have errors");
+
+            if (deleteResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Delete test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Delete test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
     }
 }

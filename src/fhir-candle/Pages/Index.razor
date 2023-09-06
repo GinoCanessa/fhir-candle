@@ -38,7 +38,7 @@
                     StoreName="@StoreManager.First().Key" 
                     Store="@StoreManager.First().Value"
                     RiName="@ServerConfig.ReferenceImplementation"
-                    RiPages="@_riPagesR4"
+                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
                     AdditionalContent="@_contentR4"
                     />
                 break;
@@ -48,7 +48,7 @@
                     StoreName="@StoreManager.First().Key" 
                     Store="@StoreManager.First().Value"
                     RiName="@ServerConfig.ReferenceImplementation"
-                    RiPages="@_riPagesR4B"
+                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
                     AdditionalContent="@_contentR4B"
                     />
                 break;
@@ -58,7 +58,7 @@
                     StoreName="@StoreManager.First().Key" 
                     Store="@StoreManager.First().Value"
                     RiName="@ServerConfig.ReferenceImplementation"
-                    RiPages="@_riPagesR5"
+                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
                     AdditionalContent="@_contentR5"
                     />
                 break;
@@ -79,7 +79,7 @@
                                 StoreName="@kvp.Key" 
                                 Store="@kvp.Value"
                                 RiName="@ServerConfig.ReferenceImplementation"
-                                RiPages="@_riPagesR4"
+                                RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
                                 AdditionalContent="@_contentR4"
                                 />
                             break;
@@ -89,7 +89,7 @@
                                 StoreName="@kvp.Key" 
                                 Store="@kvp.Value"
                                 RiName="@ServerConfig.ReferenceImplementation"
-                                RiPages="@_riPagesR4B"
+                                RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
                                 AdditionalContent="@_contentR4B"
                                 />
                             break;
@@ -99,7 +99,7 @@
                                 StoreName="@kvp.Key" 
                                 Store="@kvp.Value"
                                 RiName="@ServerConfig.ReferenceImplementation"
-                                RiPages="@_riPagesR5"
+                                RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
                                 AdditionalContent="@_contentR5"
                                 />
                             break;
@@ -150,9 +150,9 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
-    private IEnumerable<RiPageInfo> _riPagesR4 = Enumerable.Empty<RiPageInfo>();
-    private IEnumerable<RiPageInfo> _riPagesR4B = Enumerable.Empty<RiPageInfo>();
-    private IEnumerable<RiPageInfo> _riPagesR5 = Enumerable.Empty<RiPageInfo>();
+    // private IEnumerable<PackagePageInfo> _riPagesR4 = Enumerable.Empty<PackagePageInfo>();
+    // private IEnumerable<PackagePageInfo> _riPagesR4B = Enumerable.Empty<PackagePageInfo>();
+    // private IEnumerable<PackagePageInfo> _riPagesR5 = Enumerable.Empty<PackagePageInfo>();
 
     private Type? _contentR4 = null;
     private Type? _contentR4B = null;
@@ -166,7 +166,7 @@
 
         NavTracker?.NotifyNav("FHIR Candle", "", 0);
 
-        Utils.GetRiPages(ServerConfig.ReferenceImplementation ?? string.Empty, out _riPagesR4, out _riPagesR4B, out _riPagesR5);
+        // Utils.GetRiPages(ServerConfig.ReferenceImplementation ?? string.Empty, out _riPagesR4, out _riPagesR4B, out _riPagesR5);
 
         Utils.GetAdditionalIndexContent(ServerConfig.ReferenceImplementation ?? string.Empty, out _contentR4, out _contentR4B, out _contentR5);
     }

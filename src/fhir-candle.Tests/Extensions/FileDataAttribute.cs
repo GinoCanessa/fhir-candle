@@ -63,7 +63,7 @@ public class FileDataAttribute : DataAttribute
         foreach (string filePath in _filePaths)
         {
             // Get the absolute path to the file
-            var path = Path.IsPathRooted(filePath)
+            string path = Path.IsPathRooted(filePath)
                 ? filePath
                 : Path.GetRelativePath(Directory.GetCurrentDirectory(), filePath);
 

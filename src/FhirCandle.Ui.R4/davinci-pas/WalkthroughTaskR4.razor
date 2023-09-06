@@ -1,0 +1,373 @@
+﻿@inject IJSRuntime JS
+
+<MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+    <MudTimelineItem Color="@ColorForStep(1)">
+        <ItemContent>
+            <MudCard id="element-step-1">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="@ColorForStep(1)" Variant="Variant.Outlined">
+                            <MudIcon Icon="@IconForStep(1)" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Precondition Information</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body1">
+                        This step contains links and information regarding this walkthrough.
+                    </MudText>
+
+                    <br />
+                    <MudDivider />
+                    <MudList>
+                        <MudListItem>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                            <MudLink Href="@($"/store?store={ProviderStore.Config.ControllerName}")"
+                                        Underline="Underline.Always">Provider FHIR Contents</MudLink>: FHIR resources in the provider FHIR server
+                        </MudListItem>
+                        <MudListItem>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                <MudLink Href="@($"/subscriptions/notifications-received?store={ProviderStore.Config.ControllerName}")"
+                                        Underline="Underline.Always">Provider Received Notifications</MudLink>: incoming notifications received by the provider
+                        </MudListItem>
+
+                        <MudListItem>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                            <MudLink Href="@($"/store?store={PayerStore.Config.ControllerName}")"
+                                        Underline="Underline.Always">Payer FHIR Contents</MudLink>: FHIR resources in the payer FHIR server
+                        </MudListItem>
+                        <MudListItem>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                            <MudLink Href="@($"/subscriptions/local?store={PayerStore.Config.ControllerName}")"
+                                        Underline="Underline.Always">Payer Subscriptions</MudLink>: configured Subscriptions in the payer FHIR server
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(2))">Got it!</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </ItemContent>
+    </MudTimelineItem>
+
+    <MudTimelineItem Color="@ColorForStep(2)">
+        <ItemContent>
+            <MudCard id="element-step-2">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="@ColorForStep(2)" Variant="Variant.Outlined">
+                            <MudIcon Icon="@IconForStep(2)" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Select a patient</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body1">
+                        In this step, we need to select a patient, as a Provider, that we will use for our claim.
+                    </MudText>
+                    <br />
+                    <MudDivider />
+                    <MudSelect Label="Patient" HelperText="Patient we are filing a claim on" @bind-Value="_patientId">
+                        @foreach (KeyValuePair<string, object> kvp in ProviderStore["Patient"])
+                        {
+                            @if (kvp.Value is Hl7.Fhir.Model.Patient p)
+                            {
+                                <MudSelectItem Value="@kvp.Key">@DisplayFor(p)</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Outlined" Disabled="@string.IsNullOrEmpty(_patientId)" OnClick="@(() => MoveToStep(3))">Use patient: @_patientId</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </ItemContent>
+    </MudTimelineItem>
+
+    <MudTimelineItem Color="@ColorForStep(3)">
+        <ItemContent>
+            <MudCard id="element-step-3">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="@ColorForStep(3)" Variant="Variant.Outlined">
+                            <MudIcon Icon="@IconForStep(3)" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Select claim data</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body1">
+                        In this step, we need to select the data we are including as part of our claim.
+                    </MudText>
+                    <br />
+                    <MudDivider />
+
+                    @foreach (SupportingData sd in _claimSupportingData)
+                    {
+                        <MudCheckBox @bind-Checked="sd.Selected"><code>@sd.Display</code></MudCheckBox>
+                    }
+
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(4))">Use this filter</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </ItemContent>
+    </MudTimelineItem>
+
+</MudTimeline>
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    [Parameter]
+    public IFhirStore PayerStore { get; set; } = null!;
+
+    [Parameter]
+    public IFhirStore ProviderStore { get; set; } = null!;
+
+    /// <summary>Gets or sets the on step.</summary>
+    private int onStep { get; set; } = 1;
+
+    /// <summary>Gets or sets the error at step.</summary>
+    private int errorAtStep { get; set; } = -1;
+
+    /// <summary>Message describing the error.</summary>
+    private string errorMessage = string.Empty;
+
+    private static readonly List<string> _allowedPatientRequestTypes = new()
+    {
+        "ServiceRequest",
+        "DeviceRequest",
+        "MedicationRequest",
+        "Coverage",
+        "DocumentReference",
+    };
+
+    private static readonly List<string> _allowedRelatedRequestTypes = new()
+    {
+        "Organization",
+    };
+
+    /// <summary>The ID of the selected patient.</summary>
+    private string _patientId = string.Empty;
+
+    private record class SupportingData
+    {
+        public bool Selected { get; set; } = false;
+
+        public required string ResourceType { get; init; }
+
+        public required string Id { get; init; }
+
+        public required Hl7.Fhir.Model.Resource Resource { get; init; }
+
+        public required string Display { get; init; }
+    }
+
+    private IEnumerable<SupportingData> _claimSupportingData = Enumerable.Empty<SupportingData>();
+
+    /// <summary>Color for step.</summary>
+    /// <param name="step">Amount to increment by.</param>
+    /// <returns>A MudBlazor.Color.</returns>
+    private MudBlazor.Color ColorForStep(int step)
+    {
+        if (step == errorAtStep)
+        {
+            return Color.Error;
+        }
+
+        if (step < onStep)
+        {
+            return Color.Success;
+        }
+
+        if (step == onStep)
+        {
+            return Color.Primary;
+        }
+
+        return Color.Default;
+    }
+
+    /// <summary>Icon for step.</summary>
+    /// <param name="step">Amount to increment by.</param>
+    /// <returns>A string.</returns>
+    private string IconForStep(int step)
+    {
+        if (step == errorAtStep)
+        {
+            return Icons.Material.Filled.Error;
+        }
+
+        if (step < onStep)
+        {
+            return Icons.Material.Filled.Check;
+        }
+
+        if (step == onStep)
+        {
+            return Icons.Material.Filled.Edit;
+        }
+
+        return Icons.Material.Filled.LockClock;
+    }
+
+    /// <summary>Move to step.</summary>
+    /// <param name="toStep">to step.</param>
+    private void MoveToStep(int toStep)
+    {
+        errorAtStep = -1;
+        errorMessage = string.Empty;
+        onStep = toStep;
+
+        if (toStep < 9)
+        {
+            _ = JS.InvokeVoidAsync("scrollElementIntoView", "element-step-" + toStep);
+        }
+
+        // call any additional functions
+        switch (toStep)
+        {
+            case 3:
+                GetCurrentRequestResources();
+                break;
+        }
+
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    private void GetCurrentRequestResources()
+    {
+        List<SupportingData> data = new();
+
+        string query = $"patient={_patientId}&_type={string.Join(',', _allowedPatientRequestTypes)}";
+
+        if (ProviderStore.TrySystemSearch(query, out object? pb) &&
+            (pb != null) &&
+            (pb is Hl7.Fhir.Model.Bundle patientBundle))
+        {
+            foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in patientBundle.Entry)
+            {
+                if (entry.Resource is Hl7.Fhir.Model.Resource r)
+                {
+                    data.Add(new SupportingData
+                    {
+                        ResourceType = r.TypeName,
+                        Id = r.Id,
+                        Resource = r,
+                        Display = DisplayFor(r),
+                    });
+                }
+            }
+        }
+
+        foreach (string resourceType in _allowedRelatedRequestTypes)
+        {
+            if (ProviderStore.TryTypeSearch(resourceType, string.Empty, out object? rb) &&
+                (rb != null) &&
+                (rb is Hl7.Fhir.Model.Bundle relatedBundle))
+            {
+                foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in relatedBundle.Entry)
+                {
+                    if (entry.Resource is Hl7.Fhir.Model.Resource r)
+                    {
+                        data.Add(new SupportingData
+                        {
+                            ResourceType = r.TypeName,
+                            Id = r.Id,
+                            Resource = r,
+                            Display = DisplayFor(r),
+                        });
+                    }
+                }
+            }
+        }
+
+        _claimSupportingData = data.AsEnumerable();
+    }
+
+    private string DisplayFor(Hl7.Fhir.Model.Resource resource) => resource switch
+    {
+        Hl7.Fhir.Model.ServiceRequest r => $"{r.TypeName}/{r.Id}: {r.Status} ({r.Priority}) {DisplayFor(r.Code)}",
+        Hl7.Fhir.Model.DeviceRequest r => $"{r.TypeName}/{r.Id}: {r.Status} ({r.Priority}) {DisplayFor(r.Code)}",
+        Hl7.Fhir.Model.MedicationRequest r => $"{r.TypeName}/{r.Id}: {r.Status} ({r.Priority}) {DisplayFor(r.Medication)}",
+        Hl7.Fhir.Model.Coverage r => $"{r.TypeName}/{r.Id}: {r.Status} {DisplayFor(r.Type)} {string.Join(", ", r.Payor.Select(p => DisplayFor(p)))}",
+        Hl7.Fhir.Model.DocumentReference r => $"{r.TypeName}/{r.Id}: {r.Status}-{r.DocStatus} {DisplayFor(r.Type)} {string.Join(", ", r.Category.Select(c => DisplayFor(c)))}",
+        Hl7.Fhir.Model.Organization r => $"{r.TypeName}/{r.Id}: {r.Name} {string.Join(", ", r.Type.Select(t => DisplayFor(t)))}",
+        Hl7.Fhir.Model.Patient r => $"{r.TypeName}/{r.Id}: {string.Join(", ", r.Name.Select(n => $"{n.Family}, {string.Join(' ', n.Given)}"))}",
+        null => string.Empty,
+        _ => resource.TypeName + "/" + resource.Id,
+    };
+
+    private string DisplayFor(Hl7.Fhir.Model.DataType dt)
+    {
+        if (dt == null)
+        {
+            return string.Empty;
+        }
+
+        switch (dt)
+        {
+            case Hl7.Fhir.Model.FhirString s:
+                return s.Value;
+
+            case Hl7.Fhir.Model.Code c:
+                return c.Value;
+
+            case Hl7.Fhir.Model.Identifier i:
+                {
+                    if (!string.IsNullOrEmpty(i.System) || !string.IsNullOrEmpty(i.Value))
+                    {
+                        return $"{i.System}|{i.Value}";
+                    }
+
+                    if (i.Type != null)
+                    {
+                        return DisplayFor(i.Type);
+                    }
+                }
+                break;
+
+            case Hl7.Fhir.Model.ResourceReference r:
+                {
+                    if (!string.IsNullOrEmpty(r.Display))
+                    {
+                        return r.Display;
+                    }
+
+                    if (!string.IsNullOrEmpty(r.Reference))
+                    {
+                        return r.Reference;
+                    }
+
+                    if (r.Identifier != null)
+                    {
+                        DisplayFor(r.Identifier);
+                    }
+                }
+                break;
+
+            case Hl7.Fhir.Model.CodeableConcept c:
+            {
+                if (!string.IsNullOrEmpty(c.Text))
+                {
+                    return c.Text;
+                }
+
+                return string.Join(", ", c.Coding.Select(c => string.IsNullOrEmpty(c.Display) ? $"{c.System}|{c.Code}" : c.Display));
+            }
+        }
+
+        return dt.ToString() ?? string.Empty;
+    }
+
+}

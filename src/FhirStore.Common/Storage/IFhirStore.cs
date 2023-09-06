@@ -45,6 +45,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string packageSupplements, 
         bool includeExamples);
 
+    /// <summary>Gets a list of names of the loaded packages.</summary>
+    HashSet<string> LoadedPackages { get; }
+
+    /// <summary>Gets the loaded supplements.</summary>
+    HashSet<string> LoadedSupplements { get; }
+
     public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>
@@ -91,6 +97,13 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string eTag,
         out string lastModified);
 
+    /// <summary>Attempts to read.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryRead(string resourceType, string id, out object? resource);
+
     /// <summary>Instance create.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="content">           The content.</param>
@@ -119,6 +132,13 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string lastModified,
         out string location);
 
+    /// <summary>Attempts to create.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryCreate(string resourceType, object resource, out string id, bool allowExistingId);
+
     /// <summary>Instance update.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
@@ -126,6 +146,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="queryString">       The query string.</param>
     /// <param name="ifMatch">           Criteria that must match to preform the update.</param>
     /// <param name="ifNoneMatch">       Criteria that must NOT match to preform the update.</param>
     /// <param name="allowCreate">       If the update should be allowed to create a new resource.</param>
@@ -142,6 +163,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string sourceFormat,
         string destFormat,
         bool pretty,
+        string queryString,
         string ifMatch,
         string ifNoneMatch,
         bool allowCreate,
@@ -150,6 +172,13 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string eTag,
         out string lastModified,
         out string location);
+
+    /// <summary>Attempts to update.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryUpdate(string resourceType, string id, object resource);
 
     /// <summary>Instance delete.</summary>
     /// <param name="resourceType">      Type of the resource.</param>
@@ -168,6 +197,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string ifMatch,
         out string serializedResource,
         out string serializedOutcome);
+
+    /// <summary>Attempts to delete a string from the given string.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryDelete(string resourceType, string id);
 
     /// <summary>Process a Batch or Transaction bundle.</summary>
     /// <param name="content">           The content.</param>
@@ -231,6 +266,13 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedBundle,
         out string serializedOutcome);
 
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="queryString">The query string.</param>
+    /// <param name="bundle">     [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TrySystemSearch(
+        string queryString,
+        out object? bundle);
 
     /// <summary>Type search.</summary>
     /// <param name="resourceType">     Type of the resource.</param>
@@ -249,6 +291,16 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         bool pretty,
         out string serializedBundle,
         out string serializedOutcome);
+
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="queryString"> The query string.</param>
+    /// <param name="bundle">      [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryTypeSearch(
+        string resourceType,
+        string queryString,
+        out object? bundle);
 
     /// <summary>System operation.</summary>
     /// <param name="operationName">     Name of the operation.</param>

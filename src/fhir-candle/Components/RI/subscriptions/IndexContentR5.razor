@@ -1,7 +1,7 @@
-﻿@implements IIndexContentR5
+﻿@implements IIndexContent
 
 <MudText Typo="Typo.body1">
-    As a reference implementation for @ContentForPackage, this endpoint contains some immutable records for testing:
+    As a reference implementation for @ContentFor, this endpoint contains some immutable records for testing:
 </MudText>
 
 <MudList>
@@ -46,6 +46,8 @@
     public IFhirStore Store { get; set; } = null!;
 
     /// <summary>Identifies the RI literal this content applies to.</summary>
-    public static string ContentForPackage { get => "subscriptions"; }
-
+    public static string ContentFor { get => "subscriptions"; }
+    
+    /// <summary>Gets the FHIR version literal.</summary>
+    public static string FhirVersionLiteral { get => "R5"; }
 }

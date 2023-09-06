@@ -127,6 +127,8 @@ public class ParsedSubscription
     /// <summary>Gets or sets the generated events.</summary>
     public Dictionary<long, SubscriptionEvent> GeneratedEvents { get => _generatedEvents; }
 
+    /// <summary>Registers the event described by subscriptionEvent.</summary>
+    /// <param name="subscriptionEvent">The subscription event.</param>
     public void RegisterEvent(SubscriptionEvent subscriptionEvent)
     {
         if (_generatedEvents.ContainsKey(subscriptionEvent.EventNumber))
@@ -137,6 +139,12 @@ public class ParsedSubscription
         }
 
         _generatedEvents.Add(subscriptionEvent.EventNumber, subscriptionEvent);
+    }
+
+    /// <summary>Clears the events.</summary>
+    public void ClearEvents()
+    {
+        _generatedEvents.Clear();
     }
 
     /// <summary>Gets or sets the notification errors.</summary>

@@ -1,0 +1,132 @@
+@page "/davinci-cdex/tasks"
+
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+@inject IJSRuntime JS
+
+@implements IDisposable
+@implements IPackagePage
+
+<PageTitle>CDex Tasks</PageTitle>
+
+<MudPaper Class="pa-4 ma-2" Square="true">
+    <MudText Typo="Typo.h6">CDex Tasks</MudText>
+    <MudText Typo="Typo.body1">
+        This page has interactions for DaVinci CDex Tasks, in FHIR @_store.Config.FhirVersion .
+    </MudText>
+    <br />
+
+    <MudText Typo="Typo.body1">
+        Following is a list of properly-tagged Tasks and actions that can be taken with them.
+    </MudText>
+    <MudSimpleTable>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Code</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <FhirCandle.Ui.R4.davinci_cdex.TaskListRows
+                Store="@_store"
+                StoreName="@StoreName"
+                />
+        </tbody>
+    </MudSimpleTable>
+    <br />
+</MudPaper>
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "store")]
+    public string StoreName { get; set; } = "";
+
+    /// <summary>The store.</summary>
+    private IFhirStore _store = null!;
+
+    /// <summary>Gets the content for package.</summary>
+    public static string ContentFor { get => "hl7.fhir.us.davinci-cdex"; }
+
+    /// <summary>Gets the name of the page.</summary>
+    public static string PageName { get => "CDex Tasks"; }
+
+    /// <summary>Gets the description.</summary>
+    public static string Description { get => "This page contains interactions with CDex Tasks."; }
+
+    /// <summary>Gets the full pathname of the route file.</summary>
+    public static string RoutePath { get => "/davinci-cdex/tasks"; }
+
+    /// <summary>Gets the FHIR version literal.</summary>
+    public static string FhirVersionLiteral { get => "R4"; }
+
+    /// <summary>Gets the FHIR version numeric.</summary>
+    public static string FhirVersionNumeric { get => "4.0"; }
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if ((!string.IsNullOrEmpty(StoreName)) &&
+            (StoreManager.TryGetValue(StoreName, out _store!)))
+        {
+            _store!.OnChanged += Store_OnChanged;
+        }
+
+        // notify of store root in case user clicked here directly
+        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+        NavTracker?.NotifyNav($"CDex Tasks", "/davinci-cdex/tasks?store=" + StoreName, 2);
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/davinci-cdex/tasks", StringComparison.Ordinal))
+        {
+            if (_store != null)
+            {
+                _store.OnChanged -= Store_OnChanged;
+            }
+
+            if ((!string.IsNullOrEmpty(StoreName)) &&
+                (StoreManager.TryGetValue(StoreName, out _store!)))
+            {
+                _store.OnChanged += Store_OnChanged;
+            }
+
+            // notify of store root in case user clicked here directly
+            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+            NavTracker?.NotifyNav($"CDex Tasks", "/davinci-cdex/tasks?store=" + StoreName, 2);
+        }
+    }
+
+    /// <summary>FHIR store on changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Event information.</param>
+    private void Store_OnChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(() => StateHasChanged());
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_store != null)
+        {
+            _store.OnChanged -= Store_OnChanged;
+        }
+    }
+}

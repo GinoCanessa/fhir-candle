@@ -10,6 +10,7 @@ using IniParser;
 using IniParser.Configuration;
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace fhir.candle.Services;
@@ -45,7 +46,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Values that represent FHIR major releases.</summary>
     public enum FhirSequenceEnum : int
     {
-        /// <summary>An enum constant representing the uknown option.</summary>
+        /// <summary>An enum constant representing the unknown option.</summary>
         [FhirLiteral("")]
         Unknown = 0,
 
@@ -139,12 +140,23 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     private static Regex _matchCorePackageNames = MatchCorePackageNames();
 
     /// <summary>Initializes a new instance of the <see cref="FhirPackageService"/> class.</summary>
-    /// <param name="logger">The logger.</param>
+    /// <param name="logger">             The logger.</param>
+    /// <param name="serverConfiguration">The server configuration.</param>
     public FhirPackageService(
-        ILogger<FhirPackageService> logger) 
+        ILogger<FhirPackageService> logger,
+        ServerConfiguration serverConfiguration)
     {
         _logger = logger;
         _singleton = this;
+
+        if (string.IsNullOrEmpty(serverConfiguration.FhirCacheDirectory))
+        {
+            _hasCacheDirectory = false;
+            return;
+        }
+
+        _cacheDirectory = serverConfiguration.FhirCacheDirectory;
+        _hasCacheDirectory = true;
     }
 
     /// <summary>Gets the current singleton.</summary>
@@ -159,33 +171,25 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Gets a value indicating whether the package service is ready.</summary>
     public bool IsReady => _isInitialized;
 
-    /// <summary>Initializes the FhirPackageService to a specific cache directory.</summary>
-    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
-    /// <param name="cacheDirectory">Pathname of the cache directory.</param>
-    public void Init(string cacheDirectory)
+    /// <summary>The completed requests.</summary>
+    private HashSet<string> _processed = new();
+
+    /// <summary>Initializes this object.</summary>
+    public void Init()
     {
-        if (string.IsNullOrEmpty(cacheDirectory))
+        if (_isInitialized)
         {
-            _hasCacheDirectory = false;
             return;
         }
 
-        _cacheDirectory = cacheDirectory;
-        _hasCacheDirectory = true;
-    }
-
-    /// <summary>Triggered when the application host is ready to start the service.</summary>
-    /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
-    /// <returns>An asynchronous result.</returns>
-    Task IHostedService.StartAsync(CancellationToken cancellationToken)
-    {
         if (!_hasCacheDirectory)
         {
             _logger.LogInformation("Disabling FhirPackageService, --fhir-package-cache set to empty.");
-            return Task.CompletedTask;
+            return;
         }
 
-        _logger.LogInformation($"Starting FhirPackageService with cache directory: {_cacheDirectory}");
+        _logger.LogInformation($"Initializing FhirPackageService with cache: {_cacheDirectory}");
+        _isInitialized = true;
 
         _cachePackageDirectory = Path.Combine(_cacheDirectory, "packages");
         _iniFilePath = Path.Combine(_cachePackageDirectory, "packages.ini");
@@ -206,7 +210,22 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         }
 
         SynchronizeCache();
-        _isInitialized = true;
+    }
+
+    /// <summary>Triggered when the application host is ready to start the service.</summary>
+    /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
+    /// <returns>An asynchronous result.</returns>
+    Task IHostedService.StartAsync(CancellationToken cancellationToken)
+    {
+        if (!_hasCacheDirectory)
+        {
+            _logger.LogInformation("Disabling FhirPackageService, --fhir-package-cache set to empty.");
+            return Task.CompletedTask;
+        }
+
+        _logger.LogInformation($"Starting FhirPackageService...");
+
+        Init();
 
         return Task.CompletedTask;
     }
@@ -249,11 +268,30 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         out IEnumerable<PackageCacheEntry> packages,
         bool offlineMode = false)
     {
+        if (string.IsNullOrEmpty(branchName))
+        {
+            _logger.LogInformation($"FhirPackageService <<< attempting to load: {directive}");
+        }
+        else
+        {
+            _logger.LogInformation($"FhirPackageService <<< attempting to load branch: {branchName}");
+        }
+
         if (!_hasCacheDirectory)
         {
+            _logger.LogInformation($"FhirPackageService <<< Package service is unavailable, package will NOT be loaded!");
             packages = Enumerable.Empty<PackageCacheEntry>();
             return false;
         }
+
+        string key = $"{directive}|{branchName}";
+        if (_processed.Contains(key))
+        {
+            // if we have already processed this once, force into offline for performance
+            offlineMode = true;
+        }
+
+        _processed.Add(key);
 
         string name;
         string version;
@@ -422,13 +460,22 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         {
             sequencesToTest = Enum.GetValues(typeof(FhirSequenceEnum))
                 .Cast<FhirSequenceEnum>()
-                .Where(v => v >= FhirSequenceEnum.R4)
                 .ToDictionary(x => x, x => LiteralForSequence(x).ToLowerInvariant());
         }
 
         // want to check for fhir-version named packages
-        foreach ((FhirSequenceEnum seqence, string trailer) in sequencesToTest)
+        foreach ((FhirSequenceEnum sequence, string trailer) in sequencesToTest)
         {
+            if ((sequence == FhirSequenceEnum.DSTU2) ||
+                (sequence == FhirSequenceEnum.STU3))
+            {
+                continue;
+            }
+
+            version = string.Empty;
+            isLocal = false;
+            directory = string.Empty;
+            
             string sequencedName = string.IsNullOrEmpty(trailer) ? name : $"{name}.{trailer}";
 
             if (string.IsNullOrEmpty(version) || 
@@ -752,9 +799,37 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             resolvedDirective = packageDirective;
             return true;
         }
+        catch (HttpRequestException hex)
+        {
+            // we have a lot of not found because of package nesting, this is reported elsewhere
+            if (hex.StatusCode == HttpStatusCode.NotFound)
+            {
+                fhirVersion = FhirSequenceEnum.Unknown;
+                resolvedDirective = string.Empty;
+                return false;
+            }
+
+            _logger.LogInformation($"TryDownloadAndExtract <<< exception downloading {uri}: {hex.Message}");
+            if (hex.InnerException != null)
+            {
+                _logger.LogInformation($" <<< inner: {hex.InnerException.Message}");
+            }
+        }
         catch (Exception ex)
         {
-            _logger.LogInformation($"TryDownloadAndExtract <<< exception downloading: {uri}, {ex.Message}");
+            if ((ex.InnerException != null) &&
+                (ex.InnerException is HttpRequestException hex))
+            {
+                // we have a lot of not found because of package nesting, this is reported elsewhere
+                if (hex.StatusCode == HttpStatusCode.NotFound)
+                {
+                    fhirVersion = FhirSequenceEnum.Unknown;
+                    resolvedDirective = string.Empty;
+                    return false;
+                }
+            }
+
+            _logger.LogInformation($"TryDownloadAndExtract <<< exception downloading: {uri}: {ex.Message}");
             if (ex.InnerException != null)
             {
                 _logger.LogInformation($" <<< inner: {ex.InnerException.Message}");
@@ -1505,10 +1580,10 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation(
-                        $"GetPackageVersionsAndUrls <<<" +
-                        $" Failed to get package info: {response.StatusCode}" +
-                        $" {requestUri.AbsoluteUri}");
+                    //_logger.LogInformation(
+                    //    $"GetPackageVersionsAndUrls <<<" +
+                    //    $" Failed to get package info: {response.StatusCode}" +
+                    //    $" {requestUri.AbsoluteUri}");
                     continue;
                 }
 
@@ -1518,19 +1593,19 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 if (!(info?.Name.Equals(packageName, StringComparison.OrdinalIgnoreCase) ?? false))
                 {
-                    _logger.LogInformation(
-                        $"GetPackageVersionsAndUrls <<<" +
-                        $" Package information mismatch: requested {requestUri.AbsoluteUri}" +
-                        $" received manifest for {info?.Name}");
+                    //_logger.LogInformation(
+                    //    $"GetPackageVersionsAndUrls <<<" +
+                    //    $" Package information mismatch: requested {requestUri.AbsoluteUri}" +
+                    //    $" received manifest for {info?.Name}");
                     continue;
                 }
 
                 if (info.Versions == null || info.Versions.Count == 0)
                 {
-                    _logger.LogInformation(
-                        $"GetPackageVersionsAndUrls <<<" +
-                        $" Package {requestUri.AbsoluteUri}" +
-                        $" contains NO versions");
+                    //_logger.LogInformation(
+                    //    $"GetPackageVersionsAndUrls <<<" +
+                    //    $" package {requestUri.AbsoluteUri}" +
+                    //    $" contains NO versions");
                     continue;
                 }
 
@@ -1556,6 +1631,9 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             return true;
         }
 
+        //_logger.LogInformation(
+        //    $"Package {packageName}" +
+        //    $" was not found on any registry.");
         manifests = Enumerable.Empty<RegistryPackageManifest>();
         return false;
     }

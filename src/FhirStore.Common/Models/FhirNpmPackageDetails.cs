@@ -146,27 +146,27 @@ public class FhirNpmPackageDetails
 
         FhirNpmPackageDetails? details = null;
 
-        // attempt to parse
-        try
-        {
-            details = JsonSerializer.Deserialize<FhirNpmPackageDetails>(contents, new JsonSerializerOptions()
-            {
-                AllowTrailingCommas = true,
-            });
-        }
-        catch (JsonException jex)
-        {
-            Console.WriteLine($"FhirNpmPackageDetails.Parse <<< caught JSON exception in typed parse: {jex.Message}");
-            if (jex.InnerException != null)
-            {
-                Console.WriteLine($" <<< {jex.InnerException.Message}");
-            }
+        //// attempt to parse
+        //try
+        //{
+        //    details = JsonSerializer.Deserialize<FhirNpmPackageDetails>(contents, new JsonSerializerOptions()
+        //    {
+        //        AllowTrailingCommas = true,
+        //    });
+        //}
+        //catch (JsonException jex)
+        //{
+        //    Console.WriteLine($"FhirNpmPackageDetails.Parse <<< caught JSON exception in typed parse: {jex.Message}");
+        //    if (jex.InnerException != null)
+        //    {
+        //        Console.WriteLine($" <<< {jex.InnerException.Message}");
+        //    }
 
-            details = null;
-        }
+        //    details = null;
+        //}
 
-        if (details == null)
-        {
+        //if (details == null)
+        //{
             try
             {
                 JsonNode? node = JsonNode.Parse(contents);
@@ -211,7 +211,7 @@ public class FhirNpmPackageDetails
 
                 details = null;
             }
-        }
+        //}
 
         if (string.IsNullOrEmpty(details?.Name))
         {
@@ -260,7 +260,18 @@ public class FhirNpmPackageDetails
 
         if (string.IsNullOrEmpty(details.FhirVersion))
         {
-            details.FhirVersion = details.FhirVersionList.First() ?? details.FhirVersions.First() ?? string.Empty;
+            if (details.FhirVersionList.Any())
+            {
+                details.FhirVersion = details.FhirVersionList.First();
+            }
+            else if (details.FhirVersions.Any())
+            {
+                details.FhirVersion = details.FhirVersions.First();
+            }
+            else
+            {
+                details.FhirVersion = string.Empty;
+            }
         }
 
         if (details.Dependencies == null)
@@ -287,9 +298,24 @@ public class FhirNpmPackageDetails
 
         if (node[prop] is JsonObject obj)
         {
-            foreach ((string key, JsonNode? oNode) in obj)
+            foreach ((string key, object? oNode) in obj)
             {
-                val.Add(key, StringFromNode(oNode, key));
+                if (oNode == null)
+                {
+                    continue;
+                }
+
+                if (oNode is not JsonObject)
+                {
+                    val.Add(key, oNode.ToString() ?? string.Empty);
+                    continue;
+                }
+
+                if (oNode is JsonNode jn)
+                {
+                    val.Add(key, StringFromNode(jn, key));
+                    continue;
+                }
             }
         }
 

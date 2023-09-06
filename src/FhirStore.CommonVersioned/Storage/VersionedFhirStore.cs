@@ -22,6 +22,9 @@ using static FhirCandle.Search.SearchDefinitions;
 using FhirCandle.Serialization;
 using System.Drawing;
 using System.Xml.Linq;
+using Fhir.Metrics;
+using static Hl7.Fhir.Model.ActivityDefinition;
+using Hl7.Fhir.Language.Debugging;
 
 namespace FhirCandle.Storage;
 
@@ -95,6 +98,9 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The loaded directives.</summary>
     private HashSet<string> _loadedDirectives = new();
 
+    /// <summary>The loaded supplements.</summary>
+    private HashSet<string> _loadedSupplements = new();
+
     /// <summary>Values that represent load state codes.</summary>
     private enum LoadStateCodes
     {
@@ -139,6 +145,12 @@ public partial class VersionedFhirStore : IFhirStore
     {
         _searchTester = new() { FhirStore = this, };
     }
+
+    /// <summary>Gets a list of names of the loaded packages.</summary>
+    public HashSet<string> LoadedPackages { get => _loadedDirectives; }
+
+    /// <summary>Gets the loaded supplements.</summary>
+    public HashSet<string> LoadedSupplements { get => _loadedSupplements; }
 
     /// <summary>Initializes this object.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
@@ -464,10 +476,11 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         if ((!string.IsNullOrEmpty(packageSupplements)) &&
-            Directory.Exists(packageSupplements))
+            Directory.Exists(packageSupplements) &&
+            (!_loadedSupplements.Contains(packageSupplements)))
         {
             Console.WriteLine($"Store[{_config.ControllerName}] loading contents from {packageSupplements}");
-
+            _loadedSupplements.Add(packageSupplements);
             di = new(packageSupplements);
 
             foreach (FileInfo file in di.GetFiles("*.*", SearchOption.AllDirectories))
@@ -793,7 +806,14 @@ public partial class VersionedFhirStore : IFhirStore
                 (resourceObj is Subscription r))
             {
                 r.Status = SubscriptionConverter.OffCode;
-                resourceStore.InstanceUpdate(r, false, _protectedResources);
+                resourceStore.InstanceUpdate(
+                    r, 
+                    false, 
+                    string.Empty, 
+                    string.Empty, 
+                    _protectedResources,
+                    out _,
+                    out _);
             }
         }
     }
@@ -848,6 +868,12 @@ public partial class VersionedFhirStore : IFhirStore
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryResolveAsResource(string uri, out Resource? resource)
     {
+        if (string.IsNullOrEmpty(uri))
+        {
+            resource = null;
+            return false;
+        }
+        
         string[] components = uri.Split('/');
 
         if (components.Length < 2)
@@ -911,6 +937,37 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         return resource.ToTypedElement().ToScopedNode();
+    }
+
+    /// <summary>Attempts to create.</summary>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="resource">       [out] The resource.</param>
+    /// <param name="id">             [out] The identifier.</param>
+    /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryCreate(string resourceType, object resource, out string id, bool allowExistingId)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (resource == null) ||
+            (resource is not Hl7.Fhir.Model.Resource r))
+        {
+            id = string.Empty;
+            return false;
+        }
+
+        HttpStatusCode sc = DoInstanceCreate(
+            resourceType,
+            r,
+            string.Empty,
+            allowExistingId,
+            out Hl7.Fhir.Model.Resource? created,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        id = created?.Id ?? string.Empty;
+        return sc.IsSuccessful();
     }
 
     /// <summary>Instance create.</summary>
@@ -1037,6 +1094,59 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.NotFound;
         }
 
+        // check for conditional create
+        if (!string.IsNullOrEmpty(ifNoneExist))
+        {
+            HttpStatusCode sc = DoTypeSearch(
+                resourceType,
+                ifNoneExist,
+                out Bundle? bundle,
+                out outcome);
+
+            if (sc.IsSuccessful())
+            {
+                switch (bundle?.Total)
+                {
+                    // no matches - continue with store as normal
+                    case 0:
+                        break;
+
+                    // one match - return the match as if just stored except with OK instead of Created
+                    case 1:
+                        {
+                            stored = bundle.Entry[0].Resource;
+                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Created {stored.TypeName}/{stored.Id}");
+                            eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
+                            lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+                            location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
+                            return HttpStatusCode.OK;
+                        }
+
+                    // multiple matches - fail the request
+                    default:
+                        {
+                            stored = null;
+                            outcome = Utils.BuildOutcomeForRequest(
+                                HttpStatusCode.PreconditionFailed,
+                                $"If-None-Exist query returned too many matches: {bundle?.Total}");
+                            eTag = string.Empty;
+                            lastModified = string.Empty;
+                            location = string.Empty;
+                            return HttpStatusCode.PreconditionFailed;
+                        }
+                }
+            }
+            else
+            {
+                stored = null;
+                eTag = string.Empty;
+                lastModified = string.Empty;
+                location = string.Empty;
+                return HttpStatusCode.PreconditionFailed;
+            }
+        }
+
+        // create the resource
         stored = _store[resourceType].InstanceCreate(content, allowExistingId);
 
         if (stored == null)
@@ -1116,12 +1226,11 @@ public partial class VersionedFhirStore : IFhirStore
             Id = Guid.NewGuid().ToString(),
         };
 
-        // TODO: Process bundle resolution rules and fix IDs
-
         switch (requestBundle.Type)
         {
             //case Bundle.BundleType.Transaction:
             //    responseBundle.Type = Bundle.BundleType.TransactionResponse;
+            //    ProcessTransaction(requestBundle, responseBundle);
             //    break;
 
             case Bundle.BundleType.Batch:
@@ -1148,6 +1257,22 @@ public partial class VersionedFhirStore : IFhirStore
         serializedOutcome = Utils.SerializeFhir(sucessOutcome, destFormat, pretty);
 
         return HttpStatusCode.OK;
+    }
+
+    /// <summary>Attempts to delete a string from the given string.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryDelete(string resourceType, string id)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)))
+        {
+            return false;
+        }
+
+        HttpStatusCode sc = DoInstanceDelete(resourceType, id, string.Empty, out _, out _);
+        return sc.IsSuccessful();
     }
 
     /// <summary>Instance delete.</summary>
@@ -1224,6 +1349,24 @@ public partial class VersionedFhirStore : IFhirStore
 
         outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}");
         return HttpStatusCode.OK;
+    }
+
+    /// <summary>Attempts to read.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryRead(string resourceType, string id, out object? resource)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)))
+        {
+            resource = null;
+            return false;
+        }
+
+        resource = ((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType])[id].DeepCopy();
+        return true;
     }
 
     /// <summary>Instance read.</summary>
@@ -1347,10 +1490,95 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.NotFound;
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {resource.TypeName}/{resource.Id}");
         eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
+
+        if ((!string.IsNullOrEmpty(ifMatch)) &&
+            (!eTag.Equals(ifMatch, StringComparison.Ordinal)))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.PreconditionFailed,
+                $"If-Match: {ifMatch} does not equal found eTag: {eTag}",
+                OperationOutcome.IssueType.BusinessRule);
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            return HttpStatusCode.PreconditionFailed;
+        }
+
         lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+
+        if ((!string.IsNullOrEmpty(ifModifiedSince)) &&
+            (lastModified.CompareTo(ifModifiedSince) < 0))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.NotModified,
+                $"Last modified: {lastModified} is prior to If-Modified-Since: {ifModifiedSince}",
+                OperationOutcome.IssueType.Informational);
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            return HttpStatusCode.NotModified;
+        }
+
+        if (ifNoneMatch.Equals("*", StringComparison.Ordinal))
+        {
+            resource = null;
+            outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.PreconditionFailed,
+                "Prior version exists, but If-None-Match is *");
+            eTag = string.Empty;
+            lastModified = string.Empty;
+            return HttpStatusCode.PreconditionFailed;
+        }
+
+        if (!string.IsNullOrEmpty(ifNoneMatch))
+        {
+            if (ifNoneMatch.Equals(eTag, StringComparison.Ordinal))
+            {
+                resource = null;
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotModified,
+                    $"Read {resourceType}/{id} found version: {eTag}, equals If-None-Match: {ifNoneMatch}");
+                eTag = string.Empty;
+                lastModified = string.Empty;
+                return HttpStatusCode.NotModified;
+            }
+        }
+
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {resource.TypeName}/{resource.Id}");
         return HttpStatusCode.OK;
+    }
+
+    /// <summary>Attempts to update.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="resource">    [out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryUpdate(string resourceType, string id, object resource)
+    {
+        if ((!_store.ContainsKey(resourceType)) ||
+            (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)) ||
+            (resource == null) ||
+            (resource is not Hl7.Fhir.Model.Resource r))
+        {
+            return false;
+        }
+
+        HttpStatusCode sc = DoInstanceUpdate(
+            resourceType, 
+            id, 
+            r,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            false,
+            out _,
+            out _,
+            out _,
+            out _,
+            out _);
+
+        return sc.IsSuccessful();
     }
 
     /// <summary>Instance update.</summary>
@@ -1376,6 +1604,7 @@ public partial class VersionedFhirStore : IFhirStore
         string sourceFormat,
         string destFormat,
         bool pretty,
+        string queryString,
         string ifMatch,
         string ifNoneMatch,
         bool allowCreate,
@@ -1407,6 +1636,7 @@ public partial class VersionedFhirStore : IFhirStore
             resourceType,
             id,
             r,
+            queryString,
             ifMatch,
             ifNoneMatch,
             allowCreate,
@@ -1434,6 +1664,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <param name="content">     The content.</param>
+    /// <param name="queryString"> The query string.</param>
     /// <param name="ifMatch">     A match specifying if.</param>
     /// <param name="ifNoneMatch"> A match specifying if none.</param>
     /// <param name="allowCreate"> If the operation should allow a create as an update.</param>
@@ -1447,6 +1678,7 @@ public partial class VersionedFhirStore : IFhirStore
         string resourceType,
         string id,
         Resource content,
+        string queryString,
         string ifMatch,
         string ifNoneMatch,
         bool allowCreate,
@@ -1482,22 +1714,86 @@ public partial class VersionedFhirStore : IFhirStore
             return HttpStatusCode.NotFound;
         }
 
-        resource = _store[resourceType].InstanceUpdate(content, allowCreate, _protectedResources);
+        HttpStatusCode sc;
+
+        // check for conditional update
+        if (!string.IsNullOrEmpty(queryString))
+        {
+            sc = DoTypeSearch(
+                resourceType,
+                queryString,
+                out Bundle? bundle,
+                out outcome);
+
+            if (sc.IsSuccessful())
+            {
+                switch (bundle?.Total)
+                {
+                    // no matches - continue with update as create
+                    case 0:
+                        break;
+
+                    // one match - check extra conditions and continue with update if they pass
+                    case 1:
+                        {
+                            if ((!string.IsNullOrEmpty(id)) &&
+                                (!bundle.Entry[0].Resource.Id.Equals(id, StringComparison.Ordinal)))
+                            {
+                                resource = null;
+                                outcome = Utils.BuildOutcomeForRequest(
+                                    HttpStatusCode.PreconditionFailed, 
+                                    $"Conditional update query returned a match with a id: {bundle.Entry[0].Resource.Id}, expected {id}");
+                                eTag = string.Empty;
+                                lastModified = string.Empty;
+                                location = string.Empty;
+                                return HttpStatusCode.PreconditionFailed;
+                            }
+                        }
+                        break;
+
+                    // multiple matches - fail the request
+                    default:
+                        {
+                            resource = null;
+                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.PreconditionFailed, $"Conditional update query returned too many matches: {bundle?.Total}");
+                            eTag = string.Empty;
+                            lastModified = string.Empty;
+                            location = string.Empty;
+                            return HttpStatusCode.PreconditionFailed;
+                        }
+                }
+            }
+            else
+            {
+                resource = null;
+                eTag = string.Empty;
+                lastModified = string.Empty;
+                location = string.Empty;
+                return HttpStatusCode.PreconditionFailed;
+            }
+        }
+
+        resource = _store[resourceType].InstanceUpdate(
+            content, 
+            allowCreate,
+            ifMatch,
+            ifNoneMatch,
+            _protectedResources,
+            out sc,
+            out outcome);
 
         if (resource == null)
         {
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to update resource");
             eTag = string.Empty;
             lastModified = string.Empty;
             location = string.Empty;
-            return HttpStatusCode.InternalServerError;
+            return sc;
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Updated {resource.TypeName}/{resource.Id}");
         eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
         lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
         location = $"{_config.BaseUrl}/{resourceType}/{resource.Id}";
-        return HttpStatusCode.OK;
+        return sc;
     }
 
     /// <summary>
@@ -1577,6 +1873,22 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
+    }
+
+    /// <summary>Compile FHIR path criteria.</summary>
+    /// <param name="fpc">The fpc.</param>
+    /// <returns>A CompiledExpression.</returns>
+    public static CompiledExpression CompileFhirPathCriteria(string fpc)
+    {
+        MatchCollection matches = _fhirpathVarMatcher().Matches(fpc);
+
+        // replace the variable with a resolve call
+        foreach (string matchValue in matches.Select(m => m.Value).Distinct())
+        {
+            fpc = fpc.Replace(matchValue, $"'{FhirPathVariableResolver._fhirPathPrefix}{matchValue.Substring(1)}'.resolve()");
+        }
+
+        return _compiler.Compile(fpc);
     }
 
     /// <summary>Processes a parsed SubscriptionTopic resource.</summary>
@@ -1677,21 +1989,11 @@ public partial class VersionedFhirStore : IFhirStore
                     // prefer FHIRPath if present
                     if (!string.IsNullOrEmpty(rt.FhirPathCritiera))
                     {
-                        string fpc = rt.FhirPathCritiera;
-
-                        MatchCollection matches = _fhirpathVarMatcher().Matches(fpc);
-
-                        // replace the variable with a resolve call
-                        foreach (string matchValue in matches.Select(m => m.Value).Distinct())
-                        {
-                            fpc = fpc.Replace(matchValue, $"'{FhirPathVariableResolver._fhirPathPrefix}{matchValue.Substring(1)}'.resolve()");
-                        }
-
                         fhirPathTriggers.Add(new(
                             onCreate,
                             onUpdate,
                             onDelete,
-                            _compiler.Compile(fpc)));
+                            CompileFhirPathCriteria(rt.FhirPathCritiera)));
 
                         canExecute = true;
                         executesOnResource = true;
@@ -1897,6 +2199,19 @@ public partial class VersionedFhirStore : IFhirStore
         //StateHasChanged();
     }
 
+    /// <summary>Adds a subscription error.</summary>
+    /// <param name="id">          The subscription id.</param>
+    /// <param name="errorMessage">Message describing the error.</param>
+    public void RegisterError(string id, string errorMessage)
+    {
+        if (!_subscriptions.ContainsKey(id))
+        {
+            return;
+        }
+
+        _subscriptions[id].RegisterError(errorMessage);
+    }
+
     /// <summary>Registers the received subscription changed.</summary>
     /// <param name="subscriptionReference">  The subscription reference.</param>
     /// <param name="cachedNotificationCount">Number of cached notifications.</param>
@@ -2082,7 +2397,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="subscription">The subscription.</param>
     /// <param name="remove">      (Optional) True to remove.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    internal bool StoreProcessSubscription(ParsedSubscription subscription, bool remove = false)
+    public bool StoreProcessSubscription(ParsedSubscription subscription, bool remove = false)
     {
         if (remove)
         {
@@ -2873,6 +3188,28 @@ public partial class VersionedFhirStore : IFhirStore
         return sc;
     }
 
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="queryString"> The query string.</param>
+    /// <param name="bundle">      [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryTypeSearch(
+        string resourceType,
+        string queryString,
+        out object? bundle)
+    {
+        HttpStatusCode sc = DoTypeSearch(
+            resourceType,
+            queryString,
+            out Bundle? b,
+            out _);
+
+        bundle = b;
+
+        return sc.IsSuccessful();
+    }
+
+
     /// <summary>Executes the type search operation.</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="queryString"> The query string.</param>
@@ -3023,6 +3360,24 @@ public partial class VersionedFhirStore : IFhirStore
         serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
         return sc;
+    }
+
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="queryString">The query string.</param>
+    /// <param name="bundle">     [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TrySystemSearch(
+        string queryString,
+        out object? bundle)
+    {
+        HttpStatusCode sc = DoSystemSearch(
+            queryString,
+            out Bundle? b,
+            out _);
+
+        bundle = b;
+
+        return sc.IsSuccessful();
     }
 
     /// <summary>Executes the system search operation.</summary>
@@ -3318,9 +3673,11 @@ public partial class VersionedFhirStore : IFhirStore
                 }
 
                 ResourceReference reference = element.ToPoco<ResourceReference>();
+                Resource? resolved = null;
 
-                if (TryResolveAsResource(reference.Reference, out Resource? resolved) &&
-                    resolved != null)
+                if ((!string.IsNullOrEmpty(reference.Reference)) &&
+                    TryResolveAsResource(reference.Reference, out resolved) &&
+                    (resolved != null))
                 {
                     if (sp.Target?.Any() ?? false)
                     {
@@ -3345,6 +3702,55 @@ public partial class VersionedFhirStore : IFhirStore
 
                     // track we have added this id
                     addedIds.Add(includedId);
+
+                    continue;
+                }
+                
+                if (reference.Identifier != null)
+                {
+                    // check if a type was specified
+                    if (!string.IsNullOrEmpty(reference.Type) && _store.ContainsKey(reference.Type))
+                    {
+                        if (_store[reference.Type].TryResolveIdentifier(reference.Identifier.System, reference.Identifier.Value, out resolved) &&
+                            (resolved != null))
+                        {
+                            string includedId = $"{resolved.TypeName}/{resolved.Id}";
+                            if (addedIds.Contains(includedId))
+                            {
+                                continue;
+                            }
+
+                            // add the matched result
+                            inclusions.Add(resolved);
+
+                            // track we have added this id
+                            addedIds.Add(includedId);
+
+                            continue;
+                        }
+                    }
+
+                    // look through all resources
+                    foreach (string resourceType in _store.Keys)
+                    {
+                        if (_store[resourceType].TryResolveIdentifier(reference.Identifier.System, reference.Identifier.Value, out resolved) &&
+                            (resolved != null))
+                        {
+                            string includedId = $"{resolved.TypeName}/{resolved.Id}";
+                            if (addedIds.Contains(includedId))
+                            {
+                                continue;
+                            }
+
+                            // add the matched result
+                            inclusions.Add(resolved);
+
+                            // track we have added this id
+                            addedIds.Add(includedId);
+
+                            continue;
+                        }
+                    }
                 }
             }
         }
@@ -3552,8 +3958,75 @@ public partial class VersionedFhirStore : IFhirStore
         cs.Rest.Add(restComponent);
 
         // update our current capabilities
-        _store["CapabilityStatement"].InstanceUpdate(cs, true, _protectedResources);
+        _store["CapabilityStatement"].InstanceUpdate(
+            cs, 
+            true,
+            string.Empty,
+            string.Empty,
+            _protectedResources,
+            out _,
+            out _);
         _capabilitiesAreStale = false;
+    }
+
+    private record class TransactionReferenceInfo
+    {
+        public required string FullUrl { get; init; }
+        public required string ReferenceLiteral { get; init; }
+
+        public string LocalReference { get; set; } = string.Empty;
+    }
+
+    private void FindReferences(string fullUrl, object o, List<TransactionReferenceInfo> references)
+    {
+        switch (o)
+        {
+            case null:
+            case Hl7.Fhir.Model.PrimitiveType:
+                return;
+
+            case Hl7.Fhir.Model.ResourceReference rr:
+                {
+                    references.Add(new()
+                    {
+                        FullUrl = fullUrl,
+                        ReferenceLiteral = ((Hl7.Fhir.Model.ResourceReference)o).Reference,
+                        LocalReference = Guid.NewGuid().ToString(),
+                    });
+
+                    return;
+                }
+
+            case Hl7.Fhir.Model.Base b:
+                foreach (Base child in b.Children)
+                {
+                    FindReferences(fullUrl, child, references);
+                }
+                break;
+        }
+    }
+
+    /// <summary>Process the transaction.</summary>
+    /// <param name="transaction">The transaction.</param>
+    /// <param name="response">   The response.</param>
+    private void ProcessTransaction(
+        Bundle transaction,
+        Bundle response)
+    {
+        List<TransactionReferenceInfo> references = new();
+
+        foreach (Bundle.EntryComponent entry in transaction.Entry)
+        {
+            FindReferences(entry.FullUrl, entry.Resource, references);
+        }
+
+        foreach (TransactionReferenceInfo i in references)
+        {
+            Console.WriteLine($"ProcessTransaction <<< {i.FullUrl} contains {i.ReferenceLiteral}");
+        }
+
+        // TODO: finish implementing transaction support
+        throw new NotImplementedException("Transaction support is not complete!");
     }
 
     /// <summary>Process a batch request.</summary>
@@ -3708,6 +4181,7 @@ public partial class VersionedFhirStore : IFhirStore
                             requestResourceType,
                             requestId,
                             entry.Resource,
+                            requestUrlQuery,
                             entry.Request.IfMatch,
                             entry.Request.IfNoneMatch,
                             true,

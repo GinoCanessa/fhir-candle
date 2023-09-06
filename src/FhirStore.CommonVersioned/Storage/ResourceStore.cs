@@ -13,6 +13,9 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using System.Collections.Concurrent;
 using System.Collections;
+using System.Net;
+using FhirCandle.Serialization;
+using Hl7.Fhir.Language.Debugging;
 
 namespace FhirCandle.Storage;
 
@@ -35,6 +38,9 @@ public class ResourceStore<T> : IVersionedResourceStore
 
     /// <summary>(Immutable) Conformance URL to ID Map.</summary>
     internal readonly ConcurrentDictionary<string, string> _conformanceUrlToId = new();
+
+    /// <summary>(Immutable) Identifier for the identifier to.</summary>
+    internal readonly ConcurrentDictionary<string, string> _identifierToId = new();
 
     /// <summary>The lock object.</summary>
     private object _lockObject = new();
@@ -201,6 +207,62 @@ public class ResourceStore<T> : IVersionedResourceStore
         return _resourceStore[id];
     }
 
+    /// <summary>Interface for has identifier.</summary>
+    internal interface IHasIdentifier
+    {
+        List<Hl7.Fhir.Model.Identifier> Identifier { get; }
+    }
+
+    /// <summary>Gets identifier key.</summary>
+    /// <param name="id">[out] The identifier.</param>
+    /// <returns>The identifier key.</returns>
+    internal string GetIdentifierKey(Hl7.Fhir.Model.Identifier id)
+    {
+        return $"{id.System}|{id.Value}";
+    }
+
+    /// <summary>Attempts to resolve identifier.</summary>
+    /// <param name="system">The system.</param>
+    /// <param name="value"> The value.</param>
+    /// <param name="r">     [out] The resolved resource process.</param>
+    /// <returns>True if identifier, false if not.</returns>
+    public bool TryResolveIdentifier(string system, string value, out Hl7.Fhir.Model.Resource? r)
+    {
+        if (_identifierToId.TryGetValue($"{system}|{value}", out string? id) &&
+            !string.IsNullOrEmpty(id) &&
+            _resourceStore.TryGetValue(id, out T? resource))
+        {
+            r = resource;
+            return true;
+        }
+
+        r = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Attempts to get a resource, returning a default value rather than throwing an exception if it
+    /// fails.
+    /// </summary>
+    /// <param name="identifier">The identifier.</param>
+    /// <returns>A T?</returns>
+    internal T? TryGetResource(Hl7.Fhir.Model.Identifier identifier)
+    {
+        // lookup
+        string key = GetIdentifierKey(identifier);
+        if (_identifierToId.TryGetValue(key, out string? id))
+        {
+            if (_resourceStore.TryGetValue(id, out T? resource))
+            {
+                return resource;
+            }
+        }
+
+        // TODO: Consider if we want a slow lookup here as well.
+
+        return null;
+    }
+
     /// <summary>Create an instance of a resource.</summary>
     /// <param name="source">         [out] The resource.</param>
     /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
@@ -287,6 +349,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
         }
 
+        if (source is IHasIdentifier hasId)
+        {
+            foreach(Identifier i in hasId.Identifier)
+            {
+                _ = _identifierToId.TryAdd(GetIdentifierKey(i), source.Id);
+            }
+        }
+
         TestCreateAgainstSubscriptions((T)source);
 
         if (parsedSubscriptionTopic != null)
@@ -316,18 +386,33 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>Update a specific instance of a resource.</summary>
     /// <param name="source">            [out] The resource.</param>
     /// <param name="allowCreate">       True to allow, false to suppress the create.</param>
+    /// <param name="ifMatch">           A match specifying if.</param>
+    /// <param name="ifNoneMatch">       A match specifying if none.</param>
     /// <param name="protectedResources">The protected resources.</param>
+    /// <param name="sc">                [out] The screen.</param>
+    /// <param name="outcome">           [out] The outcome.</param>
     /// <returns>The updated resource, or null if it could not be performed.</returns>
-    public Resource? InstanceUpdate(Resource source, bool allowCreate, HashSet<string> protectedResources)
+    public Resource? InstanceUpdate(
+        Resource source, 
+        bool allowCreate, 
+        string ifMatch,
+        string ifNoneMatch,
+        HashSet<string> protectedResources,
+        out HttpStatusCode sc,
+        out OperationOutcome outcome)
     {
-        if (string.IsNullOrEmpty(source?.Id) ||
+        if ((source == null) ||
             (source is not T))
         {
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, $"Invalid resource content for {_resourceName}");
+            sc = HttpStatusCode.BadRequest;
             return null;
         }
 
-        if (string.IsNullOrEmpty(source?.Id))
+        if (string.IsNullOrEmpty(source.Id))
         {
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.BadRequest, "Cannot update resources without an ID");
+            sc = HttpStatusCode.BadRequest;
             return null;
         }
 
@@ -338,6 +423,8 @@ public class ResourceStore<T> : IVersionedResourceStore
 
         if (protectedResources.Any() && protectedResources.Contains(_resourceName + "/" + source.Id))
         {
+            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Unauthorized, $"Resource {_resourceName}/{source.Id} is protected and cannot be changed");
+            sc = HttpStatusCode.Unauthorized;
             return null;
         }
 
@@ -358,6 +445,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                     {
                         if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
                         {
+                            outcome = Utils.BuildOutcomeForRequest(
+                                HttpStatusCode.BadRequest,
+                                $"Basic-wrapped SubscriptionTopic could not be parsed!");
+                            sc = HttpStatusCode.BadRequest;
                             return null;
                         }
                     }
@@ -368,6 +459,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                 // fail the request if this fails
                 if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))
                 {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.BadRequest,
+                        $"SubscriptionTopic could not be parsed!");
+                    sc = HttpStatusCode.BadRequest;
                     return null;
                 }
                 break;
@@ -376,6 +471,10 @@ public class ResourceStore<T> : IVersionedResourceStore
                 // fail the request if this fails
                 if (!_subscriptionConverter.TryParse((Subscription)source, out parsedSubscription))
                 {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.BadRequest,
+                        $"Subscription could not be parsed!");
+                    sc = HttpStatusCode.BadRequest;
                     return null;
                 }
                 break;
@@ -394,22 +493,62 @@ public class ResourceStore<T> : IVersionedResourceStore
                 }
                 else
                 {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.BadRequest,
+                        $"Update as Create is disabled");
+                    sc = HttpStatusCode.BadRequest;
                     return null;
                 }
             }
             else if (int.TryParse(_resourceStore[source.Id].Meta?.VersionId ?? string.Empty, out int version))
             {
                 source.Meta.VersionId = (version + 1).ToString();
-                previous = _resourceStore[source.Id];
+                previous = (T)_resourceStore[source.Id].DeepCopy();
             }
             else
             {
                 source.Meta.VersionId = "1";
-                previous = _resourceStore[source.Id];
+                previous = (T)_resourceStore[source.Id].DeepCopy();
             }
 
+            // check preconditions
+            if (ifNoneMatch.Equals("*", StringComparison.Ordinal))
+            {
+                outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.PreconditionFailed,
+                    "Prior version exists, but If-None-Match is *");
+                sc = HttpStatusCode.PreconditionFailed;
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(ifNoneMatch))
+            {
+                if (ifNoneMatch.Equals($"W/\"{previous?.Meta.VersionId ?? string.Empty}\"", StringComparison.Ordinal))
+                {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.PreconditionFailed,
+                        $"Conditional update query returned a match with version: {previous?.Meta.VersionId}, If-None-Match: {ifNoneMatch}");
+                    sc = HttpStatusCode.PreconditionFailed;
+                    return null;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(ifMatch))
+            {
+                if (!ifMatch.Equals($"W/\"{previous?.Meta.VersionId}\"", StringComparison.Ordinal))
+                {
+                    outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.PreconditionFailed,
+                        $"Conditional update query returned a match with version: {previous?.Meta.VersionId}, If-Match: {ifNoneMatch}");
+                    sc = HttpStatusCode.PreconditionFailed;
+                    return null;
+                }
+            }
+
+            // update the last updated time
             source.Meta.LastUpdated = DateTimeOffset.UtcNow;
 
+            // store
             _resourceStore[source.Id] = (T)source;
         }
 
@@ -426,6 +565,22 @@ public class ResourceStore<T> : IVersionedResourceStore
             if (!string.IsNullOrEmpty(cr.Url))
             {
                 _ = _conformanceUrlToId.TryAdd(cr.Url, source.Id);
+            }
+        }
+
+        if (source is IHasIdentifier hasId)
+        {
+            if (previous is IHasIdentifier pId)
+            {
+                foreach (Identifier i in pId.Identifier)
+                {
+                    _ = _identifierToId.TryRemove(GetIdentifierKey(i), out _);
+                }
+            }
+
+            foreach (Identifier i in hasId.Identifier)
+            {
+                _ = _identifierToId.TryAdd(GetIdentifierKey(i), source.Id);
             }
         }
 
@@ -459,6 +614,8 @@ public class ResourceStore<T> : IVersionedResourceStore
                 break;
         }
 
+        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Updated {_resourceName}/{source.Id} to version {source.Meta.VersionId}");
+        sc = HttpStatusCode.OK;
         return source;
     }
 
@@ -500,6 +657,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             if (!string.IsNullOrEmpty(pcr.Url))
             {
                 _ = _conformanceUrlToId.TryRemove(pcr.Url, out _);
+            }
+        }
+
+        if (previous is IHasIdentifier pId)
+        {
+            foreach (Identifier i in pId.Identifier)
+            {
+                _ = _identifierToId.TryRemove(GetIdentifierKey(i), out _);
             }
         }
 
@@ -667,8 +832,12 @@ public class ResourceStore<T> : IVersionedResourceStore
         HashSet<string> notifiedSubscriptions = new();
         List<string> matchedTopics = new();
 
+        Dictionary<string, List<string>> topicErrors = new();
+
         foreach ((string topicUrl, ExecutableSubscriptionInfo executable) in _executableSubscriptions)
         {
+            bool matched = false;
+
             // first, check for interaction types
             if (executable.InteractionTriggers.Any())
             {
@@ -677,148 +846,202 @@ public class ResourceStore<T> : IVersionedResourceStore
                     case ExecutableSubscriptionInfo.InteractionTypes.Create:
                         if (executable.InteractionTriggers.Any(it => it.OnCreate == true))
                         {
+                            matched = true;
                             matchedTopics.Add(topicUrl);
-                            continue;
+                            break;
                         }
                         break;
 
                     case ExecutableSubscriptionInfo.InteractionTypes.Update:
                         if (executable.InteractionTriggers.Any(it => it.OnUpdate == true))
                         {
+                            matched = true;
                             matchedTopics.Add(topicUrl);
-                            continue;
+                            break;
                         }
                         break;
 
                     case ExecutableSubscriptionInfo.InteractionTypes.Delete:
                         if (executable.InteractionTriggers.Any(it => it.OnDelete == true))
                         {
+                            matched = true;
                             matchedTopics.Add(topicUrl);
-                            continue;
+                            break;
                         }
                         break;
                 }
             }
 
+            if (matched)
+            {
+                continue;
+            }
+
             // second, test FhirPath
             if (executable.FhirPathTriggers.Any())
             {
-                bool matched = false;
-
                 foreach (ExecutableSubscriptionInfo.CompiledFhirPathTrigger cfp in executable.FhirPathTriggers)
                 {
-                    ITypedElement? result;
+                    try
+                    {
+                        ITypedElement? result;
 
-                    if (currentTE != null)
-                    {
-                        result = cfp.FhirPathTrigger.Invoke(currentTE, fpContext).First() ?? null;
+                        if (currentTE != null)
+                        {
+                            result = cfp.FhirPathTrigger.Invoke(currentTE, fpContext).First() ?? null;
+                        }
+                        else if (previousTE != null)
+                        {
+                            result = cfp.FhirPathTrigger.Invoke(previousTE, fpContext).First() ?? null;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+
+                        if ((result == null) ||
+                            (result.Value == null) ||
+                            (!(result.Value is bool val)) ||
+                            (val == false))
+                        {
+                            continue;
+                        }
+
+                        matched = true;
+                        matchedTopics.Add(topicUrl);
+                        break;
                     }
-                    else if (previousTE != null)
+                    catch (Exception ex)
                     {
-                        result = cfp.FhirPathTrigger.Invoke(previousTE, fpContext).First() ?? null;
-                    }
-                    else
-                    {
+                        Console.WriteLine($"ResourceStore[{_resourceName}] <<< Error evaluating FhirPath trigger for topic {topicUrl}: {ex.Message}");
+
+                        if (!topicErrors.ContainsKey(topicUrl))
+                        {
+                            topicErrors.Add(topicUrl, new());
+                        }
+
+                        if (ex.InnerException == null)
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating FhirPath trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}");
+                        }
+                        else
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating FhirPath trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}:{ex.InnerException.Message}");
+                        }
+
                         continue;
                     }
-
-                    if ((result == null) ||
-                        (result.Value == null) ||
-                        (!(result.Value is bool val)) ||
-                        (val == false))
-                    {
-                        continue;
-                    }
-
-                    matched = true;
-                    break;
                 }
+            }
 
-                if (matched)
-                {
-                    matchedTopics.Add(topicUrl);
-                    continue;
-                }
+            if (matched)
+            {
+                continue;
             }
 
             // finally, test query
             if (executable.QueryTriggers.Any())
             {
-                bool matched = false;
                 bool previousPassed = false;
                 bool currentPassed = false;
 
                 foreach (ExecutableSubscriptionInfo.CompiledQueryTrigger cq in executable.QueryTriggers)
                 {
-                    switch (interaction)
+                    try
                     {
-                        case ExecutableSubscriptionInfo.InteractionTypes.Create:
-                            {
-                                if (!cq.OnCreate)
+
+                        switch (interaction)
+                        {
+                            case ExecutableSubscriptionInfo.InteractionTypes.Create:
                                 {
-                                    continue;
+                                    if (!cq.OnCreate)
+                                    {
+                                        continue;
+                                    }
+
+                                    previousPassed = cq.CreateAutoPasses;
+                                    currentPassed = _searchTester.TestForMatch(
+                                        currentTE!,
+                                        cq.CurrentTest,
+                                        fpContext);
                                 }
+                                break;
 
-                                previousPassed = cq.CreateAutoPasses;
-                                currentPassed = _searchTester.TestForMatch(
-                                    currentTE!,
-                                    cq.CurrentTest,
-                                    fpContext);
-                            }
-                            break;
-
-                        case ExecutableSubscriptionInfo.InteractionTypes.Update:
-                            {
-                                if (!cq.OnUpdate)
+                            case ExecutableSubscriptionInfo.InteractionTypes.Update:
                                 {
-                                    continue;
+                                    if (!cq.OnUpdate)
+                                    {
+                                        continue;
+                                    }
+
+                                    previousPassed = _searchTester.TestForMatch(
+                                        previousTE!,
+                                        cq.PreviousTest,
+                                        fpContext);
+                                    currentPassed = _searchTester.TestForMatch(
+                                        currentTE!,
+                                        cq.CurrentTest,
+                                        fpContext);
                                 }
+                                break;
 
-                                previousPassed = _searchTester.TestForMatch(
-                                    previousTE!,
-                                    cq.PreviousTest,
-                                    fpContext);
-                                currentPassed = _searchTester.TestForMatch(
-                                    currentTE!,
-                                    cq.CurrentTest,
-                                    fpContext);
-                            }
-                            break;
-
-                        case ExecutableSubscriptionInfo.InteractionTypes.Delete:
-                            {
-                                if (!cq.OnDelete)
+                            case ExecutableSubscriptionInfo.InteractionTypes.Delete:
                                 {
-                                    continue;
-                                }
+                                    if (!cq.OnDelete)
+                                    {
+                                        continue;
+                                    }
 
-                                previousPassed = _searchTester.TestForMatch(
-                                    previousTE!,
-                                    cq.PreviousTest,
-                                    fpContext);
-                                currentPassed = cq.DeleteAutoPasses;
-                            }
-                            break;
+                                    previousPassed = _searchTester.TestForMatch(
+                                        previousTE!,
+                                        cq.PreviousTest,
+                                        fpContext);
+                                    currentPassed = cq.DeleteAutoPasses;
+                                }
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"ResourceStore[{_resourceName}] <<< Error evaluating Query trigger for topic {topicUrl}: {ex.Message}");
+
+                        if (!topicErrors.ContainsKey(topicUrl))
+                        {
+                            topicErrors.Add(topicUrl, new());
+                        }
+
+                        if (ex.InnerException == null)
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating Query trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}");
+                        }
+                        else
+                        {
+                            topicErrors[topicUrl].Add($"Error while evaluating Query trigger for topic {topicUrl} on resource {_resourceName}: {ex.Message}:{ex.InnerException.Message}");
+                        }
+
+                        continue;
                     }
 
                     if ((cq.RequireBothTests && previousPassed && currentPassed) ||
                         ((!cq.RequireBothTests) && (previousPassed || currentPassed)))
                     {
                         matched = true;
+                        matchedTopics.Add(topicUrl);
                         break;
                     }
                 }
+            }
 
-                if (matched)
-                {
-                    matchedTopics.Add(topicUrl);
-                    continue;
-                }
+            if (matched)
+            {
+                continue;
             }
         }
 
         Resource focus = current ?? previous!;
         ITypedElement focusTE = currentTE ?? previousTE!;
+
+        Dictionary<string, List<string>> subscriptionErrors = new();
 
         // traverse the list of matched topics to test against subscription filters
         foreach (string topicUrl in matchedTopics)
@@ -881,11 +1104,27 @@ public class ResourceStore<T> : IVersionedResourceStore
                 }
             }
         }
+
+        foreach ((string topicUrl, List<string> errors) in topicErrors)
+        {
+            if (!_executableSubscriptions.ContainsKey(topicUrl))
+            {
+                continue;
+            }
+
+            foreach (string subId in _executableSubscriptions[topicUrl].FiltersBySubscription.Keys)
+            {
+                foreach (string error in errors)
+                {
+                    _store.RegisterError(subId, error);
+                }
+            }
+        }
     }
 
     /// <summary>Tests a create interaction against all subscriptions.</summary>
     /// <param name="current">The current resource version.</param>
-    private void TestCreateAgainstSubscriptions(T current)
+    public void TestCreateAgainstSubscriptions(T current)
     {
         // TODO: Change this to async
 
@@ -894,38 +1133,49 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        ITypedElement currentTE = current.ToTypedElement();
-
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        try
         {
-            TerminologyService = _store.Terminology,
-        };
+            ITypedElement currentTE = current.ToTypedElement();
 
-        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
-        {
-            NextResolver = _store.Resolve,
-            Variables = new()
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
             {
-                { "current", currentTE },
-                //{ "previous", Enumerable.Empty<ITypedElement>() },
-            },
-        };
+                TerminologyService = _store.Terminology,
+            };
 
-        fpContext.ElementResolver = resolver.Resolve;
+            FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+            {
+                NextResolver = _store.Resolve,
+                Variables = new()
+                {
+                    { "current", currentTE },
+                    //{ "previous", Enumerable.Empty<ITypedElement>() },
+                },
+            };
 
-        PerformSubscriptionTest(
-            current,
-            currentTE,
-            null,
-            null,
-            fpContext,
-            ExecutableSubscriptionInfo.InteractionTypes.Create);
+            fpContext.ElementResolver = resolver.Resolve;
+
+            PerformSubscriptionTest(
+                current,
+                currentTE,
+                null,
+                null,
+                fpContext,
+                ExecutableSubscriptionInfo.InteractionTypes.Create);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestCreateAgainstSubscriptions caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestCreateAgainstSubscriptions caught: {ex.InnerException.Message}");
+            }
+        }
     }
 
     /// <summary>Tests an update interaction against all subscriptions.</summary>
     /// <param name="current"> The current resource version.</param>
     /// <param name="previous">The previous resource version.</param>
-    private void TestUpdateAgainstSubscriptions(T current, T previous)
+    public void TestUpdateAgainstSubscriptions(T current, T previous)
     {
         // TODO: Change this to async
 
@@ -934,37 +1184,48 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        ITypedElement currentTE = current.ToTypedElement();
-        ITypedElement previousTE = previous.ToTypedElement();
-
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+        try
         {
-            TerminologyService = _store.Terminology,
-        };
+            ITypedElement currentTE = current.ToTypedElement();
+            ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
-        {
-            NextResolver = _store.Resolve,
-            Variables = new()
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
             {
-                { "current", currentTE },
-                { "previous", previousTE },
-            },
-        };
+                TerminologyService = _store.Terminology,
+            };
 
-        fpContext.ElementResolver = resolver.Resolve;
+            FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+            {
+                NextResolver = _store.Resolve,
+                Variables = new()
+                {
+                    { "current", currentTE },
+                    { "previous", previousTE },
+                },
+            };
 
-        PerformSubscriptionTest(
-            current,
-            currentTE,
-            previous,
-            previousTE,
-            fpContext, ExecutableSubscriptionInfo.InteractionTypes.Update);
+            fpContext.ElementResolver = resolver.Resolve;
+
+            PerformSubscriptionTest(
+                current,
+                currentTE,
+                previous,
+                previousTE,
+                fpContext, ExecutableSubscriptionInfo.InteractionTypes.Update);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestUpdateAgainstSubscriptions caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestUpdateAgainstSubscriptions caught: {ex.InnerException.Message}");
+            }
+        }
     }
 
     /// <summary>Tests a delete interaction against all subscriptions.</summary>
     /// <param name="previous">The previous resource version.</param>
-    private void TestDeleteAgainstSubscriptions(T previous)
+    public void TestDeleteAgainstSubscriptions(T previous)
     {
         // TODO: Change this to async
 
@@ -973,55 +1234,44 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        ITypedElement previousTE = previous.ToTypedElement();
-
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
+        try
         {
-            TerminologyService = _store.Terminology,
-        };
+            ITypedElement previousTE = previous.ToTypedElement();
 
-        FhirPathVariableResolver resolver = new FhirPathVariableResolver()
-        {
-            NextResolver = _store.Resolve,
-            Variables = new()
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
             {
-                //{ "current", currentTE },
-                { "previous", previousTE },
-            },
-        };
+                TerminologyService = _store.Terminology,
+            };
 
-        fpContext.ElementResolver = resolver.Resolve;
+            FhirPathVariableResolver resolver = new FhirPathVariableResolver()
+            {
+                NextResolver = _store.Resolve,
+                Variables = new()
+                {
+                    //{ "current", currentTE },
+                    { "previous", previousTE },
+                },
+            };
 
-        PerformSubscriptionTest(
-            null,
-            null,
-            previous,
-            previousTE,
-            fpContext,
-            ExecutableSubscriptionInfo.InteractionTypes.Delete);
+            fpContext.ElementResolver = resolver.Resolve;
+
+            PerformSubscriptionTest(
+                null,
+                null,
+                previous,
+                previousTE,
+                fpContext,
+                ExecutableSubscriptionInfo.InteractionTypes.Delete);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestDeleteAgainstSubscriptions caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< TestDeleteAgainstSubscriptions caught: {ex.InnerException.Message}");
+            }
+        }
     }
-
-    ///// <summary>Sets executable subscription topic.</summary>
-    ///// <param name="topic">The topic.</param>
-    //public void SetExecutableSubscriptionTopic(ParsedSubscriptionTopic topic)
-    //{
-    //    if (_subscriptionTopics.ContainsKey(topic.Id))
-    //    {
-    //        _subscriptionTopics.Remove(topic.Id);
-    //    }
-
-    //    _subscriptionTopics.Add(topic.Id, topic);
-    //}
-
-    ///// <summary>Removes the executable subscription topic described by ID.</summary>
-    ///// <param name="id">The identifier.</param>
-    //public void RemoveExecutableSubscriptionTopic(string id)
-    //{
-    //    if (_subscriptionTopics.ContainsKey(id))
-    //    {
-    //        _subscriptionTopics.Remove(id);
-    //    }
-    //}
 
     /// <summary>Adds or updates an executable search parameter based on a SearchParameter resource.</summary>
     /// <param name="sp">    The sp.</param>
@@ -1056,7 +1306,7 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception Setting Executable Search Paramter {rt}.{name}: {ex.Message}");
+                Console.WriteLine($"ResourceStore[{_resourceName}] <<< Exception Setting Executable Search Parameter {rt}.{name}: {ex.Message}");
             }
         }
     }

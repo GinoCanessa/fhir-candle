@@ -8,10 +8,13 @@ extern alias candleR4B;
 extern alias candleR5;
 
 using System.Collections;
+using System.Linq;
 using fhir.candle.Models;
+using FhirCandle.Extensions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using MudBlazor;
+using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace fhir.candle.Services;
 
@@ -20,6 +23,9 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 {
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;
+
+    /// <summary>True if is initialized, false if not.</summary>
+    private bool _isInitialized = false;
 
     /// <summary>The logger.</summary>
     private ILogger _logger;
@@ -41,6 +47,9 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
     /// <summary>The stores by controller.</summary>
     private Dictionary<string, IFhirStore> _storesByController = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The additional pages by controller.</summary>
+    private Dictionary<string, IEnumerable<PackagePageInfo>> _additionalPagesByController = new();
 
     /// <summary>
     /// Gets an enumerable collection that contains the keys in the read-only dictionary.
@@ -123,6 +132,9 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
         _packageService = fhirPackageService;
     }
 
+    /// <summary>Gets the additional pages by tenant.</summary>
+    public Dictionary<string, IEnumerable<PackagePageInfo>> AdditionalPagesByTenant { get => _additionalPagesByController; }
+
     /// <summary>State has changed.</summary>
     public void StateHasChanged()
     {
@@ -134,12 +146,21 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
         }
     }
 
-    /// <summary>Triggered when the application host is ready to start the service.</summary>
-    /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
-    /// <returns>An asynchronous result.</returns>
-    Task IHostedService.StartAsync(CancellationToken cancellationToken)
+    /// <summary>Initializes this object.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    public void Init()
     {
-        _logger.LogInformation("Starting FhirStoreManager...");
+        if (_isInitialized)
+        {
+            return;
+        }
+
+        _isInitialized = true;
+
+        // make sure the package service has been initalized
+        _packageService.Init();
+
+        _logger.LogInformation("FhirStoreManager <<< Creating FHIR tenants...");
 
         // initialize the requested fhir stores
         foreach ((string name, TenantConfiguration config) in _tenants)
@@ -168,7 +189,145 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
             //_storesByController[config.ControllerName].OnSubscriptionSendEvent += FhirStoreManager_OnSubscriptionSendEvent;
         }
 
+        string root =
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location ?? AppContext.BaseDirectory) ??
+            Environment.CurrentDirectory ??
+            string.Empty;
+
+        // check for loading packages
+        if (_packageService.IsConfigured &&
+            (_serverConfig.PublishedPackages.Any() || _serverConfig.CiPackages.Any()))
+        {
+            // look for a package supplemental directory
+            string supplemental = string.IsNullOrEmpty(_serverConfig.SourceDirectory)
+                ? Program.FindRelativeDir(root, "fhirData", false)
+            : _serverConfig.SourceDirectory;
+
+            LoadRequestedPackages(supplemental, _serverConfig.LoadPackageExamples == true).Wait();
+        }
+
+        // sort through RI info
+        if (!string.IsNullOrEmpty(_serverConfig.ReferenceImplementation))
+        {
+            // look for a package supplemental directory
+            string supplemental = string.IsNullOrEmpty(_serverConfig.SourceDirectory)
+                ? Program.FindRelativeDir(root, Path.Combine("fhirData", _serverConfig.ReferenceImplementation), false)
+                : Path.Combine(_serverConfig.SourceDirectory, _serverConfig.ReferenceImplementation);
+
+            LoadRiContents(supplemental);
+        }
+
+        // load packages
+        LoadPackagePages();
+    }
+
+    /// <summary>Triggered when the application host is ready to start the service.</summary>
+    /// <param name="cancellationToken">Indicates that the start process has been aborted.</param>
+    /// <returns>An asynchronous result.</returns>
+    Task IHostedService.StartAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Starting FhirStoreManager...");
+
+        Init();
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>Loads package pages.</summary>
+    /// <param name="manager">The manager.</param>
+    /// <returns>The package pages.</returns>
+    private void LoadPackagePages()
+    {
+        _logger.LogInformation("FhirStoreManager <<< Discovering package-based pages...");
+
+        // get all page types
+        List<PackagePageInfo> pages = new();
+
+        pages.AddRange(System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)))
+            .Select(pt => new PackagePageInfo()
+            {
+                ContentFor = pt.GetProperty("ContentFor", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                PageName = pt.GetProperty("PageName", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                Description = pt.GetProperty("Description", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+                FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+            }));
+
+        pages.AddRange(typeof(FhirCandle.Ui.R4.Subscriptions.TourUtils).Assembly.GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)))
+            .Select(pt => new PackagePageInfo()
+            {
+                ContentFor = pt.GetProperty("ContentFor", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                PageName = pt.GetProperty("PageName", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                Description = pt.GetProperty("Description", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+            }));
+
+        pages.AddRange(typeof(FhirCandle.Ui.R4B.Subscriptions.TourUtils).Assembly.GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)))
+            .Select(pt => new PackagePageInfo()
+            {
+                ContentFor = pt.GetProperty("ContentFor", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                PageName = pt.GetProperty("PageName", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                Description = pt.GetProperty("Description", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+            }));
+
+        pages.AddRange(typeof(FhirCandle.Ui.R5.Subscriptions.TourUtils).Assembly.GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)))
+            .Select(pt => new PackagePageInfo()
+            {
+                ContentFor = pt.GetProperty("ContentFor", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                PageName = pt.GetProperty("PageName", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                Description = pt.GetProperty("Description", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+            }));
+
+        _additionalPagesByController = new();
+        foreach (string tenant in _tenants.Keys)
+        {
+            _additionalPagesByController.Add(tenant, new List<PackagePageInfo>());
+        }
+
+        // traverse page types to build package info
+        foreach (PackagePageInfo page in pages)
+        {
+            if (string.IsNullOrEmpty(page.FhirVersionLiteral))
+            {
+                foreach ((string name, IFhirStore store) in _storesByController)
+                {
+                    if ((store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor)))
+                    {
+                        ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                    }
+                }
+
+                continue;
+            }
+
+            if ((!page.FhirVersionLiteral.TryFhirEnum(out TenantConfiguration.SupportedFhirVersions pageFhirVersion)))
+            {
+                continue;
+            }
+
+            // traverse stores to marry contents
+            foreach ((string name, IFhirStore store) in _storesByController)
+            {
+                if ((store.Config.FhirVersion == pageFhirVersion) &&
+                    (store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor)))
+                {
+                    ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                }
+            }
+        }
     }
 
     /// <summary>A loaded packagage.</summary>
@@ -197,6 +356,8 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
             return;
         }
 
+        _logger.LogInformation("FhirStoreManager <<< Loading RI contents...");
+
         // loop over controllers to see where we can add this
         foreach ((string tenantName, TenantConfiguration config) in _tenants)
         {
@@ -209,6 +370,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             string.Empty,
                             string.Empty,
                             Path.Combine(dir, "r4"),
+                            true);
+                    }
+                    else if (Directory.Exists(Path.Combine(dir, tenantName)))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, tenantName),
                             true);
                     }
                     else
@@ -229,6 +398,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             Path.Combine(dir, "r4b"),
                             true);
                     }
+                    else if (Directory.Exists(Path.Combine(dir, tenantName)))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, tenantName),
+                            true);
+                    }
                     else
                     {
                         _storesByController[tenantName].LoadPackage(
@@ -245,6 +422,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             string.Empty,
                             string.Empty,
                             Path.Combine(dir, "r5"),
+                            true);
+                    }
+                    else if (Directory.Exists(Path.Combine(dir, tenantName)))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, tenantName),
                             true);
                     }
                     else
@@ -269,14 +454,18 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     /// <returns>An asynchronous result.</returns>
     public async Task LoadRequestedPackages(string supplementalRoot, bool loadExamples)
     {
+        _logger.LogInformation("FhirStoreManager <<< loading requested packages...");
+
         // check for requested packages
         int waitCount = 0;
         while (!_packageService.IsReady)
         {
-            await Task.Delay(1000);
+            _logger.LogInformation("FhirStoreManager <<< Waiting for package service...");
+
+            await Task.Delay(100);
             waitCount++;
 
-            if (waitCount > 20)
+            if (waitCount > 200)
             {
                 throw new Exception("Package service is not responding!");
             }
@@ -286,6 +475,8 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
         foreach (string branchName in _serverConfig.CiPackages)
         {
+            _logger.LogInformation($"FhirStoreManager <<< loading CI package {branchName}...");
+
             if (!_packageService.FindOrDownload(string.Empty, branchName, out IEnumerable<FhirPackageService.PackageCacheEntry> pacakges, false))
             {
                 throw new Exception($"Unable to find or download CI package: {branchName}");
@@ -311,6 +502,8 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
         foreach (string directive in _serverConfig.PublishedPackages)
         {
+            _logger.LogInformation($"FhirStoreManager <<< Loading published package {directive}...");
+
             if (!_packageService.FindOrDownload(directive, string.Empty, out IEnumerable<FhirPackageService.PackageCacheEntry> pacakges, false))
             {
                 throw new Exception($"Unable to find or download published package: {directive}");
@@ -336,6 +529,8 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
         foreach (LoadedPackageRec r in loadRecs)
         {
+            _logger.LogInformation($"FhirStoreManager <<< discovering and loading additional content for {r.directive}...");
+
             // loop over controllers to see where we can add this
             foreach ((string tenantName, TenantConfiguration config) in _tenants)
             {
@@ -351,6 +546,15 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                                     r.directive, 
                                     r.directory, 
                                     Path.Combine(r.supplementDirectory, "r4"),
+                                    loadExamples);
+                            }
+                            else if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
+                                Directory.Exists(Path.Combine(r.supplementDirectory, tenantName)))
+                            {
+                                _storesByController[tenantName].LoadPackage(
+                                    r.directive,
+                                    r.directory,
+                                    Path.Combine(r.supplementDirectory, tenantName),
                                     loadExamples);
                             }
                             else
@@ -375,6 +579,15 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                                     Path.Combine(r.supplementDirectory, "r4b"),
                                     loadExamples);
                             }
+                            else if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
+                                Directory.Exists(Path.Combine(r.supplementDirectory, tenantName)))
+                            {
+                                _storesByController[tenantName].LoadPackage(
+                                    r.directive,
+                                    r.directory,
+                                    Path.Combine(r.supplementDirectory, tenantName),
+                                    loadExamples);
+                            }
                             else
                             {
                                 _storesByController[tenantName].LoadPackage(
@@ -396,6 +609,15 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                                     r.directory, 
                                     Path.Combine(r.supplementDirectory, 
                                     "r5"),
+                                    loadExamples);
+                            }
+                            else if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
+                                Directory.Exists(Path.Combine(r.supplementDirectory, tenantName)))
+                            {
+                                _storesByController[tenantName].LoadPackage(
+                                    r.directive,
+                                    r.directory,
+                                    Path.Combine(r.supplementDirectory, tenantName),
                                     loadExamples);
                             }
                             else

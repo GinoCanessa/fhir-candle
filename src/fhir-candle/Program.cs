@@ -14,6 +14,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using fhir.candle.Models;
 using fhir.candle.Services;
+using FhirCandle.Extensions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using Microsoft.AspNetCore;
@@ -32,7 +33,7 @@ namespace fhir.candle;
 /// <summary>A program.</summary>
 public static partial class Program
 {
-    [GeneratedRegex("(http[s]*:\\/\\/[A-Za-z0-9\\.]*(:\\d+)*)")]
+    [GeneratedRegex("(http[s]*:\\/\\/.*(:\\d+)*)")]
     private static partial Regex InputUrlFormatRegex();
 
     /// <summary>(Immutable) The default listen port.</summary>
@@ -60,7 +61,7 @@ public static partial class Program
 
         Option<int?> optListenPort = new(
             aliases: new[] { "--port", "-p" },
-            getDefaultValue: () => configuration.GetValue<int>("Listen_Port", _defaultListenPort),
+            getDefaultValue: () => configuration.GetValue<int?>("Listen_Port", _defaultListenPort) ?? _defaultListenPort,
             "Listen port for the server");
 
         Option<bool?> optOpenBrowser = new(
@@ -235,9 +236,19 @@ public static partial class Program
     { 
         try
         {
+            if (string.IsNullOrEmpty(config.PublicUrl))
+            {
+                config.PublicUrl = $"http://localhost:{config.ListenPort}";
+            }
+
             // update configuration to make sure listen url is properly formatted
             Match match = InputUrlFormatRegex().Match(config.PublicUrl);
             config.PublicUrl = match.ToString();
+
+            if (config.PublicUrl.EndsWith('/'))
+            {
+                config.PublicUrl = config.PublicUrl.Substring(0, config.PublicUrl.Length - 1);
+            }
 
             // check for no tenants (create defaults)
             if ((!config.TenantsR4.Any()) &&
@@ -247,6 +258,13 @@ public static partial class Program
                 config.TenantsR4.Add("r4");
                 config.TenantsR4B.Add("r4b");
                 config.TenantsR5.Add("r5");
+            }
+
+            if (config.FhirCacheDirectory == null)
+            {
+                config.FhirCacheDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".fhir");
             }
 
             Dictionary<string, TenantConfiguration> tenants = BuildTenantConfigurations(config);
@@ -337,42 +355,16 @@ public static partial class Program
                 app.MapFallbackToPage("/_Host");
             }
 
-            if (config.FhirCacheDirectory == null)
-            {
-                config.FhirCacheDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".fhir");
-            }
-
             IFhirPackageService ps = app.Services.GetRequiredService<IFhirPackageService>();
             IFhirStoreManager sm = app.Services.GetRequiredService<IFhirStoreManager>();
 
-            ps.Init(config.FhirCacheDirectory);
+            // perform slow initialization of services
+            ps.Init();          // store manager requires Package Service to be initialized
+            sm.Init();          // store manager may need to download packages
 
             // run the server
             //await app.RunAsync(cancellationToken);
             _ = app.StartAsync();
-
-            if (ps.IsConfigured &&
-                (config.PublishedPackages.Any() || config.CiPackages.Any()))
-            {
-                // look for a package supplemental directory
-                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-                    ? FindRelativeDir(root, "fhirData", false)
-                    : config.SourceDirectory;
-
-                _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
-            }
-
-            if (!string.IsNullOrEmpty(config.ReferenceImplementation))
-            {
-                // look for a package supplemental directory
-                string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-                    ? FindRelativeDir(root, $"fhirData/{config.ReferenceImplementation}", false)
-                    : Path.Combine(config.SourceDirectory, config.ReferenceImplementation);
-
-                sm.LoadRiContents(supplemental);
-            }
 
             AfterServerStart(app, config);
             await app.WaitForShutdownAsync(cancellationToken);
@@ -389,6 +381,7 @@ public static partial class Program
             return -1;
         }
     }
+
 
     /// <summary>After server start.</summary>
     /// <param name="app">   The application.</param>

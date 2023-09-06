@@ -43,7 +43,7 @@
         },
         {
           "url": "resource",
-          "valueUri": "http://hl7.org/fhir/StructureDefinition/Encounter"
+          "valueUri": "Encounter"
         },
         {
           "url": "supportedInteraction",

@@ -221,12 +221,15 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets resource instance.</summary>
-    /// <param name="store">       The store.</param>
-    /// <param name="resourceName">Name of the resource.</param>
-    /// <param name="id">          The identifier.</param>
-    /// <param name="format">      Describes the format to use.</param>
-    /// <param name="summary">     The summary.</param>
-    /// <param name="pretty">      The pretty.</param>
+    /// <param name="store">          The store.</param>
+    /// <param name="resourceName">   Name of the resource.</param>
+    /// <param name="id">             The identifier.</param>
+    /// <param name="format">         Describes the format to use.</param>
+    /// <param name="summary">        The summary.</param>
+    /// <param name="pretty">         The pretty.</param>
+    /// <param name="ifMatch">        A match specifying if.</param>
+    /// <param name="ifModifiedSince">if modified since.</param>
+    /// <param name="ifNoneMatch">    A match specifying if none.</param>
     /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/{resourceName}/{id}")]
     public async Task GetResourceInstance(
@@ -235,7 +238,10 @@ public class FhirController : ControllerBase
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
-        [FromQuery(Name = "_pretty")] string? pretty)
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        [FromHeader(Name = "If-Modified-Since")] string? ifModifiedSince,
+        [FromHeader(Name = "If-None-Match")] string? ifNoneMatch)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -252,9 +258,9 @@ public class FhirController : ControllerBase
             format,
             summary ?? string.Empty,
             pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-            string.Empty,
-            string.Empty,
-            string.Empty,
+            ifMatch ?? string.Empty,
+            ifModifiedSince ?? string.Empty,
+            ifNoneMatch ?? string.Empty,
             out string resource,
             out string outcome,
             out string eTag,
@@ -707,6 +713,7 @@ public class FhirController : ControllerBase
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="prefer">      The prefer.</param>
+    /// <param name="ifNoneExist"> if none exist.</param>
     /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/{resourceName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
@@ -715,7 +722,8 @@ public class FhirController : ControllerBase
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "If-None-Exist")] string? ifNoneExist)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -750,7 +758,7 @@ public class FhirController : ControllerBase
                     Request.ContentType ?? string.Empty,
                     format,
                     pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    string.Empty,
+                    ifNoneExist ?? string.Empty,
                     true,
                     out resource,
                     out outcome,
@@ -808,7 +816,9 @@ public class FhirController : ControllerBase
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        [FromHeader(Name = "If-None-Match")] string? ifNoneMatch)
     {
         if ((!_fhirStoreManager.ContainsKey(store)) ||
             (!_fhirStoreManager[store].SupportsResource(resourceName)))
@@ -841,8 +851,9 @@ public class FhirController : ControllerBase
                     HttpContext.Request.ContentType ?? string.Empty,
                     format,
                     pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    string.Empty,
-                    string.Empty,
+                    Request.QueryString.ToString(),
+                    ifMatch ?? string.Empty,
+                    ifNoneMatch ?? string.Empty,
                     true,
                     out string resource,
                     out string outcome,

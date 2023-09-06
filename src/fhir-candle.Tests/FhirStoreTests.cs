@@ -316,6 +316,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             false,
             string.Empty,
             string.Empty,
+            string.Empty,
             true,
             out serializedResource,
             out serializedOutcome,

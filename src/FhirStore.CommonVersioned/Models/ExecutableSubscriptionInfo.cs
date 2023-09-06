@@ -12,6 +12,7 @@ namespace FhirCandle.Models;
 /// <summary>An executable subscription tree.</summary>
 public class ExecutableSubscriptionInfo
 {
+    /// <summary>Values that represent interaction types.</summary>
     public enum InteractionTypes
     {
         Create,
@@ -19,17 +20,37 @@ public class ExecutableSubscriptionInfo
         Delete
     }
 
+    /// <summary>An interaction only trigger.</summary>
+    /// <param name="OnCreate">True to on create.</param>
+    /// <param name="OnUpdate">True to on update.</param>
+    /// <param name="OnDelete">True to on delete.</param>
     public record class InteractionOnlyTrigger(
         bool OnCreate,
         bool OnUpdate,
         bool OnDelete);
 
+    /// <summary>A compiled FHIR path trigger.</summary>
+    /// <param name="OnCreate">       True to on create.</param>
+    /// <param name="OnUpdate">       True to on update.</param>
+    /// <param name="OnDelete">       True to on delete.</param>
+    /// <param name="FhirPathTrigger">The FHIR path trigger.</param>
     public record class CompiledFhirPathTrigger(
         bool OnCreate,
         bool OnUpdate,
         bool OnDelete,
         CompiledExpression FhirPathTrigger);
 
+    /// <summary>A compiled query trigger.</summary>
+    /// <param name="OnCreate">        True to on create.</param>
+    /// <param name="OnUpdate">        True to on update.</param>
+    /// <param name="OnDelete">        True to on delete.</param>
+    /// <param name="PreviousTest">    The previous test.</param>
+    /// <param name="CreateAutoFails"> True to create automatic fails.</param>
+    /// <param name="CreateAutoPasses">True to create automatic passes.</param>
+    /// <param name="CurrentTest">     The current test.</param>
+    /// <param name="DeleteAutoFails"> True to delete the automatic fails.</param>
+    /// <param name="DeleteAutoPasses">True to delete the automatic passes.</param>
+    /// <param name="RequireBothTests">True to require both tests.</param>
     public record class CompiledQueryTrigger(
         bool OnCreate,
         bool OnUpdate,

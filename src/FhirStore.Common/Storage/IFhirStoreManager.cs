@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirCandle.Models;
 using Microsoft.Extensions.Hosting;
 
 namespace FhirCandle.Storage;
@@ -12,6 +13,12 @@ public interface IFhirStoreManager : IHostedService, IReadOnlyDictionary<string,
 {
     /// <summary>Occurs when On Changed.</summary>
     event EventHandler<EventArgs>? OnChanged;
+
+    /// <summary>Initializes the FHIR Store Manager and tenants.</summary>
+    void Init();
+
+    /// <summary>Gets the additional pages by tenant.</summary>
+    Dictionary<string, IEnumerable<PackagePageInfo>> AdditionalPagesByTenant { get; }
 
     /// <summary>Loads ri contents.</summary>
     /// <param name="dir">The dir.</param>

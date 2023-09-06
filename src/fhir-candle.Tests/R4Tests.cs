@@ -4,6 +4,7 @@
 // </copyright>
 
 extern alias candleR4;
+extern alias coreR4;
 
 using FhirCandle.Models;
 using FhirCandle.Storage;
@@ -17,8 +18,12 @@ using static FhirCandle.Storage.Common;
 using fhir.candle.Tests.Extensions;
 using Hl7.Fhir.Language.Debugging;
 using System.Net;
-using Hl7.Fhir.Model;
 using System.Reflection.Metadata;
+using Hl7.FhirPath.Expressions;
+using Hl7.Fhir.FhirPath;
+using Hl7.FhirPath;
+using System.Text.RegularExpressions;
+using Hl7.Fhir.ElementModel;
 
 namespace fhir.candle.Tests;
 
@@ -283,6 +288,303 @@ public class R4TestsPatient : IClassFixture<R4Tests>
     }
 }
 
+/// <summary>A 4 test conditionals.</summary>
+public class R4TestConditionals : IClassFixture<R4Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    /// <summary>Information describing the conditional.</summary>
+    public static IEnumerable<object[]> ConditionalData;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R4Tests _fixture;
+
+    /// <summary>
+    /// Initializes a new instance of the fhir.candle.Tests.TestSubscriptionInternals class.
+    /// </summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
+    public R4TestConditionals(R4Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    /// <summary>
+    /// Initializes static members of the fhir.candle.Tests.R4TestConditionals class.
+    /// </summary>
+    static R4TestConditionals()
+    {
+        ConditionalData = new List<object[]>()
+        {
+            new object[] { "Patient", GetContents("data/r4/patient-example.json") },
+        };
+    }
+
+    /// <summary>Gets the contents.</summary>
+    /// <exception cref="ArgumentException">Thrown when one or more arguments have unsupported or
+    ///  illegal values.</exception>
+    /// <param name="filePath">Full pathname of the file.</param>
+    /// <returns>The contents.</returns>
+    private static string GetContents(string filePath)
+    {
+        // Get the absolute path to the file
+        string path = Path.IsPathRooted(filePath)
+            ? filePath
+            : Path.GetRelativePath(Directory.GetCurrentDirectory(), filePath);
+
+        if (!File.Exists(path))
+        {
+            throw new ArgumentException($"Could not find file at path: {path}");
+        }
+
+        return File.ReadAllText(path);
+    }
+
+    /// <summary>Change identifier.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
+    /// <exception cref="ArgumentException">    Thrown when one or more arguments have unsupported or
+    ///  illegal values.</exception>
+    /// <param name="json">The JSON.</param>
+    /// <param name="id">  The identifier.</param>
+    /// <returns>A string.</returns>
+    private static string ChangeId(string json, string id)
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            throw new ArgumentNullException(nameof(json));
+        }
+
+        if (string.IsNullOrEmpty(id))
+        {
+            throw new ArgumentNullException(nameof(id));
+        }
+
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            json,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        if (sc != HttpStatusCode.OK)
+        {
+            throw new ArgumentException($"Could not deserialize json: {json}");
+        }
+
+        if (r == null)
+        {
+            throw new ArgumentException($"Could not deserialize json: {json}");
+        }
+
+        r.Id = id;
+
+        return candleR4.FhirCandle.Serialization.Utils.SerializeFhir(r, "application/fhir+json", false);
+    }
+
+    /// <summary>Conditional create no match.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="json">        The JSON.</param>
+    [Theory]
+    [MemberData(nameof(ConditionalData))]
+    public void ConditionalCreateNoMatch(string resourceType, string json)
+    {
+        string id = Guid.NewGuid().ToString();
+
+        // test conditional that has no matches
+        HttpStatusCode sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            $"_id={id}",
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id}");
+
+        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            serializedResource,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be(resourceType);
+        r!.Id.Should().Be(id);
+    }
+
+    /// <summary>Conditional create one match.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="json">        The JSON.</param>
+    [Theory]
+    [MemberData(nameof(ConditionalData))]
+    public void ConditionalCreateOneMatch(string resourceType, string json)
+    {
+        string id = Guid.NewGuid().ToString();
+
+        // first, store our resource
+        HttpStatusCode sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            string.Empty,
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id}");
+
+        // now, store it conditionally with a single match
+        sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            $"_id={id}",
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        // all contents should match original - not a new version
+        sc.Should().Be(HttpStatusCode.OK);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id}");
+
+        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            serializedResource,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be(resourceType);
+        r!.Id.Should().Be(id);
+    }
+
+    /// <summary>Conditional create multiple matches.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="json">        The JSON.</param>
+    [Theory]
+    [MemberData(nameof(ConditionalData))]
+    public void ConditionalCreateMultipleMatches(string resourceType, string json)
+    {
+        string id1 = Guid.NewGuid().ToString();
+        string id2 = Guid.NewGuid().ToString();
+        string id3 = Guid.NewGuid().ToString();
+
+        // first, store our resource
+        HttpStatusCode sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id1),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            string.Empty,
+            true,
+            out string serializedResource,
+            out string serializedOutcome,
+            out string eTag,
+            out string lastModified,
+            out string location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id1}");
+
+        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            serializedResource,
+            "application/fhir+json",
+            out Hl7.Fhir.Model.Resource? r,
+            out _);
+
+        sc.Should().Be(HttpStatusCode.OK);
+        r.Should().NotBeNull();
+        r!.TypeName.Should().Be(resourceType);
+        r!.Id.Should().Be(id1);
+
+        // now store the second resource
+        sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id2),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            string.Empty,
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        sc.Should().Be(HttpStatusCode.Created);
+        serializedResource.Should().NotBeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().Be("W/\"1\"");
+        lastModified.Should().NotBeNullOrEmpty();
+        location.Should().Contain($"{resourceType}/{id2}");
+
+        // now attempt to store with a conditional create that matches both
+        sc = _fixture._store.InstanceCreate(
+            resourceType,
+            ChangeId(json, id3),
+            "application/fhir+json",
+            "application/fhir+json",
+            false,
+            $"_id={id1},{id2}",
+            true,
+            out serializedResource,
+            out serializedOutcome,
+            out eTag,
+            out lastModified,
+            out location);
+
+        // this should fail
+        sc.Should().Be(HttpStatusCode.PreconditionFailed);
+        serializedResource.Should().BeNullOrEmpty();
+        serializedOutcome.Should().NotBeNullOrEmpty();
+        eTag.Should().BeNullOrEmpty();
+        lastModified.Should().BeNullOrEmpty();
+        location.Should().BeNullOrEmpty();
+    }
+}
+
 /// <summary>A test subscription internals.</summary>
 public class R4TestSubscriptions : IClassFixture<R4Tests>
 {
@@ -309,6 +611,7 @@ public class R4TestSubscriptions : IClassFixture<R4Tests>
     /// <summary>Parse topic.</summary>
     /// <param name="json">The JSON.</param>
     [Theory]
+    [FileData("data/r4/Basic-topic-encounter-complete-qualified.json")]
     [FileData("data/r4/Basic-topic-encounter-complete.json")]
     public void ParseTopic(string json)
     {
@@ -331,9 +634,12 @@ public class R4TestSubscriptions : IClassFixture<R4Tests>
         s.Id.Should().Be("encounter-complete");
         s.Url.Should().Be("http://example.org/FHIR/SubscriptionTopic/encounter-complete");
         s.ResourceTriggers.Should().HaveCount(1);
+        s.ResourceTriggers.Keys.Should().Contain("Encounter");
         s.EventTriggers.Should().BeEmpty();
         s.AllowedFilters.Should().NotBeEmpty();
+        s.AllowedFilters.Keys.Should().Contain("Encounter");
         s.NotificationShapes.Should().NotBeEmpty();
+        s.NotificationShapes.Keys.Should().Contain("Encounter");
     }
 
     [Theory]
@@ -393,4 +699,205 @@ public class R4TestSubscriptions : IClassFixture<R4Tests>
         s.NotificationEvents.Should().BeEmpty();
         s.Errors.Should().BeEmpty();
     }
+
+    /// <summary>Tests an encounter subscription with no filters.</summary>
+    /// <param name="fpCriteria">  The criteria.</param>
+    /// <param name="onCreate">    True to on create.</param>
+    /// <param name="createResult">True to create result.</param>
+    /// <param name="onUpdate">    True to on update.</param>
+    /// <param name="updateResult">True to update result.</param>
+    /// <param name="onDelete">    True to on delete.</param>
+    /// <param name="deleteResult">True to delete the result.</param>
+    [Theory]
+    [InlineData("(%previous.empty() or (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    [InlineData("(%previous.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    [InlineData("(%previous.id.empty() or (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    [InlineData("(%previous.id.empty() | (%previous.status != 'finished')) and (%current.status = 'finished')", true, true, true, true, false, false)]
+    public void TestSubEncounterNoFilters(
+        string fpCriteria, 
+        bool onCreate,
+        bool createResult, 
+        bool onUpdate,
+        bool updateResult, 
+        bool onDelete,
+        bool deleteResult)
+    {
+        VersionedFhirStore store = ((VersionedFhirStore)_fixture._store);
+        ResourceStore<coreR4.Hl7.Fhir.Model.Encounter> rs = (ResourceStore<coreR4.Hl7.Fhir.Model.Encounter>)_fixture._store["Encounter"];
+
+        string resourceType = "Encounter";
+        string topicId = "test-topic";
+        string topicUrl = "http://example.org/FHIR/TestTopic";
+        string subId = "test-subscription";
+
+        ParsedSubscriptionTopic topic = new()
+        {
+            Id = topicId,
+            Url = topicUrl,
+            ResourceTriggers = new()
+            {
+                { 
+                    resourceType, 
+                    new List<ParsedSubscriptionTopic.ResourceTrigger>()
+                    { 
+                        new ParsedSubscriptionTopic.ResourceTrigger()
+                        {
+                            ResourceType = resourceType,
+                            OnCreate = onCreate,
+                            OnUpdate = onUpdate,
+                            OnDelete = onDelete,
+                            QueryPrevious = string.Empty,
+                            CreateAutoPass = false,
+                            CreateAutoFail = false,
+                            QueryCurrent = string.Empty,
+                            DeleteAutoPass = false,
+                            DeleteAutoFail = false,
+                            FhirPathCritiera = fpCriteria,
+                        }
+                    }
+                },
+            },
+        };
+
+        ParsedSubscription subscription = new()
+        {
+            Id = subId,
+            TopicUrl = topicUrl,
+            Filters = new()
+            {
+                { resourceType, new List<ParsedSubscription.SubscriptionFilter>() },
+            },
+            ChannelSystem = string.Empty,
+            ChannelCode = "rest-hook",
+            ContentType = "application/fhir+json",
+            ContentLevel = "full-resource",
+            CurrentStatus = "active",
+        };
+
+        store.StoreProcessSubscriptionTopic(topic, false);
+        store.StoreProcessSubscription(subscription, false);
+
+        coreR4.Hl7.Fhir.Model.Encounter previous = new()
+        {
+            Id = "object-under-test",
+            Status = coreR4.Hl7.Fhir.Model.Encounter.EncounterStatus.Planned,
+        };
+        coreR4.Hl7.Fhir.Model.Encounter current = new()
+        {
+            Id = "object-under-test",
+            Status = coreR4.Hl7.Fhir.Model.Encounter.EncounterStatus.Finished,
+        };
+
+        // test create current
+        if (onCreate)
+        {
+            rs.TestCreateAgainstSubscriptions(current);
+
+            subscription.NotificationErrors.Should().BeEmpty("Create test should not have errors");
+
+            if (createResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Create test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Create test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
+
+        // test update previous to current
+        if (onUpdate)
+        {
+            rs.TestUpdateAgainstSubscriptions(current, previous);
+
+            subscription.NotificationErrors.Should().BeEmpty("Update test should not have errors");
+
+            if (updateResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Update test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Update test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
+
+        // test delete previous
+        if (onDelete)
+        {
+            rs.TestDeleteAgainstSubscriptions(previous);
+            subscription.NotificationErrors.Should().BeEmpty("Delete test should not have errors");
+
+            if (deleteResult)
+            {
+                subscription.GeneratedEvents.Should().NotBeEmpty("Delete test should have generated event");
+                subscription.GeneratedEvents.Should().HaveCount(1);
+            }
+            else
+            {
+                subscription.GeneratedEvents.Should().BeEmpty("Delete test should NOT have generated event");
+            }
+
+            subscription.ClearEvents();
+        }
+    }
+}
+
+/// <summary>A 4 test transactions.</summary>
+public class R4TestTransactions: IClassFixture<R4Tests>
+{
+    /// <summary>(Immutable) The test output helper.</summary>
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    /// <summary>Gets the configurations.</summary>
+    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+
+    /// <summary>(Immutable) The fixture.</summary>
+    private readonly R4Tests _fixture;
+
+    /// <summary>
+    /// Initializes a new instance of the fhir.candle.Tests.TestSubscriptionInternals class.
+    /// </summary>
+    /// <param name="fixture">         (Immutable) The fixture.</param>
+    /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
+    public R4TestTransactions(R4Tests fixture, ITestOutputHelper testOutputHelper)
+    {
+        _fixture = fixture;
+        _testOutputHelper = testOutputHelper;
+    }
+
+    ///// <summary>Parse topic.</summary>
+    ///// <param name="json">The JSON.</param>
+    //[Theory]
+    //[FileData("data/r4/Bundle-transaction-cdex-load-payer.json")]
+    //public void ProcessBundle(string json)
+    //{
+    //    HttpStatusCode sc = _fixture._store.ProcessBundle(
+    //        json,
+    //        "application/fhir+json",
+    //        "application/fhir+json",
+    //        false,
+    //        out string serializedResource,
+    //        out string serializedOutcome);
+
+    //    sc.Should().Be(HttpStatusCode.OK);
+    //    serializedResource.Should().NotBeNullOrEmpty();
+    //    serializedOutcome.Should().NotBeNullOrEmpty();
+
+    //    sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+    //        serializedResource,
+    //        "application/fhir+json",
+    //        out Hl7.Fhir.Model.Resource? r,
+    //        out _);
+
+    //    sc.Should().Be(HttpStatusCode.OK);
+    //    r.Should().NotBeNull();
+    //    r!.TypeName.Should().Be("Bundle");
+    //}
 }

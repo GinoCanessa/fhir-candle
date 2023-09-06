@@ -22,7 +22,7 @@
         "resultForDelete": "test-fails",
         "requireBoth": true
       },
-      "fhirPathCriteria": "(%previous.empty() | (%previous.status != 'completed')) and (%current.status = 'completed')"
+      "fhirPathCriteria": "(%previous.id.empty() or (%previous.status != 'completed')) and (%current.status = 'completed')"
     }
   ],
   "canFilterBy": [

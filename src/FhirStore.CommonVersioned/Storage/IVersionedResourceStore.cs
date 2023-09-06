@@ -5,7 +5,9 @@
 
 using FhirCandle.Models;
 using FhirCandle.Storage;
+using Hl7.Fhir.Model;
 using Hl7.FhirPath;
+using System.Net;
 
 namespace FhirCandle.Storage;
 
@@ -22,17 +24,27 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <param name="source">         [out] The resource.</param>
     /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
     /// <returns>The created resource, or null if it could not be created.</returns>
-    Hl7.Fhir.Model.Resource? InstanceCreate(Hl7.Fhir.Model.Resource source, bool allowExistingId);
+    Hl7.Fhir.Model.Resource? InstanceCreate(
+        Hl7.Fhir.Model.Resource source,
+        bool allowExistingId);
 
     /// <summary>Update a specific instance of a resource.</summary>
     /// <param name="source">            [out] The resource.</param>
     /// <param name="allowCreate">       True to allow, false to suppress the create.</param>
+    /// <param name="ifMatch">           A match specifying if.</param>
+    /// <param name="ifNoneMatch">       A match specifying if none.</param>
     /// <param name="protectedResources">The protected resources.</param>
+    /// <param name="sc">                [out] The screen.</param>
+    /// <param name="outcome">           [out] The outcome.</param>
     /// <returns>The updated resource, or null if it could not be performed.</returns>
     Hl7.Fhir.Model.Resource? InstanceUpdate(
         Hl7.Fhir.Model.Resource source, 
         bool allowCreate,
-        HashSet<string> protectedResources);
+        string ifMatch,
+        string ifNoneMatch,
+        HashSet<string> protectedResources,
+        out HttpStatusCode sc,
+        out OperationOutcome outcome);
 
     /// <summary>Instance delete.</summary>
     /// <param name="id">                [out] The identifier.</param>
@@ -89,9 +101,15 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// </returns>
     IEnumerable<string> GetSearchRevIncludes();
 
+    /// <summary>Query if this type contains a resource with the specified identifier.</summary>
+    /// <param name="system">The system.</param>
+    /// <param name="value"> The value.</param>
+    /// <param name="r">     [out] The resolved resource process.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryResolveIdentifier(string system, string value, out Hl7.Fhir.Model.Resource? r);
+
     /// <summary>Sets executable subscription information.</summary>
     /// <param name="url">             URL of the resource.</param>
-    /// 
     void SetExecutableSubscriptionTopic(
         string url,
         IEnumerable<ExecutableSubscriptionInfo.InteractionOnlyTrigger> interactionTriggers,

@@ -1,0 +1,218 @@
+{
+  "resourceType": "Bundle",
+  "id": "cdex-scenario7-payer-load-transaction-bundle",
+  "type": "transaction",
+  "timestamp": "2023-08-23T23:55:01.066830-07:00",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:254c080e-424b-11ee-a1fc-daaf18ab2cba",
+      "resource": {
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/davinci-cdex/StructureDefinition/cdex-patient-demographics"
+          ]
+        },
+        "identifier": [
+          {
+            "use": "usual",
+            "type": {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/us/davinci-hrex/CodeSystem/hrex-temp",
+                  "code": "UMB",
+                  "display": "Member Number"
+                }
+              ],
+              "text": "Member Number"
+            },
+            "system": "http://example.org/cdex/payer/member-ids",
+            "value": "Member123"
+          }
+        ],
+        "name": [
+          {
+            "family": "Shaw",
+            "given": [
+              "Amy"
+            ]
+          }
+        ],
+        "birthDate": "1987-02-20"
+      },
+      "request": {
+        "method": "POST",
+        "url": "Patient",
+        "ifNoneMatch": "identifier=http://example.org/cdex/payer/member-ids|Member123"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:254c19e8-424b-11ee-a1fc-daaf18ab2cba",
+      "resource": {
+        "resourceType": "Claim",
+        "identifier": [
+          {
+            "system": "http://example.org/payer",
+            "value": "trackingid123"
+          },
+          {
+            "system": "http://CedarArmsMedicalCenter.com/claim",
+            "value": "MED-Claim123"
+          }
+        ],
+        "status": "active",
+        "type": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/claim-type",
+              "code": "professional",
+              "display": "Professional"
+            }
+          ]
+        },
+        "use": "preauthorization",
+        "patient": {
+          "reference": "urn:uuid:254c080e-424b-11ee-a1fc-daaf18ab2cba",
+          "identifier": {
+            "system": "http://example.org/cdex/payer/member-ids",
+            "value": "Member123"
+          }
+        },
+        "created": "2023-08-23",
+        "provider": {
+          "type": "Organization",
+          "identifier": {
+            "system": "http://hl7.org/fhir/sid/us-npi",
+            "value": "9941339100"
+          }
+        },
+        "priority": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/processpriority",
+              "code": "normal",
+              "display": "Normal"
+            }
+          ]
+        },
+        "insurance": [
+          {
+            "sequence": 1,
+            "focal": true,
+            "identifier": {
+              "system": "http://CedarArmsMedicalCenter.com/claim",
+              "value": "MED-00050"
+            },
+            "coverage": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "http: //terminology.hl7.org/CodeSystem/v2-0203",
+                      "code": "MB",
+                      "display": "Member Number"
+                    }
+                  ]
+                },
+                "system": "http: /example.org/cdex/payer/member-ids",
+                "value": "Member123"
+              }
+            }
+          }
+        ],
+        "item": [
+          {
+            "extension": [
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-itemTraceNumber",
+                "valueIdentifier": {
+                  "system": "http: //example.org/ITEM_TRACE_NUMBER",
+                  "value": "1"
+                }
+              },
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-authorizationNumber",
+                "valueString": "1122445"
+              },
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-administrationReferenceNumber",
+                "valueString": "9988311"
+              },
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-serviceItemRequestType",
+                "valueCodeableConcept": {
+                  "coding": [
+                    {
+                      "system": "https: //codesystem.x12.org/005010/1525",
+                      "code": "SC",
+                      "display": "Specialty Care Review"
+                    }
+                  ]
+                }
+              },
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-certificationType",
+                "valueCodeableConcept": {
+                  "coding": [
+                    {
+                      "system": "https: //codesystem.x12.org/005010/1322",
+                      "code": "I",
+                      "display": "Initial"
+                    }
+                  ]
+                }
+              },
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-requestedService",
+                "valueReference": {
+                  "reference": "ServiceRequest/ReferralRequestExample"
+                }
+              },
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-epsdtIndicator",
+                "valueBoolean": false
+              },
+              {
+                "url": "http: //hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-revenueUnitRateLimit",
+                "valueDecimal": 800
+              }
+            ],
+            "sequence": 1,
+            "category": {
+              "coding": [
+                {
+                  "system": "https://codesystem.x12.org/005010/1365",
+                  "code": "62",
+                  "display": "MRI/CAT Scan"
+                }
+              ]
+            },
+            "productOrService": {
+              "coding": [
+                {
+                  "system": "http://www.ama-assn.org/go/cpt",
+                  "code": "73722",
+                  "display": "Magnetic resonance (eg, proton) imaging, any joint of lower extremity"
+                }
+              ]
+            },
+            "servicedDate": "2023-08-23",
+            "locationCodeableConcept": {
+              "coding": [
+                {
+                  "system": "https://www.cms.gov/Medicare/Coding/place-of-service-codes/Place_of_Service_Code_Set",
+                  "code": "19",
+                  "display": "Off Campus-Outpatient Hospital"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url": "Claim"
+      }
+    }
+  ]
+}

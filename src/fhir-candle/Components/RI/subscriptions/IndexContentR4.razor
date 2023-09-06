@@ -42,6 +42,10 @@
     [Parameter]
     public string StoreName { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the store.</summary>
+    [Parameter]
+    public IFhirStore Store { get; set; } = null!;
+
     /// <summary>Identifies the RI literal this content applies to.</summary>
     public static string ContentFor { get => "subscriptions"; }
 

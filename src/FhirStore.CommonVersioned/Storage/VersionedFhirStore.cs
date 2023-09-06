@@ -1226,12 +1226,11 @@ public partial class VersionedFhirStore : IFhirStore
             Id = Guid.NewGuid().ToString(),
         };
 
-        // TODO: Process bundle resolution rules and fix IDs
-
         switch (requestBundle.Type)
         {
             //case Bundle.BundleType.Transaction:
             //    responseBundle.Type = Bundle.BundleType.TransactionResponse;
+            //    ProcessTransaction(requestBundle, responseBundle);
             //    break;
 
             case Bundle.BundleType.Batch:
@@ -3189,6 +3188,28 @@ public partial class VersionedFhirStore : IFhirStore
         return sc;
     }
 
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="queryString"> The query string.</param>
+    /// <param name="bundle">      [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryTypeSearch(
+        string resourceType,
+        string queryString,
+        out object? bundle)
+    {
+        HttpStatusCode sc = DoTypeSearch(
+            resourceType,
+            queryString,
+            out Bundle? b,
+            out _);
+
+        bundle = b;
+
+        return sc.IsSuccessful();
+    }
+
+
     /// <summary>Executes the type search operation.</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="queryString"> The query string.</param>
@@ -3339,6 +3360,24 @@ public partial class VersionedFhirStore : IFhirStore
         serializedOutcome = Utils.SerializeFhir(outcome, destFormat, pretty);
 
         return sc;
+    }
+
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="queryString">The query string.</param>
+    /// <param name="bundle">     [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TrySystemSearch(
+        string queryString,
+        out object? bundle)
+    {
+        HttpStatusCode sc = DoSystemSearch(
+            queryString,
+            out Bundle? b,
+            out _);
+
+        bundle = b;
+
+        return sc.IsSuccessful();
     }
 
     /// <summary>Executes the system search operation.</summary>
@@ -3634,9 +3673,11 @@ public partial class VersionedFhirStore : IFhirStore
                 }
 
                 ResourceReference reference = element.ToPoco<ResourceReference>();
+                Resource? resolved = null;
 
-                if (TryResolveAsResource(reference.Reference, out Resource? resolved) &&
-                    resolved != null)
+                if ((!string.IsNullOrEmpty(reference.Reference)) &&
+                    TryResolveAsResource(reference.Reference, out resolved) &&
+                    (resolved != null))
                 {
                     if (sp.Target?.Any() ?? false)
                     {
@@ -3661,6 +3702,55 @@ public partial class VersionedFhirStore : IFhirStore
 
                     // track we have added this id
                     addedIds.Add(includedId);
+
+                    continue;
+                }
+                
+                if (reference.Identifier != null)
+                {
+                    // check if a type was specified
+                    if (!string.IsNullOrEmpty(reference.Type) && _store.ContainsKey(reference.Type))
+                    {
+                        if (_store[reference.Type].TryResolveIdentifier(reference.Identifier.System, reference.Identifier.Value, out resolved) &&
+                            (resolved != null))
+                        {
+                            string includedId = $"{resolved.TypeName}/{resolved.Id}";
+                            if (addedIds.Contains(includedId))
+                            {
+                                continue;
+                            }
+
+                            // add the matched result
+                            inclusions.Add(resolved);
+
+                            // track we have added this id
+                            addedIds.Add(includedId);
+
+                            continue;
+                        }
+                    }
+
+                    // look through all resources
+                    foreach (string resourceType in _store.Keys)
+                    {
+                        if (_store[resourceType].TryResolveIdentifier(reference.Identifier.System, reference.Identifier.Value, out resolved) &&
+                            (resolved != null))
+                        {
+                            string includedId = $"{resolved.TypeName}/{resolved.Id}";
+                            if (addedIds.Contains(includedId))
+                            {
+                                continue;
+                            }
+
+                            // add the matched result
+                            inclusions.Add(resolved);
+
+                            // track we have added this id
+                            addedIds.Add(includedId);
+
+                            continue;
+                        }
+                    }
                 }
             }
         }
@@ -3877,6 +3967,66 @@ public partial class VersionedFhirStore : IFhirStore
             out _,
             out _);
         _capabilitiesAreStale = false;
+    }
+
+    private record class TransactionReferenceInfo
+    {
+        public required string FullUrl { get; init; }
+        public required string ReferenceLiteral { get; init; }
+
+        public string LocalReference { get; set; } = string.Empty;
+    }
+
+    private void FindReferences(string fullUrl, object o, List<TransactionReferenceInfo> references)
+    {
+        switch (o)
+        {
+            case null:
+            case Hl7.Fhir.Model.PrimitiveType:
+                return;
+
+            case Hl7.Fhir.Model.ResourceReference rr:
+                {
+                    references.Add(new()
+                    {
+                        FullUrl = fullUrl,
+                        ReferenceLiteral = ((Hl7.Fhir.Model.ResourceReference)o).Reference,
+                        LocalReference = Guid.NewGuid().ToString(),
+                    });
+
+                    return;
+                }
+
+            case Hl7.Fhir.Model.Base b:
+                foreach (Base child in b.Children)
+                {
+                    FindReferences(fullUrl, child, references);
+                }
+                break;
+        }
+    }
+
+    /// <summary>Process the transaction.</summary>
+    /// <param name="transaction">The transaction.</param>
+    /// <param name="response">   The response.</param>
+    private void ProcessTransaction(
+        Bundle transaction,
+        Bundle response)
+    {
+        List<TransactionReferenceInfo> references = new();
+
+        foreach (Bundle.EntryComponent entry in transaction.Entry)
+        {
+            FindReferences(entry.FullUrl, entry.Resource, references);
+        }
+
+        foreach (TransactionReferenceInfo i in references)
+        {
+            Console.WriteLine($"ProcessTransaction <<< {i.FullUrl} contains {i.ReferenceLiteral}");
+        }
+
+        // TODO: finish implementing transaction support
+        throw new NotImplementedException("Transaction support is not complete!");
     }
 
     /// <summary>Process a batch request.</summary>

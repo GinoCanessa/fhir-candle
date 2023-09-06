@@ -43,7 +43,7 @@
     },
     "davinci-pas": {
       "commandName": "Project",
-      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-pas --ci-package HL7/davinci-pas --load-package hl7.fhir.us.davinci-cdex#2.0.0 --r4 r4 --protect-source true -m 1000",
+      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-pas --ci-package HL7/davinci-pas --load-package hl7.fhir.us.davinci-cdex#2.0.0 --r4 provider --r4 payer --protect-source true -m 1000",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {
@@ -59,7 +59,7 @@
     },
     "davinci-cdex": {
       "commandName": "Project",
-      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-cdex --load-package hl7.fhir.us.davinci-cdex --r4 r4 --protect-source true -m 1000 --load-examples false",
+      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-cdex --load-package hl7.fhir.us.davinci-cdex --r4 provider --r4 payer --protect-source true -m 1000 --load-examples false",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

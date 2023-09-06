@@ -15,6 +15,7 @@ using System.Collections.Concurrent;
 using System.Collections;
 using System.Net;
 using FhirCandle.Serialization;
+using Hl7.Fhir.Language.Debugging;
 
 namespace FhirCandle.Storage;
 
@@ -37,6 +38,9 @@ public class ResourceStore<T> : IVersionedResourceStore
 
     /// <summary>(Immutable) Conformance URL to ID Map.</summary>
     internal readonly ConcurrentDictionary<string, string> _conformanceUrlToId = new();
+
+    /// <summary>(Immutable) Identifier for the identifier to.</summary>
+    internal readonly ConcurrentDictionary<string, string> _identifierToId = new();
 
     /// <summary>The lock object.</summary>
     private object _lockObject = new();
@@ -203,6 +207,62 @@ public class ResourceStore<T> : IVersionedResourceStore
         return _resourceStore[id];
     }
 
+    /// <summary>Interface for has identifier.</summary>
+    internal interface IHasIdentifier
+    {
+        List<Hl7.Fhir.Model.Identifier> Identifier { get; }
+    }
+
+    /// <summary>Gets identifier key.</summary>
+    /// <param name="id">[out] The identifier.</param>
+    /// <returns>The identifier key.</returns>
+    internal string GetIdentifierKey(Hl7.Fhir.Model.Identifier id)
+    {
+        return $"{id.System}|{id.Value}";
+    }
+
+    /// <summary>Attempts to resolve identifier.</summary>
+    /// <param name="system">The system.</param>
+    /// <param name="value"> The value.</param>
+    /// <param name="r">     [out] The resolved resource process.</param>
+    /// <returns>True if identifier, false if not.</returns>
+    public bool TryResolveIdentifier(string system, string value, out Hl7.Fhir.Model.Resource? r)
+    {
+        if (_identifierToId.TryGetValue($"{system}|{value}", out string? id) &&
+            !string.IsNullOrEmpty(id) &&
+            _resourceStore.TryGetValue(id, out T? resource))
+        {
+            r = resource;
+            return true;
+        }
+
+        r = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Attempts to get a resource, returning a default value rather than throwing an exception if it
+    /// fails.
+    /// </summary>
+    /// <param name="identifier">The identifier.</param>
+    /// <returns>A T?</returns>
+    internal T? TryGetResource(Hl7.Fhir.Model.Identifier identifier)
+    {
+        // lookup
+        string key = GetIdentifierKey(identifier);
+        if (_identifierToId.TryGetValue(key, out string? id))
+        {
+            if (_resourceStore.TryGetValue(id, out T? resource))
+            {
+                return resource;
+            }
+        }
+
+        // TODO: Consider if we want a slow lookup here as well.
+
+        return null;
+    }
+
     /// <summary>Create an instance of a resource.</summary>
     /// <param name="source">         [out] The resource.</param>
     /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
@@ -286,6 +346,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             if (!string.IsNullOrEmpty(cr.Url))
             {
                 _ = _conformanceUrlToId.TryAdd(cr.Url, source.Id);
+            }
+        }
+
+        if (source is IHasIdentifier hasId)
+        {
+            foreach(Identifier i in hasId.Identifier)
+            {
+                _ = _identifierToId.TryAdd(GetIdentifierKey(i), source.Id);
             }
         }
 
@@ -500,6 +568,22 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
         }
 
+        if (source is IHasIdentifier hasId)
+        {
+            if (previous is IHasIdentifier pId)
+            {
+                foreach (Identifier i in pId.Identifier)
+                {
+                    _ = _identifierToId.TryRemove(GetIdentifierKey(i), out _);
+                }
+            }
+
+            foreach (Identifier i in hasId.Identifier)
+            {
+                _ = _identifierToId.TryAdd(GetIdentifierKey(i), source.Id);
+            }
+        }
+
         if (previous == null)
         {
             TestCreateAgainstSubscriptions((T)source);
@@ -573,6 +657,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             if (!string.IsNullOrEmpty(pcr.Url))
             {
                 _ = _conformanceUrlToId.TryRemove(pcr.Url, out _);
+            }
+        }
+
+        if (previous is IHasIdentifier pId)
+        {
+            foreach (Identifier i in pId.Identifier)
+            {
+                _ = _identifierToId.TryRemove(GetIdentifierKey(i), out _);
             }
         }
 

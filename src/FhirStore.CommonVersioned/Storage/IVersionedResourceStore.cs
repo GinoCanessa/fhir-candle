@@ -101,9 +101,15 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// </returns>
     IEnumerable<string> GetSearchRevIncludes();
 
+    /// <summary>Query if this type contains a resource with the specified identifier.</summary>
+    /// <param name="system">The system.</param>
+    /// <param name="value"> The value.</param>
+    /// <param name="r">     [out] The resolved resource process.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryResolveIdentifier(string system, string value, out Hl7.Fhir.Model.Resource? r);
+
     /// <summary>Sets executable subscription information.</summary>
     /// <param name="url">             URL of the resource.</param>
-    /// 
     void SetExecutableSubscriptionTopic(
         string url,
         IEnumerable<ExecutableSubscriptionInfo.InteractionOnlyTrigger> interactionTriggers,

@@ -171,6 +171,9 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Gets a value indicating whether the package service is ready.</summary>
     public bool IsReady => _isInitialized;
 
+    /// <summary>The completed requests.</summary>
+    private HashSet<string> _processed = new();
+
     /// <summary>Initializes this object.</summary>
     public void Init()
     {
@@ -280,6 +283,15 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             packages = Enumerable.Empty<PackageCacheEntry>();
             return false;
         }
+
+        string key = $"{directive}|{branchName}";
+        if (_processed.Contains(key))
+        {
+            // if we have already processed this once, force into offline for performance
+            offlineMode = true;
+        }
+
+        _processed.Add(key);
 
         string name;
         string version;

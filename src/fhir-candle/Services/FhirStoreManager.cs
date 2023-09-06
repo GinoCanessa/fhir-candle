@@ -372,6 +372,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             Path.Combine(dir, "r4"),
                             true);
                     }
+                    else if (Directory.Exists(Path.Combine(dir, tenantName)))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, tenantName),
+                            true);
+                    }
                     else
                     {
                         _storesByController[tenantName].LoadPackage(
@@ -390,6 +398,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             Path.Combine(dir, "r4b"),
                             true);
                     }
+                    else if (Directory.Exists(Path.Combine(dir, tenantName)))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, tenantName),
+                            true);
+                    }
                     else
                     {
                         _storesByController[tenantName].LoadPackage(
@@ -406,6 +422,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                             string.Empty,
                             string.Empty,
                             Path.Combine(dir, "r5"),
+                            true);
+                    }
+                    else if (Directory.Exists(Path.Combine(dir, tenantName)))
+                    {
+                        _storesByController[tenantName].LoadPackage(
+                            string.Empty,
+                            string.Empty,
+                            Path.Combine(dir, tenantName),
                             true);
                     }
                     else
@@ -524,6 +548,15 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                                     Path.Combine(r.supplementDirectory, "r4"),
                                     loadExamples);
                             }
+                            else if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
+                                Directory.Exists(Path.Combine(r.supplementDirectory, tenantName)))
+                            {
+                                _storesByController[tenantName].LoadPackage(
+                                    r.directive,
+                                    r.directory,
+                                    Path.Combine(r.supplementDirectory, tenantName),
+                                    loadExamples);
+                            }
                             else
                             {
                                 _storesByController[tenantName].LoadPackage(
@@ -544,6 +577,15 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                                     r.directive, 
                                     r.directory, 
                                     Path.Combine(r.supplementDirectory, "r4b"),
+                                    loadExamples);
+                            }
+                            else if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
+                                Directory.Exists(Path.Combine(r.supplementDirectory, tenantName)))
+                            {
+                                _storesByController[tenantName].LoadPackage(
+                                    r.directive,
+                                    r.directory,
+                                    Path.Combine(r.supplementDirectory, tenantName),
                                     loadExamples);
                             }
                             else
@@ -567,6 +609,15 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                                     r.directory, 
                                     Path.Combine(r.supplementDirectory, 
                                     "r5"),
+                                    loadExamples);
+                            }
+                            else if ((!string.IsNullOrEmpty(r.supplementDirectory)) &&
+                                Directory.Exists(Path.Combine(r.supplementDirectory, tenantName)))
+                            {
+                                _storesByController[tenantName].LoadPackage(
+                                    r.directive,
+                                    r.directory,
+                                    Path.Combine(r.supplementDirectory, tenantName),
                                     loadExamples);
                             }
                             else

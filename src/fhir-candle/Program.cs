@@ -33,7 +33,7 @@ namespace fhir.candle;
 /// <summary>A program.</summary>
 public static partial class Program
 {
-    [GeneratedRegex("(http[s]*:\\/\\/[A-Za-z0-9\\.]*(:\\d+)*)")]
+    [GeneratedRegex("(http[s]*:\\/\\/.*(:\\d+)*)")]
     private static partial Regex InputUrlFormatRegex();
 
     /// <summary>(Immutable) The default listen port.</summary>
@@ -61,7 +61,7 @@ public static partial class Program
 
         Option<int?> optListenPort = new(
             aliases: new[] { "--port", "-p" },
-            getDefaultValue: () => configuration.GetValue<int>("Listen_Port", _defaultListenPort),
+            getDefaultValue: () => configuration.GetValue<int?>("Listen_Port", _defaultListenPort) ?? _defaultListenPort,
             "Listen port for the server");
 
         Option<bool?> optOpenBrowser = new(
@@ -236,9 +236,19 @@ public static partial class Program
     { 
         try
         {
+            if (string.IsNullOrEmpty(config.PublicUrl))
+            {
+                config.PublicUrl = $"http://localhost:{config.ListenPort}";
+            }
+
             // update configuration to make sure listen url is properly formatted
             Match match = InputUrlFormatRegex().Match(config.PublicUrl);
             config.PublicUrl = match.ToString();
+
+            if (config.PublicUrl.EndsWith('/'))
+            {
+                config.PublicUrl = config.PublicUrl.Substring(0, config.PublicUrl.Length - 1);
+            }
 
             // check for no tenants (create defaults)
             if ((!config.TenantsR4.Any()) &&
@@ -348,37 +358,9 @@ public static partial class Program
             IFhirPackageService ps = app.Services.GetRequiredService<IFhirPackageService>();
             IFhirStoreManager sm = app.Services.GetRequiredService<IFhirStoreManager>();
 
-            ////TODO: NEXT: need to have store manager load packages so that we can load pages when done
-            //throw new Exception("Need to have store manager load packages so that we can load pages when done");
-
-            //ps.Init(config.FhirCacheDirectory);
-
             // perform slow initialization of services
             ps.Init();          // store manager requires Package Service to be initialized
             sm.Init();          // store manager may need to download packages
-
-            //// load requested packages
-            //if (ps.IsConfigured &&
-            //    (config.PublishedPackages.Any() || config.CiPackages.Any()))
-            //{
-            //    // look for a package supplemental directory
-            //    string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-            //        ? FindRelativeDir(root, "fhirData", false)
-            //        : config.SourceDirectory;
-
-            //    _ = sm.LoadRequestedPackages(supplemental, config.LoadPackageExamples == true);
-            //}
-
-            //// sort through RI info
-            //if (!string.IsNullOrEmpty(config.ReferenceImplementation))
-            //{
-            //    // look for a package supplemental directory
-            //    string supplemental = string.IsNullOrEmpty(config.SourceDirectory)
-            //        ? FindRelativeDir(root, Path.Combine("fhirData", config.ReferenceImplementation), false)
-            //        : Path.Combine(config.SourceDirectory, config.ReferenceImplementation);
-
-            //    sm.LoadRiContents(supplemental);
-            //}
 
             // run the server
             //await app.RunAsync(cancellationToken);

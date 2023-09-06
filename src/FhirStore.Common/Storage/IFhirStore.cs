@@ -266,6 +266,13 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedBundle,
         out string serializedOutcome);
 
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="queryString">The query string.</param>
+    /// <param name="bundle">     [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TrySystemSearch(
+        string queryString,
+        out object? bundle);
 
     /// <summary>Type search.</summary>
     /// <param name="resourceType">     Type of the resource.</param>
@@ -284,6 +291,16 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         bool pretty,
         out string serializedBundle,
         out string serializedOutcome);
+
+    /// <summary>Attempts to system search an object from the given string.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="queryString"> The query string.</param>
+    /// <param name="bundle">      [out] The bundle.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryTypeSearch(
+        string resourceType,
+        string queryString,
+        out object? bundle);
 
     /// <summary>System operation.</summary>
     /// <param name="operationName">     Name of the operation.</param>

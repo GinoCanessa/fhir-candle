@@ -1,6 +1,6 @@
 {
   "resourceType" : "Basic",
-  "id" : "PASSubscriptionTopic",
+  "id" : "pas-claimresponse-topic",
   "extension": [
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
@@ -25,38 +25,6 @@
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",
       "valueDateTime": "2023-08-08"
-    },
-    {
-      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.publisher",
-      "valueString": "HL7 International - Financial Management Work Group"
-    },
-    {
-      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.contact",
-      "valueContactDetail": {
-        "name": "HL7 International - Financial Management Work Group",
-        "telecom": [
-          {
-            "system": "url",
-            "value": "http://hl7.org/Special/committees/fm"
-          },
-          {
-            "system": "email",
-            "value": "fmlists@lists.hl7.org"
-          }
-        ]
-      }
-    },
-    {
-      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.contact",
-      "valueContactDetail": {
-        "name": "Jean Duteau",
-        "telecom": [
-          {
-            "system": "email",
-            "value": "mailto:jean@duteaudesign.com"
-          }
-        ]
-      }
     },
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.description",

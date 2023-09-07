@@ -62,7 +62,7 @@
 
     private IFhirStore _store = null!;
 
-    private ParsedSubscription _subscription = null!;
+    private ParsedSubscription? _subscription = null;
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
@@ -75,7 +75,8 @@
         {
             _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
 
-            if (!string.IsNullOrEmpty(SubscriptionId))
+            if ((!string.IsNullOrEmpty(SubscriptionId)) &&
+                (_store.CurrentSubscriptions.Any()))
             {
                 _subscription = _store.CurrentSubscriptions.Where(s => s.Id.Equals(SubscriptionId, StringComparison.Ordinal)).First() ?? null!;
             }
@@ -102,7 +103,8 @@
             {
                 _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
 
-                if (!string.IsNullOrEmpty(SubscriptionId))
+                if ((!string.IsNullOrEmpty(SubscriptionId)) &&
+                    (_store.CurrentSubscriptions.Any()))
                 {
                     _subscription = _store.CurrentSubscriptions.Where(s => s.Id.Equals(SubscriptionId, StringComparison.Ordinal)).First() ?? null!;
                 }
@@ -132,5 +134,4 @@
             _store.OnSubscriptionSendEvent -= Store_OnSubscriptionSendEvent;
         }
     }
-
 }

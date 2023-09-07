@@ -1,4 +1,5 @@
-﻿@inject IJSRuntime JS
+﻿@using System.Diagnostics.CodeAnalysis;
+@inject IJSRuntime JS
 
 <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
     <MudTimelineItem Color="@ColorForStep(1)">
@@ -21,6 +22,7 @@
 
                     <br />
                     <MudDivider />
+                    <br />
                     <MudList>
                         <MudListItem>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
@@ -67,22 +69,20 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudText Typo="Typo.body1">
-                        In this step, we need to select a patient, as a Provider, that we will use for our claim.
+                        As Provider: In this step we select the patient to use for our claim.
                     </MudText>
                     <br />
                     <MudDivider />
-                    <MudSelect Label="Patient" HelperText="Patient we are filing a claim on" @bind-Value="_patientId">
-                        @foreach (KeyValuePair<string, object> kvp in ProviderStore["Patient"])
+                    <br />
+                    <MudSelect Label="Patient" HelperText="Patient we are filing a claim on" @bind-Value="_patient">
+                        @foreach (ResourceInfo ri in _patients)
                         {
-                            @if (kvp.Value is Hl7.Fhir.Model.Patient p)
-                            {
-                                <MudSelectItem Value="@kvp.Key">@DisplayFor(p)</MudSelectItem>
-                            }
+                            <MudSelectItem Value="@ri">@ri.Display</MudSelectItem>
                         }
                     </MudSelect>
                 </MudCardContent>
                 <MudCardActions>
-                    <MudButton Variant="Variant.Outlined" Disabled="@string.IsNullOrEmpty(_patientId)" OnClick="@(() => MoveToStep(3))">Use patient: @_patientId</MudButton>
+                    <MudButton Variant="Variant.Outlined" Disabled="@(_patient == null)" OnClick="@(() => MoveToStep(3))">Use patient: @_patient?.Id</MudButton>
                 </MudCardActions>
             </MudCard>
         </ItemContent>
@@ -103,23 +103,138 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudText Typo="Typo.body1">
-                        In this step, we need to select the data we are including as part of our claim.
+                        As Provider: In this step select data we are using to construct our our claim.
                     </MudText>
+
                     <br />
                     <MudDivider />
+                    <br />
 
-                    @foreach (SupportingData sd in _claimSupportingData)
+                    <MudText Typo="Typo.h6">
+                        Focal Encounter (optional)
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _focalEncounter = null)">Clear</MudButton>
+                    </MudText>
+                    @if (_encounters.Any())
+                    {
+                        <MudRadioGroup @bind-SelectedOption="@_focalEncounter">
+                            @foreach (ResourceInfo en in _encounters)
+                            {
+                                <MudRadio Option="en"><code>@en.Display</code></MudRadio>
+                            }
+                        </MudRadioGroup>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body1">No encounters found for patient @_patient?.Id</MudText>
+                    }
+
+                    <br />
+                    <MudDivider />
+                    <br />
+
+                    <MudText Typo="Typo.h6">Supporting Resources (optional)</MudText>
+                    @foreach (ResourceInfo sd in _claimSupportingData)
                     {
                         <MudCheckBox @bind-Checked="sd.Selected"><code>@sd.Display</code></MudCheckBox>
                     }
 
+                    <br />
+                    <MudDivider />
+                    <br />
+
+                    <MudText Typo="Typo.h6">Free Text Notes (optional)</MudText>
+                    <MudTextField T="string" Variant="Variant.Outlined" @bind-Value="@_supportingMessage" Lines="5" />
+
+                    <br />
+                    <MudDivider />
+                    <br />
+
+                    @if (_organizations.Any())
+                    {
+                        <MudText Typo="Typo.h6">
+                            Insurer (Required)
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _insurer = null)">Clear</MudButton>
+                        </MudText>
+
+                        <MudRadioGroup @bind-SelectedOption="@_insurer">
+                            @foreach (ResourceInfo ri in _organizations)
+                            {
+                                <MudRadio Option="ri"><code>@ri.Display</code></MudRadio>
+                            }
+                        </MudRadioGroup>
+
+                        <br />
+                        <MudDivider />
+                        <br />
+
+                        <MudText Typo="Typo.h6">
+                            Requestor (Required)
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _requestor = null)">Clear</MudButton>
+                        </MudText>
+
+                        <MudRadioGroup @bind-SelectedOption="@_requestor">
+                            @foreach (ResourceInfo ri in _organizations)
+                            {
+                                <MudRadio Option="ri"><code>@ri.Display</code></MudRadio>
+                            }
+                        </MudRadioGroup>
+
+                        @if ((errorAtStep == 3) && (!string.IsNullOrEmpty(errorMessage)))
+                        {
+                            <br />
+                            <MudDivider />
+                            <br />
+
+                            <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+                        }
+                    }
+
                 </MudCardContent>
                 <MudCardActions>
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(4))">Use this filter</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => MoveToStep(4))">Use selected data</MudButton>
                 </MudCardActions>
             </MudCard>
         </ItemContent>
     </MudTimelineItem>
+
+
+    <MudTimelineItem Color="@ColorForStep(4)">
+        <ItemContent>
+            <MudCard id="element-step-4">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="@ColorForStep(4)" Variant="Variant.Outlined">
+                            <MudIcon Icon="@IconForStep(4)" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Build the claim</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body1">
+                        In this step, we build the actual claim.
+                    </MudText>
+                    <br />
+                    <MudDivider />
+
+                    @if ((errorAtStep == 4) && (!string.IsNullOrEmpty(errorMessage)))
+                    {
+                        <br />
+                        <MudDivider />
+                        <br />
+
+                        <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+                    }
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Outlined" Disabled="@(_claim == null)" OnClick="@(() => MoveToStep(5))">Submit!</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </ItemContent>
+    </MudTimelineItem>
+
+
 
 </MudTimeline>
 
@@ -152,16 +267,24 @@
         "DocumentReference",
     };
 
-    private static readonly List<string> _allowedRelatedRequestTypes = new()
-    {
-        "Organization",
-    };
+    private string _supportingMessage = string.Empty;
 
-    /// <summary>The ID of the selected patient.</summary>
-    private string _patientId = string.Empty;
-
-    private record class SupportingData
+    private record class ResourceInfo
     {
+        /// <summary>Initializes a new instance of the SupportingData class.</summary>
+        public ResourceInfo() { }
+
+        /// <summary>Initializes a new instance of the SupportingData class.</summary>
+        /// <param name="other">The other.</param>
+        [SetsRequiredMembers]
+        protected ResourceInfo(ResourceInfo other)
+        {
+            ResourceType = other.ResourceType;
+            Id = other.Id;
+            Resource = (Hl7.Fhir.Model.Resource)other.Resource.DeepCopy();
+            Display = other.Display;
+        }
+
         public bool Selected { get; set; } = false;
 
         public required string ResourceType { get; init; }
@@ -171,9 +294,65 @@
         public required Hl7.Fhir.Model.Resource Resource { get; init; }
 
         public required string Display { get; init; }
+
+        public override string ToString()
+        {
+            return Display;
+        }
+
+        bool IEquatable<ResourceInfo?>.Equals(ResourceInfo? obj)
+        {
+            if (obj == null)
+            {
+                return false;
+            }
+
+            if (obj is ResourceInfo sd)
+            {
+                return (this.ResourceType.Equals(sd.ResourceType) && this.Id.Equals(sd.Id));
+            }
+
+            return false;
+        }
+
+        public int CompareTo(ResourceInfo? other)
+        {
+            if (other == null)
+            {
+                return 1;
+            }
+
+            if (ResourceType.Equals(other.ResourceType))
+            {
+                return Id.CompareTo(other.Id);
+            }
+
+            return ResourceType.CompareTo(other.ResourceType);
+        }
+
+        public override int GetHashCode()
+        {
+            return $"{ResourceType}/{Id}".GetHashCode();
+        }
     }
 
-    private IEnumerable<SupportingData> _claimSupportingData = Enumerable.Empty<SupportingData>();
+    private IEnumerable<ResourceInfo> _patients = Enumerable.Empty<ResourceInfo>();
+
+    private ResourceInfo? _patient = null;
+
+    private IEnumerable<ResourceInfo> _encounters = Enumerable.Empty<ResourceInfo>();
+
+    private ResourceInfo? _focalEncounter = null;
+
+    private IEnumerable<ResourceInfo> _claimSupportingData = Enumerable.Empty<ResourceInfo>();
+
+    private IEnumerable<ResourceInfo> _organizations = Enumerable.Empty<ResourceInfo>();
+
+    private ResourceInfo? _insurer = null;
+    private ResourceInfo? _requestor = null;
+
+    private Hl7.Fhir.Model.Claim? _claim = null;
+    private Hl7.Fhir.Model.Bundle? _requestBundle = null;
 
     /// <summary>Color for step.</summary>
     /// <param name="step">Amount to increment by.</param>
@@ -227,6 +406,18 @@
     {
         errorAtStep = -1;
         errorMessage = string.Empty;
+
+        // peform any validation
+        switch (toStep)
+        {
+            case 4:
+                if (!ValidateClaimData())
+                {
+                    return;
+                }
+                break;
+        }
+
         onStep = toStep;
 
         if (toStep < 9)
@@ -237,19 +428,184 @@
         // call any additional functions
         switch (toStep)
         {
+            case 2:
+                GetPatients();
+                break;
+
             case 3:
                 GetCurrentRequestResources();
+                break;
+
+            case 4:
+                BuildClaim();
                 break;
         }
 
         InvokeAsync(() => StateHasChanged());
     }
 
+    private void BuildClaim()
+    {
+        _claim = new()
+        {
+
+        };
+    }
+
+    private bool ValidateClaimData()
+    {
+        // validate data
+        if (_patient == null)
+        {
+            errorAtStep = 3;
+            errorMessage = "Cannot build a Claim without a patient.";
+            return false;
+        }
+
+        if (_insurer == null)
+        {
+            errorAtStep = 3;
+            errorMessage = $"Insurer is REQUIRED - see PAS Claim Base profile.";
+            return false;
+        }
+
+        if (_insurer.ResourceType != "Organization")
+        {
+            errorAtStep = 3;
+            errorMessage = $"Insurer must be an Organization, found: {_insurer.ResourceType}.";
+            return false;
+        }
+
+        if (!(_insurer.Resource is Hl7.Fhir.Model.Organization insurer))
+        {
+            errorAtStep = 3;
+            errorMessage = $"Insurer must be an Organization, found: {_insurer.Resource.GetType().Name}.";
+            return false;
+        }
+
+        if (insurer.Active == null)
+        {
+            errorAtStep = 3;
+            errorMessage = "Insurer must have 'active' element.";
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(insurer.Name))
+        {
+            errorAtStep = 3;
+            errorMessage = "Insurer must have 'name' element.";
+            return false;
+        }
+
+        if (_requestor == null)
+        {
+            errorAtStep = 3;
+            errorMessage = $"Requestor is REQUIRED - see PAS Claim Base profile.";
+            return false;
+        }
+
+        if (_requestor.ResourceType != "Organization")
+        {
+            errorAtStep = 3;
+            errorMessage = $"Requestor must be an Organization, found: {_requestor.ResourceType}.";
+            return false;
+        }
+
+        if (!(_requestor.Resource is Hl7.Fhir.Model.Organization requestor))
+        {
+            errorAtStep = 3;
+            errorMessage = $"Requestor must be an Organization, found: {_requestor.Resource.GetType().Name}.";
+            return false;
+        }
+
+        if (requestor.Active == null)
+        {
+            errorAtStep = 3;
+            errorMessage = "Requestor must have 'active' element.";
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(requestor.Name))
+        {
+            errorAtStep = 3;
+            errorMessage = "Requestor must have 'name' element.";
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(_supportingMessage) &&
+            (!_claimSupportingData.Any(i => i.Selected)))
+        {
+            errorAtStep = 3;
+            errorMessage = "At least one piece of supporting evidence is required.  Please either select a supporting resource or add a message.";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Gets the patients.</summary>
+    private void GetPatients()
+    {
+        List<ResourceInfo> patients = new();
+
+        if (ProviderStore.TryTypeSearch("Patient", string.Empty, out object? pb) &&
+            (pb != null) &&
+            (pb is Hl7.Fhir.Model.Bundle patientBundle))
+        {
+            foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in patientBundle.Entry)
+            {
+                if (entry.Resource is Hl7.Fhir.Model.Patient r)
+                {
+                    patients.Add(new ResourceInfo
+                        {
+                            ResourceType = r.TypeName,
+                            Id = r.Id,
+                            Resource = r,
+                            Display = DisplayFor(r),
+                        });
+                }
+            }
+        }
+
+        _patients = patients.OrderBy(p => p.Display);
+    }
+
     private void GetCurrentRequestResources()
     {
-        List<SupportingData> data = new();
+        if (_patient == null)
+        {
+            _encounters = Enumerable.Empty<ResourceInfo>();
+            _claimSupportingData = Enumerable.Empty<ResourceInfo>();
+            _organizations = Enumerable.Empty<ResourceInfo>();
 
-        string query = $"patient={_patientId}&_type={string.Join(',', _allowedPatientRequestTypes)}";
+            return;
+        }
+
+        List<ResourceInfo> encounters = new();
+        List<ResourceInfo> data = new();
+        List<ResourceInfo> orgs = new();
+        string query;
+
+        if (ProviderStore.TryTypeSearch("Encounter", $"patient={_patient.Id}", out object? eb) &&
+            (eb != null) &&
+            (eb is Hl7.Fhir.Model.Bundle encounterBundle))
+        {
+            foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in encounterBundle.Entry)
+            {
+                if (entry.Resource is Hl7.Fhir.Model.Resource r)
+                {
+                    encounters.Add(new ResourceInfo
+                        {
+                            ResourceType = r.TypeName,
+                            Id = r.Id,
+                            Resource = r,
+                            Display = DisplayFor(r),
+                        });
+                }
+            }
+        }
+
+        query = $"patient={_patient.Id}&_type={string.Join(',', _allowedPatientRequestTypes)}";
 
         if (ProviderStore.TrySystemSearch(query, out object? pb) &&
             (pb != null) &&
@@ -259,7 +615,7 @@
             {
                 if (entry.Resource is Hl7.Fhir.Model.Resource r)
                 {
-                    data.Add(new SupportingData
+                    data.Add(new ResourceInfo
                     {
                         ResourceType = r.TypeName,
                         Id = r.Id,
@@ -270,29 +626,28 @@
             }
         }
 
-        foreach (string resourceType in _allowedRelatedRequestTypes)
+        if (ProviderStore.TryTypeSearch("Organization", string.Empty, out object? rb) &&
+            (rb != null) &&
+            (rb is Hl7.Fhir.Model.Bundle relatedBundle))
         {
-            if (ProviderStore.TryTypeSearch(resourceType, string.Empty, out object? rb) &&
-                (rb != null) &&
-                (rb is Hl7.Fhir.Model.Bundle relatedBundle))
+            foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in relatedBundle.Entry)
             {
-                foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in relatedBundle.Entry)
+                if (entry.Resource is Hl7.Fhir.Model.Resource r)
                 {
-                    if (entry.Resource is Hl7.Fhir.Model.Resource r)
+                    orgs.Add(new ResourceInfo
                     {
-                        data.Add(new SupportingData
-                        {
-                            ResourceType = r.TypeName,
-                            Id = r.Id,
-                            Resource = r,
-                            Display = DisplayFor(r),
-                        });
-                    }
+                        ResourceType = r.TypeName,
+                        Id = r.Id,
+                        Resource = r,
+                        Display = DisplayFor(r),
+                    });
                 }
             }
         }
 
-        _claimSupportingData = data.AsEnumerable();
+        _encounters = encounters.OrderBy(sd => sd.Id);
+        _claimSupportingData = data.OrderBy(sd => sd.ToString());
+        _organizations = orgs.OrderBy(sd => sd.Id);
     }
 
     private string DisplayFor(Hl7.Fhir.Model.Resource resource) => resource switch
@@ -303,7 +658,8 @@
         Hl7.Fhir.Model.Coverage r => $"{r.TypeName}/{r.Id}: {r.Status} {DisplayFor(r.Type)} {string.Join(", ", r.Payor.Select(p => DisplayFor(p)))}",
         Hl7.Fhir.Model.DocumentReference r => $"{r.TypeName}/{r.Id}: {r.Status}-{r.DocStatus} {DisplayFor(r.Type)} {string.Join(", ", r.Category.Select(c => DisplayFor(c)))}",
         Hl7.Fhir.Model.Organization r => $"{r.TypeName}/{r.Id}: {r.Name} {string.Join(", ", r.Type.Select(t => DisplayFor(t)))}",
-        Hl7.Fhir.Model.Patient r => $"{r.TypeName}/{r.Id}: {string.Join(", ", r.Name.Select(n => $"{n.Family}, {string.Join(' ', n.Given)}"))}",
+        Hl7.Fhir.Model.Encounter r => $"{r.TypeName}/{r.Id}: {r.Status} {DisplayFor(r.Class)} {string.Join(", ", r.Type.Select(t => DisplayFor(t)))}",
+        Hl7.Fhir.Model.Patient r => $"{string.Join(", ", r.Name.Select(n => $"{n.Family}, {string.Join(' ', n.Given)}"))} ({r.TypeName}/{r.Id})",
         null => string.Empty,
         _ => resource.TypeName + "/" + resource.Id,
     };
@@ -323,6 +679,9 @@
             case Hl7.Fhir.Model.Code c:
                 return c.Value;
 
+            case Hl7.Fhir.Model.Coding coding:
+                return string.IsNullOrEmpty(coding.Display) ? $"{coding.System}|{coding.Code}" : coding.Display;
+
             case Hl7.Fhir.Model.Identifier i:
                 {
                     if (!string.IsNullOrEmpty(i.System) || !string.IsNullOrEmpty(i.Value))
@@ -337,33 +696,33 @@
                 }
                 break;
 
-            case Hl7.Fhir.Model.ResourceReference r:
+            case Hl7.Fhir.Model.ResourceReference rr:
                 {
-                    if (!string.IsNullOrEmpty(r.Display))
+                    if (!string.IsNullOrEmpty(rr.Display))
                     {
-                        return r.Display;
+                        return rr.Display;
                     }
 
-                    if (!string.IsNullOrEmpty(r.Reference))
+                    if (!string.IsNullOrEmpty(rr.Reference))
                     {
-                        return r.Reference;
+                        return rr.Reference;
                     }
 
-                    if (r.Identifier != null)
+                    if (rr.Identifier != null)
                     {
-                        DisplayFor(r.Identifier);
+                        DisplayFor(rr.Identifier);
                     }
                 }
                 break;
 
-            case Hl7.Fhir.Model.CodeableConcept c:
+            case Hl7.Fhir.Model.CodeableConcept cc:
             {
-                if (!string.IsNullOrEmpty(c.Text))
+                if (!string.IsNullOrEmpty(cc.Text))
                 {
-                    return c.Text;
+                    return cc.Text;
                 }
 
-                return string.Join(", ", c.Coding.Select(c => string.IsNullOrEmpty(c.Display) ? $"{c.System}|{c.Code}" : c.Display));
+                return string.Join(", ", cc.Coding.Select(c => string.IsNullOrEmpty(c.Display) ? $"{c.System}|{c.Code}" : c.Display));
             }
         }
 

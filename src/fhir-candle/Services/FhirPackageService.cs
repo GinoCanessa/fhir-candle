@@ -323,6 +323,8 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             }
         }
 
+        string directiveVersion = version;
+
         name = GetPackageNameFromInput(name);
 
         if (version.Equals("dev", StringComparison.OrdinalIgnoreCase))
@@ -463,6 +465,8 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                 .ToDictionary(x => x, x => LiteralForSequence(x).ToLowerInvariant());
         }
 
+        bool foundLocally = false;
+
         // want to check for fhir-version named packages
         foreach ((FhirSequenceEnum sequence, string trailer) in sequencesToTest)
         {
@@ -472,7 +476,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                 continue;
             }
 
-            version = string.Empty;
+            version = directiveVersion;
             isLocal = false;
             directory = string.Empty;
             
@@ -497,10 +501,15 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                     umbrellaPackageName = name,
                 });
 
+                foundLocally = true;
                 continue;
             }
 
-            if (!isLocal && offlineMode)
+            // do not check online if we already have the package locally
+            // note this can have an issue if we have a 'root' package and not a version-specific package
+            // but that is a rare case and can be solved by cleaning the cache.
+            if ((!isLocal && offlineMode) ||
+                foundLocally)
             {
                 continue;
             }

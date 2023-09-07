@@ -10,4 +10,4 @@ FROM mcr.microsoft.com/dotnet/aspnet:7.0
 WORKDIR /app
 COPY --from=build-env /app/out .
 ENTRYPOINT ["dotnet", "fhir-candle.dll"]
-CMD ["--reference-implementation", "subscriptions", "--load-package", "hl7.fhir.uv.subscriptions-backport#1.1.0", "--load-examples", "false", "--protect-source", "true", "-m", "200"]
+CMD ["-m", "1000"]

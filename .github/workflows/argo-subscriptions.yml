@@ -1,4 +1,4 @@
-name: Deploy to subscriptions.argo.run
+name: Deploy to *.argo.run
 # Basics from https://docs.microsoft.com/en-us/azure/dev-spaces/how-to/github-actions
 on:
   push:
@@ -29,4 +29,4 @@ jobs:
           -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/subscriptions/fhir-candle:$GITHUB_SHA \
           -t ${{ secrets.ARGO_CONTAINER_REGISTRY }}/subscriptions/fhir-candle:latest
         docker push ${{ secrets.ARGO_CONTAINER_REGISTRY }}/subscriptions/fhir-candle
-        kubectl -n subscriptions-ri rollout restart deployment/fhir-candle
+        kubectl -n subscriptions-ri rollout restart deployment

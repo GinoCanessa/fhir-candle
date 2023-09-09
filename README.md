@@ -104,6 +104,7 @@ Note: items are unsorted within their priorities
 * Resource display / edit in UI
 * Subscription RI scenario/walkthrough
 * Resource editor design improvements
+* Add loading packages/profiles to CapabilityStatement
 
 ## Mid Priority
 * SMART support

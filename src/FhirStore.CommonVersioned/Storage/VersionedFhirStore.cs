@@ -3862,6 +3862,12 @@ public partial class VersionedFhirStore : IFhirStore
             Software = new()
             {
                 Name = "fhir-candle",
+                Version = @GetType()?.Assembly?.GetName()?.Version?.ToString() ?? "0.0.0.0",
+            },
+            Implementation = new()
+            {
+                Description = "fhir-candle: A FHIR Server for testing and development",
+                Url = "https://github.com/GinoCanessa/fhir-candle",
             },
             FhirVersion = CommonToFirelyVersion(_config.FhirVersion),
             Format = _config.SupportedFormats,
@@ -3934,7 +3940,7 @@ public partial class VersionedFhirStore : IFhirStore
                         Name = sp.Name,
                         Definition = sp.Url,
                         Type = sp.Type,
-                        Documentation = sp.Description,
+                        Documentation = string.IsNullOrEmpty(sp.Description) ? null : sp.Description,
                     }).ToList(),
                 Operation = _operations.Values
                     .Where(o => 

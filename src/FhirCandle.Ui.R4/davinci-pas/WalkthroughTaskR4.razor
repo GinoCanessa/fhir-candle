@@ -132,7 +132,7 @@
                     <MudDivider />
                     <br />
 
-                    <MudText Typo="Typo.h6">Supporting Resources (optional)</MudText>
+                    <MudText Typo="Typo.h6">Supporting Resources (min one required)</MudText>
                     @foreach (ResourceInfo sd in _claimSupportingData)
                     {
                         <MudCheckBox @bind-Checked="sd.Selected"><code>@sd.Display</code></MudCheckBox>

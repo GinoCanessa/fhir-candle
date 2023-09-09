@@ -4154,9 +4154,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                             },
                         });
 
@@ -4206,9 +4204,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                                 Location = location,
                             },
                         });
@@ -4257,9 +4253,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                                 Location = location,
                             },
                         });
@@ -4364,9 +4358,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                             },
                         });
 

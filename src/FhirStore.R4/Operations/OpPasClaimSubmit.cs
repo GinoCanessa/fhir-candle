@@ -252,9 +252,7 @@ public class OpPasClaimSubmit : IFhirOperation
                     Status = sc.ToString(),
                     Outcome = subOutcome,
                     Etag = eTag,
-                    LastModified = Models.ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                        ? dto
-                        : null,
+                    LastModified = r?.Meta?.LastUpdated ?? null,
                     Location = location,
                 },
             });

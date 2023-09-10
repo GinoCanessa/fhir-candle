@@ -31,7 +31,7 @@ public class ParsedSubscriptionTopic
         bool DeleteAutoPass,
         bool DeleteAutoFail,
         bool RequireBothQueries,
-        string FhirPathCritiera);
+        string FhirPathCriteria);
 
     /// <summary>An event trigger.</summary>
     /// <param name="ResourceType">Type of the resource.</param>

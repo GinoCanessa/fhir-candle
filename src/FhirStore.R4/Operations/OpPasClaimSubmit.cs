@@ -349,13 +349,13 @@ public class OpPasClaimSubmit : IFhirOperation
                 {
                     FullUrl = $"ClaimResponse/{cr.Id}",
                     Resource = cr,
-                    Response = new Bundle.ResponseComponent()
-                    {
-                        Status = HttpStatusCode.Created.ToString(),
-                        Etag = Guid.NewGuid().ToString(),
-                        LastModified = cr.Meta.LastUpdated,
-                        Location = $"ClaimResponse/{cr.Id}",
-                    },
+                    // Response = new Bundle.ResponseComponent()
+                    // {
+                    //     Status = HttpStatusCode.Created.ToString(),
+                    //     Etag = Guid.NewGuid().ToString(),
+                    //     LastModified = cr.Meta.LastUpdated,
+                    //     Location = $"ClaimResponse/{cr.Id}",
+                    // },
                 },
             },
         };
@@ -380,13 +380,13 @@ public class OpPasClaimSubmit : IFhirOperation
             {
                 FullUrl = e.FullUrl,
                 Resource = e.Resource,
-                Response = new Bundle.ResponseComponent()
-                {
-                    Status = HttpStatusCode.Created.ToString(),
-                    Etag = Guid.NewGuid().ToString(),
-                    LastModified = e.Resource?.Meta?.LastUpdated ?? null,
-                    Location = e.FullUrl,
-                },
+                // Response = new Bundle.ResponseComponent()
+                // {
+                //     Status = HttpStatusCode.Created.ToString(),
+                //     Etag = Guid.NewGuid().ToString(),
+                //     LastModified = e.Resource?.Meta?.LastUpdated ?? null,
+                //     Location = e.FullUrl,
+                // },
             });
         }
 

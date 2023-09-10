@@ -447,7 +447,7 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
                             QueryCurrent = string.Empty,
                             DeleteAutoPass = false,
                             DeleteAutoFail = false,
-                            FhirPathCritiera = fpCriteria,
+                            FhirPathCriteria = fpCriteria,
                         }
                     }
                 },

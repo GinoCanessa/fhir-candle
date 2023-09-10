@@ -752,7 +752,7 @@ public class R4TestSubscriptions : IClassFixture<R4Tests>
                             QueryCurrent = string.Empty,
                             DeleteAutoPass = false,
                             DeleteAutoFail = false,
-                            FhirPathCritiera = fpCriteria,
+                            FhirPathCriteria = fpCriteria,
                         }
                     }
                 },

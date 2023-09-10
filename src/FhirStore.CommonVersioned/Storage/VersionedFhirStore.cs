@@ -1710,16 +1710,19 @@ public partial class VersionedFhirStore : IFhirStore
         out string lastModified,
         out string location)
     {
-        // allow empty ids during load
-        if (string.IsNullOrEmpty(resourceType) && (_loadState == LoadStateCodes.Read))
+        if (_loadState == LoadStateCodes.Read)
         {
-            resourceType = content.TypeName;
-        }
+            // allow empty ids during load
+            if (string.IsNullOrEmpty(resourceType))
+            {
+                resourceType = content.TypeName;
+            }
 
-        // allow empty ids during load
-        if (string.IsNullOrEmpty(id) && (_loadState == LoadStateCodes.Read))
-        {
-            id = content.Id;
+            // allow empty ids during load
+            if (string.IsNullOrEmpty(id))
+            {
+                id = content.Id;
+            }
         }
 
         if (content.TypeName != resourceType)

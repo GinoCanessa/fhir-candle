@@ -1238,6 +1238,13 @@ public class ParsedSearchParameter
     /// <returns>True if it succeeds, false if it fails.</returns>
     public static bool TryParseDateString(string dateString, out DateTimeOffset start, out DateTimeOffset end)
     {
+        if (string.IsNullOrEmpty(dateString))
+        {
+            start = DateTimeOffset.MinValue;
+            end = DateTimeOffset.MaxValue;
+            return false;
+        }
+
         // need to check for just year because DateTime refuses to parse that
         if (dateString.Length == 4)
         {

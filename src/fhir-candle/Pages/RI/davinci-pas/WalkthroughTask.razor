@@ -20,7 +20,7 @@
         <MudLink Href="http://hl7.org/fhir/us/davinci-pas/"
                  Underline="Underline.Always">hl7.org</MudLink>.
         <br />
-        Note that this walkthrough uses two internal FHIR endpoints, one for a Provider and one for a Payer.
+        Note that this walkthrough uses two internal FHIR endpoints, one for a Provider and one for a Payer or Intermediary.
     </MudText>
     <br />
 
@@ -74,6 +74,11 @@
                 _payer = store;
                 _payer.OnChanged += Store_OnChanged;
             }
+            else if (name.Contains("intermediary", StringComparison.OrdinalIgnoreCase))
+            {
+                _payer = store;
+                _payer.OnChanged += Store_OnChanged;
+            }
         }
 
         // notify of store root in case user clicked here directly
@@ -105,6 +110,11 @@
                     _provider.OnChanged += Store_OnChanged;
                 }
                 else if (name.Contains("payer", StringComparison.OrdinalIgnoreCase))
+                {
+                    _payer = store;
+                    _payer.OnChanged += Store_OnChanged;
+                }
+                else if (name.Contains("intermediary", StringComparison.OrdinalIgnoreCase))
                 {
                     _payer = store;
                     _payer.OnChanged += Store_OnChanged;

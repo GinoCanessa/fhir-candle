@@ -4,6 +4,7 @@
 // </copyright>
 
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -95,7 +96,7 @@ public class OpPasClaimSubmit : IFhirOperation
         out string contentLocation)
     {
         if ((bodyResource == null) ||
-            (bodyResource is not Bundle b))
+            (bodyResource is not Bundle cb))
         {
             responseResource = null;
             responseOutcome = new OperationOutcome()
@@ -116,7 +117,7 @@ public class OpPasClaimSubmit : IFhirOperation
             return HttpStatusCode.UnprocessableEntity;
         }
 
-        if (b.Type != Bundle.BundleType.Collection)
+        if (cb.Type != Bundle.BundleType.Collection)
         {
             responseResource = null;
             responseOutcome = new OperationOutcome()
@@ -137,7 +138,7 @@ public class OpPasClaimSubmit : IFhirOperation
             return HttpStatusCode.UnprocessableEntity;
         }
 
-        IEnumerable<Resource> claims = b.Entry.Select(e => e.Resource).Where(r => r is Claim);
+        IEnumerable<Resource> claims = cb.Entry.Select(e => e.Resource).Where(r => r is Claim);
 
         if (!claims.Any())
         {
@@ -167,114 +168,252 @@ public class OpPasClaimSubmit : IFhirOperation
         };
 
 
-        Bundle response = new()
+        // ensure that the first entry is a claim
+        if (!(cb.Entry[0].Resource is Claim c))
+        {
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.BusinessRule,
+                Diagnostics = $"First entry in bundle is not a Claim.",
+            });
+            
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.BadRequest;
+        }
+
+        if (!c.Identifier.Any())
+        {
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Required,
+                Diagnostics = $"Claim {c.Id} is missing mandatory `identifier` element.",
+            });
+
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.BadRequest;
+        }
+
+        if (c.Provider == null)
+        {
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Required,
+                Diagnostics = $"Claim {c.Id} is missing mandatory `provider` element.",
+            });
+
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.BadRequest;
+        }
+
+        if (!c.Insurance.Any())
+        {
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Required,
+                Diagnostics = $"Claim {c.Id} is missing mandatory `insurance` element.",
+            });
+
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.BadRequest;
+        }
+
+        if (!c.Item.Any())
+        {
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Required,
+                Diagnostics = $"Claim {c.Id} is missing mandatory `item` element.",
+            });
+
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.BadRequest;
+        }
+
+        // store the bundle
+        if (!store.TryCreate("Bundle", cb, out string id, false))
+        {
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Exception,
+                Diagnostics = $"Failed to store claim request bundle.",
+            });
+
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.InternalServerError;
+        }
+
+        // build a claim response
+        ClaimResponse cr = new()
         {
             Id = Guid.NewGuid().ToString(),
             Meta = new()
             {
                 LastUpdated = DateTimeOffset.UtcNow,
             },
-            Type = Bundle.BundleType.Collection,
-            Timestamp = DateTimeOffset.UtcNow,
-            Entry = new List<Bundle.EntryComponent>(),
+            Identifier = new List<Identifier>()
+            {
+                new Identifier()
+                {
+                    System = "http://hl7.org/fhir/us/davinci-pas/ClaimResponse",
+                    Value = Guid.NewGuid().ToString(),
+                },
+            },
+            Status = FinancialResourceStatusCodes.Active,
+            Type = new CodeableConcept()
+            {
+                Coding = new List<Coding>()
+                {
+                    new Coding()
+                    {
+                        System = "http://terminology.hl7.org/CodeSystem/claim-type",
+                        Code = "professional",
+                    },
+                },
+            },
+            Use = ClaimUseCode.Preauthorization,
+            Patient = c.Patient,
+            Created = DateTime.UtcNow.ToString("o"),
+            Insurer = c.Insurer,
+            Request = new ResourceReference()
+            {
+                Reference = $"Claim/{c.Id}",
+            },
+            Outcome = ClaimProcessingCodes.Queued,
+            Disposition = "Claim accepted.",
+            // Item = new List<ClaimResponse.ItemComponent>(),
+            Item = c.Item.Select(ci => new ClaimResponse.ItemComponent()
+            {
+                ItemSequence = ci.Sequence,
+                NoteNumber = new List<int?>() { 1 },
+                Adjudication = new List<ClaimResponse.AdjudicationComponent>()
+                {
+                    new ClaimResponse.AdjudicationComponent()
+                    {
+                        Category = new CodeableConcept()
+                        {
+                            Coding = new List<Coding>()
+                            {
+                                new Coding()
+                                {
+                                    System = "http://terminology.hl7.org/CodeSystem/adjudication",
+                                    Code = "submitted",
+                                },
+                            },
+                        },
+                    },
+                },
+            }).ToList(),
         };
 
-        foreach (Resource entry in b.Entry.Select(e => e.Resource).Where(r => r != null))
+        // store the claim response locally
+        if (!store.TryCreate(cr.TypeName, cr, out string claimResponseId, false))
         {
-            if (entry is Claim c)
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
-                if (!c.Identifier.Any())
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Exception,
+                Diagnostics = $"Failed to store claim response.",
+            });
+
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.InternalServerError;
+        }
+
+        // build a claim response bundle
+        Bundle crb = new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Meta = new()
+            {
+                LastUpdated = DateTimeOffset.UtcNow,
+            },
+            Identifier = cb.Identifier,
+            Type = Bundle.BundleType.Collection,
+            Timestamp = DateTimeOffset.UtcNow,
+            Entry = new List<Bundle.EntryComponent>()
+            {
+                new Bundle.EntryComponent()
                 {
-                    responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+                    FullUrl = $"ClaimResponse/{cr.Id}",
+                    Resource = cr,
+                    Response = new Bundle.ResponseComponent()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Error,
-                        Code = OperationOutcome.IssueType.Required,
-                        Diagnostics = $"Claim {c.Id} is missing mandatory `identifier` element.",
-                    });
+                        Status = HttpStatusCode.Created.ToString(),
+                        Etag = Guid.NewGuid().ToString(),
+                        LastModified = cr.Meta.LastUpdated,
+                        Location = $"ClaimResponse/{cr.Id}",
+                    },
+                },
+            },
+        };
 
-                    continue;
-                }
-
-                if (c.Provider == null)
-                {
-                    responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Error,
-                        Code = OperationOutcome.IssueType.Required,
-                        Diagnostics = $"Claim {c.Id} is missing mandatory `provider` element.",
-                    });
-
-                    continue;
-                }
-
-                if (!c.Insurance.Any())
-                {
-                    responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Error,
-                        Code = OperationOutcome.IssueType.Required,
-                        Diagnostics = $"Claim {c.Id} is missing mandatory `insurance` element.",
-                    });
-
-                    continue;
-                }
-
-                if (!c.Item.Any())
-                {
-                    responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Error,
-                        Code = OperationOutcome.IssueType.Required,
-                        Diagnostics = $"Claim {c.Id} is missing mandatory `item` element.",
-                    });
-
-                    continue;
-                }
+        // copy items from the claim request bundle to the response bundle
+        foreach (Bundle.EntryComponent e in cb.Entry)
+        {
+            if (e.Resource == null)
+            {
+                continue;
             }
 
-            HttpStatusCode sc = store.DoInstanceCreate(
-                entry.TypeName,
-                entry,
-                string.Empty,
-                true,
-                out Resource? r,
-                out OperationOutcome subOutcome,
-                out string eTag,
-                out string lastModified,
-                out string location);
-
-            response.Entry.Add(new Bundle.EntryComponent()
+            // skip all resources except for organization, patient, and coverage
+            if ((e.Resource is not Organization) &&
+                (e.Resource is not Patient) &&
+                (e.Resource is not Coverage))
             {
-                FullUrl = location,
-                Resource = r,
+                continue;
+            }
+
+            crb.Entry.Add(new Bundle.EntryComponent()
+            {
+                FullUrl = e.FullUrl,
+                Resource = e.Resource,
                 Response = new Bundle.ResponseComponent()
                 {
-                    Status = sc.ToString(),
-                    Outcome = subOutcome,
-                    Etag = eTag,
-                    LastModified = Models.ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                        ? dto
-                        : null,
-                    Location = location,
+                    Status = HttpStatusCode.Created.ToString(),
+                    Etag = Guid.NewGuid().ToString(),
+                    LastModified = e.Resource?.Meta?.LastUpdated ?? null,
+                    Location = e.FullUrl,
                 },
             });
         }
 
-        responseResource = response;
-        responseOutcome = responseOutcome ?? new OperationOutcome()
+        // store the claim response bundle
+        if (!store.TryCreate(crb.TypeName, crb, out string claimResponseBundleId, false))
         {
-            Id = Guid.NewGuid().ToString(),
-            Issue = new List<OperationOutcome.IssueComponent>()
-                {
-                    new OperationOutcome.IssueComponent()
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Success,
-                        Code = OperationOutcome.IssueType.Success,
-                        Diagnostics = "See response bundle for details.",
-                    },
-                },
-        };
-        contentLocation = string.Empty;
+            responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+            {
+                Severity = OperationOutcome.IssueSeverity.Error,
+                Code = OperationOutcome.IssueType.Exception,
+                Diagnostics = $"Failed to store claim response bundle.",
+            });
+
+            responseResource = null;
+            contentLocation = string.Empty;
+            return HttpStatusCode.InternalServerError;
+        }
+
+        responseResource = crb;
+        responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
+        {
+            Severity = OperationOutcome.IssueSeverity.Success,
+            Code = OperationOutcome.IssueType.Informational,
+            Diagnostics = $"Claim request has been accepted and a claim response bundle stored.",
+        });
+
+        contentLocation = string.Empty;;
 
         return HttpStatusCode.OK;
     }

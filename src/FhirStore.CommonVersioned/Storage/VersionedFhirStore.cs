@@ -436,12 +436,15 @@ public partial class VersionedFhirStore : IFhirStore
                 switch (file.Extension.ToLowerInvariant())
                 {
                     case ".json":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+json",
                             "application/fhir+json",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -452,12 +455,15 @@ public partial class VersionedFhirStore : IFhirStore
                         break;
 
                     case ".xml":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+xml",
                             "application/fhir+xml",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -472,6 +478,11 @@ public partial class VersionedFhirStore : IFhirStore
                 }
 
                 Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+
+                if (!sc.IsSuccessful())
+                {
+                    Console.WriteLine(serializedOutcome);
+                }
             }
         }
 
@@ -488,12 +499,15 @@ public partial class VersionedFhirStore : IFhirStore
                 switch (file.Extension.ToLowerInvariant())
                 {
                     case ".json":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+json",
                             "application/fhir+json",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -504,12 +518,15 @@ public partial class VersionedFhirStore : IFhirStore
                         break;
 
                     case ".xml":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+xml",
                             "application/fhir+xml",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -524,6 +541,11 @@ public partial class VersionedFhirStore : IFhirStore
                 }
 
                 Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+
+                if (!sc.IsSuccessful())
+                {
+                    Console.WriteLine(serializedOutcome);
+                }
             }
         }
 
@@ -1688,6 +1710,21 @@ public partial class VersionedFhirStore : IFhirStore
         out string lastModified,
         out string location)
     {
+        if (_loadState == LoadStateCodes.Read)
+        {
+            // allow empty ids during load
+            if (string.IsNullOrEmpty(resourceType))
+            {
+                resourceType = content.TypeName;
+            }
+
+            // allow empty ids during load
+            if (string.IsNullOrEmpty(id))
+            {
+                id = content.Id;
+            }
+        }
+
         if (content.TypeName != resourceType)
         {
             resource = null;

@@ -849,55 +849,56 @@ public class R4TestSubscriptions : IClassFixture<R4Tests>
     }
 }
 
-/// <summary>A 4 test transactions.</summary>
-public class R4TestTransactions: IClassFixture<R4Tests>
-{
-    /// <summary>(Immutable) The test output helper.</summary>
-    private readonly ITestOutputHelper _testOutputHelper;
+// /// <summary>A 4 test transactions.</summary>
+// public class R4TestTransactions: IClassFixture<R4Tests>
+// {
+//     /// <summary>(Immutable) The test output helper.</summary>
+//     private readonly ITestOutputHelper _testOutputHelper;
 
-    /// <summary>Gets the configurations.</summary>
-    public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
+//     /// <summary>Gets the configurations.</summary>
+//     public static IEnumerable<object[]> Configurations => FhirStoreTests.TestConfigurations;
 
-    /// <summary>(Immutable) The fixture.</summary>
-    private readonly R4Tests _fixture;
+//     /// <summary>(Immutable) The fixture.</summary>
+//     private readonly R4Tests _fixture;
 
-    /// <summary>
-    /// Initializes a new instance of the fhir.candle.Tests.TestSubscriptionInternals class.
-    /// </summary>
-    /// <param name="fixture">         (Immutable) The fixture.</param>
-    /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
-    public R4TestTransactions(R4Tests fixture, ITestOutputHelper testOutputHelper)
-    {
-        _fixture = fixture;
-        _testOutputHelper = testOutputHelper;
-    }
+//     /// <summary>
+//     /// Initializes a new instance of the fhir.candle.Tests.TestSubscriptionInternals class.
+//     /// </summary>
+//     /// <param name="fixture">         (Immutable) The fixture.</param>
+//     /// <param name="testOutputHelper">(Immutable) The test output helper.</param>
+//     public R4TestTransactions(R4Tests fixture, ITestOutputHelper testOutputHelper)
+//     {
+//         _fixture = fixture;
+//         _testOutputHelper = testOutputHelper;
+//     }
 
-    ///// <summary>Parse topic.</summary>
-    ///// <param name="json">The JSON.</param>
-    //[Theory]
-    //[FileData("data/r4/Bundle-transaction-cdex-load-payer.json")]
-    //public void ProcessBundle(string json)
-    //{
-    //    HttpStatusCode sc = _fixture._store.ProcessBundle(
-    //        json,
-    //        "application/fhir+json",
-    //        "application/fhir+json",
-    //        false,
-    //        out string serializedResource,
-    //        out string serializedOutcome);
+//     /// <summary>Parse topic.</summary>
+//     /// <param name="json">The JSON.</param>
+//     [Theory]
+//     // [FileData("data/r4/Bundle-transaction-cdex-load-payer.json")]
+//     [FileData("data/r4/Bundle-pas-test-claim-01.json")]
+//     public void ProcessBundle(string json)
+//     {
+//        HttpStatusCode sc = _fixture._store.ProcessBundle(
+//            json,
+//            "application/fhir+json",
+//            "application/fhir+json",
+//            false,
+//            out string serializedResource,
+//            out string serializedOutcome);
 
-    //    sc.Should().Be(HttpStatusCode.OK);
-    //    serializedResource.Should().NotBeNullOrEmpty();
-    //    serializedOutcome.Should().NotBeNullOrEmpty();
+//        sc.Should().Be(HttpStatusCode.OK);
+//        serializedResource.Should().NotBeNullOrEmpty();
+//        serializedOutcome.Should().NotBeNullOrEmpty();
 
-    //    sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
-    //        serializedResource,
-    //        "application/fhir+json",
-    //        out Hl7.Fhir.Model.Resource? r,
-    //        out _);
+//        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+//            serializedResource,
+//            "application/fhir+json",
+//            out Hl7.Fhir.Model.Resource? r,
+//            out _);
 
-    //    sc.Should().Be(HttpStatusCode.OK);
-    //    r.Should().NotBeNull();
-    //    r!.TypeName.Should().Be("Bundle");
-    //}
-}
+//        sc.Should().Be(HttpStatusCode.OK);
+//        r.Should().NotBeNull();
+//        r!.TypeName.Should().Be("Bundle");
+//     }
+// }

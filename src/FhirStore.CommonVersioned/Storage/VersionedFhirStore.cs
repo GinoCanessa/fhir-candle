@@ -1987,13 +1987,13 @@ public partial class VersionedFhirStore : IFhirStore
                     }
 
                     // prefer FHIRPath if present
-                    if (!string.IsNullOrEmpty(rt.FhirPathCritiera))
+                    if (!string.IsNullOrEmpty(rt.FhirPathCriteria))
                     {
                         fhirPathTriggers.Add(new(
                             onCreate,
                             onUpdate,
                             onDelete,
-                            CompileFhirPathCriteria(rt.FhirPathCritiera)));
+                            CompileFhirPathCriteria(rt.FhirPathCriteria)));
 
                         canExecute = true;
                         executesOnResource = true;

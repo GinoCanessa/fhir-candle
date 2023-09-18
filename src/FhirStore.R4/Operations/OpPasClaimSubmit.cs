@@ -167,7 +167,6 @@ public class OpPasClaimSubmit : IFhirOperation
             Issue = new List<OperationOutcome.IssueComponent>(),
         };
 
-
         // ensure that the first entry is a claim
         if (!(cb.Entry[0].Resource is Claim c))
         {

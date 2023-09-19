@@ -15,7 +15,7 @@
 
 <MudStack>
     <MudPaper>
-        <MudGrid Spacing="2" Justify="Justify.FlexStart">
+        <MudGrid Spacing="2" Justify="Justify.FlexStart" Style="align-items: center;">
             <MudItem xs="2">
                 <MudSelect T="string"
                            Label="Format"
@@ -27,6 +27,34 @@
                     <MudSelectItem Value="@("xml")">XML</MudSelectItem>
                 </MudSelect>
             </MudItem>
+
+            @switch (_store.Config.FhirVersion)
+            {
+                case TenantConfiguration.SupportedFhirVersions.R4:
+                    <FhirCandle.Ui.R4.Components.FhirEditorLinks
+                        BaseUrl="@_store.Config.BaseUrl"
+                        ResourceType="@ResourceType"
+                        Id="@Id"
+                        />
+                    break;
+
+                case TenantConfiguration.SupportedFhirVersions.R4B:
+                    <FhirCandle.Ui.R4B.Components.FhirEditorLinks
+                        BaseUrl="@_store.Config.BaseUrl"
+                        ResourceType="@ResourceType"
+                        Id="@Id"
+                        />
+                    break;
+
+                case TenantConfiguration.SupportedFhirVersions.R5:
+                    <FhirCandle.Ui.R5.Components.FhirEditorLinks
+                        BaseUrl="@_store.Config.BaseUrl"
+                        ResourceType="@ResourceType"
+                        Id="@Id"
+                        />
+                    break;
+            }
+
         </MudGrid>
     </MudPaper>
 

@@ -4,6 +4,7 @@
 @using BlazorMonaco
 @using BlazorMonaco.Editor
 
+@inject ServerConfiguration ServerConfig
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IFhirStoreManager StoreManager
@@ -35,6 +36,7 @@
                         BaseUrl="@_store.Config.BaseUrl"
                         ResourceType="@ResourceType"
                         Id="@Id"
+                        FhirPathLabUrl="@ServerConfig.FhirPathLabUrl"
                         />
                     break;
 
@@ -43,6 +45,7 @@
                         BaseUrl="@_store.Config.BaseUrl"
                         ResourceType="@ResourceType"
                         Id="@Id"
+                        FhirPathLabUrl="@ServerConfig.FhirPathLabUrl"
                         />
                     break;
 
@@ -51,6 +54,7 @@
                         BaseUrl="@_store.Config.BaseUrl"
                         ResourceType="@ResourceType"
                         Id="@Id"
+                        FhirPathLabUrl="@ServerConfig.FhirPathLabUrl"
                         />
                     break;
             }

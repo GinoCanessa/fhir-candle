@@ -164,6 +164,11 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue("SMTP_Password", string.Empty) ?? string.Empty,
             "SMTP Password");
 
+        Option<string> optFhirPathLabUrl = new(
+            name: "--fhirpath-lab-url",
+            getDefaultValue: () => configuration.GetValue("FHIRPath_Lab_Url", string.Empty) ?? string.Empty,
+            "FHIRPath Lab URL");
+
         RootCommand rootCommand = new()
         {
             optPublicUrl,
@@ -188,6 +193,7 @@ public static partial class Program
             optSmtpPort,
             optSmtpUser,
             optSmtpPassword,
+            optFhirPathLabUrl,
         };
 
         rootCommand.Description = "A lightweight in-memory FHIR server, for when a small FHIR will do.";
@@ -218,6 +224,7 @@ public static partial class Program
                 SmtpPort = context.ParseResult.GetValueForOption(optSmtpPort) ?? 0,
                 SmtpUser = context.ParseResult.GetValueForOption(optSmtpUser) ?? string.Empty,
                 SmtpPassword = context.ParseResult.GetValueForOption(optSmtpPassword) ?? string.Empty,
+                FhirPathLabUrl = context.ParseResult.GetValueForOption(optFhirPathLabUrl) ?? string.Empty,
             };
 
             await RunServer(config, context.GetCancellationToken());
@@ -248,6 +255,11 @@ public static partial class Program
             if (config.PublicUrl.EndsWith('/'))
             {
                 config.PublicUrl = config.PublicUrl.Substring(0, config.PublicUrl.Length - 1);
+            }
+
+            if (config.FhirPathLabUrl.EndsWith('/'))
+            {
+                config.FhirPathLabUrl = config.FhirPathLabUrl.Substring(0, config.FhirPathLabUrl.Length - 1);
             }
 
             // check for no tenants (create defaults)

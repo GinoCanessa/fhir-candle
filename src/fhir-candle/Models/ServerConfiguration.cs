@@ -78,4 +78,9 @@ public class ServerConfiguration
 
     /// <summary>Gets or sets the SMTP password.</summary>
     public string SmtpPassword { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the FHIRPath Lab URL.
+    /// </summary>
+    public string FhirPathLabUrl { get; set; } = string.Empty;
 }

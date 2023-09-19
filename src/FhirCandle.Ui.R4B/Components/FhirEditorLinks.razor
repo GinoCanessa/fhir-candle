@@ -1,25 +1,28 @@
-<MudItem xs="2">
-
-@switch (ResourceType)
+@if (!string.IsNullOrEmpty(FhirPathLabUrl))
 {
-    case "SearchParameter":
-    case "SubscriptionTopic":
-    case "StructureMap":
-    case "StructureDefinition":
-    case "Questionnaire":
-    case "Library":
-        <MudButton
-            Size="Size.Small"
-            Variant="Variant.Filled"
-            Color="Color.Primary"
-            Href="@($"https://dev.fhirpath-lab.com/SubscriptionTopic?id={BaseUrl}/{ResourceType}/{Id}")" 
-            Target="_blank"
-        >Edit in FHIRPath Lab</MudButton>
+    <MudItem xs="2">
 
-        break;
+    @switch (ResourceType)
+    {
+        case "SearchParameter":
+        case "SubscriptionTopic":
+        case "StructureMap":
+        case "StructureDefinition":
+        case "Questionnaire":
+        case "Library":
+            <MudButton
+                Size="Size.Small"
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                Href="@($"{FhirPathLabUrl}/SubscriptionTopic?id={BaseUrl}/{ResourceType}/{Id}")" 
+                Target="_blank"
+            >Edit in FHIRPath Lab</MudButton>
+
+            break;
+    }
+
+    </MudItem>
 }
-
-</MudItem>
 
 @code {
     [Parameter]
@@ -30,4 +33,7 @@
 
     [Parameter]
     public string Id { get; set; } = string.Empty;
+
+    [Parameter]
+    public string FhirPathLabUrl { get; set; } = string.Empty;
 }

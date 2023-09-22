@@ -20,7 +20,7 @@
         <MudLink Href="http://hl7.org/fhir/us/davinci-pas/"
                  Underline="Underline.Always">hl7.org</MudLink>.
         <br />
-        Note that this walkthrough uses two internal FHIR endpoints, one for a Provider and one for a Payer.
+        Note that this walkthrough uses two internal FHIR endpoints, one for a Provider and one for a Payer or Intermediary.
     </MudText>
     <br />
 
@@ -42,10 +42,10 @@
     public static string ContentFor { get => "hl7.fhir.us.davinci-pas"; }
 
     /// <summary>Gets the name of the page.</summary>
-    public static string PageName { get => "PAS-CDex Walkthrough"; }
+    public static string PageName { get => "PAS Walkthrough"; }
 
     /// <summary>Gets the description.</summary>
-    public static string Description { get => "A walkthrough of a CDex-Based PAS workflow."; }
+    public static string Description { get => "A walkthrough of a FHIR-based PAS workflow."; }
 
     /// <summary>Gets the full pathname of the route file.</summary>
     public static string RoutePath { get => "/davinci-pas/walkthrough"; }
@@ -74,10 +74,15 @@
                 _payer = store;
                 _payer.OnChanged += Store_OnChanged;
             }
+            else if (name.Contains("intermediary", StringComparison.OrdinalIgnoreCase))
+            {
+                _payer = store;
+                _payer.OnChanged += Store_OnChanged;
+            }
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"PAS-CDex Walkthrough", "/davinci-pas/walkthrough", 1);
+        NavTracker?.NotifyNav($"PAS Walkthrough", "/davinci-pas/walkthrough", 1);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -109,10 +114,15 @@
                     _payer = store;
                     _payer.OnChanged += Store_OnChanged;
                 }
+                else if (name.Contains("intermediary", StringComparison.OrdinalIgnoreCase))
+                {
+                    _payer = store;
+                    _payer.OnChanged += Store_OnChanged;
+                }
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"PAS-CDex Walkthrough", "/davinci-pas/walkthrough", 1);
+            NavTracker?.NotifyNav($"PAS Walkthrough", "/davinci-pas/walkthrough", 1);
         }
     }
 

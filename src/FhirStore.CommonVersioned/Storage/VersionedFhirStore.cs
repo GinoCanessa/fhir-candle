@@ -436,12 +436,15 @@ public partial class VersionedFhirStore : IFhirStore
                 switch (file.Extension.ToLowerInvariant())
                 {
                     case ".json":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+json",
                             "application/fhir+json",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -452,12 +455,15 @@ public partial class VersionedFhirStore : IFhirStore
                         break;
 
                     case ".xml":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+xml",
                             "application/fhir+xml",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -472,6 +478,11 @@ public partial class VersionedFhirStore : IFhirStore
                 }
 
                 Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+
+                if (!sc.IsSuccessful())
+                {
+                    Console.WriteLine(serializedOutcome);
+                }
             }
         }
 
@@ -488,12 +499,15 @@ public partial class VersionedFhirStore : IFhirStore
                 switch (file.Extension.ToLowerInvariant())
                 {
                     case ".json":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+json",
                             "application/fhir+json",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -504,12 +518,15 @@ public partial class VersionedFhirStore : IFhirStore
                         break;
 
                     case ".xml":
-                        sc = InstanceCreate(
+                        sc = InstanceUpdate(
+                            string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+xml",
                             "application/fhir+xml",
                             false,
+                            string.Empty,
+                            string.Empty,
                             string.Empty,
                             true,
                             out serializedResource,
@@ -524,6 +541,11 @@ public partial class VersionedFhirStore : IFhirStore
                 }
 
                 Console.WriteLine($"Store[{_config.ControllerName}]:{directive} <<< {sc}: {file.FullName}");
+
+                if (!sc.IsSuccessful())
+                {
+                    Console.WriteLine(serializedOutcome);
+                }
             }
         }
 
@@ -1228,7 +1250,7 @@ public partial class VersionedFhirStore : IFhirStore
 
         switch (requestBundle.Type)
         {
-            //case Bundle.BundleType.Transaction:
+            // case Bundle.BundleType.Transaction:
             //    responseBundle.Type = Bundle.BundleType.TransactionResponse;
             //    ProcessTransaction(requestBundle, responseBundle);
             //    break;
@@ -1688,6 +1710,21 @@ public partial class VersionedFhirStore : IFhirStore
         out string lastModified,
         out string location)
     {
+        if (_loadState == LoadStateCodes.Read)
+        {
+            // allow empty ids during load
+            if (string.IsNullOrEmpty(resourceType))
+            {
+                resourceType = content.TypeName;
+            }
+
+            // allow empty ids during load
+            if (string.IsNullOrEmpty(id))
+            {
+                id = content.Id;
+            }
+        }
+
         if (content.TypeName != resourceType)
         {
             resource = null;
@@ -1987,13 +2024,13 @@ public partial class VersionedFhirStore : IFhirStore
                     }
 
                     // prefer FHIRPath if present
-                    if (!string.IsNullOrEmpty(rt.FhirPathCritiera))
+                    if (!string.IsNullOrEmpty(rt.FhirPathCriteria))
                     {
                         fhirPathTriggers.Add(new(
                             onCreate,
                             onUpdate,
                             onDelete,
-                            CompileFhirPathCriteria(rt.FhirPathCritiera)));
+                            CompileFhirPathCriteria(rt.FhirPathCriteria)));
 
                         canExecute = true;
                         executesOnResource = true;
@@ -3862,6 +3899,12 @@ public partial class VersionedFhirStore : IFhirStore
             Software = new()
             {
                 Name = "fhir-candle",
+                Version = @GetType()?.Assembly?.GetName()?.Version?.ToString() ?? "0.0.0.0",
+            },
+            Implementation = new()
+            {
+                Description = "fhir-candle: A FHIR Server for testing and development",
+                Url = "https://github.com/GinoCanessa/fhir-candle",
             },
             FhirVersion = CommonToFirelyVersion(_config.FhirVersion),
             Format = _config.SupportedFormats,
@@ -3934,7 +3977,7 @@ public partial class VersionedFhirStore : IFhirStore
                         Name = sp.Name,
                         Definition = sp.Url,
                         Type = sp.Type,
-                        Documentation = sp.Description,
+                        Documentation = string.IsNullOrEmpty(sp.Description) ? null : sp.Description,
                     }).ToList(),
                 Operation = _operations.Values
                     .Where(o => 
@@ -3969,28 +4012,98 @@ public partial class VersionedFhirStore : IFhirStore
         _capabilitiesAreStale = false;
     }
 
+    private record class TransactionResourceInfo
+    {
+        public required string FullUrl { get; init; }
+
+        public required string OriginalId { get; init; }
+
+        public required string NewId { get; init; }
+
+        public required bool IsRoot { get; init; }
+    }
+
     private record class TransactionReferenceInfo
     {
         public required string FullUrl { get; init; }
+
         public required string ReferenceLiteral { get; init; }
+
+        public required string ReferenceLiteralFragment { get; init; }
+
+        public required string IdentifierSystem { get; init; }
+
+        public required string IdentifierValue { get; init; }
 
         public string LocalReference { get; set; } = string.Empty;
     }
 
-    private void FindReferences(string fullUrl, object o, List<TransactionReferenceInfo> references)
+    private void FindTransactionReferences(
+        string fullUrl, 
+        object o, 
+        List<TransactionReferenceInfo> references,
+        List<TransactionResourceInfo> resources,
+        bool isRoot = false)
     {
+        if (o == null)
+        {
+            return;
+        }
+
         switch (o)
         {
             case null:
             case Hl7.Fhir.Model.PrimitiveType:
                 return;
 
+            case Hl7.Fhir.Model.Resource resource:
+                {
+                    resources.Add(new()
+                    {
+                        FullUrl = fullUrl,
+                        OriginalId = ((Hl7.Fhir.Model.Resource)o).Id,
+                        NewId = Guid.NewGuid().ToString(),
+                        IsRoot = isRoot,
+                    });
+
+                    foreach (Base child in resource.Children)
+                    {
+                        FindTransactionReferences(
+                            fullUrl, 
+                            child,
+                            references,
+                            resources,
+                            false);
+                    }
+
+                    return;
+                }
+
             case Hl7.Fhir.Model.ResourceReference rr:
                 {
+                    string rl = ((Hl7.Fhir.Model.ResourceReference)o).Reference ?? string.Empty;
+                    string frag;
+
+                    if (rl.Contains('#'))
+                    {
+                        rl = rl.Substring(0, rl.IndexOf('#'));
+                        frag = rl.Substring(rl.IndexOf('#') + 1);
+                    }
+                    else
+                    {
+                        frag = string.Empty;
+                    }
+
+                    string system = ((Hl7.Fhir.Model.ResourceReference)o).Identifier?.System ?? string.Empty;
+                    string value = ((Hl7.Fhir.Model.ResourceReference)o).Identifier?.Value ?? string.Empty;
+
                     references.Add(new()
                     {
                         FullUrl = fullUrl,
-                        ReferenceLiteral = ((Hl7.Fhir.Model.ResourceReference)o).Reference,
+                        ReferenceLiteral = rl,
+                        ReferenceLiteralFragment = frag,
+                        IdentifierSystem = system,
+                        IdentifierValue = value,
                         LocalReference = Guid.NewGuid().ToString(),
                     });
 
@@ -4000,7 +4113,12 @@ public partial class VersionedFhirStore : IFhirStore
             case Hl7.Fhir.Model.Base b:
                 foreach (Base child in b.Children)
                 {
-                    FindReferences(fullUrl, child, references);
+                    FindTransactionReferences(
+                        fullUrl, 
+                        child,
+                        references,
+                        resources,
+                        false);
                 }
                 break;
         }
@@ -4014,15 +4132,34 @@ public partial class VersionedFhirStore : IFhirStore
         Bundle response)
     {
         List<TransactionReferenceInfo> references = new();
+        List<TransactionResourceInfo> resources = new();
 
         foreach (Bundle.EntryComponent entry in transaction.Entry)
         {
-            FindReferences(entry.FullUrl, entry.Resource, references);
+            FindTransactionReferences(entry.FullUrl, entry.Resource, references, resources, true);
+        }
+
+        Dictionary<string, string> knownResources = new();
+
+        foreach (TransactionResourceInfo ri in resources)
+        {
+            Console.WriteLine($"ProcessTransaction <<< {ri.FullUrl} {ri.OriginalId} {ri.NewId} {ri.IsRoot}");
+            knownResources.Add(ri.OriginalId, ri.NewId);
         }
 
         foreach (TransactionReferenceInfo i in references)
         {
+            if (string.IsNullOrEmpty(i.ReferenceLiteral))
+            {
+                continue;
+            }
+
             Console.WriteLine($"ProcessTransaction <<< {i.FullUrl} contains {i.ReferenceLiteral}");
+
+            if (!knownResources.ContainsKey(i.ReferenceLiteral))
+            {
+                Console.WriteLine($"ProcessTransaction <<< {i.FullUrl} contains unknown reference literal: {i.ReferenceLiteral}");
+            }
         }
 
         // TODO: finish implementing transaction support
@@ -4148,9 +4285,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                             },
                         });
 
@@ -4200,9 +4335,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                                 Location = location,
                             },
                         });
@@ -4251,9 +4384,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                                 Location = location,
                             },
                         });
@@ -4358,9 +4489,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Status = sc.ToString(),
                                 Outcome = outcome,
                                 Etag = eTag,
-                                LastModified = ParsedSearchParameter.TryParseDateString(lastModified, out DateTimeOffset dto, out _)
-                                    ? dto
-                                    : null,
+                                LastModified = resource?.Meta?.LastUpdated ?? null,
                             },
                         });
 

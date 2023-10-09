@@ -163,6 +163,9 @@ public class ParsedSearchParameter
     /// <summary>Gets or sets the value FHIR codes.</summary>
     public Hl7.Fhir.ElementModel.Types.Code[]? ValueFhirCodes { get; set; }
 
+    /// <summary>Gets or sets a list of types of the value FHIR codes.</summary>
+    public Hl7.Fhir.ElementModel.Types.Code[]? ValueFhirCodeTypes { get; set; }
+
     /// <summary>Gets or sets the value bools.</summary>
     public bool[]? ValueBools { get; set; } = null;
 
@@ -720,19 +723,30 @@ public class ParsedSearchParameter
 
                     // tokens always represent a code and system
                     ValueFhirCodes = new Hl7.Fhir.ElementModel.Types.Code[Values.Length];
+                    ValueFhirCodeTypes = new Hl7.Fhir.ElementModel.Types.Code[Values.Length];
 
                     // traverse values
                     for (int i = 0; i < Values.Length; i++)
                     {
                         string[] components = Values[i].Split('|');
 
-                        if (components.Length == 1)
+                        switch (components.Length)
                         {
-                            ValueFhirCodes[i] = new(null, components[0]);
-                        }
-                        else
-                        {
-                            ValueFhirCodes[i] = new(components[0], components[1]);
+                            // code only (no system)
+                            case 1:
+                                ValueFhirCodes[i] = new(null, components[0]);
+                                break;
+
+                            // system|code
+                            case 2:
+                                ValueFhirCodes[i] = new(components[0], components[1]);
+                                break;
+
+                            // system|code|value
+                            default:
+                                ValueFhirCodeTypes[i] = new(components[0], components[1]);
+                                ValueFhirCodes[i] = new(null, components[2]);
+                                break;
                         }
                     }
                 }
@@ -968,7 +982,7 @@ public class ParsedSearchParameter
             {
                 modifierCode = SearchModifierCodes.ResourceType;
             }
-            else if (!Enum.TryParse(modifierLiteral, true, out modifierCode))
+            else if (!modifierLiteral.TryFhirEnum(out modifierCode))
             {
                 // TODO: need to fail query
                 throw new Exception($"unknown modifier in query: {modifierLiteral} ({key})");

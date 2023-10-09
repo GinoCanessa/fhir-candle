@@ -567,4 +567,69 @@ public static class EvalTokenSearch
         // not is inverted
         return true;
     }
+
+    /// <summary>Tests token of type identifier.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="valueNode">The value node.</param>
+    /// <param name="sp">       The sp.</param>
+    /// <param name="store">    The store.</param>
+    /// <returns>True if the test passes, false if the test fails.</returns>
+    public static bool TestTokenOfType(ITypedElement valueNode, ParsedSearchParameter sp)
+    {
+        if ((valueNode == null) ||
+            (sp.ValueFhirCodes == null))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < sp.ValueFhirCodes.Length; i++)
+        {
+            if (sp.IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            switch (valueNode.InstanceType)
+            {
+                case "Identifier":
+                    {
+                        Hl7.Fhir.Model.Identifier v = valueNode.ToPoco<Hl7.Fhir.Model.Identifier>();
+
+                        // if there is a value, it needs to match
+                        if ((!string.IsNullOrEmpty(sp.ValueFhirCodes[i].Value)) &&
+                            (!v.Value.Equals(sp.ValueFhirCodes[i].Value, StringComparison.Ordinal)))
+
+                        {
+                            continue;
+                        }
+
+                        if ((v.Type?.Coding != null) && (sp.ValueFhirCodeTypes != null))
+                        {
+                            foreach (Hl7.Fhir.Model.Coding c in v.Type.Coding)
+                            {
+                                for (int j = 0; j < sp.ValueFhirCodeTypes.Length; j++)
+                                {
+                                    if (sp.IgnoredValueFlags[j])
+                                    {
+                                        continue;
+                                    }
+
+                                    if (CompareCodeWithSystem(
+                                            c.System ?? string.Empty,
+                                            c.Code ?? string.Empty,
+                                            sp.ValueFhirCodeTypes[j].System ?? string.Empty,
+                                            sp.ValueFhirCodeTypes[j].Value))
+                                    {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+
+        return false;
+    }
 }

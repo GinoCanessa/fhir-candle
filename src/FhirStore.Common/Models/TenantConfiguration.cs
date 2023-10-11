@@ -64,4 +64,10 @@ public class TenantConfiguration
 
     /// <summary>Gets or sets the number of maximum resources.</summary>
     public int MaxResourceCount { get; set; } = 0;
+
+    /// <summary>Gets or sets a value indicating whether the smart required.</summary>
+    public bool SmartRequired { get; set; } = false;
+
+    /// <summary>Gets or sets a value indicating whether smart is allowed.</summary>
+    public bool SmartAllowed { get; set; } = false;
 }

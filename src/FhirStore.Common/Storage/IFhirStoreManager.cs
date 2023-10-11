@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirCandle.Models;
+using FhirStore.Smart;
 using Microsoft.Extensions.Hosting;
 
 namespace FhirCandle.Storage;

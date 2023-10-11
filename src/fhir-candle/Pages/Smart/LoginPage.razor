@@ -1,0 +1,145 @@
+﻿@page "/smart/login"
+@inject NavigationManager NavigationManager
+@inject ISmartAuthManager AuthManager
+
+@implements IDisposable
+
+<PageTitle>SMART Login</PageTitle>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h4">SMART Login</MudText>
+            <MudText Typo="Typo.body1">Please login to the FHIR store: @StoreName.</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudStack Row="true">
+            <MudItem xs="12" sm="7">
+                <MudPaper Class="pa-4">
+                    <MudForm @ref="form" @bind-IsValid="@isValid">
+                        <MudTextField T="string"
+                                      Label="Username"
+                                      @bind-Value="Username"
+                                      Required="true"
+                                      RequiredError="User name is required!" />
+                        <MudTextField T="string"
+                                      Label="Password"
+                                      HelperText="Enter your password"
+                                      @bind-Value="Password"
+                                      RequiredError="Password is required!"
+                                      InputType="@PasswordInput"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@PasswordInputIcon"
+                                      OnAdornmentClick="ToggleShowPassword"
+                                      AdornmentAriaLabel="Show Password" />
+                    </MudForm>
+                </MudPaper>
+                <MudPaper Class="pa-4 mt-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" DisableElevation="true" OnClick="@(()=>form.Validate())">Validate</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" DisableElevation="true" OnClick="@(()=>form.ResetAsync())" Class="mx-2">Reset</MudButton>
+                    <MudButton Variant="Variant.Filled" DisableElevation="true" OnClick="@(()=>form.ResetValidation())">Reset Validation</MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+<MudGrid>
+</MudGrid>
+
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "store")]
+    public string StoreName { get; set; } = "";
+
+    /// <summary>Gets or sets the authorization key.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "key")]
+    public string Key { get; set; } = string.Empty;
+
+    /// <summary>The authorization information.</summary>
+    private SmartAuthorization _auth = null!;
+
+    MudForm form = null!;
+    bool isValid = false;
+
+    private string Username { get; set; } = string.Empty;
+    private string Password { get; set; } = string.Empty;
+
+    bool passwordVisible = false;
+    InputType PasswordInput = InputType.Password;
+    string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // if ((!string.IsNullOrEmpty(StoreName)) &&
+        //     (AuthManager.HasTenant(StoreName)))
+        // {
+        //     //
+        // }
+
+        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
+
+        NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
+    }
+
+    /// <summary>Toggle show password.</summary>
+    void ToggleShowPassword()
+    {
+        if (passwordVisible)
+        {
+            passwordVisible = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            passwordVisible = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+        }
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/smart/login?", StringComparison.Ordinal))
+        {
+            // if (_store != null)
+            // {
+            //     _store.OnChanged -= Store_OnChanged;
+            // }
+
+            // if ((!string.IsNullOrEmpty(StoreName)) &&
+            //     (StoreManager.TryGetValue(StoreName, out _store!)))
+            // {
+            // }
+
+            NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
+        }
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        // if (_store != null)
+        // {
+        // }
+    }
+}

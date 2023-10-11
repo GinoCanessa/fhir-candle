@@ -51,6 +51,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <summary>Gets the loaded supplements.</summary>
     HashSet<string> LoadedSupplements { get; }
 
+    /// <summary>Gets the configuration.</summary>
     public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>

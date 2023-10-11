@@ -1,4 +1,4 @@
-﻿// <copyright file="SmartConfiguration.cs" company="Microsoft Corporation">
+﻿// <copyright file="SmartWellKnown.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
@@ -8,17 +8,17 @@ using System.Text.Json.Serialization;
 namespace FhirStore.Smart;
 
 /// <summary>SMART configuration information, i.e. from /.well-known/smart-configuration.</summary>
-public record class SmartConfiguration
+public record class SmartWellKnown
 {
     /// <summary>
-    /// Gets or sets the string conveying this system’s OpenID Connect Issuer URL. Required
-    /// if the server’s capabilities include sso-openid-connect; otherwise, omitted.
+    /// Gets or sets the string conveying this system's OpenID Connect Issuer URL. Required
+    /// if the server's capabilities include sso-openid-connect; otherwise, omitted.
     /// </summary>
     [JsonPropertyName("issuer")]
     public string Issuer { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the string conveying this system’s JSON Web Key Set URL. Required if the server’s
+    /// Gets or sets the string conveying this system's JSON Web Key Set URL. Required if the server's
     /// capabilities include sso-openid-connect; otherwise, optional.
     /// </summary>
     [JsonPropertyName("jwks_uri")]
@@ -26,7 +26,7 @@ public record class SmartConfiguration
 
     /// <summary>
     /// Gets or sets the array of grant types supported at the token endpoint. The options are
-    /// “authorization_code” (when SMART App Launch is supported) and “client_credentials” (when
+    /// "authorization_code" (when SMART App Launch is supported) and "client_credentials" (when
     /// SMART Backend Services is supported).
     /// </summary>
     [JsonPropertyName("grant_types_supported")]
@@ -42,7 +42,7 @@ public record class SmartConfiguration
 
     /// <summary>
     /// Gets or sets the array of client authentication methods supported by the token endpoint. The
-    /// options are “client_secret_post”, “client_secret_basic”, and “private_key_jwt”.
+    /// options are "client_secret_post", "client_secret_basic", and "private_key_jwt".
     /// </summary>
     [JsonPropertyName("token_endpoint_auth_methods_supported")]
     public IEnumerable<string> TokenEndpointAuthMethods { get; set; } = Enumerable.Empty<string>();
@@ -55,8 +55,8 @@ public record class SmartConfiguration
     public string RegistrationEndpoint { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets URL the to the EHR’s app state endpoint. SHALL be present when the EHR supports the
-    /// smart-app-state capability and the endpoint is distinct from the EHR’s primary endpoint.
+    /// Gets or sets URL the to the EHR's app state endpoint. SHALL be present when the EHR supports the
+    /// smart-app-state capability and the endpoint is distinct from the EHR's primary endpoint.
     /// </summary>
     [JsonPropertyName("smart_app_state_endpoint")]
     public string AppStateEndpoint { get; set; } = string.Empty;
@@ -84,19 +84,22 @@ public record class SmartConfiguration
     public string ManagementEndpoint { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the URL to a server’s introspection endpoint that can be used to validate a
+    /// Gets or sets the URL to a server's introspection endpoint that can be used to validate a
     /// token.
     /// </summary>
     [JsonPropertyName("introspection_endpoint")]
     public string IntrospectionEndpoint { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the URL to a server’s revoke endpoint that can be used to revoke a token.
+    /// Gets or sets the URL to a server's revoke endpoint that can be used to revoke a token.
     /// </summary>
     [JsonPropertyName("revocation_endpoint")]
     public string RecovationEndpoint { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the array of strings representing SMART capabilities (e.g., sso-openid-connect or launch-standalone) that the server supports..</summary>
+    /// <summary>
+    /// Gets or sets the array of strings representing SMART capabilities (e.g., sso-openid-connect
+    /// or launch-standalone) that the server supports.
+    /// </summary>
     [JsonPropertyName("capabilities")]
     public IEnumerable<string> Capabilities { get; set; } = Enumerable.Empty<string>();
 

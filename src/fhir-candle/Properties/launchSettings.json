@@ -23,6 +23,15 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
+    "smart": {
+      "commandName": "Project",
+      "commandLineArgs": "-m 1000 --r4 req --r4 opt --smart-required req --smart-optional opt",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5826",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
     "subscriptions": {
       "commandName": "Project",
       "commandLineArgs": "--reference-implementation subscriptions --load-package hl7.fhir.uv.subscriptions-backport#1.1.0 --load-examples false --protect-source true -m 1000",

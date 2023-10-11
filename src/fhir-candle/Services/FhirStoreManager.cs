@@ -13,6 +13,7 @@ using fhir.candle.Models;
 using FhirCandle.Extensions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
+using FhirStore.Smart;
 using MudBlazor;
 using static Org.BouncyCastle.Math.EC.ECCurve;
 

@@ -4,21 +4,24 @@
 // </copyright>
 
 using System.Net;
+using fhir.candle.Models;
+using fhir.candle.Services;
 using Fhir.Metrics;
 using FhirCandle.Storage;
-using Hl7.Fhir.Rest;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
+using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
 
 /// <summary>A FHIR API controller.</summary>
 [ApiController]
-[Route("fhir", Order = 1)]
+[Route("fhir", Order = 2)]
 [Produces("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
 public class FhirController : ControllerBase
 {
     private IFhirStoreManager _fhirStoreManager;
+    private ISmartAuthManager _smartAuthManager;
 
     private readonly HashSet<string> _acceptMimeTypes = new()
     {
@@ -35,7 +38,9 @@ public class FhirController : ControllerBase
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="fhirStore">The FHIR store.</param>
-    public FhirController([FromServices] IFhirStoreManager fhirStoreManager)            // , [FromServices] IServer host
+    public FhirController(
+        [FromServices] IFhirStoreManager fhirStoreManager,
+        [FromServices] ISmartAuthManager smartAuthManager)
     {
         if (fhirStoreManager == null)
         {
@@ -43,6 +48,13 @@ public class FhirController : ControllerBase
         }
 
         _fhirStoreManager = fhirStoreManager;
+
+        if (smartAuthManager == null)
+        {
+            throw new ArgumentNullException(nameof(smartAuthManager));
+        }
+
+        _smartAuthManager = smartAuthManager;
 
         //if (host != null)
         //{
@@ -129,6 +141,33 @@ public class FhirController : ControllerBase
                 }
                 break;
         }
+    }
+
+    /// <summary>(An Action that handles HTTP GET requests) gets smart well known.</summary>
+    /// <remarks>
+    /// Note that most "core" SMART stuff is in the <see cref="SmartController"/>, but this needs to
+    /// remain here to be discoverable by FHIR clients.
+    /// </remarks>
+    /// <param name="store">The store.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpGet, Route("{store}/.well-known/smart-configuration")]
+    public async Task GetSmartWellKnown(
+        [FromRoute] string store)
+    {
+        // make sure this store exists and has SMART enabled
+        if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
+                store, 
+                out FhirStore.Smart.SmartWellKnown? smartConfig))
+        {
+            Response.StatusCode = 404;
+            return;
+        }
+
+        // SMART well-known configuration is always returned as JSON
+        Response.ContentType = "application/json";
+        Response.StatusCode = (int)HttpStatusCode.OK;
+
+        await Response.WriteAsync(FhirCandle.Serialization.Utils.SerializeObject(smartConfig));
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets a metadata.</summary>

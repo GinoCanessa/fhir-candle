@@ -1,0 +1,68 @@
+﻿@page "/smart/authorize"
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+
+@implements IDisposable
+
+<PageTitle>SMART Login</PageTitle>
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "store")]
+    public string StoreName { get; set; } = "";
+
+    private IFhirStore _store = null!;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if ((!string.IsNullOrEmpty(StoreName)) &&
+            (StoreManager.TryGetValue(StoreName, out _store!)))
+        {
+            //
+        }
+
+        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+    }
+
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/store?", StringComparison.Ordinal))
+        {
+            // if (_store != null)
+            // {
+            //     _store.OnChanged -= Store_OnChanged;
+            // }
+
+            if ((!string.IsNullOrEmpty(StoreName)) &&
+                (StoreManager.TryGetValue(StoreName, out _store!)))
+            {
+            }
+
+            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+        }
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        // if (_store != null)
+        // {
+        // }
+    }
+}

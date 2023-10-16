@@ -589,18 +589,6 @@ public class SearchTester
                         }
                         break;
 
-                    case "token-oftype-code":
-                    case "token-oftype-coding":
-                    case "token-oftype-codeableconcept":
-                    case "token-oftype-contactpoint":
-                    case "token-oftype-canonical":
-                    case "token-oftype-oid":
-                    case "token-oftype-uri":
-                    case "token-oftype-url":
-                    case "token-oftype-uuid":
-                    case "token-oftype-string":
-
-
                     case "reference-above-canonical":
                     case "reference-above-reference":
                     case "reference-above-oid":

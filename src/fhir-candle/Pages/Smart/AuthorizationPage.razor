@@ -1,22 +1,94 @@
-﻿@page "/smart/authorize"
+﻿@page "/smart/auth"
+
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
 
 @implements IDisposable
 
-<PageTitle>SMART Login</PageTitle>
+<PageTitle>SMART Authorization</PageTitle>
+
+@if (string.IsNullOrEmpty(ErrorMessage))
+{
+
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h4">SMART Authorization</MudText>
+                <MudText Typo="Typo.body1">Please select allowed scopes:</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudStack Row="false" Spacing="3">
+                <MudButton Variant="Variant.Outlined" Class="ma-2" OnClick="@(() => ApproveScopes())" >Approve Selected Scopes</MudButton>
+                <MudTable 
+                @ref="_displayTable"
+                T="string"
+                Dense="true"
+                Striped="true"
+                MultiSelection="true"
+                @bind-SelectedItems="_selected"
+                Hover="true"
+                SelectOnRowClick="true"
+                Items="_auth.Scopes.Keys">
+                    <ColGroup>
+                        <col style="width: 5vw!important;" />
+                        <col style="width: 90vw!important;" />
+                    </ColGroup>
+                    <HeaderContent>
+                        <MudTh>Scope</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Scope">@context</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+}
+else
+{
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h4">SMART Authorization</MudText>
+                <MudText Typo="Typo.body1">Error</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudStack Row="false" Spacing="3">
+                <MudText Typo="Typo.body1">@ErrorMessage</MudText>
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+}
+
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    /// <summary>The display table.</summary>
+    private MudTable<string>? _displayTable = null;
+
+    /// <summary>The selected.</summary>
+    private HashSet<string> _selected = new();
+
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "store")]
     public string StoreName { get; set; } = "";
 
-    private IFhirStore _store = null!;
+    /// <summary>Gets or sets the authorization key.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "key")]
+    public string Key { get; set; } = string.Empty;
+
+    public string ErrorMessage { get; set; } = string.Empty;
+
+    /// <summary>The authorization information.</summary>
+    private AuthorizationInfo _auth = null!;
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
@@ -24,34 +96,44 @@
     {
         base.OnInitialized();
 
-        if ((!string.IsNullOrEmpty(StoreName)) &&
-            (StoreManager.TryGetValue(StoreName, out _store!)))
+        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
+
+        if (_auth != null)
         {
-            //
+            _selected = new HashSet<string>(_auth.Scopes.Keys);
         }
 
-        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+        NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
     }
 
+    private void ApproveScopes()
+    {
+        foreach (string scope in _auth.Scopes.Keys)
+        {
+            _auth.Scopes[scope] = _selected.Contains(scope);
+        }
+
+        _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
+
+        if (!AuthManager.TryGetClientRedirect(StoreName, Key, out string redirect))
+        {
+            ErrorMessage = "Failed to retrieve redirect URL for client.";
+            return;
+        }
+
+        NavigationManager.NavigateTo(redirect);
+    }
 
     /// <summary>Handles the location changed.</summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">     Location changed event information.</param>
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (e.Location.ToLowerInvariant().Contains("/store?", StringComparison.Ordinal))
+        if (e.Location.ToLowerInvariant().Contains("/smart/auth?", StringComparison.Ordinal))
         {
-            // if (_store != null)
-            // {
-            //     _store.OnChanged -= Store_OnChanged;
-            // }
+            _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
 
-            if ((!string.IsNullOrEmpty(StoreName)) &&
-                (StoreManager.TryGetValue(StoreName, out _store!)))
-            {
-            }
-
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+            NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
         }
     }
 

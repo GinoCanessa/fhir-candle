@@ -14,6 +14,7 @@ public class ServerConfiguration
     /// <summary>Gets or sets the listen port.</summary>
     public required int ListenPort { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether the browser should be opened at launch.</summary>
     public bool OpenBrowser { get; set; } = false;
 
     /// <summary>Gets or sets the number of maximum resources.</summary>

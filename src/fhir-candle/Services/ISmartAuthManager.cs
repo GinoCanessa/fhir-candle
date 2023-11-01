@@ -26,7 +26,41 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="key">   The key.</param>
     /// <param name="auth">  [out] The authentication.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryGetAuthorization(string tenant, string key, out SmartAuthorization auth);
+    bool TryGetAuthorization(string tenant, string key, out AuthorizationInfo auth);
+
+    /// <summary>Attempts to update authentication.</summary>
+    /// <param name="tenant">The tenant name.</param>
+    /// <param name="key">   The key.</param>
+    /// <param name="auth">  [out] The authentication.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryUpdateAuth(string tenant, string key, AuthorizationInfo auth);
+
+    /// <summary>Attempts to get the authorization client redirect URL.</summary>
+    /// <param name="tenant">  The tenant name.</param>
+    /// <param name="key">     The key.</param>
+    /// <param name="redirect">[out] The redirect.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryGetClientRedirect(string tenant, string key, out string redirect);
+
+    /// <summary>Attempts to create smart response.</summary>
+    /// <param name="tenant">  The tenant name.</param>
+    /// <param name="authCode">The authentication code.</param>
+    /// <param name="clientId">The client's identifier.</param>
+    /// <param name="response">[out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryCreateSmartResponse(string tenant, string authCode, string clientId, out AuthorizationInfo.SmartResponse response);
+
+    /// <summary>Attempts to exchange a refresh token for a new access token.</summary>
+    /// <param name="tenant">      The tenant.</param>
+    /// <param name="refreshToken">The refresh token.</param>
+    /// <param name="clientId">    The client's identifier.</param>
+    /// <param name="response">    [out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TrySmartRefresh(
+        string tenant,
+        string refreshToken,
+        string clientId,
+        out AuthorizationInfo.SmartResponse response);
 
     /// <summary>Request authentication.</summary>
     /// <param name="tenant">             The tenant.</param>

@@ -10,6 +10,7 @@ using Fhir.Metrics;
 using FhirCandle.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
+using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
 
@@ -21,13 +22,16 @@ public class SmartController : ControllerBase
 {
     private ISmartAuthManager _smartAuthManager;
 
+    private ILogger<ISmartAuthManager> _logger;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="FhirController"/> class.
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="fhirStore">The FHIR store.</param>
     public SmartController(
-        [FromServices] ISmartAuthManager smartAuthManager)
+        [FromServices] ISmartAuthManager smartAuthManager,
+        [FromServices] ILogger<ISmartAuthManager> logger)
     {
         if (smartAuthManager == null)
         {
@@ -35,6 +39,7 @@ public class SmartController : ControllerBase
         }
 
         _smartAuthManager = smartAuthManager;
+        _logger = logger;
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets smart well known.</summary>
@@ -49,6 +54,7 @@ public class SmartController : ControllerBase
                 store,
                 out FhirStore.Smart.SmartWellKnown? smartConfig))
         {
+            _logger.LogWarning($"GetSmartWellKnown <<< tenant {store} does not exist!");
             Response.StatusCode = 404;
             return;
         }
@@ -89,6 +95,8 @@ public class SmartController : ControllerBase
         [FromQuery(Name = "code_challenge")] string? pkceChallenge,
         [FromQuery(Name = "code_challenge_method")] string? pkceMethod)
     {
+        _logger.LogInformation($"Request: {store}/authorize");
+
         if (!_smartAuthManager.RequestAuth(
                 store,
                 Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
@@ -109,4 +117,121 @@ public class SmartController : ControllerBase
 
         Response.Redirect(redirectDestination);
     }
+
+    [HttpPost, Route("{store}/token")]
+    [Consumes("application/x-www-form-urlencoded")]
+    [Produces("application/json")]
+    public async Task PostSmartTokenRequest(
+        [FromRoute] string store)
+    {
+        // make sure this store exists and has SMART enabled
+        if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
+                store,
+                out FhirStore.Smart.SmartWellKnown? smartConfig))
+        {
+            _logger.LogWarning($"PostSmartTokenRequest <<< tenant {store} does not exist!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        // sanity check
+        if (Request == null)
+        {
+            _logger.LogError("PostSmartTokenRequest <<< cannot process a POST token call without a Request!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            string grantType = string.Empty;
+            string authCode = string.Empty;
+            string refreshToken = string.Empty;
+            string redirectUri = string.Empty;
+            string clientId = string.Empty;
+
+            foreach ((string key, Microsoft.Extensions.Primitives.StringValues values) in Request.Form)
+            {
+                switch (key.ToLowerInvariant())
+                {
+                    case "grant_type":
+                        grantType = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "code":
+                        authCode = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "redirect_uri":
+                        redirectUri = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "client_id":
+                        clientId = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "refresh_token":
+                        refreshToken = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                }
+            }
+
+            AuthorizationInfo.SmartResponse? smart = null;
+
+            switch (grantType)
+            {
+                case "authorization_code":
+                    {
+                        if (!_smartAuthManager.TryCreateSmartResponse(
+                                store,
+                                authCode,
+                                clientId,
+                                out smart))
+                        {
+                            _logger.LogWarning($"PostSmartTokenRequest <<< exchange code {authCode} failed!");
+                            Response.StatusCode = 400;
+                            return;
+                        }
+                    }
+                    break;
+
+                case "refresh_token":
+                    {
+                        if (!_smartAuthManager.TrySmartRefresh(
+                                store,
+                                refreshToken,
+                                clientId,
+                                out smart))
+                        {
+                            _logger.LogWarning($"PostSmartTokenRequest <<< exchange refresh token {refreshToken} failed!");
+                            Response.StatusCode = 400;
+                            return;
+                        }
+                    }
+                    break;
+            }
+
+            if (smart == null)
+            {
+                _logger.LogWarning($"PostSmartTokenRequest <<< request for {grantType} failed!");
+                Response.StatusCode = 400;
+                return;
+            }
+
+            // SMART token exchange response is JSON
+            Response.ContentType = "application/json";
+            Response.StatusCode = (int)HttpStatusCode.OK;
+
+            await Response.WriteAsync(FhirCandle.Serialization.Utils.SerializeObject(smart));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"PostSmartTokenRequest <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                _logger.LogError($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+
+    }
+
 }

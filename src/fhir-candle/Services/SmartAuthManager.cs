@@ -4,15 +4,27 @@
 // </copyright>
 
 using fhir.candle.Models;
+using fhir.candle.Pages.Subscriptions;
 using FhirCandle.Models;
 using FhirStore.Smart;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Asn1.Ocsp;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace fhir.candle.Services;
 
 /// <summary>Manager for smart authentications.</summary>
 public class SmartAuthManager : ISmartAuthManager, IDisposable
 {
+    /// <summary>(Immutable) The jwt signing value.</summary>
+    private const string _jwtSign = "***NotSecure!DoNotUseInProduction!ThisIsForDevOnly!***";
+    
+    /// <summary>(Immutable) The jwt signing value in bytes.</summary>
+    private static readonly byte[] _jwtBytes = System.Text.Encoding.UTF8.GetBytes(_jwtSign);
+
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;
 
@@ -32,26 +44,32 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     private Dictionary<string, SmartWellKnown> _smartConfigs = new();
 
     /// <summary>The authorizations.</summary>
-    private Dictionary<string, SmartAuthorization> _authorizations = new();
+    private Dictionary<string, AuthorizationInfo> _authorizations = new();
 
     /// <summary>The token key map.</summary>
     private Dictionary<string, string> _tokenKeyMap = new();
 
+    /// <summary>
+    /// Initializes a new instance of the fhir.candle.Services.SmartAuthManager class.
+    /// </summary>
+    /// <param name="tenants">            The tenants.</param>
+    /// <param name="serverConfiguration">The server configuration.</param>
+    /// <param name="logger">             The logger.</param>
     public SmartAuthManager(
         Dictionary<string, TenantConfiguration> tenants,
-        ILogger<SmartAuthManager> logger,
-        ServerConfiguration serverConfiguration)
+        ServerConfiguration serverConfiguration,
+        ILogger<SmartAuthManager>? logger)
     {
         _tenants = tenants;
-        _logger = logger;
         _serverConfig = serverConfiguration;
+        _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<SmartAuthManager>();
     }
 
     /// <summary>Gets the smart configuration by tenant.</summary>
     public Dictionary<string, SmartWellKnown> SmartConfigurationByTenant { get => _smartConfigs; }
 
     /// <summary>Gets the smart authorizations.</summary>
-    public Dictionary<string, SmartAuthorization> SmartAuthorizations { get => _authorizations; }
+    public Dictionary<string, AuthorizationInfo> SmartAuthorizations { get => _authorizations; }
 
     /// <summary>Query if 'tenant' has tenant.</summary>
     /// <param name="tenant">The tenant.</param>
@@ -66,9 +84,9 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     /// <param name="key">   The key.</param>
     /// <param name="auth">  [out] The authentication.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryGetAuthorization(string tenant, string key, out SmartAuthorization auth)
+    public bool TryGetAuthorization(string tenant, string key, out AuthorizationInfo auth)
     {
-        if (!_authorizations.TryGetValue(key, out SmartAuthorization? local))
+        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
             auth = null!;
             return false;
@@ -81,9 +99,268 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         }
 
         auth = local;
-        return false;
+        return true;
     }
 
+    /// <summary>Attempts to update authentication.</summary>
+    /// <param name="tenant">The tenant name.</param>
+    /// <param name="key">   The key.</param>
+    /// <param name="auth">  [out] The authentication.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryUpdateAuth(string tenant, string key, AuthorizationInfo auth)
+    {
+        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
+        {
+            return false;
+        }
+
+        if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // update our last access
+        auth.LastAccessed = DateTimeOffset.UtcNow;
+        auth.Expires = DateTimeOffset.UtcNow.AddMinutes(10);
+
+        _authorizations[key] = auth;
+        return true;
+    }
+
+    /// <summary>Attempts to get the authorization client redirect URL.</summary>
+    /// <param name="tenant">  The tenant name.</param>
+    /// <param name="key">     The key.</param>
+    /// <param name="redirect">[out] The redirect.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryGetClientRedirect(string tenant, string key, out string redirect)
+    {
+        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
+        {
+            redirect = string.Empty;
+            return false;
+        }
+
+        if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
+        {
+            redirect = string.Empty;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(_authorizations[key].RequestParameters.RedirectUri))
+        {
+            redirect = string.Empty;
+            return false;
+        }
+
+        // update our last access
+        _authorizations[key].LastAccessed = DateTimeOffset.UtcNow;
+        _authorizations[key].Expires = DateTimeOffset.UtcNow.AddMinutes(10);
+
+        string redirectUri = _authorizations[key].RequestParameters.RedirectUri;
+
+        // use our key as the authorization code
+        if (redirectUri.Contains('?'))
+        {
+            redirect = $"{redirectUri}&code={_authorizations[key].AuthCode}&state={_authorizations[key].RequestParameters.State}";
+        }
+        else
+        {
+            redirect = $"{redirectUri}?code={_authorizations[key].AuthCode}&state={_authorizations[key].RequestParameters.State}";
+        }
+
+        return true;
+    }
+
+    /// <summary>Attempts to exchange a refresh token for a new access token.</summary>
+    /// <param name="tenant">      The tenant.</param>
+    /// <param name="refreshToken">The refresh token.</param>
+    /// <param name="clientId">    The client's identifier.</param>
+    /// <param name="response">    [out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TrySmartRefresh(
+        string tenant,
+        string refreshToken,
+        string clientId,
+        out AuthorizationInfo.SmartResponse response)
+    {
+        if (string.IsNullOrEmpty(refreshToken) || string.IsNullOrEmpty(tenant) || string.IsNullOrEmpty(clientId))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (refreshToken.Length < 36)
+        {
+            response = null!;
+            return false;
+        }
+
+        string key = refreshToken.Substring(0, 36);
+
+        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (!clientId.Equals(local.RequestParameters.ClientId, StringComparison.Ordinal))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (local.Response == null)
+        {
+            response = null!;
+            return false;
+        }
+
+        if (!refreshToken.Equals(local.Response.RefreshToken, StringComparison.Ordinal))
+        {
+            response = null!;
+            return false;
+        }
+
+        // update our last access
+        local.LastAccessed = DateTimeOffset.UtcNow;
+        local.Expires = DateTimeOffset.UtcNow.AddMinutes(10);
+
+        // update the access and refresh tokens
+        local.Response = local.Response with
+        {
+            AccessToken = key + "_" + Guid.NewGuid().ToString(),
+            RefreshToken = key + "_" + Guid.NewGuid().ToString(),
+        };
+
+        response = local.Response!;
+        return true;
+    }
+
+    /// <summary>Attempts to create smart response.</summary>
+    /// <param name="tenant">  The tenant name.</param>
+    /// <param name="authCode">The authorization code.</param>
+    /// <param name="clientId">The client's identifier.</param>
+    /// <param name="response">[out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryCreateSmartResponse(
+        string tenant, 
+        string authCode,
+        string clientId,
+        out AuthorizationInfo.SmartResponse response)
+    {
+        if (string.IsNullOrEmpty(authCode) || string.IsNullOrEmpty(tenant) || string.IsNullOrEmpty(clientId))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (authCode.Length < 36)
+        {
+            response = null!;
+            return false;
+        }
+
+        string key = authCode.Substring(0, 36);
+
+        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (!clientId.Equals(local.RequestParameters.ClientId, StringComparison.Ordinal))
+        {
+            response = null!;
+            return false;
+        }
+
+        // update our last access
+        local.LastAccessed = DateTimeOffset.UtcNow;
+        local.Expires = DateTimeOffset.UtcNow.AddMinutes(10);
+
+        // create our response
+        local.Response = new()
+        {
+            PatientId = local.LaunchPatient,
+            TokenType = "bearer",
+            Scopes = string.Join(" ", local.Scopes.Where(kvp => kvp.Value == true).Select(kvp => kvp.Key)),
+            ClientId = local.RequestParameters.ClientId,
+            IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
+            AccessToken = key + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
+            RefreshToken = key + "_" + Guid.NewGuid().ToString()
+        };
+
+        response = local.Response!;
+        return true;
+    }
+
+    /// <summary>Generates an access-token jwt.</summary>
+    /// <param name="rootUrl">URL of the root.</param>
+    /// <param name="auth">   [out] The authentication.</param>
+    /// <returns>The jwt.</returns>
+    internal string GenerateAccessJwt(string rootUrl, AuthorizationInfo auth)
+    {
+        JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+        SecurityTokenDescriptor tokenDescriptor = new()
+        {
+            Subject = new System.Security.Claims.ClaimsIdentity(new System.Security.Claims.Claim[]
+            {
+                new("sub", auth.UserId.GetHashCode().ToString()),
+                new("jti", Guid.NewGuid().ToString()),
+                //new("aud", auth.RequestParameters.Audience),
+                //new("iss", rootUrl),
+                //new("exp", auth.Expires.ToUnixTimeSeconds().ToString()),
+                //new("iat", auth.Created.ToUnixTimeSeconds().ToString()),
+            }),
+            Expires = auth.Expires.DateTime,
+            Audience = auth.RequestParameters.Audience,
+            Issuer = rootUrl,
+            IssuedAt = auth.LastAccessed.DateTime,
+            SigningCredentials = new(new SymmetricSecurityKey(_jwtBytes), SecurityAlgorithms.HmacSha256Signature),
+        };
+
+        SecurityToken token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+
+    /// <summary>Generates an id-token jwt.</summary>
+    /// <param name="rootUrl">URL of the root.</param>
+    /// <param name="auth">   [out] The authentication.</param>
+    /// <returns>The identifier jwt.</returns>
+    internal string GenerateIdJwt(string rootUrl, AuthorizationInfo auth)
+    {
+        JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+        SecurityTokenDescriptor tokenDescriptor = new()
+        {
+            Subject = new System.Security.Claims.ClaimsIdentity(new System.Security.Claims.Claim[]
+            {
+                new("sub", auth.RequestParameters.Audience),
+                new("profile", auth.UserId),
+                new("fhirUser", auth.UserId),
+                new("jti", Guid.NewGuid().ToString()),
+            }),
+            Expires = auth.Expires.DateTime,
+            Audience = auth.RequestParameters.Audience,
+            Issuer = rootUrl,
+            IssuedAt = auth.LastAccessed.DateTime,
+            SigningCredentials = new(new SymmetricSecurityKey(_jwtBytes), SecurityAlgorithms.HmacSha256Signature),
+        };
+
+        SecurityToken token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
 
     /// <summary>Initializes this service.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
@@ -168,7 +445,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                         //"context-standalone-encounter",       // encounter-level launch context (requested by launch/encounter scope, conveyed via encounter token parameter)
                         //"permission-offline",                 // refresh tokens (requested by offline_access scope)
                         //"permission-online",                  // refresh tokens (requested by online_access scope)
-                        //"permission-patient",                 // patient-level scopes (e.g., patient/Observation.rs)
+                        "permission-patient",                 // patient-level scopes (e.g., patient/Observation.rs)
                         "permission-user",                      // user-level scopes (e.g., user/Appointment.rs)
                         "permission-v1",                        // SMARTv1 scope syntax (e.g., patient/Observation.read)
                         "permission-v2",                        // SMARTv2 granular scope syntax (e.g., patient/Observation.rs?...)
@@ -237,8 +514,34 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             return false;
         }
 
+        // check our audience
+        if (!audience.Equals(_tenants[tenant].BaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            if (audience.EndsWith('/') && !_tenants[tenant].BaseUrl.EndsWith('/'))
+            {
+                if (!audience.Equals(_tenants[tenant].BaseUrl + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    redirectDestination = string.Empty;
+                    return false;
+                }
+            }
+            else if (_tenants[tenant].BaseUrl.EndsWith('/') && !audience.EndsWith('/'))
+            {
+                if (!audience.Equals(_tenants[tenant].BaseUrl.Substring(0, _tenants[tenant].BaseUrl.Length - 1), StringComparison.OrdinalIgnoreCase))
+                {
+                    redirectDestination = string.Empty;
+                    return false;
+                }
+            }
+            else
+            {
+                redirectDestination = string.Empty;
+                return false;
+            }
+        }
+
         // create our auth - default to 5 minute timeout
-        SmartAuthorization auth = new()
+        AuthorizationInfo auth = new()
         {
             Key = Guid.NewGuid().ToString(),
             Tenant = tenant,
@@ -255,8 +558,10 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 PkceChallenge = pkceChallenge,
                 PkceMethod = pkceMethod,
             },
-            Expires = DateTimeOffset.UtcNow.AddMinutes(5),
+            Expires = DateTimeOffset.UtcNow.AddMinutes(10),
         };
+
+        auth.AuthCode = auth.Key + "_" + Guid.NewGuid().ToString();
 
         _authorizations.Add(auth.Key, auth);
 

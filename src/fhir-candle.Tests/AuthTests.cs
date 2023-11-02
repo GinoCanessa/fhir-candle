@@ -164,7 +164,11 @@ public class AuthTests : IClassFixture<AuthTestFixture>
         _fixture.AuthR4.TryUpdateAuth(_fixture.Name, authKey, auth).Should().BeTrue();
 
         // try to exchange the auth code for a token
-        _fixture.AuthR4.TryCreateSmartResponse(_fixture.Name, auth.AuthCode, out AuthorizationInfo.SmartResponse response).Should().BeTrue();
+        _fixture.AuthR4.TryCreateSmartResponse(
+            _fixture.Name, 
+            auth.AuthCode,
+            "clientId", 
+            out AuthorizationInfo.SmartResponse response).Should().BeTrue();
 
         response.Should().NotBeNull();
 

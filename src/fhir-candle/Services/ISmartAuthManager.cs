@@ -43,12 +43,20 @@ public interface ISmartAuthManager : IHostedService
     bool TryGetClientRedirect(string tenant, string key, out string redirect);
 
     /// <summary>Attempts to create smart response.</summary>
-    /// <param name="tenant">  The tenant name.</param>
-    /// <param name="authCode">The authentication code.</param>
-    /// <param name="clientId">The client's identifier.</param>
-    /// <param name="response">[out] The response.</param>
+    /// <param name="tenant">      The tenant name.</param>
+    /// <param name="authCode">    The authentication code.</param>
+    /// <param name="clientId">    The client's identifier.</param>
+    /// <param name="clientSecret">The client secret.</param>
+    /// <param name="codeVerifier">The code verifier.</param>
+    /// <param name="response">    [out] The response.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryCreateSmartResponse(string tenant, string authCode, string clientId, out AuthorizationInfo.SmartResponse response);
+    bool TryCreateSmartResponse(
+        string tenant, 
+        string authCode, 
+        string clientId,
+        string clientSecret,
+        string codeVerifier,
+        out AuthorizationInfo.SmartResponse response);
 
     /// <summary>Attempts to exchange a refresh token for a new access token.</summary>
     /// <param name="tenant">      The tenant.</param>

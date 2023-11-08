@@ -149,6 +149,8 @@ public class SmartController : ControllerBase
             string refreshToken = string.Empty;
             string redirectUri = string.Empty;
             string clientId = string.Empty;
+            string clientSecret = string.Empty;
+            string codeVerifier = string.Empty;
 
             foreach ((string key, Microsoft.Extensions.Primitives.StringValues values) in Request.Form)
             {
@@ -169,6 +171,12 @@ public class SmartController : ControllerBase
                     case "refresh_token":
                         refreshToken = values.FirstOrDefault() ?? string.Empty;
                         break;
+                    case "client_secret":
+                        clientSecret = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "code_verifier":
+                        codeVerifier = values.FirstOrDefault() ?? string.Empty;
+                        break;
                 }
             }
 
@@ -182,6 +190,8 @@ public class SmartController : ControllerBase
                                 store,
                                 authCode,
                                 clientId,
+                                clientSecret,
+                                codeVerifier,
                                 out smart))
                         {
                             _logger.LogWarning($"PostSmartTokenRequest <<< exchange code {authCode} failed!");

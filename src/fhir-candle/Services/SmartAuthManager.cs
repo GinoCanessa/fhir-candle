@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Asn1.Ocsp;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace fhir.candle.Services;
 
@@ -243,15 +244,19 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     }
 
     /// <summary>Attempts to create smart response.</summary>
-    /// <param name="tenant">  The tenant name.</param>
-    /// <param name="authCode">The authorization code.</param>
-    /// <param name="clientId">The client's identifier.</param>
-    /// <param name="response">[out] The response.</param>
+    /// <param name="tenant">      The tenant name.</param>
+    /// <param name="authCode">    The authorization code.</param>
+    /// <param name="clientId">    The client's identifier.</param>
+    /// <param name="clientSecret">The client secret.</param>
+    /// <param name="codeVerifier">The code verifier.</param>
+    /// <param name="response">    [out] The response.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryCreateSmartResponse(
         string tenant, 
         string authCode,
         string clientId,
+        string clientSecret,
+        string codeVerifier,
         out AuthorizationInfo.SmartResponse response)
     {
         if (string.IsNullOrEmpty(authCode) || string.IsNullOrEmpty(tenant) || string.IsNullOrEmpty(clientId))
@@ -284,6 +289,32 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         {
             response = null!;
             return false;
+        }
+
+        // check the PKCE code if one has been provided
+        if (!string.IsNullOrEmpty(local.RequestParameters.PkceChallenge))
+        {
+            if (string.IsNullOrEmpty(codeVerifier))
+            {
+                _logger.LogWarning($"TryCreateSmartResponse <<< code verifier is required if initial request contains PKCE!");
+                response = null!;
+                return false;
+            }
+
+            string coded = string.Empty;
+
+            using (System.Security.Cryptography.SHA256 s256 = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] hash = s256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
+                coded = Microsoft.AspNetCore.WebUtilities.Base64UrlTextEncoder.Encode(hash);
+            }
+
+            if (!coded.Equals(local.RequestParameters.PkceChallenge, StringComparison.Ordinal))
+            {
+                _logger.LogWarning($"TryCreateSmartResponse <<< code verifier does not match PKCE challenge!");
+                response = null!;
+                return false;
+            }
         }
 
         // update our last access

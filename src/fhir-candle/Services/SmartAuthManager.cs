@@ -41,7 +41,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     private ServerConfiguration _serverConfig;
 
     /// <summary>The smart configs.</summary>
-    private Dictionary<string, SmartWellKnown> _smartConfigs = new();
+    private Dictionary<string, SmartWellKnown> _smartConfigs = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The authorizations.</summary>
     private Dictionary<string, AuthorizationInfo> _authorizations = new();

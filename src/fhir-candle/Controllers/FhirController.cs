@@ -23,6 +23,9 @@ public class FhirController : ControllerBase
     private IFhirStoreManager _fhirStoreManager;
     private ISmartAuthManager _smartAuthManager;
 
+    private ILogger<FhirController> _logger;
+
+
     private readonly HashSet<string> _acceptMimeTypes = new()
     {
         "application/fhir+json",
@@ -40,7 +43,8 @@ public class FhirController : ControllerBase
     /// <param name="fhirStore">The FHIR store.</param>
     public FhirController(
         [FromServices] IFhirStoreManager fhirStoreManager,
-        [FromServices] ISmartAuthManager smartAuthManager)
+        [FromServices] ISmartAuthManager smartAuthManager,
+        [FromServices] ILogger<FhirController> logger)
     {
         if (fhirStoreManager == null)
         {
@@ -55,6 +59,8 @@ public class FhirController : ControllerBase
         }
 
         _smartAuthManager = smartAuthManager;
+
+        _logger = logger;
 
         //if (host != null)
         //{
@@ -160,6 +166,7 @@ public class FhirController : ControllerBase
                 store, 
                 out FhirStore.Smart.SmartWellKnown? smartConfig))
         {
+            _logger.LogWarning($"GetSmartWellKnown <<< no SMART config for {store}!");
             Response.StatusCode = 404;
             return;
         }

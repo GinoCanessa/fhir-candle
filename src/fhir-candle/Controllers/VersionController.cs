@@ -65,11 +65,14 @@ public class VersionController : ControllerBase
 
         foreach (IConfigurationSection configItem in configItems)
         {
+            if (configItem.Key.Contains("pass", StringComparison.OrdinalIgnoreCase) ||
+                configItem.Key.Contains("key", StringComparison.OrdinalIgnoreCase))
+            {
+                information.Add(configItem.Key, "************");
+                continue;
+            }
+
             information.Add(configItem.Key, configItem.Value ?? string.Empty);
-            //if (configItem.Key.StartsWith(_configPrefix, StringComparison.Ordinal))
-            //{
-            //    information.Add(configItem.Key, configItem.Value ?? string.Empty);
-            //}
         }
 
         // try to get a list of routes
@@ -83,7 +86,12 @@ public class VersionController : ControllerBase
             })
                 .ToList();
 
-            information.Add("Routes", JsonConvert.SerializeObject(routes, Formatting.Indented));
+            foreach (RouteInfo route in routes)
+            {
+                information.Add($"{route.ControllerName}.{route.FunctionName}", route.UriTemplate);
+            }
+
+            //information.Add("Routes", JsonConvert.SerializeObject(routes, Formatting.Indented));
         }
         catch (Exception ex)
         {

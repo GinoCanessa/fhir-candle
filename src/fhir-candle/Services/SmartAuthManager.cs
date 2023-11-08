@@ -256,8 +256,23 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         string codeVerifier,
         out AuthorizationInfo.SmartResponse response)
     {
-        if (string.IsNullOrEmpty(authCode) || string.IsNullOrEmpty(tenant) || string.IsNullOrEmpty(clientId))
+        if (string.IsNullOrEmpty(authCode))
         {
+            _logger.LogWarning("TryCreateSmartResponse <<< missing authorization code.");
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(tenant))
+        {
+            _logger.LogWarning("TryCreateSmartResponse <<< missing tenant.");
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(clientId))
+        {
+            _logger.LogWarning("TryCreateSmartResponse <<< missing client id.");
             response = null!;
             return false;
         }

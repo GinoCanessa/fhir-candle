@@ -47,9 +47,6 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     /// <summary>The authorizations.</summary>
     private Dictionary<string, AuthorizationInfo> _authorizations = new();
 
-    /// <summary>The token key map.</summary>
-    private Dictionary<string, string> _tokenKeyMap = new();
-
     /// <summary>
     /// Initializes a new instance of the fhir.candle.Services.SmartAuthManager class.
     /// </summary>
@@ -366,6 +363,67 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         return tokenHandler.WriteToken(token);
     }
 
+    /// <summary>Attempts to introspection.</summary>
+    /// <param name="tenant">  The tenant.</param>
+    /// <param name="token">   The token.</param>
+    /// <param name="response">[out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryIntrospection(
+        string tenant,
+        string token,
+        out AuthorizationInfo.IntrospectionResponse? response)
+    {
+        if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(tenant))
+        {
+            response = null;
+            return false;
+        }
+
+        if (token.Length < 36)
+        {
+            response = null;
+            return false;
+        }
+
+        string key = token.Substring(0, 36);
+
+        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
+        {
+            response = null!;
+            return false;
+        }
+
+        if (local.Response == null)
+        {
+            response = null;
+            return false;
+        }
+
+        if (!token.Equals(local.Response.AccessToken, StringComparison.Ordinal))
+        {
+            response = null;
+            return false;
+        }
+
+        response = new()
+        {
+            Active = true,
+            Scopes = string.Join(' ', local.Scopes.Where(kvp => kvp.Value == true).Select(kvp => kvp.Key)),
+            ClientId = local.RequestParameters.ClientId,
+            Username = local.UserId,
+            Subject = local.UserId.GetHashCode().ToString(),
+            Audience = local.RequestParameters.Audience,
+        };
+
+        return true;
+    }
+
     /// <summary>Generates an id-token jwt.</summary>
     /// <param name="rootUrl">URL of the root.</param>
     /// <param name="auth">   [out] The authentication.</param>
@@ -458,6 +516,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 },
                 //ManagementEndpoint = $"{config.BaseUrl}/auth/manage",
                 //IntrospectionEndpoint = $"{config.BaseUrl}/auth/introspect",
+                IntrospectionEndpoint = $"{_serverConfig.PublicUrl}/_smart/{name}/introspect",
                 //RecovationEndpoint = $"{config.BaseUrl}/auth/revoke",
                 Capabilities = new string[]
                 {

@@ -226,7 +226,7 @@
 
     private void ProcessLoginPatient()
     {
-        _auth.UserId = SelectedPatientId;
+        _auth.UserId = "Patient/" + SelectedPatientId;
         _auth.LaunchPatient = SelectedPatientId;
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
@@ -236,7 +236,7 @@
 
     private void ProcessLoginPractitioner()
     {
-        _auth.UserId = SelectedPractitionerId;
+        _auth.UserId = "Practitioner/" + SelectedPractitionerId;
         _auth.LaunchPatient = SelectedPatientId;
         _auth.LaunchPractitioner = SelectedPractitionerId;
 

@@ -129,7 +129,8 @@
     void OnRowClick(TableRowClickEventArgs<Hl7.Fhir.Model.Practitioner> args)
     {
         _selectedItemText = DisplayFor(args.Item);
-        SelectedId = "Practitioner/" + args.Item.Id;
+        SelectedId = args.Item.Id;
+        // SelectedId = "Practitioner/" + args.Item.Id;
     }
 
     private string DisplayFor(object o)

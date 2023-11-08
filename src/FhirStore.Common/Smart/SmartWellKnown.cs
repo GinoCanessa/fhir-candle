@@ -14,15 +14,17 @@ public record class SmartWellKnown
     /// Gets or sets the string conveying this system's OpenID Connect Issuer URL. Required
     /// if the server's capabilities include sso-openid-connect; otherwise, omitted.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("issuer")]
-    public string Issuer { get; set; } = string.Empty;
+    public string? Issuer { get; set; } = null;
 
     /// <summary>
     /// Gets or sets the string conveying this system's JSON Web Key Set URL. Required if the server's
     /// capabilities include sso-openid-connect; otherwise, optional.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("jwks_uri")]
-    public string JwksUri { get; set; } = string.Empty;
+    public string? JwksUri { get; set; } = null;
 
     /// <summary>
     /// Gets or sets the array of grant types supported at the token endpoint. The options are
@@ -51,15 +53,17 @@ public record class SmartWellKnown
     /// Gets or sets the URL to the OAuth2 dynamic registration endpoint for this FHIR server, if
     /// available.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("registration_endpoint")]
-    public string RegistrationEndpoint { get; set; } = string.Empty;
+    public string? RegistrationEndpoint { get; set; } = null;
 
     /// <summary>
     /// Gets or sets URL the to the EHR's app state endpoint. SHALL be present when the EHR supports the
     /// smart-app-state capability and the endpoint is distinct from the EHR's primary endpoint.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("smart_app_state_endpoint")]
-    public string AppStateEndpoint { get; set; } = string.Empty;
+    public string? AppStateEndpoint { get; set; } = null;
 
     /// <summary>
     /// Gets or sets the array of scopes a client may request. See scopes and launch context. The
@@ -80,21 +84,24 @@ public record class SmartWellKnown
     /// Gets or sets the URL where an end-user can view which applications currently have access to
     /// data and can make adjustments to these access rights.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("management_endpoint")]
-    public string ManagementEndpoint { get; set; } = string.Empty;
+    public string? ManagementEndpoint { get; set; } = null;
 
     /// <summary>
     /// Gets or sets the URL to a server's introspection endpoint that can be used to validate a
     /// token.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("introspection_endpoint")]
-    public string IntrospectionEndpoint { get; set; } = string.Empty;
+    public string? IntrospectionEndpoint { get; set; } = null;
 
     /// <summary>
     /// Gets or sets the URL to a server's revoke endpoint that can be used to revoke a token.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("revocation_endpoint")]
-    public string RecovationEndpoint { get; set; } = string.Empty;
+    public string? RecovationEndpoint { get; set; } = null;
 
     /// <summary>
     /// Gets or sets the array of strings representing SMART capabilities (e.g., sso-openid-connect
@@ -107,6 +114,6 @@ public record class SmartWellKnown
     /// Gets or sets the array of PKCE code challenge methods supported. The S256 method SHALL be
     /// included in this list, and the plain method SHALL NOT be included in this list.
     /// </summary>
-    [JsonPropertyName("challenge_methods_supported")]
+    [JsonPropertyName("code_challenge_methods_supported")]
     public IEnumerable<string> SupportedChallengeMethods { get; set; } = Enumerable.Empty<string>();
 }

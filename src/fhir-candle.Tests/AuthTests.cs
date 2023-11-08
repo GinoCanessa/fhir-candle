@@ -167,7 +167,9 @@ public class AuthTests : IClassFixture<AuthTestFixture>
         _fixture.AuthR4.TryCreateSmartResponse(
             _fixture.Name, 
             auth.AuthCode,
-            "clientId", 
+            "clientId",
+            string.Empty,
+            string.Empty,
             out AuthorizationInfo.SmartResponse response).Should().BeTrue();
 
         response.Should().NotBeNull();

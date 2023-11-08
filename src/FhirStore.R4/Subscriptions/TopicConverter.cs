@@ -32,6 +32,11 @@ public class TopicConverter
         }
 
         ParseExtensions(
+            st.ModifierExtension,
+            out Dictionary<string, List<Hl7.Fhir.Model.DataType>> modifierExts,
+            out Dictionary<string, List<List<Hl7.Fhir.Model.Extension>>> modifierNested);
+
+        ParseExtensions(
             st.Extension,
             out Dictionary<string, List<Hl7.Fhir.Model.DataType>> exts,
             out Dictionary<string, List<List<Hl7.Fhir.Model.Extension>>> nested);
@@ -40,6 +45,12 @@ public class TopicConverter
         {
             Id = st.Id,
             Url = GetString(exts, "url"),
+            Status = GetString(modifierExts, "status"),
+            Name = GetString(exts, "name"),
+            Version = GetString(exts, "version"),
+            Title = GetString(exts, "title"),
+            Date = GetString(exts, "date"),
+            Description = GetString(exts, "description"),
         };
 
         if (nested.ContainsKey("resourceTrigger"))

@@ -3,7 +3,6 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-
 using Hl7.Fhir.Model;
 
 namespace FhirCandle.Subscriptions;
@@ -20,14 +19,14 @@ internal static class ConverterUtils
     /// <summary>Parse extensions.</summary>
     /// <param name="extensions">The extensions.</param>
     /// <param name="values">    [out] The extension values.</param>
-    /// <param name="nexted">    [out] The nested extension values.</param>
+    /// <param name="nested">    [out] The nested extension values.</param>
     internal static void ParseExtensions(
         IEnumerable<Hl7.Fhir.Model.Extension> extensions,
         out Dictionary<string, List<Hl7.Fhir.Model.DataType>> values,
-        out Dictionary<string, List<List<Hl7.Fhir.Model.Extension>>> nexted)
+        out Dictionary<string, List<List<Hl7.Fhir.Model.Extension>>> nested)
     {
         values = new();
-        nexted = new();
+        nested = new();
 
         foreach (Hl7.Fhir.Model.Extension ext in extensions)
         {
@@ -57,12 +56,12 @@ internal static class ConverterUtils
 
             if (ext.Extension?.Any() ?? false)
             {
-                if (!nexted.ContainsKey(name))
+                if (!nested.ContainsKey(name))
                 {
-                    nexted.Add(name, new());
+                    nested.Add(name, new());
                 }
 
-                nexted[name].Add(ext.Extension);
+                nested[name].Add(ext.Extension);
             }
 
             if (!values.ContainsKey(name))

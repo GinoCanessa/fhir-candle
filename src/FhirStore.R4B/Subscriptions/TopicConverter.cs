@@ -31,6 +31,12 @@ public class TopicConverter
         {
             Id = st.Id,
             Url = st.Url,
+            Status = st.Status?.ToString() ?? string.Empty,
+            Name = string.Empty,
+            Version = st.Version,
+            Title = st.Title,
+            Date = st.Date?.ToString() ?? string.Empty,
+            Description = st.Description,
         };
 
         if (st.ResourceTrigger?.Any() ?? false)

@@ -80,4 +80,22 @@ public class ParsedSubscriptionTopic
 
     /// <summary>Gets or initializes the notification shapes.</summary>
     public Dictionary<string, List<NotificationShape>> NotificationShapes { get; set; } = new();
+
+    /// <summary>Gets or initializes the canonical document status.</summary>
+    public string Status { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes the name.</summary>
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes the version.</summary>
+    public string Version { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes the title.</summary>
+    public string Title { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes the date.</summary>
+    public string Date { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes the description.</summary>
+    public string Description { get; init; } = string.Empty;
 }

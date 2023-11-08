@@ -151,6 +151,7 @@ public class FhirController : ControllerBase
     /// <param name="store">The store.</param>
     /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{store}/.well-known/smart-configuration")]
+    [Produces("application/json")]
     public async Task GetSmartWellKnown(
         [FromRoute] string store)
     {

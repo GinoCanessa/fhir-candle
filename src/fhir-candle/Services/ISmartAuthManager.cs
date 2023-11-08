@@ -70,6 +70,17 @@ public interface ISmartAuthManager : IHostedService
         string clientId,
         out AuthorizationInfo.SmartResponse response);
 
+    /// <summary>Attempts to introspection.</summary>
+    /// <param name="tenant">  The tenant name.</param>
+    /// <param name="token">   The token.</param>
+    /// <param name="response">[out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryIntrospection(
+        string tenant,
+        string token,
+        out AuthorizationInfo.IntrospectionResponse? response);
+
+
     /// <summary>Request authentication.</summary>
     /// <param name="tenant">             The tenant.</param>
     /// <param name="remoteIpAddress">    The remote IP address.</param>

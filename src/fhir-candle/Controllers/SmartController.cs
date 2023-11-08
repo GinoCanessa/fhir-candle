@@ -244,4 +244,75 @@ public class SmartController : ControllerBase
 
     }
 
+    [HttpPost, Route("{store}/introspect")]
+    [Consumes("application/x-www-form-urlencoded")]
+    [Produces("application/json")]
+    public async Task PostSmartTokenIntrospect(
+    [FromRoute] string store)
+    {
+        // make sure this store exists and has SMART enabled
+        if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
+                store,
+                out FhirStore.Smart.SmartWellKnown? smartConfig))
+        {
+            _logger.LogWarning($"PostSmartTokenIntrospect <<< tenant {store} does not exist!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        // sanity check
+        if (Request == null)
+        {
+            _logger.LogError("PostSmartTokenIntrospect <<< cannot process a POST token call without a Request!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            string token = string.Empty;
+            string tokenTypeHint = string.Empty;
+
+            foreach ((string key, Microsoft.Extensions.Primitives.StringValues values) in Request.Form)
+            {
+                switch (key.ToLowerInvariant())
+                {
+                    case "token":
+                        token = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "token_type_hint":
+                        tokenTypeHint = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                }
+            }
+
+            if (!_smartAuthManager.TryIntrospection(
+                    store,
+                    token,
+                    out AuthorizationInfo.IntrospectionResponse? resp))
+            {
+                _logger.LogWarning($"PostSmartTokenIntrospect <<< introspection failed!");
+                Response.StatusCode = 400;
+                return;
+            }
+
+            // SMART token exchange response is JSON
+            Response.ContentType = "application/json";
+            Response.StatusCode = (int)HttpStatusCode.OK;
+
+            await Response.WriteAsync(FhirCandle.Serialization.Utils.SerializeObject(resp));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"PostSmartTokenIntrospect <<< caught: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                _logger.LogError($" <<< inner: {ex.InnerException.Message}");
+            }
+
+            Response.StatusCode = 500;
+            return;
+        }
+
+    }
 }

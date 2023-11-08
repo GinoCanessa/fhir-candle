@@ -13,6 +13,61 @@ public class AuthorizationInfo
 {
     private SmartRequest _requestParameters = null!;
 
+    /// <summary>An introspection response.</summary>
+    public readonly record struct IntrospectionResponse
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AuthorizationInfo"/> class.
+        /// </summary>
+        public IntrospectionResponse() { }
+
+        [JsonPropertyName("active")]
+        public required bool Active { get; init; }
+
+        [JsonPropertyName("scope")]
+        public required string Scopes { get; init; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("client_id")]
+        public string? ClientId { get; init; } = null;
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("username")]
+        public string? Username { get; init; } = null;
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("token_type")]
+        public string? TokenType { get; init; } = null;
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("exp")]
+        public int? ExpiresAt { get; init; } = null;
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("iat")]
+        public int? IssuedAt { get; init; } = null;
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("nbf")]
+        public int? NotUsedBefore { get; init; } = null;
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("sub")]
+        public required string Subject { get; init; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("aud")]
+        public required string Audience { get; init; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("iss")]
+        public string? Issuer { get; init; } = null;
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("jti")]
+        public string? TokenIdentifier { get; init; } = null;
+    }
+
     /// <summary>Authorization request parameters.</summary>
     public class SmartRequest
     {

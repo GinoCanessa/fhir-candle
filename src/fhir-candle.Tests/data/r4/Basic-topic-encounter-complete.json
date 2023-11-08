@@ -5,6 +5,12 @@
     "versionId": "1",
     "lastUpdated": "2023-08-30T14:59:14.2070706+00:00"
   },
+  "modifierExtension": [
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
+      "valueCode": "draft"
+    }
+  ],
   "extension": [
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
@@ -21,10 +27,6 @@
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.title",
       "valueString": "encounter-complete"
-    },
-    {
-      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
-      "valueCode": "draft"
     },
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",

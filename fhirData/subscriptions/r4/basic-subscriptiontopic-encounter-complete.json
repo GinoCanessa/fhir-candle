@@ -1,6 +1,11 @@
 {
   "resourceType" : "Basic",
-  "id" : "encounter-complete",
+  "id": "encounter-complete",
+  "modifierExtension": [{
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
+      "valueCode": "draft"
+    }
+  ],
   "extension" : [{
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
     "valueUri" : "http://example.org/FHIR/SubscriptionTopic/encounter-complete"
@@ -16,10 +21,6 @@
   {
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.title",
     "valueString" : "encounter-complete"
-  },
-  {
-    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
-    "valueCode" : "draft"
   },
   {
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",

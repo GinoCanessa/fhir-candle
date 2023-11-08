@@ -1,6 +1,12 @@
 {
-  "resourceType" : "Basic",
-  "id" : "PASSubscriptionTopic",
+  "resourceType": "Basic",
+  "id": "PASSubscriptionTopic",
+  "modifierExtension": [
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
+      "valueCode": "active"
+    }
+  ],
   "extension": [
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
@@ -17,10 +23,6 @@
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.title",
       "valueString": "PAS Subscription"
-    },
-    {
-      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
-      "valueCode": "active"
     },
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",
@@ -211,10 +213,12 @@
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.notificationShape"
     }
   ],
-  "code" : {
-    "coding" : [{
-      "system" : "http://hl7.org/fhir/fhir-types",
-      "code" : "SubscriptionTopic"
-    }]
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/fhir-types",
+        "code": "SubscriptionTopic"
+      }
+    ]
   }
 }

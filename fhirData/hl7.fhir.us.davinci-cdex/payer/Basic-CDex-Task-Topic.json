@@ -1,6 +1,11 @@
 {
   "resourceType" : "Basic",
-  "id" : "cdex-task-topic",
+  "id": "cdex-task-topic",
+  "modifierExtension": [{
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
+      "valueCode": "active"
+    }
+  ],
   "extension" : [{
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
     "valueUri" : "http://hl7.org/fhir/us/davinci-cdex/ImplementationGuide/hl7.fhir.us.davinci-cdex"
@@ -16,10 +21,6 @@
   {
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.title",
     "valueString" : "CDex Task-Based SubscriptionTopic"
-  },
-  {
-    "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
-    "valueCode" : "active"
   },
   {
     "url" : "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",

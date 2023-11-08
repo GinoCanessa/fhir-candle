@@ -35,6 +35,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirCandle.Ui.R5", "src\Fhi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FhirCandle.Ui.Common", "src\FhirCandle.Ui.Common\FhirCandle.Ui.Common.csproj", "{2276D057-68A6-4639-A821-0C028D8449D0}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "FhirCandle.Ui.Versioned", "src\FhirCandle.Ui.Versioned\FhirCandle.Ui.Versioned.shproj", "{EC6C9E23-56A7-470B-95D9-59D8CCCF942C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -91,7 +93,11 @@ Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{05dd03de-a22d-4fd8-a8a8-06fd05f20a18}*SharedItemsImports = 13
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{316b7737-194d-41d8-8725-b79c09cd8f93}*SharedItemsImports = 5
+		src\FhirCandle.Ui.Versioned\FhirCandle.Ui.Versioned.projitems*{34a8dc55-57b2-4af5-9a9d-6c764ee9507b}*SharedItemsImports = 5
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{759eb849-ee81-4dae-8ab4-941e1f2824e7}*SharedItemsImports = 5
 		src\FhirStore.CommonVersioned\FhirStore.CommonVersioned.projitems*{b767a8a4-910f-4fc3-be6b-a0515c6e167e}*SharedItemsImports = 5
+		src\FhirCandle.Ui.Versioned\FhirCandle.Ui.Versioned.projitems*{d6f90c51-d9a6-48e8-aae8-f200c83e3f5f}*SharedItemsImports = 5
+		src\FhirCandle.Ui.Versioned\FhirCandle.Ui.Versioned.projitems*{e89fe0a1-6f77-43fb-8f84-75282d3f4538}*SharedItemsImports = 5
+		src\FhirCandle.Ui.Versioned\FhirCandle.Ui.Versioned.projitems*{ec6c9e23-56a7-470b-95d9-59d8cccf942c}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

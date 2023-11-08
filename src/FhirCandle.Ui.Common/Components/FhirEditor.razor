@@ -1,0 +1,144 @@
+@using BlazorMonaco
+@using BlazorMonaco.Editor
+
+@inject IJSRuntime JS
+
+@implements IDisposable
+
+<StandaloneCodeEditor @ref="_editor"
+    Id="resource-editor"
+    ConstructionOptions="ResourceConstructorOptions"
+    OnDidInit="EditorOnDidInit" />
+
+@code {
+
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+
+    private string _language = "json";
+
+    [Parameter]
+    public string Language
+    { 
+        get => _language;
+        set
+        {
+            if (value.Equals(_language, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _language = value;
+            _ = SetHightlightLanguage();
+        }
+    }
+
+    private string _editorContent = "";
+
+    [Parameter]
+    public string EditorContent
+    { 
+        get => _editorContent;
+        set
+        {
+            if (value.Equals(_editorContent, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _editorContent = value;
+            _editor?.SetValue(value);
+        }
+    }
+
+    /// <summary>The editor.</summary>
+    private StandaloneCodeEditor? _editor = null;
+
+    /// <summary>Resource construction options.</summary>
+    /// <param name="editor">The editor.</param>
+    /// <returns>The StandaloneEditorConstructionOptions.</returns>
+    private StandaloneEditorConstructionOptions ResourceConstructorOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+            {
+                Language = _language,
+                Theme = (NavTracker?.IsDarkMode ?? true) ? "vs-dark" : "vs-light",
+                GlyphMargin = false,
+                Value = _editorContent,
+            };
+    }
+
+    /// <summary>Editor on did initialize.</summary>
+    /// <returns>An asynchronous result.</returns>
+    private async Task EditorOnDidInit()
+    {
+        if (_editor == null)
+        {
+            return;
+        }
+
+        await UpdateTheme();
+        await JS.InvokeVoidAsync("setMonacoEditorResize", _editor.Id);
+        await _editor.SetValue(_editorContent ?? string.Empty);
+    }
+
+    /// <summary>Updates the theme.</summary>
+    /// <returns>An asynchronous result.</returns>
+    private async Task UpdateTheme()
+    {
+        if (_editor == null)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync(
+            "blazorMonaco.editor.setTheme",
+            (NavTracker?.IsDarkMode ?? true) ? "vs-dark" : "vs-light");
+    }
+
+    /// <summary>Sets hightlight language.</summary>
+    private async Task SetHightlightLanguage()
+    {
+        if (_editor == null)
+        {
+            return;
+        }
+
+        // need to get the editor model uri
+        TextModel tm = await _editor.GetModel();
+        await JS.InvokeVoidAsync(
+            "blazorMonaco.editor.setModelLanguage",
+            tm.Uri,
+            _language);
+    }
+
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if (NavTracker != null)
+        {
+            NavTracker.OnThemeChanged += NavTracker_OnThemeChanged;
+        }
+    }
+
+    private void NavTracker_OnThemeChanged(object? sender, EventArgs e)
+    {
+        _ = UpdateTheme();
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (NavTracker != null)
+        {
+            NavTracker.OnThemeChanged -= NavTracker_OnThemeChanged;
+        }
+    }
+}

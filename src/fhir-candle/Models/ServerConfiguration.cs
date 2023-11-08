@@ -8,18 +8,13 @@ namespace fhir.candle.Models;
 /// <summary>A server configuration.</summary>
 public class ServerConfiguration
 {
-    public enum UiModes
-    {
-        Default,
-        None,
-    }
-
     /// <summary>Gets or sets URL of the public.</summary>
     public string PublicUrl { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the listen port.</summary>
     public required int ListenPort { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether the browser should be opened at launch.</summary>
     public bool OpenBrowser { get; set; } = false;
 
     /// <summary>Gets or sets the number of maximum resources.</summary>
@@ -58,6 +53,12 @@ public class ServerConfiguration
     /// <summary>Gets or sets the FHIR R5 tenants.</summary>
     public List<string> TenantsR5 { get; set; } = new();
 
+    /// <summary>Gets or sets the tenants that REQUIRE SMART launch.</summary>
+    public List<string> SmartRequiredTenants { get; set; } = new();
+
+    /// <summary>Gets or sets the tenants that allow SMART launch.</summary>
+    public List<string> SmartOptionalTenants { get; set; } = new();
+
     /// <summary>Gets or sets the zulip email.</summary>
     public string ZulipEmail { get; set; } = string.Empty;
 
@@ -78,4 +79,7 @@ public class ServerConfiguration
 
     /// <summary>Gets or sets the SMTP password.</summary>
     public string SmtpPassword { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the FHIRPath Lab URL.</summary>
+    public string FhirPathLabUrl { get; set; } = string.Empty;
 }

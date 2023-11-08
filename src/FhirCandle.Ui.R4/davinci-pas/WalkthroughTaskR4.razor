@@ -132,6 +132,28 @@
                     <MudDivider />
                     <br />
 
+                    <MudText Typo="Typo.h6">
+                        Patient Insurance (Coverage) (optional)
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _insurance = null)">Clear</MudButton>
+                    </MudText>
+                    @if (_coverages.Any())
+                    {
+                        <MudRadioGroup @bind-SelectedOption="@_insurance">
+                            @foreach (ResourceInfo en in _coverages)
+                            {
+                                <MudRadio Option="en"><code>@en.Display</code></MudRadio>
+                            }
+                        </MudRadioGroup>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body1">No coverage found for patient @_patient?.Id</MudText>
+                    }
+
+                    <br />
+                    <MudDivider />
+                    <br />
+
                     <MudText Typo="Typo.h6">Supporting Resources (min one required)</MudText>
                     @foreach (ResourceInfo sd in _claimSupportingData)
                     {
@@ -142,7 +164,7 @@
                     <MudDivider />
                     <br />
 
-                    <MudText Typo="Typo.h6">Free Text Notes (optional)</MudText>
+                    <MudText Typo="Typo.h6">Supporting Info Note (optional)</MudText>
                     <MudTextField T="string" Variant="Variant.Outlined" @bind-Value="@_supportingMessage" Lines="5" />
 
                     <br />
@@ -263,7 +285,6 @@
         "ServiceRequest",
         "DeviceRequest",
         "MedicationRequest",
-        "Coverage",
         "DocumentReference",
     };
 
@@ -344,9 +365,13 @@
 
     private ResourceInfo? _focalEncounter = null;
 
+    private ResourceInfo? _insurance = null;
+
     private IEnumerable<ResourceInfo> _claimSupportingData = Enumerable.Empty<ResourceInfo>();
 
     private IEnumerable<ResourceInfo> _organizations = Enumerable.Empty<ResourceInfo>();
+
+    private IEnumerable<ResourceInfo> _coverages = Enumerable.Empty<ResourceInfo>();
 
     private ResourceInfo? _insurer = null;
     private ResourceInfo? _requestor = null;
@@ -446,9 +471,220 @@
 
     private void BuildClaim()
     {
+        if (_patient == null)
+        {
+            errorAtStep = 4;
+            errorMessage = "Cannot build a Claim without a patient.";
+            return;
+        }
+
+        if (_insurer == null)
+        {
+            errorAtStep = 4;
+            errorMessage = $"Insurer is REQUIRED - see PAS Claim Base profile.";
+            return;
+        }
+
+        if (_requestor == null)
+        {
+            errorAtStep = 4;
+            errorMessage = $"Requestor is REQUIRED - see PAS Claim Base profile.";
+            return;
+        }
+
+        if (_insurance == null)
+        {
+            errorAtStep = 4;
+            errorMessage = $"Insurance is REQUIRED - see PAS Claim Base profile.";
+            return;
+        }
+
         _claim = new()
         {
+            Identifier = new List<Hl7.Fhir.Model.Identifier>
+            {
+                new()
+                {
+                    System = "http://example.org/PATIENT_EVENT_TRACE_NUMBER",
+                    Value = Guid.NewGuid().ToString(),
+                    Assigner = new() 
+                    {
+                        Identifier = new()
+                        {
+                            System = "http://example.org/USER_ASSIGNED",
+                            Value = Guid.NewGuid().ToString(),
+                        },
+                    },
+                },
+            },
+            Status = Hl7.Fhir.Model.FinancialResourceStatusCodes.Active,
+            Type = new Hl7.Fhir.Model.CodeableConcept
+            {
+                Coding = new List<Hl7.Fhir.Model.Coding>
+                {
+                    new()
+                    {
+                        System = "http://terminology.hl7.org/CodeSystem/claim-type",
+                        Code = "professional",
+                        Display = "Professional",
+                    },
+                },
+            },
+            Use = Hl7.Fhir.Model.ClaimUseCode.Preauthorization,
+            Patient = new Hl7.Fhir.Model.ResourceReference
+            {
+                Reference = $"Patient/{_patient.Id}",
+                Identifier = new Hl7.Fhir.Model.Identifier
+                {
+                    System = ((Hl7.Fhir.Model.Patient)_patient.Resource).Identifier.First().System,
+                    Value = ((Hl7.Fhir.Model.Patient)_patient.Resource).Identifier.First().Value,
+                },
+            },
+            Created = DateTimeOffset.UtcNow.ToString("o"),
+            Insurer = new Hl7.Fhir.Model.ResourceReference
+            {
+                Reference = $"Organization/{_insurer.Id}",
+                Identifier = ((Hl7.Fhir.Model.Organization)_insurer.Resource).Identifier?.Any() ?? false
+                    ? new Hl7.Fhir.Model.Identifier
+                    {
+                        System = ((Hl7.Fhir.Model.Organization)_insurer.Resource).Identifier.First().System,
+                        Value = ((Hl7.Fhir.Model.Organization)_insurer.Resource).Identifier.First().Value,
+                    }
+                    : null,
+            },
+            Provider = new Hl7.Fhir.Model.ResourceReference
+            {
+                Reference = $"Organization/{_requestor.Id}",
+                Identifier = ((Hl7.Fhir.Model.Organization)_requestor.Resource).Identifier?.Any() ?? false
+                    ? new Hl7.Fhir.Model.Identifier
+                    {
+                        System = ((Hl7.Fhir.Model.Organization)_requestor.Resource).Identifier.First().System,
+                        Value = ((Hl7.Fhir.Model.Organization)_requestor.Resource).Identifier.First().Value,
+                    }
+                    : null,
+            },
+            Priority = new Hl7.Fhir.Model.CodeableConcept
+            {
+                Coding = new List<Hl7.Fhir.Model.Coding>
+                {
+                    new()
+                    {
+                        System = "http://terminology.hl7.org/CodeSystem/processpriority",
+                        Code = "normal",
+                        Display = "Normal",
+                    },
+                },
+            },
+            Insurance = new List<Hl7.Fhir.Model.Claim.InsuranceComponent>
+            {
+                new()
+                {
+                    Coverage = new Hl7.Fhir.Model.ResourceReference
+                    {
+                        Reference = $"Coverage/{_insurance.Id}",
+                        Identifier = ((Hl7.Fhir.Model.Coverage)_insurance.Resource).Identifier?.Any() ?? false
+                            ? new Hl7.Fhir.Model.Identifier
+                            {
+                                System = ((Hl7.Fhir.Model.Coverage)_insurance.Resource).Identifier.First().System,
+                                Value = ((Hl7.Fhir.Model.Coverage)_insurance.Resource).Identifier.First().Value,
+                            }
+                            : null,
+                    },
+                    Sequence = 1,
+                    Focal = true,
+                },
+            },
+            Item = new List<Hl7.Fhir.Model.Claim.ItemComponent>()
+            {
+                new()
+                {
+                    Extension = new List<Hl7.Fhir.Model.Extension>
+                    {
+                        new()
+                        {
+                            Url = "http://hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-serviceItemRequestType",
+                            Value = new Hl7.Fhir.Model.CodeableConcept
+                            {
+                                Coding = new List<Hl7.Fhir.Model.Coding>
+                                {
+                                    new()
+                                    {
+                                        System = "https://codesystem.x12.org/005010/1525",
+                                        Code = "HS",
+                                        Display = "Health Services Review",
+                                    },
+                                },
+                            },
+                        },
+                        new()
+                        {
+                            Url = "http://hl7.org/fhir/us/davinci-pas/StructureDefinition/extension-certificationType",
+                            Value = new Hl7.Fhir.Model.CodeableConcept
+                            {
+                                Coding = new List<Hl7.Fhir.Model.Coding>
+                                {
+                                    new()
+                                    {
+                                        System = "https://codesystem.x12.org/005010/1322",
+                                        Code = "I",
+                                        Display = "Initial",
+                                    },
+                                },
+                            },
+                        }
+                    },
+                }
+            },
+        };
 
+        // check for a focal encounter as an extension
+        if (_focalEncounter != null)
+        {
+            _claim.Extension.Add(new ()
+            {
+                Url = "http://hl7.org/fhir/5.0/StructureDefinition/extension-Claim.encounter",
+                Value = new Hl7.Fhir.Model.ResourceReference($"Encounter/{_focalEncounter.Id}"),
+            });
+        }
+
+        // check for adding a note as supporting info
+        if (!string.IsNullOrEmpty(_supportingMessage))
+        {
+            _claim.SupportingInfo.Add(new ()
+            {
+                Sequence = 1,
+                Category = new Hl7.Fhir.Model.CodeableConcept
+                {
+                    Coding = new List<Hl7.Fhir.Model.Coding>
+                    {
+                        new()
+                        {
+                            System = "http://hl7.org/fhir/us/davinci-pas/CodeSystem/PASSupportingInfoType",
+                            Code = "freeFormMessage",
+                            Display = "Free Form Message",
+                        },
+                    },
+                },
+                Value = new Hl7.Fhir.Model.FhirString(_supportingMessage),
+            });
+        }
+
+        // build the claim bundle
+        _requestBundle = new()
+        {
+            Identifier = new Hl7.Fhir.Model.Identifier
+            {
+                System = "http://example.org/SUBMITTER_TRANSACTION_IDENTIFIER",
+                Value = Guid.NewGuid().ToString(),
+            },
+            Type = Hl7.Fhir.Model.Bundle.BundleType.Collection,
+            Entry = new List<Hl7.Fhir.Model.Bundle.EntryComponent>()
+                {
+                    new()
+                    {
+                        Resource = _claim,
+                    },
+                },
         };
     }
 
@@ -584,6 +820,7 @@
         List<ResourceInfo> encounters = new();
         List<ResourceInfo> data = new();
         List<ResourceInfo> orgs = new();
+        List<ResourceInfo> coverages = new();
         string query;
 
         if (ProviderStore.TryTypeSearch("Encounter", $"patient={_patient.Id}", out object? eb) &&
@@ -595,6 +832,25 @@
                 if (entry.Resource is Hl7.Fhir.Model.Resource r)
                 {
                     encounters.Add(new ResourceInfo
+                        {
+                            ResourceType = r.TypeName,
+                            Id = r.Id,
+                            Resource = r,
+                            Display = DisplayFor(r),
+                        });
+                }
+            }
+        }
+
+        if (ProviderStore.TryTypeSearch("Coverage", $"patient={_patient.Id}", out object? cb) &&
+            (cb != null) &&
+            (cb is Hl7.Fhir.Model.Bundle coverageBundle))
+        {
+            foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in coverageBundle.Entry)
+            {
+                if (entry.Resource is Hl7.Fhir.Model.Resource r)
+                {
+                    coverages.Add(new ResourceInfo
                         {
                             ResourceType = r.TypeName,
                             Id = r.Id,
@@ -645,6 +901,7 @@
             }
         }
 
+        _coverages = coverages.OrderBy(sd => sd.Id);
         _encounters = encounters.OrderBy(sd => sd.Id);
         _claimSupportingData = data.OrderBy(sd => sd.ToString());
         _organizations = orgs.OrderBy(sd => sd.Id);

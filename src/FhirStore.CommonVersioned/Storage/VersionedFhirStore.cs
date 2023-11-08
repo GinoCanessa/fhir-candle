@@ -3935,6 +3935,27 @@ public partial class VersionedFhirStore : IFhirStore
             //Compartment = new(),
         };
 
+        if (_config.SmartRequired || _config.SmartAllowed)
+        {
+            restComponent.Security = new()
+            {
+                Cors = true,
+                Service = new() { new CodeableConcept("http://hl7.org/fhir/restful-security-service", "SMART-on-FHIR") },
+            };
+
+            Extension ext = new()
+            {
+                Url = "http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris",
+                Extension = new()
+                {
+                    new Extension("token", new FhirUri($"{_config.BaseUrl.Replace("/fhir/", "/_smart/")}/token")),
+                    new Extension("authorize", new FhirUri($"{_config.BaseUrl.Replace("/fhir/", "/_smart/")}/authorize")),
+                }
+            };
+
+            restComponent.Security.Extension.Add(ext);
+        }
+
         // add our resources
         foreach ((string resourceName, IVersionedResourceStore resourceStore) in _store)
         {

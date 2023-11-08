@@ -129,6 +129,16 @@ public static partial class Program
             getDefaultValue: () => new(),
             "FHIR R5 Tenants to provide");
 
+        Option<List<string>> optTenantsSmartRequired = new(
+            name: "--smart-required",
+            getDefaultValue: () => new(),
+            "FHIR Tenants that require SMART auth");
+
+        Option<List<string>> optTenantsSmartOptional = new(
+            name: "--smart-optional",
+            getDefaultValue: () => new(),
+            "FHIR Tenants that allow (but do not require) SMART auth");
+
         Option<string> optZulipEmail = new(
             name: "--zulip-email",
             getDefaultValue: () => configuration.GetValue("Zulip_Email", string.Empty) ?? string.Empty,
@@ -164,6 +174,11 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue("SMTP_Password", string.Empty) ?? string.Empty,
             "SMTP Password");
 
+        Option<string> optFhirPathLabUrl = new(
+            name: "--fhirpath-lab-url",
+            getDefaultValue: () => configuration.GetValue("FHIRPath_Lab_Url", string.Empty) ?? string.Empty,
+            "FHIRPath Lab URL");
+
         RootCommand rootCommand = new()
         {
             optPublicUrl,
@@ -181,6 +196,8 @@ public static partial class Program
             optTenantsR4,
             optTenantsR4B,
             optTenantsR5,
+            optTenantsSmartRequired,
+            optTenantsSmartOptional,
             optZulipEmail,
             optZulipKey,
             optZulipUrl,
@@ -188,6 +205,7 @@ public static partial class Program
             optSmtpPort,
             optSmtpUser,
             optSmtpPassword,
+            optFhirPathLabUrl,
         };
 
         rootCommand.Description = "A lightweight in-memory FHIR server, for when a small FHIR will do.";
@@ -211,6 +229,8 @@ public static partial class Program
                 TenantsR4 = context.ParseResult.GetValueForOption(optTenantsR4) ?? new(),
                 TenantsR4B = context.ParseResult.GetValueForOption(optTenantsR4B) ?? new(),
                 TenantsR5 = context.ParseResult.GetValueForOption(optTenantsR5) ?? new(),
+                SmartRequiredTenants = context.ParseResult.GetValueForOption(optTenantsSmartRequired) ?? new(),
+                SmartOptionalTenants = context.ParseResult.GetValueForOption(optTenantsSmartOptional) ?? new(),
                 ZulipEmail = context.ParseResult.GetValueForOption(optZulipEmail) ?? string.Empty,
                 ZulipKey = context.ParseResult.GetValueForOption(optZulipKey) ?? string.Empty,
                 ZulipUrl = context.ParseResult.GetValueForOption(optZulipUrl) ?? string.Empty,
@@ -218,6 +238,7 @@ public static partial class Program
                 SmtpPort = context.ParseResult.GetValueForOption(optSmtpPort) ?? 0,
                 SmtpUser = context.ParseResult.GetValueForOption(optSmtpUser) ?? string.Empty,
                 SmtpPassword = context.ParseResult.GetValueForOption(optSmtpPassword) ?? string.Empty,
+                FhirPathLabUrl = context.ParseResult.GetValueForOption(optFhirPathLabUrl) ?? string.Empty,
             };
 
             await RunServer(config, context.GetCancellationToken());
@@ -248,6 +269,11 @@ public static partial class Program
             if (config.PublicUrl.EndsWith('/'))
             {
                 config.PublicUrl = config.PublicUrl.Substring(0, config.PublicUrl.Length - 1);
+            }
+
+            if (config.FhirPathLabUrl.EndsWith('/'))
+            {
+                config.FhirPathLabUrl = config.FhirPathLabUrl.Substring(0, config.FhirPathLabUrl.Length - 1);
             }
 
             // check for no tenants (create defaults)
@@ -315,9 +341,22 @@ public static partial class Program
             builder.Services.AddSingleton<IFhirPackageService, FhirPackageService>();
             builder.Services.AddHostedService<IFhirPackageService>(sp => sp.GetRequiredService<IFhirPackageService>());
 
+            // add a SMART Authorization singleton, then register as a hosted service
+            builder.Services.AddSingleton<ISmartAuthManager, SmartAuthManager>();
+            builder.Services.AddHostedService<ISmartAuthManager>(sp => sp.GetRequiredService<ISmartAuthManager>());
+
             builder.Services.AddControllers();
 
-            if (config.DisableUi != true)
+            if (config.DisableUi == true)
+            {
+                // check for any SMART-enabled tenants - *requires* UI
+                if (config.SmartRequiredTenants.Any() || config.SmartOptionalTenants.Any())
+                {
+                    Console.WriteLine("fhir-candle <<< ERROR: Cannot disable UI when SMART is configured.");
+                    return -1;
+                }
+            }
+            else
             {
                 builder.Services.AddRazorPages(options =>
                 {
@@ -341,7 +380,8 @@ public static partial class Program
             app.UseCors(builder => builder
                 .AllowAnyOrigin()
                 .AllowAnyMethod()
-                .AllowAnyHeader());
+                .AllowAnyHeader()
+                .WithExposedHeaders(new[] { "Content-Location", "Location", "Etag", "Last-Modified" }));
 
             app.UseStaticFiles();
 
@@ -357,10 +397,12 @@ public static partial class Program
 
             IFhirPackageService ps = app.Services.GetRequiredService<IFhirPackageService>();
             IFhirStoreManager sm = app.Services.GetRequiredService<IFhirStoreManager>();
+            ISmartAuthManager am = app.Services.GetRequiredService<ISmartAuthManager>();
 
             // perform slow initialization of services
             ps.Init();          // store manager requires Package Service to be initialized
             sm.Init();          // store manager may need to download packages
+            am.Init();          // spin up authorization manager
 
             // run the server
             //await app.RunAsync(cancellationToken);
@@ -431,6 +473,9 @@ public static partial class Program
     /// </returns>
     private static Dictionary<string, TenantConfiguration> BuildTenantConfigurations(ServerConfiguration config)
     {
+        HashSet<string> smartRequired = config.SmartRequiredTenants.ToHashSet();
+        HashSet<string> smartOptional = config.SmartOptionalTenants.ToHashSet();
+
         Dictionary<string, TenantConfiguration> tenants = new();
 
         foreach (string tenant in config.TenantsR4)
@@ -442,6 +487,8 @@ public static partial class Program
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
                 ProtectLoadedContent = config.ProtectLoadedContent,
                 MaxResourceCount = config.MaxResourceCount,
+                SmartRequired = smartRequired.Contains(tenant),
+                SmartAllowed = smartOptional.Contains(tenant),
             });
         }
 
@@ -454,6 +501,8 @@ public static partial class Program
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
                 ProtectLoadedContent = config.ProtectLoadedContent,
                 MaxResourceCount = config.MaxResourceCount,
+                SmartRequired = smartRequired.Contains(tenant),
+                SmartAllowed = smartOptional.Contains(tenant),
             });
         }
 
@@ -466,6 +515,8 @@ public static partial class Program
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
                 ProtectLoadedContent = config.ProtectLoadedContent,
                 MaxResourceCount = config.MaxResourceCount,
+                SmartRequired = smartRequired.Contains(tenant),
+                SmartAllowed = smartOptional.Contains(tenant),
             });
         }
 

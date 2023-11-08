@@ -581,6 +581,14 @@ public class SearchTester
                         }
                         break;
 
+                    case "token-oftype-identifier":
+                        if (EvalTokenSearch.TestTokenOfType(resultNode, sp))
+                        {
+                            found = true;
+                            break;
+                        }
+                        break;
+
                     case "reference-above-canonical":
                     case "reference-above-reference":
                     case "reference-above-oid":
@@ -631,8 +639,6 @@ public class SearchTester
                     case "token-codetext-coding":
                     case "token-notin-code":
                     case "token-notin-coding":
-                    case "token-oftype-code":
-                    case "token-oftype-coding":
                     case "token-text-code":
                     case "token-text-coding":
                     case "token-textadvanced-code":
@@ -680,15 +686,6 @@ public class SearchTester
                     case "token-notin-url":
                     case "token-notin-uuid":
                     case "token-notin-string":
-                    case "token-oftype-codeableconcept":
-                    case "token-oftype-identifier":
-                    case "token-oftype-contactpoint":
-                    case "token-oftype-canonical":
-                    case "token-oftype-oid":
-                    case "token-oftype-uri":
-                    case "token-oftype-url":
-                    case "token-oftype-uuid":
-                    case "token-oftype-string":
                     case "token-text-codeableconcept":
                     case "token-text-identifier":
                     case "token-text-contactpoint":

@@ -17,7 +17,7 @@ using System.Diagnostics;
 
 namespace FhirCandle.Serialization;
 
-/// <summary>Serialization utilties.</summary>
+/// <summary>Serialization utilities.</summary>
 public static class Utils
 {
     /// <summary>The JSON parser.</summary>

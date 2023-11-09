@@ -123,7 +123,7 @@ public class SmartController : ControllerBase
     [Produces("application/json")]
     public async Task PostSmartTokenRequest(
         [FromRoute] string store,
-        [FromHeader] string? authHeader = null)
+        [FromHeader(Name = "Authorization")] string? authHeader = null)
     {
         // make sure this store exists and has SMART enabled
         if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(

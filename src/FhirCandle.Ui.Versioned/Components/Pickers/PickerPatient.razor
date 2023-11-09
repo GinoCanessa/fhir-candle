@@ -1,5 +1,4 @@
-﻿
-@inject NavigationManager NavigationManager
+﻿@inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IFhirStoreManager StoreManager
 
@@ -7,17 +6,29 @@
 
 @* <MudText Inline="true">Item: @_selectedItemText</MudText> *@
 
+<style>
+    .selected {
+        background-color: #1E88E5 !important;
+    }
+    .selected > td {
+        color: white !important;
+    }
+    .selected > td .mud-input {
+        color: white !important;
+    }
+</style>
+
 <MudTable 
         @ref="_displayTable"
         T="Hl7.Fhir.Model.Patient"
         Filter="new Func<Hl7.Fhir.Model.Patient, bool>(FilterFuncInstance)"
         Dense="true"
-        Striped="true"
         MultiSelection="false"
-        @bind-SelectedItems="_selected"
+        RowClass="cursor-pointer" 
+        RowClassFunc="@SelectedRowClassFunc"
         Hover="true"
-        OnRowClick="@OnRowClick"
         SelectOnRowClick="true"
+        OnRowClick="OnRowClick"
         Items="_resources">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Patients</MudText>
@@ -66,26 +77,11 @@
     [Parameter]
     public IResourceStore ResourceStore { get; set; } = null!;
 
-    private string _selectedId = string.Empty;
+    [Parameter]
+    public string SelectedId { get; set; } = string.Empty;
 
     [Parameter]
-    public string SelectedId
-    {
-        get => _selectedId;
-        set
-        {
-            if (_selectedId.Equals(value))
-            {
-                return;
-            }
-
-            _selectedId = value;
-            SelectedIdChanged.InvokeAsync(value);
-        }
-    }
-
-    [Parameter]
-    public EventCallback<string> SelectedIdChanged { get; set; } 
+    public EventCallback<string> SelectedIdChanged { get; set; }
 
     /// <summary>The display table.</summary>
     private MudTable<Hl7.Fhir.Model.Patient>? _displayTable = null;
@@ -126,13 +122,47 @@
         return false;
     }
 
-    void OnRowClick(TableRowClickEventArgs<Hl7.Fhir.Model.Patient> args)
+    /// <summary>Selected row class function.</summary>
+    /// <param name="item">     The item.</param>
+    /// <param name="rowNumber">The row number.</param>
+    /// <returns>A string.</returns>
+    private string SelectedRowClassFunc(Hl7.Fhir.Model.Patient item, int rowNumber)
     {
-        _selectedItemText = DisplayFor(args.Item);
-        SelectedId = args.Item.Id;
-        // SelectedId = "Patient/" + args.Item.Id;
+        if (string.IsNullOrEmpty(SelectedId))
+        {
+            return string.Empty;
+        }
+
+        if (SelectedId.Equals(item?.Id ?? string.Empty))
+        {
+            return "selected";
+        }
+    
+        return string.Empty;
     }
 
+    /// <summary>Executes the row click action.</summary>
+    /// <param name="args">The arguments.</param>
+    async void OnRowClick(TableRowClickEventArgs<Hl7.Fhir.Model.Patient> args)
+    {
+        if (args.Item.Id.Equals(SelectedId))
+        {
+            _displayTable?.SetSelectedItem(null);
+            _selectedItemText = "Nothing selected";
+            SelectedId = string.Empty;
+            await SelectedIdChanged.InvokeAsync(string.Empty);
+            return;
+        }
+
+        _displayTable?.SetSelectedItem(args.Item);
+        _selectedItemText = DisplayFor(args.Item);
+        SelectedId = args.Item.Id;
+        await SelectedIdChanged.InvokeAsync(SelectedId);
+    }
+
+    /// <summary>Displays for described by o.</summary>
+    /// <param name="o">An object to process.</param>
+    /// <returns>A string.</returns>
     private string DisplayFor(object o)
     {
         if (o == null)

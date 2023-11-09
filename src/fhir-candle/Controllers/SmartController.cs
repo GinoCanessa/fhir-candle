@@ -63,7 +63,7 @@ public class SmartController : ControllerBase
         Response.ContentType = "application/json";
         Response.StatusCode = (int)HttpStatusCode.OK;
 
-        await Response.WriteAsync(FhirCandle.Serialization.Utils.SerializeObject(smartConfig));
+        await Response.WriteAsync(FhirCandle.Serialization.SerializationCommon.SerializeObject(smartConfig));
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets smart authorize.</summary>
@@ -248,7 +248,7 @@ public class SmartController : ControllerBase
             Response.ContentType = "application/json";
             Response.StatusCode = (int)HttpStatusCode.OK;
 
-            await Response.WriteAsync(FhirCandle.Serialization.Utils.SerializeObject(smart));
+            await Response.WriteAsync(FhirCandle.Serialization.SerializationCommon.SerializeObject(smart));
         }
         catch (Exception ex)
         {
@@ -320,7 +320,7 @@ public class SmartController : ControllerBase
             Response.ContentType = "application/json";
             Response.StatusCode = (int)HttpStatusCode.OK;
 
-            await Response.WriteAsync(FhirCandle.Serialization.Utils.SerializeObject(resp));
+            await Response.WriteAsync(FhirCandle.Serialization.SerializationCommon.SerializeObject(resp));
         }
         catch (Exception ex)
         {

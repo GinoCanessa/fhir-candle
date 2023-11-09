@@ -98,8 +98,7 @@
     private string _resourceContent { get; set; } = "";
 
     /// <summary>Loads resource content.</summary>
-    /// <returns>An asynchronous result.</returns>
-    private async Task LoadResourceContent()
+    private void LoadResourceContent()
     {
         string content;
 
@@ -144,7 +143,7 @@
     /// <summary>Updates this object.</summary>
     private void UpdateContent()
     {
-        _ = LoadResourceContent();
+        LoadResourceContent();
     }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
@@ -174,7 +173,7 @@
 
         NavigationManager.LocationChanged += HandleLocationChanged;
 
-        _ = LoadResourceContent();
+        LoadResourceContent();
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -207,7 +206,7 @@
                     3);
             }
 
-            _ = LoadResourceContent();
+            LoadResourceContent();
         }
     }
 

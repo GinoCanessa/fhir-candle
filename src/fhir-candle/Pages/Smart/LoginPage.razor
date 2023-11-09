@@ -17,13 +17,6 @@
     <MudCardContent>
         <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
             <MudTabPanel Text="Patient Login">
-                <MudText Typo="Typo.body1" Class="ma-2" >Patient: @SelectedPatientId</MudText>
-
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPatient())" Disabled="@string.IsNullOrEmpty(SelectedPatientId)" >Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
-                </MudStack>
-
                 @switch (_store.Config.FhirVersion)
                 {
                     case TenantConfiguration.SupportedFhirVersions.R4:
@@ -31,6 +24,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -39,6 +33,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -47,19 +42,23 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
-                    }
+                }
+
+                <br />
+
+                <MudTextField Label="User (Patient)" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+
+                <MudStack Row="true" Spacing="3" Class="ma-2">
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPatient())">Login</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
+                </MudStack>
             </MudTabPanel>
 
             <MudTabPanel Text="Practitioner Login">
-                <MudText Typo="Typo.body1" Class="ma-2">Practitioner: @SelectedPractitionerId</MudText>
-
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPractitioner())" Disabled="@string.IsNullOrEmpty(SelectedPractitionerId)">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
-                </MudStack>
-
                 @switch (_store.Config.FhirVersion)
                 {
                     case TenantConfiguration.SupportedFhirVersions.R4:
@@ -67,6 +66,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Practitioner"]"
                             @bind-SelectedId="SelectedPractitionerId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -75,6 +75,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Practitioner"]"
                             @bind-SelectedId="SelectedPractitionerId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -83,11 +84,14 @@
                             Store="@_store"
                             ResourceStore="@_store["Practitioner"]"
                             @bind-SelectedId="SelectedPractitionerId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
                 }
 
-                <MudText Typo="Typo.body1" Class="ma-2">Launch Patient: @SelectedPatientId</MudText>
+                <br />
+
+                @* <MudText Typo="Typo.body1" Class="ma-2">Launch Patient: @SelectedPatientId</MudText> *@
                 <MudText Typo="Typo.body1" Class="ma-2">If you want a patient context, please select a patient below:</MudText>
 
                 @switch (_store.Config.FhirVersion)
@@ -97,6 +101,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -105,6 +110,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -113,23 +119,24 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
                     }
 
+                <br />
+
+                <MudTextField Label="User (Practitioner)" @bind-Value="SelectedPractitionerId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+                <MudTextField Label="Practitioner" @bind-Value="SelectedPractitionerId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+
                 <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPractitioner())" Disabled="@string.IsNullOrEmpty(SelectedPractitionerId)">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPractitioner())">Login</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
             </MudTabPanel>
 
             <MudTabPanel Text="Administrator Login">
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginSystem())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
-                </MudStack>
-
-                <MudText Typo="Typo.body1" Class="ma-2">Launch Patient: @SelectedPatientId</MudText>
                 <MudText Typo="Typo.body1" Class="ma-2">If you want a patient context, please select a patient below:</MudText>
 
                 @switch (_store.Config.FhirVersion)
@@ -139,6 +146,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -147,6 +155,7 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
 
@@ -155,13 +164,17 @@
                             Store="@_store"
                             ResourceStore="@_store["Patient"]"
                             @bind-SelectedId="SelectedPatientId"
+                            @bind-SelectedId:event="SelectedIdChanged"
                             />
                         break;
                 }
 
+                <MudTextField Label="User (Admin)" Value="@("administrator")" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+
                 <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginSystem())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginAdministrator())">Login</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
 
             </MudTabPanel>
@@ -190,6 +203,9 @@
     /// <summary>The authorization information.</summary>
     private AuthorizationInfo _auth = null!;
 
+    /// <summary>Gets or sets the selected user.</summary>
+    public string SelectedUser { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the selected patient identifier.</summary>
     public string SelectedPatientId { get; set; } = string.Empty;
 
@@ -214,9 +230,31 @@
         NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
     }
 
-    private void ProcessLoginSystem()
+    /// <summary>Cancel login.</summary>
+    private void CancelLogin()
     {
-        _auth.UserId = "system_user";
+        if (AuthManager.TryGetClientRedirect(StoreName, Key, out string url, "canceled", "canceled by user request"))
+        {
+            NavigationManager.NavigateTo(url);
+        }
+
+        // TODO: show an error on the screen
+    }
+
+    private void ProcessLogin()
+    {
+        _auth.UserId = SelectedUser;
+        _auth.LaunchPatient = SelectedPatientId;
+        _auth.LaunchPractitioner = SelectedPractitionerId;
+
+        _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
+
+        NavigationManager.NavigateTo($"/smart/auth?store={StoreName}&key={Key}");
+    }
+
+    private void ProcessLoginAdministrator()
+    {
+        _auth.UserId = "administrator";
         _auth.LaunchPatient = SelectedPatientId;
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);

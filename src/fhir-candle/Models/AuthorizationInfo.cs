@@ -124,7 +124,7 @@ public class AuthorizationInfo
     public record class SmartResponse
     {
         [JsonPropertyName("need_patient_banner")]
-        public bool NeedPatientBanner { get; init; } = false;
+        public bool NeedPatientBanner { get; init; } = true;
 
         [JsonPropertyName("smart_style_url")]
         public string SmartStyleUrl { get; init; } = string.Empty;

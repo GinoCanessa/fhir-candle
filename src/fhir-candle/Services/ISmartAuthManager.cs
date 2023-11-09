@@ -40,7 +40,13 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="key">     The key.</param>
     /// <param name="redirect">[out] The redirect.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryGetClientRedirect(string tenant, string key, out string redirect);
+    bool TryGetClientRedirect(
+        string tenant, 
+        string key, 
+        out string redirect,
+        string error = "",
+        string errorDescription = "");
+
 
     /// <summary>Attempts to create smart response.</summary>
     /// <param name="tenant">      The tenant name.</param>

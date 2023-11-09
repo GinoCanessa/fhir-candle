@@ -175,7 +175,7 @@ public class FhirController : ControllerBase
         Response.ContentType = "application/json";
         Response.StatusCode = (int)HttpStatusCode.OK;
 
-        await Response.WriteAsync(FhirCandle.Serialization.Utils.SerializeObject(smartConfig));
+        await Response.WriteAsync(FhirCandle.Serialization.SerializationCommon.SerializeObject(smartConfig));
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets a metadata.</summary>

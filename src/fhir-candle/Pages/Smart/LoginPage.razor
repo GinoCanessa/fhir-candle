@@ -53,8 +53,8 @@
                 <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
 
                 <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPractitioner())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPatient())">Login</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
             </MudTabPanel>
 
@@ -132,7 +132,7 @@
 
                 <MudStack Row="true" Spacing="3" Class="ma-2">
                     <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPractitioner())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
             </MudTabPanel>
 
@@ -174,45 +174,11 @@
 
                 <MudStack Row="true" Spacing="3" Class="ma-2">
                     <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginAdministrator())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined">Cancel</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
 
             </MudTabPanel>
         </MudTabs>
-@* 
-        <br />
-
-        <MudPaper Class="pa-6">
-            <MudSimpleTable>
-                <thead>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>User</td>
-                        <td>@SelectedUser</td>
-                    </tr>
-                    <tr>
-                        <td>Patient Context</td>
-                        <td>@SelectedPatientId</td>
-                    </tr>
-                    <tr>
-                        <td>Practitioner Context</td>
-                        <td>@SelectedPractitionerId</td>
-                    </tr>
-                </tbody>
-            </MudSimpleTable>
-
-            <MudStack Row="true" Spacing="3" Class="ma-2">
-                <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLogin())">Login</MudButton>
-                <MudButton Variant="Variant.Outlined">Cancel</MudButton>
-                <MudButton Variant="Variant.Outlined" OnClick="@(() => StateHasChanged())">Refresh</MudButton>
-            </MudStack>
-        </MudPaper>
- *@
     </MudCardContent>
 </MudCard>
 
@@ -262,6 +228,17 @@
         // }
 
         NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
+    }
+
+    /// <summary>Cancel login.</summary>
+    private void CancelLogin()
+    {
+        if (AuthManager.TryGetClientRedirect(StoreName, Key, out string url, "canceled", "canceled by user request"))
+        {
+            NavigationManager.NavigateTo(url);
+        }
+
+        // TODO: show an error on the screen
     }
 
     private void ProcessLogin()

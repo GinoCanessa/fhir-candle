@@ -1,4 +1,4 @@
-﻿// <copyright file="Utils.cs" company="Microsoft Corporation">
+﻿// <copyright file="SerializationCommon.cs" company="Microsoft Corporation">
 //     Copyright (c) Microsoft Corporation. All rights reserved.
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
@@ -8,7 +8,8 @@ using System.Xml;
 
 namespace FhirCandle.Serialization;
 
-public static class Utils
+/// <summary>Common serialization utilities.</summary>
+public static class SerializationCommon
 {
     /// <summary>Serialize object.</summary>
     /// <typeparam name="T">Generic type parameter.</typeparam>

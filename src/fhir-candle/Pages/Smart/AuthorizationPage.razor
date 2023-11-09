@@ -20,17 +20,22 @@
         </MudCardHeader>
         <MudCardContent>
             <MudStack Row="false" Spacing="3">
-                <MudButton Variant="Variant.Outlined" Class="ma-2" OnClick="@(() => ApproveScopes())" >Approve Selected Scopes</MudButton>
+
+                <MudStack Row="true" Spacing="3" Class="ma-2">
+                    <MudButton Variant="Variant.Outlined" Class="ma-2" OnClick="@(() => ApproveScopes())">Approve Selected Scopes</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="@(() => DenyScopes())">Cancel</MudButton>
+                </MudStack>
+
                 <MudTable 
-                @ref="_displayTable"
-                T="string"
-                Dense="true"
-                Striped="true"
-                MultiSelection="true"
-                @bind-SelectedItems="_selected"
-                Hover="true"
-                SelectOnRowClick="true"
-                Items="_auth.Scopes.Keys">
+                    @ref="_displayTable"
+                    T="string"
+                    Dense="true"
+                    Striped="true"
+                    MultiSelection="true"
+                    @bind-SelectedItems="_selected"
+                    Hover="true"
+                    SelectOnRowClick="true"
+                    Items="_auth.Scopes.Keys">
                     <ColGroup>
                         <col style="width: 5vw!important;" />
                         <col style="width: 90vw!important;" />
@@ -104,6 +109,16 @@ else
         }
 
         NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
+    }
+
+    private void DenyScopes()
+    {
+        if (AuthManager.TryGetClientRedirect(StoreName, Key, out string url, "denied", "authorization request was denied"))
+        {
+            NavigationManager.NavigateTo(url);
+        }
+
+        // TODO: show an error on the screen
     }
 
     private void ApproveScopes()

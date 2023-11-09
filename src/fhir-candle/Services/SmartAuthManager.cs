@@ -128,11 +128,18 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     }
 
     /// <summary>Attempts to get the authorization client redirect URL.</summary>
-    /// <param name="tenant">  The tenant name.</param>
-    /// <param name="key">     The key.</param>
-    /// <param name="redirect">[out] The redirect.</param>
+    /// <param name="tenant">          The tenant name.</param>
+    /// <param name="key">             The key.</param>
+    /// <param name="redirect">        [out] The redirect.</param>
+    /// <param name="error">           (Optional) The error.</param>
+    /// <param name="errorDescription">(Optional) Information describing the error.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryGetClientRedirect(string tenant, string key, out string redirect)
+    public bool TryGetClientRedirect(
+        string tenant, 
+        string key, 
+        out string redirect,
+        string error = "",
+        string errorDescription = "")
     {
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
@@ -157,6 +164,27 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         _authorizations[key].Expires = DateTimeOffset.UtcNow.AddMinutes(10);
 
         string redirectUri = _authorizations[key].RequestParameters.RedirectUri;
+
+        // check for an error state redirection
+        if (!string.IsNullOrEmpty(error))
+        {
+            // use our key as the authorization code
+            if (redirectUri.Contains('?'))
+            {
+                redirect = $"{redirectUri}&error={System.Web.HttpUtility.UrlEncode(error)}";
+            }
+            else
+            {
+                redirect = $"{redirectUri}?error={System.Web.HttpUtility.UrlEncode(error)}";
+            }
+
+            if (!string.IsNullOrEmpty(errorDescription))
+            {
+                redirect = redirect + $"&error_description={System.Web.HttpUtility.UrlEncode(errorDescription)}";
+            }
+
+            return true;
+        }
 
         // use our key as the authorization code
         if (redirectUri.Contains('?'))
@@ -183,14 +211,16 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         string clientId,
         out AuthorizationInfo.SmartResponse response)
     {
-        if (string.IsNullOrEmpty(refreshToken) || string.IsNullOrEmpty(tenant) || string.IsNullOrEmpty(clientId))
+        if (string.IsNullOrEmpty(refreshToken))
         {
+            _logger.LogWarning("TrySmartRefresh <<< request is missing refresh token.");
             response = null!;
             return false;
         }
 
         if (refreshToken.Length < 36)
         {
+            _logger.LogWarning($"TrySmartRefresh <<< request {refreshToken} is malformed.");
             response = null!;
             return false;
         }
@@ -199,30 +229,91 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
+            _logger.LogWarning($"TrySmartRefresh <<< auth {key} does not exist.");
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(tenant))
+        {
+            string msg = $"TrySmartRefresh <<< refresh of {refreshToken} is missing the tenant.";
+            local.Activity.Add(new()
+            {
+                RequestType = "refresh_token",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(clientId))
+        {
+            string msg = $"TrySmartRefresh <<< refresh of {refreshToken} is missing the client id.";
+            local.Activity.Add(new()
+            {
+                RequestType = "refresh_token",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
         {
+            string msg = $"TrySmartRefresh <<< {key} tenant ({local.Tenant}) does not match request: {tenant}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "refresh_token",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (!clientId.Equals(local.RequestParameters.ClientId, StringComparison.Ordinal))
         {
+            string msg = $"TrySmartRefresh <<< {key} client ({local.RequestParameters.ClientId}) does not match request: {clientId}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "refresh_token",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (local.Response == null)
         {
+            string msg = $"TrySmartRefresh <<< {key} does not have an issued refresh token.";
+            local.Activity.Add(new()
+            {
+                RequestType = "refresh_token",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (!refreshToken.Equals(local.Response.RefreshToken, StringComparison.Ordinal))
         {
+            string msg = $"TrySmartRefresh <<< {key} refresh token {refreshToken} does not match issued: {local.Response.RefreshToken}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "refresh_token",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
@@ -237,6 +328,13 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             AccessToken = key + "_" + Guid.NewGuid().ToString(),
             RefreshToken = key + "_" + Guid.NewGuid().ToString(),
         };
+
+        local.Activity.Add(new()
+        {
+            RequestType = "refresh_token",
+            Success = true,
+            Message = $"Refreshed access: {local.Response.AccessToken}, refresh token: {local.Response.RefreshToken}"
+        });
 
         response = local.Response!;
         return true;
@@ -548,7 +646,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         {
             Subject = new System.Security.Claims.ClaimsIdentity(new System.Security.Claims.Claim[]
             {
-                new("sub", auth.RequestParameters.Audience),
+                new("sub", auth.Key + "_" + Guid.NewGuid().ToString()),
                 new("profile", auth.UserId),
                 new("fhirUser", auth.UserId),
                 new("jti", Guid.NewGuid().ToString()),
@@ -609,18 +707,20 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 //AppStateEndpoint = $"{config.BaseUrl}/auth/appstate",
                 SupportedScopes = new string[]
                 {
-                        "launch",
-                        "launch/patient",
-                        //"patient/*.read",
-                        //"patient/*.r",
-                        //"patient/*.*",
-                        "user/*.read",
-                        "user/*.rs",
-                        "user/*.*",
-                        "openid",
-                        "fhirUser",
-                    //"profile",
+                    //"openid",
+                    "profile",
                     //"offline_access",
+                    "fhirUser",
+                    "launch",
+                    "launch/patient",
+                    //"launch/practitioner",
+                    //"launch/encounter",
+                    //"patient/*.read",
+                    //"patient/*.r",
+                    "patient/*.*",
+                    //"user/*.read",
+                    //"user/*.rs",
+                    "user/*.*",
                 },
                 SupportedResponseTypes = new string[]
                 {
@@ -633,7 +733,6 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                         "refresh_token",
                 },
                 //ManagementEndpoint = $"{config.BaseUrl}/auth/manage",
-                //IntrospectionEndpoint = $"{config.BaseUrl}/auth/introspect",
                 IntrospectionEndpoint = $"{_serverConfig.PublicUrl}/_smart/{name}/introspect",
                 //RecovationEndpoint = $"{config.BaseUrl}/auth/revoke",
                 Capabilities = new string[]

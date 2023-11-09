@@ -4,13 +4,10 @@
 // </copyright>
 
 using System.Net;
-using fhir.candle.Models;
 using fhir.candle.Services;
-using Fhir.Metrics;
 using FhirCandle.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
-using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
 

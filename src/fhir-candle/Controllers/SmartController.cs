@@ -6,11 +6,7 @@
 using System.Net;
 using fhir.candle.Models;
 using fhir.candle.Services;
-using Fhir.Metrics;
-using FhirCandle.Storage;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
-using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
 
@@ -117,6 +113,12 @@ public class SmartController : ControllerBase
         Response.Redirect(redirectDestination);
     }
 
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts a smart token request.
+    /// </summary>
+    /// <param name="store">     The store.</param>
+    /// <param name="authHeader">(Optional) The authentication header.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/token")]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]
@@ -266,6 +268,11 @@ public class SmartController : ControllerBase
 
     }
 
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts a smart token introspect.
+    /// </summary>
+    /// <param name="store">The store.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/introspect")]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]

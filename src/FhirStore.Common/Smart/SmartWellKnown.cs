@@ -49,6 +49,11 @@ public record class SmartWellKnown
     [JsonPropertyName("token_endpoint_auth_methods_supported")]
     public IEnumerable<string> TokenEndpointAuthMethods { get; set; } = Enumerable.Empty<string>();
 
+    /// <summary>Gets or sets the token endpoint authentication signing algs.</summary>
+    [JsonPropertyName("token_endpoint_auth_signing_alg_values_supported")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IEnumerable<string>? TokenEndpointAuthSigningAlgs { get; set; } = null;
+
     /// <summary>
     /// Gets or sets the URL to the OAuth2 dynamic registration endpoint for this FHIR server, if
     /// available.

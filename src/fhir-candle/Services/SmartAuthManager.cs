@@ -596,10 +596,15 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 TokenEndpoint = $"{_serverConfig.PublicUrl}/_smart/{name}/token",
                 TokenEndpointAuthMethods = new string[]
                 {
-                        //"client_secret_post",
-                        "client_secret_basic",
+                    //"client_secret_post",
+                    "client_secret_basic",
                     //"private_key_jwt",
                 },
+                //TokenEndpointAuthSigningAlgs = new string[]
+                //{
+                //    //"RS384",
+                //    //"ES384",
+                //},
                 //RegistrationEndpoint = $"{config.BaseUrl}/auth/register",
                 //AppStateEndpoint = $"{config.BaseUrl}/auth/appstate",
                 SupportedScopes = new string[]
@@ -633,26 +638,26 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 //RecovationEndpoint = $"{config.BaseUrl}/auth/revoke",
                 Capabilities = new string[]
                 {
-                        //"launch-ehr",                         // SMART's EHR Launch mode
-                        "launch-standalone",                    // SMART's Standalone Launch mode
-                        //"authorize-post",                     // POST-based authorization
-                        "client-public",                        // SMART's public client profile (no client authentication)
-                        //"client-confidential-symmetric",      // SMART's symmetric confidential client profile ("client secret" authentication)
-                        //"client-confidential-asymmetric",     // SMART's asymmetric confidential client profile ("JWT authentication")
-                        //"sso-openid-connect",                 // SMART's OpenID Connect profile
-                        //"context-banner",                     // "need patient banner" launch context (conveyed via need_patient_banner token parameter)
-                        //"context-style",                      // "SMART style URL" launch context (conveyed via smart_style_url token parameter). This capability is deemed experimental.
-                        //"context-ehr-patient",                // patient-level launch context (requested by launch/patient scope, conveyed via patient token parameter)
-                        //"context-ehr-encounter",              // encounter-level launch context (requested by launch/encounter scope, conveyed via encounter token parameter)
-                        "context-standalone-patient",           // patient-level launch context (requested by launch/patient scope, conveyed via patient token parameter)
-                        //"context-standalone-encounter",       // encounter-level launch context (requested by launch/encounter scope, conveyed via encounter token parameter)
-                        //"permission-offline",                 // refresh tokens (requested by offline_access scope)
-                        //"permission-online",                  // refresh tokens (requested by online_access scope)
-                        "permission-patient",                 // patient-level scopes (e.g., patient/Observation.rs)
-                        "permission-user",                      // user-level scopes (e.g., user/Appointment.rs)
-                        "permission-v1",                        // SMARTv1 scope syntax (e.g., patient/Observation.read)
-                        "permission-v2",                        // SMARTv2 granular scope syntax (e.g., patient/Observation.rs?...)
-                                                                //"smart-app-state",                    // managing SMART App State - experimental
+                        //"launch-ehr",                             // SMART's EHR Launch mode
+                        "launch-standalone",                        // SMART's Standalone Launch mode
+                        //"authorize-post",                         // POST-based authorization
+                        "client-public",                            // SMART's public client profile (no client authentication)
+                        "client-confidential-symmetric",            // SMART's symmetric confidential client profile ("client secret" authentication)
+                        //"client-confidential-asymmetric",         // SMART's asymmetric confidential client profile ("JWT authentication")
+                        //"sso-openid-connect",                     // SMART's OpenID Connect profile
+                        //"context-banner",                         // "need patient banner" launch context (conveyed via need_patient_banner token parameter)
+                        //"context-style",                          // "SMART style URL" launch context (conveyed via smart_style_url token parameter). This capability is deemed experimental.
+                        //"context-ehr-patient",                    // patient-level launch context (requested by launch/patient scope, conveyed via patient token parameter)
+                        //"context-ehr-encounter",                  // encounter-level launch context (requested by launch/encounter scope, conveyed via encounter token parameter)
+                        "context-standalone-patient",               // patient-level launch context (requested by launch/patient scope, conveyed via patient token parameter)
+                        //"context-standalone-encounter",           // encounter-level launch context (requested by launch/encounter scope, conveyed via encounter token parameter)
+                        //"permission-offline",                     // refresh tokens (requested by offline_access scope)
+                        //"permission-online",                      // refresh tokens (requested by online_access scope)
+                        "permission-patient",                       // patient-level scopes (e.g., patient/Observation.rs)
+                        "permission-user",                          // user-level scopes (e.g., user/Appointment.rs)
+                        "permission-v1",                            // SMARTv1 scope syntax (e.g., patient/Observation.read)
+                        "permission-v2",                            // SMARTv2 granular scope syntax (e.g., patient/Observation.rs?...)
+                                                                    //"smart-app-state",                    // managing SMART App State - experimental
                 },
                 SupportedChallengeMethods = new string[]
                 {

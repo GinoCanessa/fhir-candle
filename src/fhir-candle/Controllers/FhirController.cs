@@ -191,6 +191,7 @@ public class FhirController : ControllerBase
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"GetMetadata <<< no tenant at {store}!");
             Response.StatusCode = 404;
             return;
         }
@@ -241,9 +242,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"GetTypeOperation <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetTypeOperation <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -290,9 +298,16 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "If-Modified-Since")] string? ifModifiedSince,
         [FromHeader(Name = "If-None-Match")] string? ifNoneMatch)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"GetResourceInstance <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetResourceInstance <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -349,9 +364,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"GetInstanceOperation <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetInstanceOperation <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -403,9 +425,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PostInstanceOperation <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostInstanceOperation <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -438,10 +467,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostInstanceOperation <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostInstanceOperation <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostInstanceOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -473,9 +505,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromQuery(Name = "_summary")] string? summary)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PostResourceTypeSearch <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostResourceTypeSearch <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -485,7 +524,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("PostResourceTypeSearch <<< cannot process a POST search without a Request!");
+            _logger.LogWarning("PostResourceTypeSearch <<< cannot process a POST search without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -527,10 +566,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostResourceTypeSearch <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostResourceTypeSearch <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostResourceTypeSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -539,13 +581,13 @@ public class FhirController : ControllerBase
     }
     
     /// <summary>(An Action that handles HTTP POST requests) posts a type operation.</summary>
-         /// <param name="store">       The store.</param>
-         /// <param name="resourceName">Name of the resource.</param>
-         /// <param name="opName">      Name of the operation.</param>
-         /// <param name="format">      Describes the format to use.</param>
-         /// <param name="summary">     The summary.</param>
-         /// <param name="pretty">      The pretty.</param>
-         /// <returns>An asynchronous result.</returns>
+    /// <param name="store">       The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="opName">      Name of the operation.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/{resourceName}/${opName}")]
     //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostTypeOperation(
@@ -557,9 +599,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PostTypeOperation <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostTypeOperation <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -591,10 +640,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostTypeOperation <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostTypeOperation <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostTypeOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -623,6 +675,7 @@ public class FhirController : ControllerBase
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PostSystemSearch <<< no tenant at {store}!");
             Response.StatusCode = 404;
             return;
         }
@@ -632,7 +685,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("PostSystemSearch <<< cannot process a POST search without a Request!");
+            _logger.LogWarning("PostSystemSearch <<< cannot process a POST search without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -673,10 +726,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostSystemSearch <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSystemSearch <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSystemSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -702,6 +758,7 @@ public class FhirController : ControllerBase
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PostSystemOperation <<< no tenant at {store}!");
             Response.StatusCode = 404;
             return;
         }
@@ -711,7 +768,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("PostResourceType <<< cannot process an operation POST without a Request!");
+            _logger.LogWarning("PostResourceType <<< cannot process an operation POST without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -743,10 +800,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostSystemOperation <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSystemOperation <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSystemOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -772,9 +832,16 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "If-None-Exist")] string? ifNoneExist)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PostResourceType <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostResourceType <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -784,7 +851,7 @@ public class FhirController : ControllerBase
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
-            System.Console.WriteLine("PostResourceType <<< cannot process a POST without data!");
+            _logger.LogWarning("PostResourceType <<< cannot process a POST without data!");
             Response.StatusCode = 400;
             return;
         }
@@ -836,10 +903,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostResourceType <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostResourceType <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostResourceType <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -867,9 +937,16 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "If-Match")] string? ifMatch,
         [FromHeader(Name = "If-None-Match")] string? ifNoneMatch)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PutResourceInstance <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PutResourceInstance <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -879,7 +956,7 @@ public class FhirController : ControllerBase
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
-            System.Console.WriteLine("PutResourceInstance <<< cannot process a PUT without data!");
+            _logger.LogWarning("PutResourceInstance <<< cannot process a PUT without data!");
             Response.StatusCode = 400;
             return;
         }
@@ -931,10 +1008,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PutResourceInstance <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PutResourceInstance <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PutResourceInstance <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -961,9 +1041,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"DeleteResourceInstance <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"DeleteResourceInstance <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -1000,9 +1087,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromQuery(Name = "_summary")] string? summary)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"GetResourceTypeSearch <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetResourceTypeSearch <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -1043,9 +1137,16 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_summary")] string? summary,
         [FromHeader(Name = "Prefer")] string? prefer)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"DeleteResourceConditional <<< no tenant at {store}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!_fhirStoreManager[store].SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"DeleteResourceConditional <<< tenant {store} does not support {resourceName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -1079,10 +1180,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"DeleteResourceConditional <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"DeleteResourceConditional <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"DeleteResourceConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -1107,6 +1211,7 @@ public class FhirController : ControllerBase
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"PostSystemBundle <<< no tenant at {store}!");
             Response.StatusCode = 404;
             return;
         }
@@ -1116,7 +1221,7 @@ public class FhirController : ControllerBase
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
-            System.Console.WriteLine("PostSystemBundle <<< cannot process a bundle POST without data!");
+            _logger.LogWarning("PostSystemBundle <<< cannot process a bundle POST without data!");
             Response.StatusCode = 400;
             return;
         }
@@ -1144,10 +1249,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostSystemBundle <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSystemBundle <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSystemBundle <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -1170,6 +1278,7 @@ public class FhirController : ControllerBase
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"GetSystemSearch <<< no tenant at {store}!");
             Response.StatusCode = 404;
             return;
         }
@@ -1209,6 +1318,7 @@ public class FhirController : ControllerBase
     {
         if (!_fhirStoreManager.ContainsKey(store))
         {
+            _logger.LogWarning($"DeleteSystemConditional <<< no tenant at {store}!");
             Response.StatusCode = 404;
             return;
         }
@@ -1218,7 +1328,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("DeleteSystemConditional <<< cannot process a conditional delete without a Request!");
+            _logger.LogWarning("DeleteSystemConditional <<< cannot process a conditional delete without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -1241,10 +1351,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"DeleteSystemConditional <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"DeleteSystemConditional <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"DeleteSystemConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;

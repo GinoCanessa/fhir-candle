@@ -22,8 +22,8 @@
             <MudStack Row="false" Spacing="3">
 
                 <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" Class="ma-2" OnClick="@(() => ApproveScopes())">Approve Selected Scopes</MudButton>
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => DenyScopes())">Cancel</MudButton>
+                    <MudButton Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ApproveScopes())">Approve Selected Scopes</MudButton>
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => DenyScopes())">Cancel</MudButton>
                 </MudStack>
 
                 <MudTable 

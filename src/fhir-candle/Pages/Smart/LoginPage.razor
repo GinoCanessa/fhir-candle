@@ -53,8 +53,8 @@
                 <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
 
                 <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPatient())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
+                    <MudButton Disabled="@(string.IsNullOrEmpty(SelectedPatientId))" Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginPatient())">Login</MudButton>
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
             </MudTabPanel>
 
@@ -91,7 +91,6 @@
 
                 <br />
 
-                @* <MudText Typo="Typo.body1" Class="ma-2">Launch Patient: @SelectedPatientId</MudText> *@
                 <MudText Typo="Typo.body1" Class="ma-2">If you want a patient context, please select a patient below:</MudText>
 
                 @switch (_store.Config.FhirVersion)
@@ -131,8 +130,8 @@
                 <MudTextField Label="Practitioner" @bind-Value="SelectedPractitionerId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
 
                 <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginPractitioner())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
+                    <MudButton Disabled="@(string.IsNullOrEmpty(SelectedPractitionerId))" Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginPractitioner())">Login</MudButton>
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
             </MudTabPanel>
 
@@ -173,8 +172,8 @@
                 <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
 
                 <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => ProcessLoginAdministrator())">Login</MudButton>
-                    <MudButton Variant="Variant.Outlined" OnClick="@(() => CancelLogin())">Cancel</MudButton>
+                    <MudButton Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginAdministrator())">Login</MudButton>
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
                 </MudStack>
 
             </MudTabPanel>

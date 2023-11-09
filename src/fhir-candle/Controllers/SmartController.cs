@@ -122,7 +122,8 @@ public class SmartController : ControllerBase
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]
     public async Task PostSmartTokenRequest(
-        [FromRoute] string store)
+        [FromRoute] string store,
+        [FromHeader] string? authHeader = null)
     {
         // make sure this store exists and has SMART enabled
         if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
@@ -178,6 +179,25 @@ public class SmartController : ControllerBase
                         codeVerifier = values.FirstOrDefault() ?? string.Empty;
                         break;
                 }
+            }
+
+            if (!string.IsNullOrEmpty(authHeader))
+            {
+                string[] authComponents = authHeader.Split(' ', StringSplitOptions.TrimEntries);
+
+                if (authComponents.Length == 2)
+                {
+                    if (authComponents[0].ToLowerInvariant() == "basic")
+                    {
+                        string[] clientCreds = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(authComponents[1])).Split(':', StringSplitOptions.TrimEntries);
+
+                        if (clientCreds.Length == 2)
+                        {
+                            clientId = clientCreds[0];
+                            clientSecret = clientCreds[1];
+                        }
+                    }
+                }   
             }
 
             AuthorizationInfo.SmartResponse? smart = null;
@@ -248,7 +268,7 @@ public class SmartController : ControllerBase
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]
     public async Task PostSmartTokenIntrospect(
-    [FromRoute] string store)
+        [FromRoute] string store)
     {
         // make sure this store exists and has SMART enabled
         if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
@@ -313,6 +333,5 @@ public class SmartController : ControllerBase
             Response.StatusCode = 500;
             return;
         }
-
     }
 }

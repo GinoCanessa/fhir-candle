@@ -7,6 +7,8 @@ using fhir.candle.Models;
 using fhir.candle.Pages.Subscriptions;
 using FhirCandle.Models;
 using FhirStore.Smart;
+using Hl7.Fhir.Rest;
+using Hl7.Fhir.Support;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -249,7 +251,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     /// <param name="response">    [out] The response.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryCreateSmartResponse(
-        string tenant, 
+        string tenant,
         string authCode,
         string clientId,
         string clientSecret,
@@ -258,27 +260,14 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     {
         if (string.IsNullOrEmpty(authCode))
         {
-            _logger.LogWarning("TryCreateSmartResponse <<< missing authorization code.");
-            response = null!;
-            return false;
-        }
-
-        if (string.IsNullOrEmpty(tenant))
-        {
-            _logger.LogWarning("TryCreateSmartResponse <<< missing tenant.");
-            response = null!;
-            return false;
-        }
-
-        if (string.IsNullOrEmpty(clientId))
-        {
-            _logger.LogWarning("TryCreateSmartResponse <<< missing client id.");
+            _logger.LogWarning("TryCreateSmartResponse <<< request is missing authorization code.");
             response = null!;
             return false;
         }
 
         if (authCode.Length < 36)
         {
+            _logger.LogWarning($"TryCreateSmartResponse <<< request {authCode} is malformed.");
             response = null!;
             return false;
         }
@@ -287,18 +276,63 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
+            _logger.LogWarning($"TryCreateSmartResponse <<< auth {key} does not exist.");
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(tenant))
+        {
+            string msg = $"TryCreateSmartResponse <<< request {authCode} is missing the tenant.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(clientId))
+        {
+            string msg = $"TryCreateSmartResponse <<< request {authCode} is missing the client id.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
         {
+            string msg = $"TryCreateSmartResponse <<< {key} tenant ({local.Tenant}) does not match request: {tenant}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (!clientId.Equals(local.RequestParameters.ClientId, StringComparison.Ordinal))
         {
+            string msg = $"TryCreateSmartResponse <<< {key} client ({local.RequestParameters.ClientId}) does not match request: {clientId}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
@@ -308,7 +342,14 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         {
             if (string.IsNullOrEmpty(codeVerifier))
             {
-                _logger.LogWarning($"TryCreateSmartResponse <<< code verifier is required if initial request contains PKCE!");
+                string msg = $"TryCreateSmartResponse <<< code verifier is required if initial request contains PKCE!";
+                local.Activity.Add(new()
+                {
+                    RequestType = "authorization_code",
+                    Success = false,
+                    Message = msg,
+                });
+                _logger.LogWarning(msg);
                 response = null!;
                 return false;
             }
@@ -323,7 +364,14 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
             if (!coded.Equals(local.RequestParameters.PkceChallenge, StringComparison.Ordinal))
             {
-                _logger.LogWarning($"TryCreateSmartResponse <<< code verifier does not match PKCE challenge!");
+                string msg = $"TryCreateSmartResponse <<< code verifier does not match PKCE challenge!";
+                local.Activity.Add(new()
+                {
+                    RequestType = "authorization_code",
+                    Success = false,
+                    Message = msg,
+                });
+                _logger.LogWarning(msg);
                 response = null!;
                 return false;
             }
@@ -344,6 +392,13 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             AccessToken = key + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
             RefreshToken = key + "_" + Guid.NewGuid().ToString()
         };
+
+        local.Activity.Add(new()
+        {
+            RequestType = "authorization_code",
+            Success = true,
+            Message = $"Granted access token: {local.Response.AccessToken}, refresh token: {local.Response.RefreshToken}"
+        });
 
         response = local.Response!;
         return true;
@@ -388,14 +443,16 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         string token,
         out AuthorizationInfo.IntrospectionResponse? response)
     {
-        if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(tenant))
+        if (string.IsNullOrEmpty(token))
         {
-            response = null;
+            _logger.LogWarning("TryIntrospection <<< request is missing token.");
+            response = null!;
             return false;
         }
 
         if (token.Length < 36)
         {
+            _logger.LogWarning($"TryIntrospection <<< request {token} is malformed.");
             response = null;
             return false;
         }
@@ -404,24 +461,63 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
+            _logger.LogWarning($"TryIntrospection <<< auth {key} was not found.");
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(tenant))
+        {
+            string msg = $"TryIntrospection <<< request {token} is missing the tenant.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
         {
+            string msg = $"TryIntrospection <<< {key} tenant ({local.Tenant}) does not match request: {tenant}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (local.Response == null)
         {
+            string msg = $"TryIntrospection <<< {key} has not retrieved an access token.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null;
             return false;
         }
 
         if (!token.Equals(local.Response.AccessToken, StringComparison.Ordinal))
         {
+            string msg = $"TryIntrospection <<< {key} access token ({local.Response.AccessToken}) does not match request: {token}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "authorization_code",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
             response = null;
             return false;
         }
@@ -434,6 +530,8 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             Username = local.UserId,
             Subject = local.UserId.GetHashCode().ToString(),
             Audience = local.RequestParameters.Audience,
+            ExpiresAt = local.Expires.ToUnixTimeSeconds(),
+            IssuedAt = local.LastAccessed.ToUnixTimeSeconds(),
         };
 
         return true;

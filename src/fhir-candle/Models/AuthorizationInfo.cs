@@ -13,6 +13,27 @@ public class AuthorizationInfo
 {
     private SmartRequest _requestParameters = null!;
 
+    /// <summary>Information about the authentication activity.</summary>
+    public readonly record struct AuthActivityRecord
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AuthorizationInfo"/> class.
+        /// </summary>
+        public AuthActivityRecord() { }
+
+        /// <summary>Gets or initializes the type of the request.</summary>
+        public required string RequestType { get; init; }
+
+        /// <summary>Gets or initializes a value indicating whether the success.</summary>
+        public required bool Success { get; init; }
+
+        /// <summary>Gets or initializes the message.</summary>
+        public string Message { get; init; } = string.Empty;
+
+        /// <summary>Gets or initializes the timestamp.</summary>
+        public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    }
+
     /// <summary>An introspection response.</summary>
     public readonly record struct IntrospectionResponse
     {
@@ -41,15 +62,15 @@ public class AuthorizationInfo
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("exp")]
-        public int? ExpiresAt { get; init; } = null;
+        public long? ExpiresAt { get; init; } = null;
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("iat")]
-        public int? IssuedAt { get; init; } = null;
+        public long? IssuedAt { get; init; } = null;
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("nbf")]
-        public int? NotUsedBefore { get; init; } = null;
+        public long? NotUsedBefore { get; init; } = null;
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("sub")]
@@ -182,4 +203,7 @@ public class AuthorizationInfo
 
     /// <summary>The latest response.</summary>
     public SmartResponse? Response = null;
+
+    /// <summary>Gets the activity.</summary>
+    public List<AuthActivityRecord> Activity { get; } = new();
 }

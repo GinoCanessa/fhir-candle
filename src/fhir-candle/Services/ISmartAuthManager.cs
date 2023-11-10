@@ -6,6 +6,7 @@
 using fhir.candle.Models;
 using FhirStore.Smart;
 using Microsoft.AspNetCore.Mvc;
+using System.CommandLine;
 
 namespace fhir.candle.Services;
 public interface ISmartAuthManager : IHostedService
@@ -27,6 +28,24 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="auth">  [out] The authentication.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryGetAuthorization(string tenant, string key, out AuthorizationInfo auth);
+
+    /// <summary>Query if this request is authorized.</summary>
+    /// <param name="tenant">         The tenant name.</param>
+    /// <param name="accessToken">    The access token.</param>
+    /// <param name="httpMethod">     The HTTP method.</param>
+    /// <param name="interaction">    The interaction.</param>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="operationName">  Name of the operation.</param>
+    /// <param name="compartmentType">Type of the compartment.</param>
+    /// <returns>True if authorized, false if not.</returns>
+    bool IsAuthorized(
+        string tenant,
+        string accessToken,
+        string httpMethod,
+        FhirCandle.Storage.Common.StoreInteractionCodes interaction,
+        string resourceType,
+        string operationName,
+        string compartmentType);
 
     /// <summary>Attempts to update authentication.</summary>
     /// <param name="tenant">The tenant name.</param>

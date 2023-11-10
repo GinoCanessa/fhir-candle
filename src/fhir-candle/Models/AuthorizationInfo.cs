@@ -184,7 +184,7 @@ public class AuthorizationInfo
     public DateTimeOffset LastAccessed { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>Gets or sets the expiration time.</summary>
-    public DateTimeOffset Expires { get; set; } = DateTimeOffset.UtcNow.AddMinutes(10);
+    public DateTimeOffset Expires { get; set; } = DateTimeOffset.UtcNow.AddMinutes(30);
 
     /// <summary>Gets or sets the identifier of the user.</summary>
     public string UserId { get; set; } = string.Empty;
@@ -197,6 +197,12 @@ public class AuthorizationInfo
 
     /// <summary>Gets or initializes the scopes.</summary>
     public Dictionary<string, bool> Scopes { get; init; } = new();
+
+    /// <summary>Gets or initializes the normalized allowed patient-based scopes.</summary>
+    public HashSet<string> PatientScopes { get; set; } = new();
+
+    /// <summary>Gets or initializes the normalized allowed patient-based scopes.</summary>
+    public HashSet<string> UserScopes { get; set; } = new();
 
     /// <summary>Gets or sets the authentication code.</summary>
     public string AuthCode { get; set; } = string.Empty;

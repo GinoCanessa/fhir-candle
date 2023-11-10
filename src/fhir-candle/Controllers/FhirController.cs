@@ -4,13 +4,14 @@
 // </copyright>
 
 using System.Net;
-using fhir.candle.Models;
+using System.Security.Cryptography.X509Certificates;
 using fhir.candle.Services;
 using Fhir.Metrics;
+using FhirCandle.Models;
 using FhirCandle.Storage;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
-using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
 
@@ -24,7 +25,6 @@ public class FhirController : ControllerBase
     private ISmartAuthManager _smartAuthManager;
 
     private ILogger<FhirController> _logger;
-
 
     private readonly HashSet<string> _acceptMimeTypes = new()
     {
@@ -154,19 +154,19 @@ public class FhirController : ControllerBase
     /// Note that most "core" SMART stuff is in the <see cref="SmartController"/>, but this needs to
     /// remain here to be discoverable by FHIR clients.
     /// </remarks>
-    /// <param name="store">The store.</param>
+    /// <param name="storeName">The store.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/.well-known/smart-configuration")]
+    [HttpGet, Route("{storeName}/.well-known/smart-configuration")]
     [Produces("application/json")]
     public async Task GetSmartWellKnown(
-        [FromRoute] string store)
+        [FromRoute] string storeName)
     {
         // make sure this store exists and has SMART enabled
         if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
-                store, 
+                storeName, 
                 out FhirStore.Smart.SmartWellKnown? smartConfig))
         {
-            _logger.LogWarning($"GetSmartWellKnown <<< no SMART config for {store}!");
+            _logger.LogWarning($"GetSmartWellKnown <<< no SMART config for {storeName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -179,18 +179,19 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets a metadata.</summary>
-    /// <param name="store"> The store.</param>
-    /// <param name="format">Describes the format to use.</param>
-    /// <param name="pretty">The pretty.</param>
+    /// <param name="storeName">The store.</param>
+    /// <param name="format">   Describes the format to use.</param>
+    /// <param name="pretty">   The pretty.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/metadata")]
+    [HttpGet, Route("{storeName}/metadata")]
     public async Task GetMetadata(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty)
     {
-        if (!_fhirStoreManager.ContainsKey(store))
+        if (!_fhirStoreManager.ContainsKey(storeName))
         {
+            _logger.LogWarning($"GetMetadata <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
             return;
         }
@@ -198,7 +199,7 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, Request);
         //string format = GetMimeType(string.Empty, HttpContext.Request);
 
-        HttpStatusCode sc = _fhirStoreManager[store].GetMetadata(
+        HttpStatusCode sc = _fhirStoreManager[storeName].GetMetadata(
             format,
             pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string resource,
@@ -223,7 +224,7 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets type operation.</summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">       The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="opName">      Name of the operation.</param>
     /// <param name="format">      Describes the format to use.</param>
@@ -231,26 +232,41 @@ public class FhirController : ControllerBase
     /// <param name="pretty">      The pretty.</param>
     /// <param name="prefer">      The prefer.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/{resourceName}/${opName}")]
+    [HttpGet, Route("{storeName}/{resourceName}/${opName}")]
     public async Task GetTypeOperation(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"GetTypeOperation <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetTypeOperation <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
         format = GetMimeType(format, Request, true);
 
-        HttpStatusCode sc = _fhirStoreManager[store].TypeOperation(
+        HttpStatusCode sc = store.TypeOperation(
             resourceName,
             "$" + opName,
             Request.QueryString.ToString(),
@@ -267,8 +283,84 @@ public class FhirController : ControllerBase
         await AddBody(Response, prefer, resource, outcome);
     }
 
+    /// <summary>Query if this object is authorized.</summary>
+    /// <param name="storeName">    Name of the store.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="requestMethod">The request method.</param>
+    /// <param name="requestUrl">   URL of the request.</param>
+    /// <param name="authHeader">   The authentication header.</param>
+    /// <param name="statusCode">   [out] The status code.</param>
+    /// <returns>True if authorized, false if not.</returns>
+    private bool IsAuthorized(
+        string storeName,
+        IFhirStore store,
+        string requestMethod,
+        string requestUrl,
+        string? authHeader,
+        out int statusCode)
+    {
+        if (string.IsNullOrEmpty(authHeader))
+        {
+            if (store.Config.SmartRequired)
+            {
+                _logger.LogWarning($"IsAuthorized <<< tenant {store} requires authorization!");
+                statusCode = 401;
+                return false;
+            }
+
+            statusCode = 200;
+            return true;
+        }
+
+        string[] authComponents = authHeader.Split(' ');
+
+        if (authComponents.Length < 2)
+        {
+            _logger.LogWarning($"IsAuthorized <<< malformed authorization header: {authHeader}!");
+            statusCode = 400;
+            return false;
+        }
+
+        Common.StoreInteractionCodes? interaction = store.DetermineInteraction(
+            requestMethod,
+            requestUrl,
+            out _,
+            out _,
+            out _,
+            out string requestResourceType,
+            out _,
+            out string requestOperationName,
+            out string requestCompartmentType,
+            out _);
+
+        if (interaction == null)
+        {
+            _logger.LogError($"IsAuthorized <<< could not parse request {Request.GetDisplayUrl()}!");
+            statusCode = 500;
+            return false;
+        }
+
+        bool authorized = _smartAuthManager.IsAuthorized(
+            storeName,
+            authComponents[1],
+            Request.Method?.ToString() ?? string.Empty,
+            (Common.StoreInteractionCodes)interaction,
+            requestResourceType,
+            requestOperationName,
+            requestCompartmentType);
+
+        if (authorized)
+        {
+            statusCode = 200;
+            return true;
+        }
+
+        statusCode = 401;
+        return false;
+    }
+
     /// <summary>(An Action that handles HTTP GET requests) gets resource instance.</summary>
-    /// <param name="store">          The store.</param>
+    /// <param name="storeName">      The store.</param>
     /// <param name="resourceName">   Name of the resource.</param>
     /// <param name="id">             The identifier.</param>
     /// <param name="format">         Describes the format to use.</param>
@@ -277,10 +369,11 @@ public class FhirController : ControllerBase
     /// <param name="ifMatch">        A match specifying if.</param>
     /// <param name="ifModifiedSince">if modified since.</param>
     /// <param name="ifNoneMatch">    A match specifying if none.</param>
+    /// <param name="authHeader">     The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/{resourceName}/{id}")]
+    [HttpGet, Route("{storeName}/{resourceName}/{id}")]
     public async Task GetResourceInstance(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
@@ -288,18 +381,33 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "If-Match")] string? ifMatch,
         [FromHeader(Name = "If-Modified-Since")] string? ifModifiedSince,
-        [FromHeader(Name = "If-None-Match")] string? ifNoneMatch)
+        [FromHeader(Name = "If-None-Match")] string? ifNoneMatch,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"GetResourceInstance <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetResourceInstance <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
         format = GetMimeType(format, Request);
 
-        HttpStatusCode sc = _fhirStoreManager[store].InstanceRead(
+        HttpStatusCode sc = store.InstanceRead(
             resourceName,
             id,
             format,
@@ -330,7 +438,7 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets instance operation.</summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">       The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="id">          The identifier.</param>
     /// <param name="opName">      Name of the operation.</param>
@@ -338,21 +446,36 @@ public class FhirController : ControllerBase
     /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/{resourceName}/{id}/${opName}")]
+    [HttpGet, Route("{storeName}/{resourceName}/{id}/${opName}")]
     public async Task GetInstanceOperation(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"GetInstanceOperation <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetInstanceOperation <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -362,7 +485,7 @@ public class FhirController : ControllerBase
         string resource, outcome;
 
         // operation
-        sc = _fhirStoreManager[store].InstanceOperation(
+        sc = store.InstanceOperation(
             resourceName,
             "$" + opName,
             id,
@@ -391,22 +514,37 @@ public class FhirController : ControllerBase
     /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/{resourceName}/{id}/${opName}")]
+    [HttpPost, Route("{storeName}/{resourceName}/{id}/${opName}")]
     //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostInstanceOperation(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PostInstanceOperation <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostInstanceOperation <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -423,7 +561,7 @@ public class FhirController : ControllerBase
                 string content = await reader.ReadToEndAsync();
 
                 // operation
-                sc = _fhirStoreManager[store].InstanceOperation(
+                sc = store.InstanceOperation(
                     resourceName,
                     "$" + opName,
                     id,
@@ -438,10 +576,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostInstanceOperation <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostInstanceOperation <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostInstanceOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -458,25 +599,40 @@ public class FhirController : ControllerBase
     /// <summary>
     /// (An Action that handles HTTP POST requests) posts a resource type search.
     /// </summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">       The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="summary">     The summary.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/{resourceName}/_search")]
+    [HttpPost, Route("{storeName}/{resourceName}/_search")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task PostResourceTypeSearch(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PostResourceTypeSearch <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostResourceTypeSearch <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -485,7 +641,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("PostResourceTypeSearch <<< cannot process a POST search without a Request!");
+            _logger.LogWarning("PostResourceTypeSearch <<< cannot process a POST search without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -510,7 +666,7 @@ public class FhirController : ControllerBase
                     }
                 }
 
-                HttpStatusCode sc = _fhirStoreManager[store].TypeSearch(
+                HttpStatusCode sc = _fhirStoreManager[storeName].TypeSearch(
                     resourceName,
                     content,
                     format,
@@ -527,40 +683,60 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostResourceTypeSearch <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostResourceTypeSearch <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostResourceTypeSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
             return;
         }
     }
-    
+
     /// <summary>(An Action that handles HTTP POST requests) posts a type operation.</summary>
-         /// <param name="store">       The store.</param>
-         /// <param name="resourceName">Name of the resource.</param>
-         /// <param name="opName">      Name of the operation.</param>
-         /// <param name="format">      Describes the format to use.</param>
-         /// <param name="summary">     The summary.</param>
-         /// <param name="pretty">      The pretty.</param>
-         /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/{resourceName}/${opName}")]
+    /// <param name="storeName">   The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="opName">      Name of the operation.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="summary">     The summary.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer">      The prefer.</param>
+    /// <param name="authHeader">  The authentication header.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpPost, Route("{storeName}/{resourceName}/${opName}")]
     //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostTypeOperation(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_summary")] string? summary,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PostTypeOperation <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostTypeOperation <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -577,7 +753,7 @@ public class FhirController : ControllerBase
                 string content = await reader.ReadToEndAsync();
 
                 // operation
-                sc = _fhirStoreManager[store].TypeOperation(
+                sc = store.TypeOperation(
                     resourceName,
                     "$" + opName,
                     Request.QueryString.ToString(),
@@ -591,10 +767,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostTypeOperation <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostTypeOperation <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostTypeOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -608,22 +787,31 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP POST requests) posts a system search.</summary>
-    /// <param name="store">  The store.</param>
+    /// <param name="storeName">  The store.</param>
     /// <param name="format"> Describes the format to use.</param>
     /// <param name="pretty"> The pretty.</param>
     /// <param name="summary">The summary.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/_search")]
+    [HttpPost, Route("{storeName}/_search")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task PostSystemSearch(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if (!_fhirStoreManager.ContainsKey(store))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PostSystemSearch <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -632,7 +820,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("PostSystemSearch <<< cannot process a POST search without a Request!");
+            _logger.LogWarning("PostSystemSearch <<< cannot process a POST search without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -657,7 +845,7 @@ public class FhirController : ControllerBase
                     }
                 }
 
-                HttpStatusCode sc = _fhirStoreManager[store].SystemSearch(
+                HttpStatusCode sc = store.SystemSearch(
                     content,
                     format,
                     summary ?? string.Empty,
@@ -673,10 +861,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostSystemSearch <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSystemSearch <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSystemSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -685,24 +876,34 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP POST requests) posts a system operation.</summary>
-    /// <param name="store"> The store.</param>
-    /// <param name="opName">Name of the operation.</param>
-    /// <param name="format">Describes the format to use.</param>
-    /// <param name="pretty">The pretty.</param>
-    /// <param name="prefer">The prefer.</param>
+    /// <param name="storeName"> The store.</param>
+    /// <param name="opName">    Name of the operation.</param>
+    /// <param name="format">    Describes the format to use.</param>
+    /// <param name="pretty">    The pretty.</param>
+    /// <param name="prefer">    The prefer.</param>
+    /// <param name="authHeader">The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/${opName}")]
+    [HttpPost, Route("{storeName}/${opName}")]
     //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostSystemOperation(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string opName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if (!_fhirStoreManager.ContainsKey(store))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PostSystemOperation <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -711,7 +912,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("PostResourceType <<< cannot process an operation POST without a Request!");
+            _logger.LogWarning("PostResourceType <<< cannot process an operation POST without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -725,7 +926,7 @@ public class FhirController : ControllerBase
 
                 // re-add the prefix $ character since it was stripped during routing
 
-                HttpStatusCode sc = _fhirStoreManager[store].SystemOperation(
+                HttpStatusCode sc = store.SystemOperation(
                         "$" + opName,
                         Request.QueryString.ToString(),
                         content,
@@ -743,10 +944,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostSystemOperation <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSystemOperation <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSystemOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -755,27 +959,43 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP POST requests) posts a resource type.</summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">   The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="prefer">      The prefer.</param>
     /// <param name="ifNoneExist"> if none exist.</param>
+    /// <param name="authHeader">  The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/{resourceName}")]
+    [HttpPost, Route("{storeName}/{resourceName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostResourceType(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer,
-        [FromHeader(Name = "If-None-Exist")] string? ifNoneExist)
+        [FromHeader(Name = "If-None-Exist")] string? ifNoneExist,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PostResourceType <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PostResourceType <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -784,7 +1004,7 @@ public class FhirController : ControllerBase
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
-            System.Console.WriteLine("PostResourceType <<< cannot process a POST without data!");
+            _logger.LogWarning("PostResourceType <<< cannot process a POST without data!");
             Response.StatusCode = 400;
             return;
         }
@@ -799,7 +1019,7 @@ public class FhirController : ControllerBase
                 HttpStatusCode sc;
                 string resource, outcome;
 
-                sc = _fhirStoreManager[store].InstanceCreate(
+                sc = store.InstanceCreate(
                     resourceName,
                     content,
                     Request.ContentType ?? string.Empty,
@@ -836,10 +1056,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostResourceType <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostResourceType <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostResourceType <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -848,29 +1071,47 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP PUT requests) puts resource instance.</summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">   The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="id">          The identifier.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="prefer">      The prefer.</param>
+    /// <param name="ifMatch">     A match specifying if.</param>
+    /// <param name="ifNoneMatch"> A match specifying if none.</param>
+    /// <param name="authHeader">  The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPut, Route("{store}/{resourceName}/{id}")]
+    [HttpPut, Route("{storeName}/{resourceName}/{id}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PutResourceInstance(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "If-Match")] string? ifMatch,
-        [FromHeader(Name = "If-None-Match")] string? ifNoneMatch)
+        [FromHeader(Name = "If-None-Match")] string? ifNoneMatch,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PutResourceInstance <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"PutResourceInstance <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "PUT", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -879,7 +1120,7 @@ public class FhirController : ControllerBase
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
-            System.Console.WriteLine("PutResourceInstance <<< cannot process a PUT without data!");
+            _logger.LogWarning("PutResourceInstance <<< cannot process a PUT without data!");
             Response.StatusCode = 400;
             return;
         }
@@ -891,7 +1132,7 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
-                HttpStatusCode sc = _fhirStoreManager[store].InstanceUpdate(
+                HttpStatusCode sc = store.InstanceUpdate(
                     resourceName,
                     id,
                     content,
@@ -931,10 +1172,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PutResourceInstance <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PutResourceInstance <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PutResourceInstance <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -945,32 +1189,48 @@ public class FhirController : ControllerBase
     /// <summary>
     /// (An Action that handles HTTP DELETE requests) deletes the resource instance.
     /// </summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">   The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="id">          The identifier.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="prefer">      The prefer.</param>
+    /// <param name="authHeader">  The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpDelete, Route("{store}/{resourceName}/{id}")]
+    [HttpDelete, Route("{storeName}/{resourceName}/{id}")]
     public async Task DeleteResourceInstance(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromRoute] string id,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"DeleteResourceInstance <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"DeleteResourceInstance <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
         format = GetMimeType(format, Request);
 
-        HttpStatusCode sc = _fhirStoreManager[store].InstanceDelete(
+        HttpStatusCode sc = store.InstanceDelete(
             resourceName,
             id,
             format,
@@ -986,30 +1246,46 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets resource type search.</summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">   The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="summary">     The summary.</param>
+    /// <param name="authHeader">  The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/{resourceName}")]
+    [HttpGet, Route("{storeName}/{resourceName}")]
     public async Task GetResourceTypeSearch(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"GetResourceTypeSearch <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"GetResourceTypeSearch <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
         format = GetMimeType(format, Request);
 
-        HttpStatusCode sc = _fhirStoreManager[store].TypeSearch(
+        HttpStatusCode sc = store.TypeSearch(
             resourceName,
             Request.QueryString.ToString(),
             format,
@@ -1027,26 +1303,42 @@ public class FhirController : ControllerBase
     /// <summary>
     /// (An Action that handles HTTP DELETE requests) deletes a resource based on type search.
     /// </summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName">   The store.</param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="summary">     The summary.</param>
     /// <param name="prefer">      The prefer.</param>
+    /// <param name="authHeader">  The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpDelete, Route("{store}/{resourceName}")]
+    [HttpDelete, Route("{storeName}/{resourceName}")]
     public async Task DeleteResourceConditional(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromRoute] string resourceName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromQuery(Name = "_summary")] string? summary,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.ContainsKey(store)) ||
-            (!_fhirStoreManager[store].SupportsResource(resourceName)))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"DeleteResourceConditional <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            _logger.LogWarning($"DeleteResourceConditional <<< tenant {storeName} does not support {resourceName}!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -1064,7 +1356,7 @@ public class FhirController : ControllerBase
         {
             string queryString = Request.QueryString.ToString();
 
-            HttpStatusCode sc = _fhirStoreManager[store].TypeDelete(
+            HttpStatusCode sc = store.TypeDelete(
                 resourceName,
                 queryString,
                 format,
@@ -1079,10 +1371,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"DeleteResourceConditional <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"DeleteResourceConditional <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"DeleteResourceConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -1091,23 +1386,32 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP POST requests) posts to the server root.</summary>
-    /// <param name="store">       The store.</param>
-    /// <param name="resourceName">Name of the resource.</param>
-    /// <param name="format">      Describes the format to use.</param>
-    /// <param name="pretty">      The pretty.</param>
-    /// <param name="prefer">      The prefer.</param>
+    /// <param name="storeName"> The store.</param>
+    /// <param name="format">    Describes the format to use.</param>
+    /// <param name="pretty">    The pretty.</param>
+    /// <param name="prefer">    The prefer.</param>
+    /// <param name="authHeader">The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}")]
+    [HttpPost, Route("{storeName}")]
     [Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
     public async Task PostSystemBundle(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if (!_fhirStoreManager.ContainsKey(store))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"PostSystemBundle <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -1116,7 +1420,7 @@ public class FhirController : ControllerBase
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
-            System.Console.WriteLine("PostSystemBundle <<< cannot process a bundle POST without data!");
+            _logger.LogWarning("PostSystemBundle <<< cannot process a bundle POST without data!");
             Response.StatusCode = 400;
             return;
         }
@@ -1128,7 +1432,7 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
-                HttpStatusCode sc = _fhirStoreManager[store].ProcessBundle(
+                HttpStatusCode sc = store.ProcessBundle(
                     content,
                     Request.ContentType ?? string.Empty,
                     format,
@@ -1144,10 +1448,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"PostSystemBundle <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSystemBundle <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSystemBundle <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -1156,27 +1463,37 @@ public class FhirController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets system search.</summary>
-    /// <param name="store">  The store.</param>
-    /// <param name="format"> Describes the format to use.</param>
-    /// <param name="pretty"> The pretty.</param>
-    /// <param name="summary">The summary.</param>
+    /// <param name="storeName"> The store.</param>
+    /// <param name="format">    Describes the format to use.</param>
+    /// <param name="pretty">    The pretty.</param>
+    /// <param name="summary">   The summary.</param>
+    /// <param name="authHeader">The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}")]
+    [HttpGet, Route("{storeName}")]
     public async Task GetSystemSearch(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
-        [FromQuery(Name = "_summary")] string? summary)
+        [FromQuery(Name = "_summary")] string? summary,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if (!_fhirStoreManager.ContainsKey(store))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"GetSystemSearch <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
         format = GetMimeType(format, Request);
 
-        HttpStatusCode sc = _fhirStoreManager[store].SystemSearch(
+        HttpStatusCode sc = store.SystemSearch(
             Request.QueryString.ToString(),
             format,
             summary ?? string.Empty,
@@ -1193,23 +1510,33 @@ public class FhirController : ControllerBase
     /// <summary>
     /// (An Action that handles HTTP DELETE requests) deletes the system conditional.
     /// </summary>
-    /// <param name="store">  The store.</param>
-    /// <param name="format"> Describes the format to use.</param>
-    /// <param name="pretty"> The pretty.</param>
-    /// <param name="summary">The summary.</param>
-    /// <param name="prefer"> The prefer.</param>
+    /// <param name="storeName"> The store.</param>
+    /// <param name="format">    Describes the format to use.</param>
+    /// <param name="pretty">    The pretty.</param>
+    /// <param name="summary">   The summary.</param>
+    /// <param name="prefer">    The prefer.</param>
+    /// <param name="authHeader">The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpDelete, Route("{store}")]
+    [HttpDelete, Route("{storeName}")]
     public async Task DeleteSystemConditional(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromQuery(Name = "_summary")] string? summary,
-        [FromHeader(Name = "Prefer")] string? prefer)
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if (!_fhirStoreManager.ContainsKey(store))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
+            _logger.LogWarning($"DeleteSystemConditional <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -1218,7 +1545,7 @@ public class FhirController : ControllerBase
         // sanity check
         if (Request == null)
         {
-            System.Console.WriteLine("DeleteSystemConditional <<< cannot process a conditional delete without a Request!");
+            _logger.LogWarning("DeleteSystemConditional <<< cannot process a conditional delete without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -1227,7 +1554,7 @@ public class FhirController : ControllerBase
         {
             string queryString = Request.QueryString.ToString();
 
-            HttpStatusCode sc = _fhirStoreManager[store].SystemDelete(
+            HttpStatusCode sc = store.SystemDelete(
                 queryString,
                 format,
                 pretty?.Equals("true", StringComparison.Ordinal) ?? false,
@@ -1241,10 +1568,13 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"DeleteSystemConditional <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                System.Console.WriteLine($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"DeleteSystemConditional <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"DeleteSystemConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;

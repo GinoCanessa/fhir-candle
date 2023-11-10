@@ -104,9 +104,151 @@
                                 />
                             break;
                     }
+
+                    @if (kvp.Value.Config.SmartRequired)
+                    {
+                        <br />
+
+                        <MudText Typo="Typo.body1">
+                            SMART authorization has been set to <code>required</code> for this FHIR endpoint:
+                        </MudText>
+                        <MudList>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                The SMART well-known configuration is available at: 
+                                <code>@kvp.Value.Config.BaseUrl/.well-known/smart-configuration</code>
+                                <sup>
+                                    <button onclick="@($"navigator.clipboard.writeText('{@kvp.Value.Config.BaseUrl}/.well-known/smart-configuration')")">
+                                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                    </button>
+                                </sup>
+                                .
+                            </MudListItem>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                The metadata endpoint (<code>@kvp.Value.Config.BaseUrl/metadata</code>) is openly accessible.
+                            </MudListItem>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                All other FHIR API calls require an access token with appropriate scopes.
+                            </MudListItem>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                For testing convenience, there is an immutable access grant for the <code>administrator</code> user.
+                                <MudList>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        The <code>code</code> is <code>00000000-0000-0000-0000-000000000000</code>
+                                        <sup>
+                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000')")">
+                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                            </button>
+                                        </sup>
+                                        .
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        The <code>access_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
+                                        <sup>
+                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
+                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                            </button>
+                                        </sup>
+                                        .
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        The <code>refresh_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
+                                        <sup>
+                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
+                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                            </button>
+                                        </sup>
+                                        .
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        All requests using this <code>access_token</code> are considered authorized
+                                        (e.g., <code>Authorization: Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>).
+                                    </MudListItem>
+                                </MudList>
+                            </MudListItem>
+                        </MudList>
+                    }
+
+                    @if (kvp.Value.Config.SmartAllowed)
+                    {
+                        <br />
+
+                        <MudText Typo="Typo.body1">
+                            SMART authorization has been set to <code>optional</code> for this FHIR endpoint:
+                        </MudText>
+                        <MudList>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                The SMART well-known configuration is available at:
+                                <code>@kvp.Value.Config.BaseUrl/.well-known/smart-configuration</code>
+                                <sup>
+                                    <button onclick="@($"navigator.clipboard.writeText('{@kvp.Value.Config.BaseUrl}/.well-known/smart-configuration')")">
+                                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                    </button>
+                                </sup>
+                                .
+                            </MudListItem>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                The metadata endpoint (<code>@kvp.Value.Config.BaseUrl/metadata</code>) is openly accessible.
+                            </MudListItem>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                For all other calls, if an authorization header is provided, it will be validated.  If
+                                no authorization header is provided, the call will be allowed.
+                            </MudListItem>
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                For testing convenience, there is an immutable access grant for the <code>administrator</code> user.
+                                <MudList>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        The <code>code</code> is <code>00000000-0000-0000-0000-000000000000</code>
+                                        <sup>
+                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000')")">
+                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                            </button>
+                                        </sup>
+                                        .
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        The <code>access_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
+                                        <sup>
+                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
+                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                            </button>
+                                        </sup>
+                                        .
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        The <code>refresh_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
+                                        <sup>
+                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
+                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
+                                            </button>
+                                        </sup>
+                                        .
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        All requests using this <code>access_token</code> are considered authorized
+                                        (e.g., <code>Authorization: Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>).
+                                    </MudListItem>
+                                </MudList>
+                            </MudListItem>
+                        </MudList>
+                    }
                 </MudTabPanel>
             }
-
         </MudTabs>
     }
 </MudPaper>

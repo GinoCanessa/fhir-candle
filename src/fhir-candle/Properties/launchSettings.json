@@ -25,7 +25,7 @@
     },
     "smart": {
       "commandName": "Project",
-      "commandLineArgs": "--reference-implementation smart -m 1000 --r4 smart --smart-required smart --r4 open",
+      "commandLineArgs": "--reference-implementation smart -m 1000 --r4 smart --smart-required smart --smart-optional open --r4 open",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

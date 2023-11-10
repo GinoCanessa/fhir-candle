@@ -6,6 +6,7 @@
 using fhir.candle.Models;
 using fhir.candle.Pages.Subscriptions;
 using FhirCandle.Models;
+using FhirCandle.Storage;
 using FhirStore.Smart;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Support;
@@ -24,6 +25,9 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 {
     /// <summary>(Immutable) The jwt signing value.</summary>
     private const string _jwtSign = "***NotSecure!DoNotUseInProduction!ThisIsForDevOnly!***";
+
+    /// <summary>(Immutable) The token expiration in minutes.</summary>
+    private const int _tokenExpirationMinutes = 30;
     
     /// <summary>(Immutable) The jwt signing value in bytes.</summary>
     private static readonly byte[] _jwtBytes = System.Text.Encoding.UTF8.GetBytes(_jwtSign);
@@ -81,11 +85,13 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
     /// <summary>Attempts to get authorization.</summary>
     /// <param name="tenant">The tenant name.</param>
-    /// <param name="key">   The key.</param>
+    /// <param name="code">  The authorization code.</param>
     /// <param name="auth">  [out] The authentication.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryGetAuthorization(string tenant, string key, out AuthorizationInfo auth)
+    public bool TryGetAuthorization(string tenant, string code, out AuthorizationInfo auth)
     {
+        string key = tenant + ":" + code;
+
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
             auth = null!;
@@ -104,11 +110,13 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
     /// <summary>Attempts to update authentication.</summary>
     /// <param name="tenant">The tenant name.</param>
-    /// <param name="key">   The key.</param>
+    /// <param name="code">  The authorization code.</param>
     /// <param name="auth">  [out] The authentication.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryUpdateAuth(string tenant, string key, AuthorizationInfo auth)
+    public bool TryUpdateAuth(string tenant, string code, AuthorizationInfo auth)
     {
+        string key = tenant + ":" + code;
+
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
             return false;
@@ -121,7 +129,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         // update our last access
         auth.LastAccessed = DateTimeOffset.UtcNow;
-        auth.Expires = DateTimeOffset.UtcNow.AddMinutes(10);
+        auth.Expires = DateTimeOffset.UtcNow.AddMinutes(_tokenExpirationMinutes);
 
         _authorizations[key] = auth;
         return true;
@@ -129,18 +137,20 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
     /// <summary>Attempts to get the authorization client redirect URL.</summary>
     /// <param name="tenant">          The tenant name.</param>
-    /// <param name="key">             The key.</param>
+    /// <param name="code">            The authorization code.</param>
     /// <param name="redirect">        [out] The redirect.</param>
     /// <param name="error">           (Optional) The error.</param>
     /// <param name="errorDescription">(Optional) Information describing the error.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryGetClientRedirect(
         string tenant, 
-        string key, 
+        string code, 
         out string redirect,
         string error = "",
         string errorDescription = "")
     {
+        string key = tenant + ":" + code;
+
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
             redirect = string.Empty;
@@ -161,7 +171,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         // update our last access
         _authorizations[key].LastAccessed = DateTimeOffset.UtcNow;
-        _authorizations[key].Expires = DateTimeOffset.UtcNow.AddMinutes(10);
+        _authorizations[key].Expires = DateTimeOffset.UtcNow.AddMinutes(_tokenExpirationMinutes);
 
         string redirectUri = _authorizations[key].RequestParameters.RedirectUri;
 
@@ -225,7 +235,8 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             return false;
         }
 
-        string key = refreshToken.Substring(0, 36);
+        string code = refreshToken.Substring(0, 36);
+        string key = tenant + ":" + code;
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
@@ -318,16 +329,25 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             return false;
         }
 
-        // update our last access
-        local.LastAccessed = DateTimeOffset.UtcNow;
-        local.Expires = DateTimeOffset.UtcNow.AddMinutes(10);
-
-        // update the access and refresh tokens
-        local.Response = local.Response with
+        // handle our 'always on' token
+        if (code.Equals(Guid.Empty.ToString()))
         {
-            AccessToken = key + "_" + Guid.NewGuid().ToString(),
-            RefreshToken = key + "_" + Guid.NewGuid().ToString(),
-        };
+            // update our last access
+            local.LastAccessed = DateTimeOffset.UtcNow;
+        }
+        else
+        {
+            // update our last access and expiration
+            local.LastAccessed = DateTimeOffset.UtcNow;
+            local.Expires = DateTimeOffset.UtcNow.AddMinutes(_tokenExpirationMinutes);
+
+            // update the access and refresh tokens
+            local.Response = local.Response with
+            {
+                AccessToken = code + "_" + Guid.NewGuid().ToString(),
+                RefreshToken = code + "_" + Guid.NewGuid().ToString(),
+            };
+        }
 
         local.Activity.Add(new()
         {
@@ -338,6 +358,276 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         response = local.Response!;
         return true;
+    }
+
+    /// <summary>Query if this request is authorized.</summary>
+    /// <param name="tenant">         The tenant.</param>
+    /// <param name="accessToken">    The access token.</param>
+    /// <param name="httpMethod">     The HTTP method.</param>
+    /// <param name="interaction">    The interaction.</param>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="operationName">  Name of the operation.</param>
+    /// <param name="compartmentType">Type of the compartment.</param>
+    /// <returns>True if authorized, false if not.</returns>
+    public bool IsAuthorized(
+        string tenant,
+        string accessToken,
+        string httpMethod,
+        Common.StoreInteractionCodes interaction,
+        string resourceType,
+        string operationName,
+        string compartmentType)
+    {
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            _logger.LogWarning("IsAuthorized <<< request is missing access token.");
+            return false;
+        }
+
+        if (accessToken.Length < 36)
+        {
+            _logger.LogWarning($"IsAuthorized <<< request {accessToken} is malformed.");
+            return false;
+        }
+
+        if (accessToken.Equals(Guid.Empty.ToString() + "_" + Guid.Empty.ToString()))
+        {
+            return true;
+        }
+
+        string code = accessToken.Substring(0, 36);
+        string key = tenant + ":" + code;
+
+        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
+        {
+            _logger.LogWarning($"IsAuthorized <<< auth {key} does not exist.");
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(tenant))
+        {
+            _logger.LogWarning("IsAuthorized <<< request is missing the tenant.");
+            return false;
+        }
+
+        if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
+        {
+            string msg = $"TrySmartRefresh <<< {key} tenant ({local.Tenant}) does not match request: {tenant}.";
+            local.Activity.Add(new()
+            {
+                RequestType = "refresh_token",
+                Success = false,
+                Message = msg,
+            });
+            _logger.LogWarning(msg);
+            return false;
+        }
+
+        if (local.UserScopes.Contains("*.*"))
+        {
+            return true;
+        }
+
+        switch (interaction)
+        {
+            // TODO: compartments are not implemented yet
+            case Common.StoreInteractionCodes.CompartmentOperation:
+            case Common.StoreInteractionCodes.CompartmentSearch:
+            case Common.StoreInteractionCodes.CompartmentTypeSearch:
+                break;
+
+            case Common.StoreInteractionCodes.InstanceDelete:
+            case Common.StoreInteractionCodes.InstanceDeleteHistory:
+            case Common.StoreInteractionCodes.InstanceDeleteVersion:
+            case Common.StoreInteractionCodes.TypeDeleteConditional:
+                {
+                    if (local.PatientScopes.Contains("*.d") ||
+                        local.UserScopes.Contains("*.d") ||
+                        local.PatientScopes.Contains(resourceType + ".d") ||
+                        local.UserScopes.Contains(resourceType + ".d"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.InstanceOperation:
+            case Common.StoreInteractionCodes.TypeOperation:
+                {
+                    switch (httpMethod.ToUpperInvariant())
+                    {
+                        case "HEAD":
+                        case "GET":
+                            {
+                                if (local.PatientScopes.Contains("*.r") ||
+                                    local.UserScopes.Contains("*.r") ||
+                                    local.PatientScopes.Contains(resourceType + ".r") ||
+                                    local.UserScopes.Contains(resourceType + ".r"))
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+
+                        case "POST":
+                        case "PUT":
+                            {
+                                if (local.PatientScopes.Contains("*.u") ||
+                                    local.UserScopes.Contains("*.u") ||
+                                    local.PatientScopes.Contains(resourceType + ".u") ||
+                                    local.UserScopes.Contains(resourceType + ".u"))
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.InstancePatch:
+            case Common.StoreInteractionCodes.InstanceUpdate:
+                {
+                    if (local.PatientScopes.Contains("*.u") ||
+                        local.UserScopes.Contains("*.u") ||
+                        local.PatientScopes.Contains(resourceType + ".u") ||
+                        local.UserScopes.Contains(resourceType + ".u"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.InstanceRead:
+            case Common.StoreInteractionCodes.InstanceReadHistory:
+            case Common.StoreInteractionCodes.InstanceReadVersion:
+            case Common.StoreInteractionCodes.TypeHistory:
+                {
+                    if (local.PatientScopes.Contains("*.r") ||
+                        local.UserScopes.Contains("*.r") ||
+                        local.PatientScopes.Contains(resourceType + ".r") ||
+                        local.UserScopes.Contains(resourceType + ".r"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.TypeSearch:
+                {
+                    if (local.PatientScopes.Contains("*.s") ||
+                        local.UserScopes.Contains("*.s") ||
+                        local.PatientScopes.Contains(resourceType + ".s") ||
+                        local.UserScopes.Contains(resourceType + ".s"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.TypeCreate:
+            case Common.StoreInteractionCodes.TypeCreateConditional:
+                {
+                    if (local.PatientScopes.Contains("*.c") ||
+                        local.UserScopes.Contains("*.c") ||
+                        local.PatientScopes.Contains(resourceType + ".c") ||
+                        local.UserScopes.Contains(resourceType + ".c"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.SystemCapabilities:
+                {
+                    // always allow capabilities test
+                    return true;
+                }
+
+            case Common.StoreInteractionCodes.SystemBundle:
+                {
+                    // only allow system bundles for user/*.*, which has already been checked
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.SystemDeleteConditional:
+                {
+                    if (local.PatientScopes.Contains("*.d") ||
+                        local.UserScopes.Contains("*.d"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.SystemHistory:
+                {
+                    if (local.PatientScopes.Contains("*.r") ||
+                        local.UserScopes.Contains("*.r"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.SystemOperation:
+                {
+                    switch (httpMethod.ToUpperInvariant())
+                    {
+                        case "HEAD":
+                        case "GET":
+                            {
+                                if (local.PatientScopes.Contains("*.r") ||
+                                    local.UserScopes.Contains("*.r"))
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+
+                        case "POST":
+                        case "PUT":
+                            {
+                                if (local.PatientScopes.Contains("*.u") ||
+                                    local.UserScopes.Contains("*.u"))
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+                    }
+
+                    return false;
+                }
+
+            case Common.StoreInteractionCodes.SystemSearch:
+                {
+                    if (local.PatientScopes.Contains("*.s") ||
+                        local.UserScopes.Contains("*.s"))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+            default:
+                break;
+        }
+
+        return false;
     }
 
     /// <summary>Attempts to create smart response.</summary>
@@ -370,7 +660,8 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             return false;
         }
 
-        string key = authCode.Substring(0, 36);
+        string code = authCode.Substring(0, 36);
+        string key = tenant + ":" + code;
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
@@ -475,21 +766,49 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             }
         }
 
-        // update our last access
-        local.LastAccessed = DateTimeOffset.UtcNow;
-        local.Expires = DateTimeOffset.UtcNow.AddMinutes(10);
+        IEnumerable<string> permittedScopes = local.Scopes.Where(kvp => kvp.Value == true).Select(kvp => kvp.Key);
 
-        // create our response
-        local.Response = new()
+        ExtractScopes(permittedScopes, out HashSet<string> userScopes, out HashSet<string> patientScopes);
+        local.UserScopes = userScopes;
+        local.PatientScopes = patientScopes;
+
+        // check for 'special' code
+        if (code.Equals(Guid.Empty.ToString()))
         {
-            PatientId = local.LaunchPatient,
-            TokenType = "bearer",
-            Scopes = string.Join(" ", local.Scopes.Where(kvp => kvp.Value == true).Select(kvp => kvp.Key)),
-            ClientId = local.RequestParameters.ClientId,
-            IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
-            AccessToken = key + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
-            RefreshToken = key + "_" + Guid.NewGuid().ToString()
-        };
+            // update our last access
+            local.LastAccessed = DateTimeOffset.UtcNow;
+
+            // create our response
+            local.Response = new()
+            {
+                PatientId = local.LaunchPatient,
+                TokenType = "bearer",
+                Scopes = string.Join(" ", permittedScopes),
+                ClientId = local.RequestParameters.ClientId,
+                IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
+                AccessToken = code + "_" + code,
+                RefreshToken = code + "_" + code,
+            };
+        }
+        else
+        {
+            // update our last access and expiration
+            local.LastAccessed = DateTimeOffset.UtcNow;
+            local.Expires = DateTimeOffset.UtcNow.AddMinutes(_tokenExpirationMinutes);
+
+            // create our response
+            local.Response = new()
+            {
+                PatientId = local.LaunchPatient,
+                TokenType = "bearer",
+                Scopes = string.Join(" ", permittedScopes),
+                ClientId = local.RequestParameters.ClientId,
+                IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
+                AccessToken = code + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
+                RefreshToken = code + "_" + Guid.NewGuid().ToString()
+            };
+        }
+
 
         local.Activity.Add(new()
         {
@@ -500,6 +819,106 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         response = local.Response!;
         return true;
+    }
+
+    /// <summary>Extracts the scopes.</summary>
+    /// <param name="scopes">       The scopes.</param>
+    /// <param name="userScopes">   [out] The user scopes.</param>
+    /// <param name="patientScopes">[out] The patient scopes.</param>
+    private void ExtractScopes(
+        IEnumerable<string> scopes,
+        out HashSet<string> userScopes, 
+        out HashSet<string> patientScopes)
+    {
+        userScopes = new();
+        patientScopes = new();
+
+        // normalize our allowed scopes
+        foreach (string scope in scopes)
+        {
+            // scopes we care about are [context]/[resource].[action][?granular]
+            string[] components = scope.Split('/', '.', '?');
+
+            // we do not care about scopes that do not match our pattern
+            if (components.Length < 3)
+            {
+                continue;
+            }
+
+            switch (components[0])
+            {
+                case "user":
+                    AddScope(components[1], components[2].ToLowerInvariant(), ref userScopes);
+                    break;
+
+                case "patient":
+                    AddScope(components[1], components[2].ToLowerInvariant(), ref patientScopes);
+                    break;
+            }
+        }
+
+        void AddScope(string resource, string actions, ref HashSet<string> scopeSet)
+        {
+            if (string.IsNullOrEmpty(resource) || string.IsNullOrEmpty(actions))
+            {
+                return;
+            }
+
+            // check for v1 scopes and all (*)
+            switch (actions)
+            {
+                case "read":
+                    {
+                        scopeSet.Add(resource + ".r");
+                        scopeSet.Add(resource + ".s");
+                        return;
+                    }
+
+                case "write":
+                    {
+                        scopeSet.Add(resource + ".c");
+                        scopeSet.Add(resource + ".u");
+                        scopeSet.Add(resource + ".d");
+                        return;
+                    }
+
+                case "*":
+                    {
+                        scopeSet.Add(resource + ".c");
+                        scopeSet.Add(resource + ".r");
+                        scopeSet.Add(resource + ".u");
+                        scopeSet.Add(resource + ".d");
+                        scopeSet.Add(resource + ".s");
+                        return;
+                    }
+            }
+
+            // v2 scopes can be in any order
+            if (actions.Contains('c'))
+            {
+                scopeSet.Add(resource + ".c");
+            }
+
+            if (actions.Contains('r'))
+            {
+                scopeSet.Add(resource + ".r");
+            }
+
+            if (actions.Contains('u'))
+            {
+                scopeSet.Add(resource + ".u");
+            }
+
+            if (actions.Contains('d'))
+            {
+                scopeSet.Add(resource + ".d");
+            }
+
+            if (actions.Contains('s'))
+            {
+                scopeSet.Add(resource + ".s");
+            }
+        }
     }
 
     /// <summary>Generates an access-token jwt.</summary>
@@ -555,7 +974,8 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             return false;
         }
 
-        string key = token.Substring(0, 36);
+        string code = token.Substring(0, 36);
+        string key = tenant + ":" + code;
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
@@ -763,6 +1183,46 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                         "S256",
                 },
             });
+
+            // create our 'always available' authorization
+            AuthorizationInfo auth = new()
+            {
+                Key = Guid.Empty.ToString(),
+                Tenant = name,
+                RemoteIpAddress = "127.0.0.1",
+                Created = DateTimeOffset.UtcNow,
+                LastAccessed = DateTimeOffset.UtcNow,
+                Expires = DateTimeOffset.MaxValue,
+                UserId = "administrator",
+                RequestParameters = new()
+                {
+                    ResponseType = "code",
+                    ClientId = "fhir-candle",
+                    RedirectUri = string.Empty,
+                    Scope = "fhirUser profile user/*.*",
+                    Audience = $"{_serverConfig.PublicUrl}/fhir/{name}",
+                },
+                AuthCode = Guid.Empty.ToString() + "_" + Guid.Empty.ToString(),
+            };
+
+            foreach (string scopeKey in auth.Scopes.Keys)
+            {
+                auth.Scopes[scopeKey] = true;
+            }
+
+            auth.UserScopes.Add("*.*");
+
+            auth.Response = new()
+            {
+                TokenType = "bearer",
+                Scopes = "fhirUser profile user/*.*",
+                ClientId = "fhir-candle",
+                IdToken = GenerateIdJwt(auth.RequestParameters.Audience, auth),
+                AccessToken = Guid.Empty.ToString() + "_" + Guid.Empty.ToString(),
+                RefreshToken = Guid.Empty.ToString() + "_" + Guid.Empty.ToString(),
+            };
+
+            _authorizations.Add(name + ":" + Guid.Empty.ToString(), auth);
         }
 
         // look for preconfigured users
@@ -865,12 +1325,12 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 PkceChallenge = pkceChallenge,
                 PkceMethod = pkceMethod,
             },
-            Expires = DateTimeOffset.UtcNow.AddMinutes(10),
+            Expires = DateTimeOffset.UtcNow.AddMinutes(_tokenExpirationMinutes),
         };
 
         auth.AuthCode = auth.Key + "_" + Guid.NewGuid().ToString();
 
-        _authorizations.Add(auth.Key, auth);
+        _authorizations.Add(tenant + ":" + auth.Key, auth);
 
         redirectDestination = $"/smart/login?store={tenant}&key={auth.Key}";
 

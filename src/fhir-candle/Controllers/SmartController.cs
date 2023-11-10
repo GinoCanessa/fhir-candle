@@ -6,11 +6,7 @@
 using System.Net;
 using fhir.candle.Models;
 using fhir.candle.Services;
-using Fhir.Metrics;
-using FhirCandle.Storage;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
-using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
 
@@ -95,8 +91,6 @@ public class SmartController : ControllerBase
         [FromQuery(Name = "code_challenge")] string? pkceChallenge,
         [FromQuery(Name = "code_challenge_method")] string? pkceMethod)
     {
-        _logger.LogInformation($"Request: {store}/authorize");
-
         if (!_smartAuthManager.RequestAuth(
                 store,
                 Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
@@ -111,6 +105,7 @@ public class SmartController : ControllerBase
                 pkceMethod,
                 out string redirectDestination))
         {
+            _logger.LogWarning($"GetSmartAuthorize <<< request for {clientId} failed!");
             Response.StatusCode = 404;
             return;
         }
@@ -118,6 +113,12 @@ public class SmartController : ControllerBase
         Response.Redirect(redirectDestination);
     }
 
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts a smart token request.
+    /// </summary>
+    /// <param name="store">     The store.</param>
+    /// <param name="authHeader">(Optional) The authentication header.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/token")]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]
@@ -252,10 +253,13 @@ public class SmartController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError($"PostSmartTokenRequest <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                _logger.LogError($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSmartTokenRequest <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSmartTokenRequest <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;
@@ -264,6 +268,11 @@ public class SmartController : ControllerBase
 
     }
 
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts a smart token introspect.
+    /// </summary>
+    /// <param name="store">The store.</param>
+    /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{store}/introspect")]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]
@@ -324,10 +333,13 @@ public class SmartController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError($"PostSmartTokenIntrospect <<< caught: {ex.Message}");
-            if (ex.InnerException != null)
+            if (ex.InnerException == null)
             {
-                _logger.LogError($" <<< inner: {ex.InnerException.Message}");
+                _logger.LogError($"PostSmartTokenIntrospect <<< caught: {ex.Message}");
+            }
+            else
+            {
+                _logger.LogError($"PostSmartTokenIntrospect <<< caught: {ex.Message}, inner: {ex.InnerException.Message}");
             }
 
             Response.StatusCode = 500;

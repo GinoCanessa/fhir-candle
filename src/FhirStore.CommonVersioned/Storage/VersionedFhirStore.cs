@@ -4707,6 +4707,34 @@ public partial class VersionedFhirStore : IFhirStore
                 }
         }
 
+        if (requestUrlPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            requestUrlPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            if (requestUrlPath.StartsWith(_config.BaseUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                requestUrlPath = requestUrlPath.Substring(_config.BaseUrl.Length);
+                if (requestUrlPath.StartsWith('/'))
+                {
+                    requestUrlPath = requestUrlPath.Substring(1);
+                }
+            }
+            else
+            {
+                message = $"DetermineInteraction: Full URL: {url} cannot be parsed!";
+                Console.WriteLine(message);
+
+                requestUrlPath = string.Empty;
+                requestUrlQuery = string.Empty;
+                resourceType = string.Empty;
+                id = string.Empty;
+                operationName = string.Empty;
+                compartmentType = string.Empty;
+                version = string.Empty;
+
+                return null;
+            }
+        }
+
         string[] pathComponents = requestUrlPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         message = string.Empty;
         resourceType = string.Empty;

@@ -6,6 +6,7 @@
 using System.Net;
 using fhir.candle.Models;
 using fhir.candle.Services;
+//using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Mvc;
 
 namespace fhir.candle.Controllers;
@@ -39,18 +40,18 @@ public class SmartController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets smart well known.</summary>
-    /// <param name="store">The store.</param>
+    /// <param name="storeName">The store.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/.well-known/smart-configuration")]
+    [HttpGet, Route("{storeName}/.well-known/smart-configuration")]
     public async Task GetSmartWellKnown(
-        [FromRoute] string store)
+        [FromRoute] string storeName)
     {
         // make sure this store exists and has SMART enabled
         if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
-                store,
+                storeName,
                 out FhirStore.Smart.SmartWellKnown? smartConfig))
         {
-            _logger.LogWarning($"GetSmartWellKnown <<< tenant {store} does not exist!");
+            _logger.LogWarning($"GetSmartWellKnown <<< tenant {storeName} does not exist!");
             Response.StatusCode = 404;
             return;
         }
@@ -63,7 +64,7 @@ public class SmartController : ControllerBase
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets smart authorize.</summary>
-    /// <param name="store">        The store.</param>
+    /// <param name="storeName">        The store.</param>
     /// <param name="responseType"> Fixed value: code.</param>
     /// <param name="clientId">     The client's identifier.</param>
     /// <param name="redirectUri">  Must match one of the client's pre-registered redirect URIs.</param>
@@ -78,9 +79,9 @@ public class SmartController : ControllerBase
     ///  challenge, as specified by PKCE. (required v2, opt v1)</param>
     /// <param name="pkceMethod">   Method used for the code_challenge parameter. (required v2, opt v1)</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpGet, Route("{store}/authorize")]
+    [HttpGet, Route("{storeName}/authorize")]
     public void GetSmartAuthorize(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromQuery(Name = "response_type")] string responseType,
         [FromQuery(Name = "client_id")] string clientId,
         [FromQuery(Name = "redirect_uri")] string redirectUri,
@@ -89,10 +90,16 @@ public class SmartController : ControllerBase
         [FromQuery(Name = "state")] string state,
         [FromQuery(Name = "aud")] string audience,
         [FromQuery(Name = "code_challenge")] string? pkceChallenge,
-        [FromQuery(Name = "code_challenge_method")] string? pkceMethod)
+        [FromQuery(Name = "code_challenge_method")] string? pkceMethod,
+        [FromQuery(Name = "candle_auth_bypass")] string? queryAuthBypass,
+        [FromQuery(Name = "candle_patient")] string? queryPatient,
+        [FromQuery(Name = "candle_practitoner")] string? queryPractitioner,
+        [FromHeader(Name = "candle-auth-bypass")] string? headerAuthBypass,
+        [FromHeader(Name = "candle-patient")] string? headerPatient,
+        [FromHeader(Name = "candle-practitioner")] string? headerPractitioner)
     {
         if (!_smartAuthManager.RequestAuth(
-                store,
+                storeName,
                 Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
                 responseType,
                 clientId,
@@ -103,11 +110,69 @@ public class SmartController : ControllerBase
                 audience,
                 pkceChallenge,
                 pkceMethod,
-                out string redirectDestination))
+                out string redirectDestination,
+                out string authKey))
         {
             _logger.LogWarning($"GetSmartAuthorize <<< request for {clientId} failed!");
             Response.StatusCode = 404;
             return;
+        }
+
+        string bypassType = queryAuthBypass ?? headerAuthBypass ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(bypassType.ToLowerInvariant()))
+        {
+            _ = _smartAuthManager.TryGetAuthorization(storeName, authKey, out AuthorizationInfo auth);
+
+            string patient = queryPatient ?? headerPatient ?? string.Empty;
+            string practitioner = queryPractitioner ?? headerPractitioner ?? string.Empty;
+
+            switch (bypassType)
+            {
+                case "admin":
+                case "administrator":
+                case "user":
+                    {
+                        auth.UserId = "administrator";
+                        auth.LaunchPatient = patient;
+                        auth.LaunchPractitioner = practitioner;
+                    }
+                    break;
+
+                case "patient":
+                    {
+                        auth.UserId = patient;
+                        auth.LaunchPatient = patient;
+                    }
+                    break;
+
+                case "practitioner":
+                    {
+                        auth.UserId = practitioner;
+                        auth.LaunchPatient = patient;
+                        auth.LaunchPractitioner = practitioner;
+                    }
+                    break;
+            }
+
+            // perform login step
+            _ = _smartAuthManager.TryUpdateAuth(storeName, authKey, auth);
+
+            // approve all scopes
+            foreach (string scopeKey in auth.Scopes.Keys)
+            {
+                auth.Scopes[scopeKey] = true;
+            }
+
+            // perform authorization step
+            _ = _smartAuthManager.TryUpdateAuth(storeName, authKey, auth);
+
+            // redirect back to client
+            if (_smartAuthManager.TryGetClientRedirect(storeName, authKey, out string redirect))
+            {
+                Response.Redirect(redirect);
+                return;
+            }
         }
 
         Response.Redirect(redirectDestination);
@@ -116,22 +181,22 @@ public class SmartController : ControllerBase
     /// <summary>
     /// (An Action that handles HTTP POST requests) posts a smart token request.
     /// </summary>
-    /// <param name="store">     The store.</param>
+    /// <param name="storeName">     The store.</param>
     /// <param name="authHeader">(Optional) The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/token")]
+    [HttpPost, Route("{storeName}/token")]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]
     public async Task PostSmartTokenRequest(
-        [FromRoute] string store,
+        [FromRoute] string storeName,
         [FromHeader(Name = "Authorization")] string? authHeader = null)
     {
         // make sure this store exists and has SMART enabled
         if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
-                store,
+                storeName,
                 out FhirStore.Smart.SmartWellKnown? smartConfig))
         {
-            _logger.LogWarning($"PostSmartTokenRequest <<< tenant {store} does not exist!");
+            _logger.LogWarning($"PostSmartTokenRequest <<< tenant {storeName} does not exist!");
             Response.StatusCode = 404;
             return;
         }
@@ -208,7 +273,7 @@ public class SmartController : ControllerBase
                 case "authorization_code":
                     {
                         if (!_smartAuthManager.TryCreateSmartResponse(
-                                store,
+                                storeName,
                                 authCode,
                                 clientId,
                                 clientSecret,
@@ -225,7 +290,7 @@ public class SmartController : ControllerBase
                 case "refresh_token":
                     {
                         if (!_smartAuthManager.TrySmartRefresh(
-                                store,
+                                storeName,
                                 refreshToken,
                                 clientId,
                                 out smart))
@@ -271,20 +336,20 @@ public class SmartController : ControllerBase
     /// <summary>
     /// (An Action that handles HTTP POST requests) posts a smart token introspect.
     /// </summary>
-    /// <param name="store">The store.</param>
+    /// <param name="storeName">The store.</param>
     /// <returns>An asynchronous result.</returns>
-    [HttpPost, Route("{store}/introspect")]
+    [HttpPost, Route("{storeName}/introspect")]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("application/json")]
     public async Task PostSmartTokenIntrospect(
-        [FromRoute] string store)
+        [FromRoute] string storeName)
     {
         // make sure this store exists and has SMART enabled
         if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
-                store,
+                storeName,
                 out FhirStore.Smart.SmartWellKnown? smartConfig))
         {
-            _logger.LogWarning($"PostSmartTokenIntrospect <<< tenant {store} does not exist!");
+            _logger.LogWarning($"PostSmartTokenIntrospect <<< tenant {storeName} does not exist!");
             Response.StatusCode = 404;
             return;
         }
@@ -316,7 +381,7 @@ public class SmartController : ControllerBase
             }
 
             if (!_smartAuthManager.TryIntrospection(
-                    store,
+                    storeName,
                     token,
                     out AuthorizationInfo.IntrospectionResponse? resp))
             {

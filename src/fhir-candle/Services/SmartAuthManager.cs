@@ -1260,6 +1260,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     /// <param name="pkceMethod">         Method used for the code_challenge parameter. (required v2,
     ///  opt v1)</param>
     /// <param name="redirectDestination">[out] The redirect destination.</param>
+    /// <param name="authKey">            [out] The authentication key.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool RequestAuth(
         string tenant,
@@ -1273,11 +1274,13 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         string audience,
         string? pkceChallenge,
         string? pkceMethod,
-        out string redirectDestination)
+        out string redirectDestination,
+        out string authKey)
     {
         if (!_smartConfigs.ContainsKey(tenant))
         {
             redirectDestination = string.Empty;
+            authKey = string.Empty;
             return false;
         }
 
@@ -1289,6 +1292,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 if (!audience.Equals(_tenants[tenant].BaseUrl + "/", StringComparison.OrdinalIgnoreCase))
                 {
                     redirectDestination = string.Empty;
+                    authKey = string.Empty;
                     return false;
                 }
             }
@@ -1297,17 +1301,19 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 if (!audience.Equals(_tenants[tenant].BaseUrl.Substring(0, _tenants[tenant].BaseUrl.Length - 1), StringComparison.OrdinalIgnoreCase))
                 {
                     redirectDestination = string.Empty;
+                    authKey = string.Empty;
                     return false;
                 }
             }
             else
             {
                 redirectDestination = string.Empty;
+                authKey = string.Empty;
                 return false;
             }
         }
 
-        // create our auth - default to 5 minute timeout
+        // create our auth
         AuthorizationInfo auth = new()
         {
             Key = Guid.NewGuid().ToString(),
@@ -1333,7 +1339,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         _authorizations.Add(tenant + ":" + auth.Key, auth);
 
         redirectDestination = $"/smart/login?store={tenant}&key={auth.Key}";
-
+        authKey = auth.Key;
         return true;
     }
 

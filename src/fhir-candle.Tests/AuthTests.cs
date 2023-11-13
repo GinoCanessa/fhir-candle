@@ -93,7 +93,8 @@ public class AuthTests : IClassFixture<AuthTestFixture>
                 audience,
                 pkceChallenge,
                 pkceMethod,
-                out string redirectDestination);
+                out string redirectDestination,
+                out string _);
 
         success.Should().Be(expectSuccess);
         
@@ -134,12 +135,15 @@ public class AuthTests : IClassFixture<AuthTestFixture>
             _fixture.ConfigR4.BaseUrl,
             string.Empty,
             string.Empty,
-            out string redirectDestination).Should().BeTrue();
+            out string redirectDestination,
+            out string authKey).Should().BeTrue();
 
         redirectDestination.Should().NotBeNullOrEmpty();
 
-        string authKey = redirectDestination.Substring(redirectDestination.IndexOf("key=") + 4);
+        string queryAuthKey = redirectDestination.Substring(redirectDestination.IndexOf("key=") + 4);
         authKey.Should().NotBeNullOrEmpty();
+        queryAuthKey.Should().NotBeNullOrEmpty();
+        authKey.Should().BeEquivalentTo(queryAuthKey);
 
         _fixture.AuthR4.TryGetAuthorization(
             _fixture.Name,

@@ -137,5 +137,6 @@ public interface ISmartAuthManager : IHostedService
         string audience,
         string? pkceChallenge,
         string? pkceMethod,
-        out string redirectDestination);
+        out string redirectDestination,
+        out string authKey);
 }

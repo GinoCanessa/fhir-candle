@@ -132,6 +132,31 @@
                                 <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
                                 All other FHIR API calls require an access token with appropriate scopes.
                             </MudListItem>
+
+                            <MudListItem>
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                For testing convenience, there are headers and query parameters that can be used to 'streamline' login and authorization.
+                                <MudList>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        Query Parameter <code>candle_auth_bypass</code> or Header <code>candle-auth-bypass</code>, can have values:
+                                        <code>administrator</code>, <code>patient</code>, or <code>practitioner</code>.  Using this value will 'fast-forward'
+                                        through the SMART authorization process and return an access token with the appropriate scopes and launch parameters,
+                                        as specified by the following options.
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        Query Parameter <code>candle_patient</code> or Header <code>candle-patient</code> is used to set the <code>launch/patient</code>.
+                                        Values MUST be formatted as <code>Patient/[id]</code> and MUST exist on the system.
+                                    </MudListItem>
+                                    <MudListItem>
+                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
+                                        Query Parameter <code>candle_practitioner</code> or Header <code>candle-practitioner</code> is used to set the <code>launch/practitioner</code>.
+                                        Values MUST be formatted as <code>Practitioner/[id]</code> and MUST exist on the system.
+                                    </MudListItem>
+                                </MudList>
+                            </MudListItem>
+
                             <MudListItem>
                                 <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
                                 For testing convenience, there is an immutable access grant for the <code>administrator</code> user.

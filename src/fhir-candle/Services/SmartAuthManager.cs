@@ -1307,7 +1307,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             }
         }
 
-        // create our auth - default to 5 minute timeout
+        // create our auth
         AuthorizationInfo auth = new()
         {
             Key = Guid.NewGuid().ToString(),

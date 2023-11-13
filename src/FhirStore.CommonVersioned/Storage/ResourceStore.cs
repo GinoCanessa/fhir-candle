@@ -303,6 +303,35 @@ public class ResourceStore<T> : IVersionedResourceStore
                 }
                 break;
 
+            case "Observation":
+                {
+                    // special handling for Vitals Write Project - https://hackmd.io/jgLf4IF4RNCqtDABAmVrug?view
+                    if (source is Hl7.Fhir.Model.Observation obs)
+                    {
+                        // check for a missing tag
+                        if (obs.Performer.Any(r => r.Reference.Equals(obs.Subject.Reference, StringComparison.Ordinal)))
+                        {
+                            if (source.Meta == null)
+                            {
+                                source.Meta = new Meta();
+                            }
+
+                            if (source.Meta.Tag == null)
+                            {
+                                source.Meta.Tag = new List<Coding>();
+                            }
+
+                            if (!source.Meta.Tag.Any(c => 
+                                c.System.Equals("http://hl7.org/fhir/us/core/CodeSystem/us-core-tags", StringComparison.Ordinal) &&
+                                c.Code.Equals("patient-supplied")))
+                            {
+                                source.Meta.Tag.Add(new Coding("http://hl7.org/fhir/us/core/CodeSystem/us-core-tags", "patient-supplied"));
+                            }
+                        }
+                    }
+                }
+                break;
+
             case "SubscriptionTopic":
                 // fail the request if this fails
                 if (!_topicConverter.TryParse(source, out parsedSubscriptionTopic))

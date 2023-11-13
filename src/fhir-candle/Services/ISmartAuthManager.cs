@@ -3,10 +3,8 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-using fhir.candle.Models;
+using FhirCandle.Models;
 using FhirStore.Smart;
-using Microsoft.AspNetCore.Mvc;
-using System.CommandLine;
 
 namespace fhir.candle.Services;
 public interface ISmartAuthManager : IHostedService
@@ -37,6 +35,7 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="resourceType">   Type of the resource.</param>
     /// <param name="operationName">  Name of the operation.</param>
     /// <param name="compartmentType">Type of the compartment.</param>
+    /// <param name="auth">           [out] The granting record, if authorized.</param>
     /// <returns>True if authorized, false if not.</returns>
     bool IsAuthorized(
         string tenant,
@@ -45,7 +44,8 @@ public interface ISmartAuthManager : IHostedService
         FhirCandle.Storage.Common.StoreInteractionCodes interaction,
         string resourceType,
         string operationName,
-        string compartmentType);
+        string compartmentType,
+        out AuthorizationInfo? auth);
 
     /// <summary>Attempts to update authentication.</summary>
     /// <param name="tenant">The tenant name.</param>

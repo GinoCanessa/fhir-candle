@@ -68,6 +68,7 @@ public class OpPasClaimSubmit : IFhirOperation
     };
 
     /// <summary>Executes the Subscription/$events operation.</summary>
+    /// <param name="auth">            The authentication.</param>
     /// <param name="store">           The store.</param>
     /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
@@ -82,6 +83,7 @@ public class OpPasClaimSubmit : IFhirOperation
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
+        Models.AuthorizationInfo? auth,
         Storage.VersionedFhirStore store,
         string resourceType,
         Storage.IVersionedResourceStore? resourceStore,
@@ -239,7 +241,7 @@ public class OpPasClaimSubmit : IFhirOperation
         }
 
         // store the bundle
-        if (!store.TryCreate("Bundle", cb, out string id, false))
+        if (!store.TryCreate(auth, "Bundle", cb, out string id, false))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
@@ -317,7 +319,7 @@ public class OpPasClaimSubmit : IFhirOperation
         };
 
         // store the claim response locally
-        if (!store.TryCreate(cr.TypeName, cr, out string claimResponseId, false))
+        if (!store.TryCreate(auth, cr.TypeName, cr, out string claimResponseId, false))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
@@ -390,7 +392,7 @@ public class OpPasClaimSubmit : IFhirOperation
         }
 
         // store the claim response bundle
-        if (!store.TryCreate(crb.TypeName, crb, out string claimResponseBundleId, false))
+        if (!store.TryCreate(auth, crb.TypeName, crb, out string claimResponseBundleId, false))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {

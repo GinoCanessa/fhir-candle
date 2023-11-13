@@ -187,12 +187,20 @@ public class FhirController : ControllerBase
     public async Task GetMetadata(
         [FromRoute] string storeName,
         [FromQuery(Name = "_format")] string? format,
-        [FromQuery(Name = "_pretty")] string? pretty)
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if (!_fhirStoreManager.ContainsKey(storeName))
+        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
+            (store == null))
         {
             _logger.LogWarning($"GetMetadata <<< no tenant at {storeName}!");
             Response.StatusCode = 404;
+            return;
+        }
+
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
+        {
+            Response.StatusCode = authStatus;
             return;
         }
 
@@ -200,6 +208,7 @@ public class FhirController : ControllerBase
         //string format = GetMimeType(string.Empty, HttpContext.Request);
 
         HttpStatusCode sc = _fhirStoreManager[storeName].GetMetadata(
+            auth,
             format,
             pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string resource,
@@ -258,7 +267,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -267,6 +276,7 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, Request, true);
 
         HttpStatusCode sc = store.TypeOperation(
+            auth,
             resourceName,
             "$" + opName,
             Request.QueryString.ToString(),
@@ -297,10 +307,13 @@ public class FhirController : ControllerBase
         string requestMethod,
         string requestUrl,
         string? authHeader,
-        out int statusCode)
+        out int statusCode,
+        out AuthorizationInfo? auth)
     {
         if (string.IsNullOrEmpty(authHeader))
         {
+            auth = null;
+
             if (store.Config.SmartRequired)
             {
                 _logger.LogWarning($"IsAuthorized <<< tenant {store} requires authorization!");
@@ -318,6 +331,7 @@ public class FhirController : ControllerBase
         {
             _logger.LogWarning($"IsAuthorized <<< malformed authorization header: {authHeader}!");
             statusCode = 400;
+            auth = null;
             return false;
         }
 
@@ -337,6 +351,7 @@ public class FhirController : ControllerBase
         {
             _logger.LogError($"IsAuthorized <<< could not parse request {Request.GetDisplayUrl()}!");
             statusCode = 500;
+            auth = null;
             return false;
         }
 
@@ -347,7 +362,8 @@ public class FhirController : ControllerBase
             (Common.StoreInteractionCodes)interaction,
             requestResourceType,
             requestOperationName,
-            requestCompartmentType);
+            requestCompartmentType,
+            out auth);
 
         if (authorized)
         {
@@ -399,7 +415,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -408,6 +424,7 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, Request);
 
         HttpStatusCode sc = store.InstanceRead(
+            auth,
             resourceName,
             id,
             format,
@@ -473,7 +490,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -486,6 +503,7 @@ public class FhirController : ControllerBase
 
         // operation
         sc = store.InstanceOperation(
+            auth,
             resourceName,
             "$" + opName,
             id,
@@ -542,7 +560,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -562,6 +580,7 @@ public class FhirController : ControllerBase
 
                 // operation
                 sc = store.InstanceOperation(
+                    auth,
                     resourceName,
                     "$" + opName,
                     id,
@@ -630,7 +649,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -667,6 +686,7 @@ public class FhirController : ControllerBase
                 }
 
                 HttpStatusCode sc = _fhirStoreManager[storeName].TypeSearch(
+                    auth,
                     resourceName,
                     content,
                     format,
@@ -734,7 +754,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -754,6 +774,7 @@ public class FhirController : ControllerBase
 
                 // operation
                 sc = store.TypeOperation(
+                    auth,
                     resourceName,
                     "$" + opName,
                     Request.QueryString.ToString(),
@@ -809,7 +830,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -846,6 +867,7 @@ public class FhirController : ControllerBase
                 }
 
                 HttpStatusCode sc = store.SystemSearch(
+                    auth,
                     content,
                     format,
                     summary ?? string.Empty,
@@ -901,7 +923,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -927,6 +949,7 @@ public class FhirController : ControllerBase
                 // re-add the prefix $ character since it was stripped during routing
 
                 HttpStatusCode sc = store.SystemOperation(
+                        auth,
                         "$" + opName,
                         Request.QueryString.ToString(),
                         content,
@@ -993,7 +1016,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1020,6 +1043,7 @@ public class FhirController : ControllerBase
                 string resource, outcome;
 
                 sc = store.InstanceCreate(
+                    auth,
                     resourceName,
                     content,
                     Request.ContentType ?? string.Empty,
@@ -1109,7 +1133,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "PUT", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "PUT", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1133,6 +1157,7 @@ public class FhirController : ControllerBase
                 string content = await reader.ReadToEndAsync();
 
                 HttpStatusCode sc = store.InstanceUpdate(
+                    auth,
                     resourceName,
                     id,
                     content,
@@ -1222,7 +1247,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1231,6 +1256,7 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, Request);
 
         HttpStatusCode sc = store.InstanceDelete(
+            auth,
             resourceName,
             id,
             format,
@@ -1277,7 +1303,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1286,6 +1312,7 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, Request);
 
         HttpStatusCode sc = store.TypeSearch(
+            auth,
             resourceName,
             Request.QueryString.ToString(),
             format,
@@ -1336,7 +1363,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1357,6 +1384,7 @@ public class FhirController : ControllerBase
             string queryString = Request.QueryString.ToString();
 
             HttpStatusCode sc = store.TypeDelete(
+                auth,
                 resourceName,
                 queryString,
                 format,
@@ -1409,7 +1437,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "POST", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1433,6 +1461,7 @@ public class FhirController : ControllerBase
                 string content = await reader.ReadToEndAsync();
 
                 HttpStatusCode sc = store.ProcessBundle(
+                    auth,
                     content,
                     Request.ContentType ?? string.Empty,
                     format,
@@ -1485,7 +1514,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "GET", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1494,6 +1523,7 @@ public class FhirController : ControllerBase
         format = GetMimeType(format, Request);
 
         HttpStatusCode sc = store.SystemSearch(
+            auth,
             Request.QueryString.ToString(),
             format,
             summary ?? string.Empty,
@@ -1534,7 +1564,7 @@ public class FhirController : ControllerBase
             return;
         }
 
-        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus))
+        if (!IsAuthorized(storeName, store, "DELETE", Request.GetDisplayUrl(), authHeader, out int authStatus, out AuthorizationInfo? auth))
         {
             Response.StatusCode = authStatus;
             return;
@@ -1555,6 +1585,7 @@ public class FhirController : ControllerBase
             string queryString = Request.QueryString.ToString();
 
             HttpStatusCode sc = store.SystemDelete(
+                auth,
                 queryString,
                 format,
                 pretty?.Equals("true", StringComparison.Ordinal) ?? false,

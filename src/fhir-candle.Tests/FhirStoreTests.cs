@@ -160,6 +160,7 @@ public class MetadataJson : IClassFixture<FhirStoreTests>
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
         HttpStatusCode scRead = fhirStore.GetMetadata(
+            null,
             "application/fhir+json",
             false,
             out string serializedResource,
@@ -209,6 +210,7 @@ public class MetadataXml : IClassFixture<FhirStoreTests>
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
         HttpStatusCode scRead = fhirStore.GetMetadata(
+            null,
             "application/fhir+xml",
             false,
             out string serializedResource,
@@ -265,6 +267,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         string serializedResource, serializedOutcome, eTag, lastModified, location;
 
         HttpStatusCode sc = fhirStore.InstanceCreate(
+            null,
             _resourceType,
             json1,
             "application/fhir+json",
@@ -288,6 +291,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         location.Should().EndWith(_resourceType + "/" + _id);
 
         sc = fhirStore.InstanceRead(
+            null,
             _resourceType,
             _id,
             "application/fhir+json",
@@ -308,6 +312,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         location.Should().EndWith(_resourceType + "/" + _id);
 
         sc = fhirStore.InstanceUpdate(
+            null,
             _resourceType,
             _id,
             json2,
@@ -334,6 +339,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         location.Should().EndWith(_resourceType + "/" + _id);
 
         sc = fhirStore.InstanceDelete(
+            null,
             _resourceType,
             _id,
             "application/fhir+json",
@@ -346,6 +352,7 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         location.Should().Contain(_resourceType);
 
         sc = fhirStore.InstanceRead(
+            null,
             _resourceType,
             _id,
             "application/fhir+json",
@@ -394,6 +401,7 @@ public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
         HttpStatusCode sc = fhirStore.InstanceCreate(
+            null,
             _resourceType2,
             json,
             "application/fhir+json",
@@ -441,6 +449,7 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
         HttpStatusCode sc = fhirStore.InstanceCreate(
+            null,
             _resourceType,
             json,
             "application/fhir+json",

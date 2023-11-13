@@ -55,6 +55,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
@@ -63,6 +64,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="lastModified">      [out] The last modified.</param>
     /// <returns>The metadata.</returns>
     HttpStatusCode GetMetadata(
+        AuthorizationInfo? auth,
         string destFormat,
         bool pretty,
         out string serializedResource,
@@ -71,6 +73,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string lastModified);
 
     /// <summary>Instance read.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="destFormat">        Destination format.</param>
@@ -85,6 +88,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="lastModified">      [out] The last modified.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceRead(
+        AuthorizationInfo? auth,
         string resourceType,
         string id,
         string destFormat,
@@ -106,6 +110,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     bool TryRead(string resourceType, string id, out object? resource);
 
     /// <summary>Instance create.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
@@ -120,6 +125,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceCreate(
+        AuthorizationInfo? auth,
         string resourceType,
         string content,
         string sourceFormat,
@@ -134,13 +140,21 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string location);
 
     /// <summary>Attempts to create.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="resource">    [out] The resource.</param>
-    /// <param name="id">          [out] The identifier.</param>
+    /// <param name="auth">           The authorization information, if available.</param>
+    /// <param name="resourceType">   Type of the resource.</param>
+    /// <param name="resource">       [out] The resource.</param>
+    /// <param name="id">             [out] The identifier.</param>
+    /// <param name="allowExistingId">True to allow an existing id.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryCreate(string resourceType, object resource, out string id, bool allowExistingId);
+    bool TryCreate(
+        AuthorizationInfo? auth,
+        string resourceType, 
+        object resource, 
+        out string id, 
+        bool allowExistingId);
 
     /// <summary>Instance update.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="content">           The content.</param>
@@ -158,6 +172,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceUpdate(
+        AuthorizationInfo? auth,
         string resourceType,
         string id,
         string content,
@@ -182,6 +197,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     bool TryUpdate(string resourceType, string id, object resource);
 
     /// <summary>Instance delete.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="destFormat">        Destination format.</param>
@@ -191,6 +207,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceDelete(
+        AuthorizationInfo? auth,
         string resourceType,
         string id,
         string destFormat,
@@ -214,6 +231,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode ProcessBundle(
+        AuthorizationInfo? auth,
         string content,
         string sourceFormat,
         string destFormat,
@@ -222,6 +240,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedOutcome);
 
     /// <summary>System delete.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
@@ -229,6 +248,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode SystemDelete(
+        AuthorizationInfo? auth,
         string queryString,
         string destFormat,
         bool pretty,
@@ -236,6 +256,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedOutcome);
 
     /// <summary>Type delete (based on search).</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="destFormat">        Destination format.</param>
@@ -244,6 +265,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode TypeDelete(
+        AuthorizationInfo? auth,
         string resourceType,
         string queryString,
         string destFormat,
@@ -252,6 +274,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedOutcome);
 
     /// <summary>System search.</summary>
+    /// <param name="auth">             The authorization information, if available.</param>
     /// <param name="queryString">      The query string.</param>
     /// <param name="destFormat">       Destination format.</param>
     /// <param name="summaryFlag">      The summary flag.</param>
@@ -260,6 +283,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome">[out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode SystemSearch(
+        AuthorizationInfo? auth,
         string queryString,
         string destFormat,
         string summaryFlag,
@@ -276,15 +300,17 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out object? bundle);
 
     /// <summary>Type search.</summary>
+    /// <param name="auth">             The authorization information, if available.</param>
     /// <param name="resourceType">     Type of the resource.</param>
     /// <param name="queryString">      The query string.</param>
     /// <param name="destFormat">       Destination format.</param>
     /// <param name="summaryFlag">      Summary-element filtering to apply.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="pretty">           If the output should be 'pretty' formatted.</param>
     /// <param name="serializedBundle"> [out] The serialized bundle.</param>
     /// <param name="serializedOutcome">[out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode TypeSearch(
+        AuthorizationInfo? auth,
         string resourceType,
         string queryString,
         string destFormat,
@@ -304,6 +330,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out object? bundle);
 
     /// <summary>System operation.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="operationName">     Name of the operation.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="content">           The content.</param>
@@ -314,6 +341,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode SystemOperation(
+        AuthorizationInfo? auth,
         string operationName,
         string queryString,
         string content,
@@ -324,6 +352,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedOutcome);
 
     /// <summary>Type operation.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="operationName">     Name of the operation.</param>
     /// <param name="queryString">       The query string.</param>
@@ -335,6 +364,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode TypeOperation(
+        AuthorizationInfo? auth,
         string resourceType,
         string operationName,
         string queryString,
@@ -346,6 +376,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serializedOutcome);
 
     /// <summary>Instance operation.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="operationName">     Name of the operation.</param>
     /// <param name="instanceId">        Identifier for the instance.</param>
@@ -358,6 +389,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceOperation(
+        AuthorizationInfo? auth,
         string resourceType,
         string operationName,
         string instanceId,
@@ -447,7 +479,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string operationName,
         out string compartmentType,
         out string version);
-
 
     ///// <summary>
     ///// Get the metadata from a remote fhir server.

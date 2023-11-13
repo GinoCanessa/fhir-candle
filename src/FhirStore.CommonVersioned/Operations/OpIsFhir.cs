@@ -63,6 +63,7 @@ public class OpTestIfFhir : IFhirOperation
     public HashSet<string> SupportedResources => new();
 
     /// <summary>Executes the Subscription/$events operation.</summary>
+    /// <param name="auth">            The authentication.</param>
     /// <param name="store">           The store.</param>
     /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
@@ -77,6 +78,7 @@ public class OpTestIfFhir : IFhirOperation
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
+        Models.AuthorizationInfo? auth,
         Storage.VersionedFhirStore store,
         string resourceType,
         Storage.IVersionedResourceStore? resourceStore,

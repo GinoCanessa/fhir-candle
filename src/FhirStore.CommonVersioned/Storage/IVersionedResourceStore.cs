@@ -21,10 +21,12 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     Hl7.Fhir.Model.Resource? InstanceRead(string id);
 
     /// <summary>Create an instance of a resource.</summary>
+    /// <param name="auth">           The authentication.</param>
     /// <param name="source">         [out] The resource.</param>
     /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
     /// <returns>The created resource, or null if it could not be created.</returns>
     Hl7.Fhir.Model.Resource? InstanceCreate(
+        AuthorizationInfo? auth,
         Hl7.Fhir.Model.Resource source,
         bool allowExistingId);
 

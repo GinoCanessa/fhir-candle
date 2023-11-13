@@ -25,6 +25,8 @@ using System.Xml.Linq;
 using Fhir.Metrics;
 using static Hl7.Fhir.Model.ActivityDefinition;
 using Hl7.Fhir.Language.Debugging;
+using static System.Formats.Asn1.AsnWriter;
+using System.Security.Cryptography.X509Certificates;
 
 namespace FhirCandle.Storage;
 
@@ -242,6 +244,7 @@ public partial class VersionedFhirStore : IFhirStore
                 {
                     case ".json":
                         sc = InstanceCreate(
+                            null,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+json",
@@ -258,6 +261,7 @@ public partial class VersionedFhirStore : IFhirStore
 
                     case ".xml":
                         sc = InstanceCreate(
+                            null,
                             string.Empty,
                             File.ReadAllText(file.FullName),
                             "application/fhir+xml",
@@ -351,7 +355,7 @@ public partial class VersionedFhirStore : IFhirStore
 
                     if (opDef != null)
                     {
-                        _ = _store["OperationDefinition"].InstanceCreate(opDef, true);
+                        _ = _store["OperationDefinition"].InstanceCreate(null, opDef, true);
                     }
                 }
                 catch (Exception ex)
@@ -437,6 +441,7 @@ public partial class VersionedFhirStore : IFhirStore
                 {
                     case ".json":
                         sc = InstanceUpdate(
+                            null,
                             string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
@@ -456,6 +461,7 @@ public partial class VersionedFhirStore : IFhirStore
 
                     case ".xml":
                         sc = InstanceUpdate(
+                            null,
                             string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
@@ -500,6 +506,7 @@ public partial class VersionedFhirStore : IFhirStore
                 {
                     case ".json":
                         sc = InstanceUpdate(
+                            null,
                             string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
@@ -519,6 +526,7 @@ public partial class VersionedFhirStore : IFhirStore
 
                     case ".xml":
                         sc = InstanceUpdate(
+                            null,
                             string.Empty,
                             string.Empty,
                             File.ReadAllText(file.FullName),
@@ -962,12 +970,18 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Attempts to create.</summary>
+    /// <param name="auth">           The authorization information, if available.</param>
     /// <param name="resourceType">   Type of the resource.</param>
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="id">             [out] The identifier.</param>
     /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryCreate(string resourceType, object resource, out string id, bool allowExistingId)
+    public bool TryCreate(
+        AuthorizationInfo? auth,
+        string resourceType, 
+        object resource, 
+        out string id, 
+        bool allowExistingId)
     {
         if ((!_store.ContainsKey(resourceType)) ||
             (resource == null) ||
@@ -978,6 +992,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         HttpStatusCode sc = DoInstanceCreate(
+            auth,
             resourceType,
             r,
             string.Empty,
@@ -993,6 +1008,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Instance create.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
@@ -1007,6 +1023,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceCreate(
+        AuthorizationInfo? auth,
         string resourceType,
         string content,
         string sourceFormat,
@@ -1039,6 +1056,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         sc = DoInstanceCreate(
+            auth,
             resourceType,
             r,
             ifNoneExist,
@@ -1064,6 +1082,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Executes the instance create operation.</summary>
+    /// <param name="auth">           The authorization information, if available.</param>
     /// <param name="resourceType">   Type of the resource.</param>
     /// <param name="content">        The content.</param>
     /// <param name="ifNoneExist">    if none exist.</param>
@@ -1075,6 +1094,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="location">       [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     internal HttpStatusCode DoInstanceCreate(
+        AuthorizationInfo? auth,
         string resourceType,
         Resource content,
         string ifNoneExist,
@@ -1169,7 +1189,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         // create the resource
-        stored = _store[resourceType].InstanceCreate(content, allowExistingId);
+        stored = _store[resourceType].InstanceCreate(auth, content, allowExistingId);
 
         if (stored == null)
         {
@@ -1197,6 +1217,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Process a Batch or Transaction bundle.</summary>
+    /// <param name="auth">              The authentication.</param>
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
@@ -1205,6 +1226,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode ProcessBundle(
+        AuthorizationInfo? auth,
         string content,
         string sourceFormat,
         string destFormat,
@@ -1257,7 +1279,7 @@ public partial class VersionedFhirStore : IFhirStore
 
             case Bundle.BundleType.Batch:
                 responseBundle.Type = Bundle.BundleType.BatchResponse;
-                ProcessBatch(requestBundle, responseBundle);
+                ProcessBatch(auth, requestBundle, responseBundle);
                 break;
 
             default:
@@ -1298,6 +1320,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Instance delete.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="destFormat">        Destination format.</param>
@@ -1307,6 +1330,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceDelete(
+        AuthorizationInfo? auth,
         string resourceType,
         string id,
         string destFormat,
@@ -1392,6 +1416,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Instance read.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="destFormat">        Destination format.</param>
@@ -1406,6 +1431,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="lastModified">      [out] The last modified.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceRead(
+        AuthorizationInfo? auth,
         string resourceType,
         string id,
         string destFormat,
@@ -1604,12 +1630,14 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Instance update.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="id">                [out] The identifier.</param>
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="queryString">       The query string.</param>
     /// <param name="ifMatch">           A match specifying if.</param>
     /// <param name="ifNoneMatch">       A match specifying if none.</param>
     /// <param name="allowCreate">       If the operation should allow a create as an update.</param>
@@ -1620,6 +1648,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceUpdate(
+        AuthorizationInfo? auth,
         string resourceType,
         string id,
         string content,
@@ -2570,6 +2599,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Perform a FHIR System-level operation.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="operationName">     Name of the operation.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="content">           The content.</param>
@@ -2580,6 +2610,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode SystemOperation(
+        AuthorizationInfo? auth,
         string operationName,
         string queryString,
         string content,
@@ -2590,6 +2621,7 @@ public partial class VersionedFhirStore : IFhirStore
         out string serializedOutcome)
     {
         HttpStatusCode sc = DoSystemOperation(
+            auth,
             operationName,
             queryString,
             null,
@@ -2622,6 +2654,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     internal HttpStatusCode DoSystemOperation(
+        AuthorizationInfo? auth,
         string operationName,
         string queryString,
         Resource? contentResource,
@@ -2674,6 +2707,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         HttpStatusCode sc = op.DoOperation(
+            auth,
             this,
             string.Empty,
             null,
@@ -2693,16 +2727,19 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Perform a FHIR Type-level operation.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="operationName">     Name of the operation.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode TypeOperation(
+        AuthorizationInfo? auth,
         string resourceType,
         string operationName,
         string queryString,
@@ -2714,6 +2751,7 @@ public partial class VersionedFhirStore : IFhirStore
         out string serializedOutcome)
     {
         HttpStatusCode sc = DoTypeOperation(
+            auth,
             resourceType,
             operationName,
             queryString,
@@ -2738,6 +2776,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Executes the type operation operation.</summary>
+    /// <param name="auth">           The authorization information, if available.</param>
     /// <param name="resourceType">   Type of the resource.</param>
     /// <param name="operationName">  Name of the operation.</param>
     /// <param name="queryString">    The query string.</param>
@@ -2748,6 +2787,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     internal HttpStatusCode DoTypeOperation(
+        AuthorizationInfo? auth,
         string resourceType,
         string operationName,
         string queryString,
@@ -2821,6 +2861,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         HttpStatusCode sc = op.DoOperation(
+            auth,
             this,
             resourceType,
             _store[resourceType],
@@ -2839,6 +2880,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Performa FHIR Instance-level operation.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="operationName">     Name of the operation.</param>
     /// <param name="id">                [out] The identifier.</param>
@@ -2846,10 +2888,12 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="content">           The content.</param>
     /// <param name="sourceFormat">      Source format.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode InstanceOperation(
+        AuthorizationInfo? auth,
         string resourceType,
         string operationName,
         string id,
@@ -2862,6 +2906,7 @@ public partial class VersionedFhirStore : IFhirStore
         out string serializedOutcome)
     {
         HttpStatusCode sc = DoInstanceOperation(
+            auth,
             resourceType,
             id,
             operationName,
@@ -2887,6 +2932,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Executes the instance operation operation.</summary>
+    /// <param name="auth">           The authorization information, if available.</param>
     /// <param name="resourceType">   Type of the resource.</param>
     /// <param name="id">             [out] The identifier.</param>
     /// <param name="operationName">  Name of the operation.</param>
@@ -2898,6 +2944,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     internal HttpStatusCode DoInstanceOperation(
+        AuthorizationInfo? auth,
         string resourceType,
         string id,
         string operationName,
@@ -2984,6 +3031,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         HttpStatusCode sc = op.DoOperation(
+            auth,
             this,
             resourceType,
             _store[resourceType],
@@ -3002,6 +3050,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>System delete.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
@@ -3009,6 +3058,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode SystemDelete(
+        AuthorizationInfo? auth,
         string queryString,
         string destFormat,
         bool pretty,
@@ -3093,6 +3143,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Type delete.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="resourceType">      Type of the resource.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="destFormat">        Destination format.</param>
@@ -3101,6 +3152,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode TypeDelete(
+        AuthorizationInfo? auth,
         string resourceType,
         string queryString,
         string destFormat,
@@ -3188,15 +3240,17 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Type search.</summary>
-    /// <param name="resourceType">     Type of the resource.</param>
-    /// <param name="queryString">      The query string.</param>
-    /// <param name="destFormat">       Destination format.</param>
-    /// <param name="summaryFlag">      Summary-element filtering to apply.</param>
+    /// <param name="auth">              The authorization information, if available.</param>
+    /// <param name="resourceType">      Type of the resource.</param>
+    /// <param name="queryString">       The query string.</param>
+    /// <param name="destFormat">        Destination format.</param>
+    /// <param name="summaryFlag">       Summary-element filtering to apply.</param>
     /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
-    /// <param name="serializedResource"> [out] The serialized bundle.</param>
-    /// <param name="serializedOutcome">[out] The serialized outcome.</param>
+    /// <param name="serializedResource">[out] The serialized bundle.</param>
+    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode TypeSearch(
+        AuthorizationInfo? auth,
         string resourceType,
         string queryString,
         string destFormat,
@@ -3365,6 +3419,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>System search.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="queryString">       The query string.</param>
     /// <param name="destFormat">        Destination format.</param>
     /// <param name="summaryFlag">       The summary flag.</param>
@@ -3373,6 +3428,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode SystemSearch(
+        AuthorizationInfo? auth,
         string queryString,
         string destFormat,
         string summaryFlag,
@@ -3827,13 +3883,16 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Gets the server capabilities.</summary>
+    /// <param name="auth">              The authorization information, if available.</param>
     /// <param name="destFormat">        Destination format.</param>
+    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
     /// <returns>The capabilities.</returns>
     public HttpStatusCode GetMetadata(
+        AuthorizationInfo? auth,
         string destFormat,
         bool pretty,
         out string serializedResource,
@@ -3848,6 +3907,7 @@ public partial class VersionedFhirStore : IFhirStore
 
         // pass through to a normal instance read
         return InstanceRead(
+            auth,
             "CapabilityStatement",
             _capabilityStatementId,
             destFormat,
@@ -4188,9 +4248,11 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Process a batch request.</summary>
+    /// <param name="auth">    The authorization information, if available.</param>
     /// <param name="batch">   The batch.</param>
     /// <param name="response">The response.</param>
     private void ProcessBatch(
+        AuthorizationInfo? auth,
         Bundle batch,
         Bundle response)
     {
@@ -4232,6 +4294,49 @@ public partial class VersionedFhirStore : IFhirStore
                 out string requestCompartmentType,
                 out string requestVersion);
 
+            if (interaction == null)
+            {
+                response.Entry.Add(new Bundle.EntryComponent()
+                {
+                    FullUrl = entry.FullUrl,
+                    Response = new Bundle.ResponseComponent()
+                    {
+                        Status = HttpStatusCode.InternalServerError.ToString(),
+                        Outcome = Utils.BuildOutcomeForRequest(
+                            HttpStatusCode.NotImplemented,
+                            $"Unknown/unsupported request: {entry.Request.Method} {entry.Request.Url}, parsed interaction: {interaction}",
+                            OperationOutcome.IssueType.NotSupported),
+                    },
+                });
+
+                continue;
+            }
+
+            // check authorization on individual requests within a bundle
+            if ((auth != null) &&
+                (!auth.IsAuthorized(
+                    entry.Request.Method?.ToString() ?? string.Empty,
+                    (Common.StoreInteractionCodes)interaction,
+                    requestResourceType,
+                    requestOperationName,
+                    requestCompartmentType)))
+            {
+                response.Entry.Add(new Bundle.EntryComponent()
+                {
+                    FullUrl = entry.FullUrl,
+                    Response = new Bundle.ResponseComponent()
+                    {
+                        Status = HttpStatusCode.Unauthorized.ToString(),
+                        Outcome = Utils.BuildOutcomeForRequest(
+                            HttpStatusCode.Unauthorized,
+                            $"Unauthorized request: {entry.Request.Method} {entry.Request.Url}, parsed interaction: {interaction}",
+                            OperationOutcome.IssueType.Forbidden),
+                    },
+                });
+
+                continue;
+            }
+
             switch (interaction)
             {
                 case Common.StoreInteractionCodes.InstanceDelete:
@@ -4260,6 +4365,7 @@ public partial class VersionedFhirStore : IFhirStore
                 case Common.StoreInteractionCodes.InstanceOperation:
                     {
                         sc = DoInstanceOperation(
+                            auth,
                             requestResourceType,
                             requestId,
                             requestOperationName,
@@ -4386,6 +4492,7 @@ public partial class VersionedFhirStore : IFhirStore
                         }
 
                         sc = DoInstanceCreate(
+                            auth,
                             requestResourceType,
                             entry.Resource,
                             entry.Request.IfNoneExist ?? string.Empty,
@@ -4438,6 +4545,7 @@ public partial class VersionedFhirStore : IFhirStore
                 case Common.StoreInteractionCodes.TypeOperation:
                     {
                         sc = DoTypeOperation(
+                            auth,
                             requestResourceType,
                             requestOperationName,
                             requestUrlQuery,
@@ -4529,7 +4637,7 @@ public partial class VersionedFhirStore : IFhirStore
                                 Type = Bundle.BundleType.BatchResponse,
                             };
 
-                            ProcessBatch(b, responseBundle);
+                            ProcessBatch(auth, b, responseBundle);
 
                             response.Entry.Add(new Bundle.EntryComponent()
                             {
@@ -4571,6 +4679,7 @@ public partial class VersionedFhirStore : IFhirStore
                 case Common.StoreInteractionCodes.SystemOperation:
                     {
                         sc = DoSystemOperation(
+                            auth,
                             requestOperationName,
                             requestUrlQuery,
                             entry.Resource,

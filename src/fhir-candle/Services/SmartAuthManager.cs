@@ -4,17 +4,13 @@
 // </copyright>
 
 using fhir.candle.Models;
-using fhir.candle.Pages.Subscriptions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using FhirStore.Smart;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Support;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
@@ -368,6 +364,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     /// <param name="resourceType">   Type of the resource.</param>
     /// <param name="operationName">  Name of the operation.</param>
     /// <param name="compartmentType">Type of the compartment.</param>
+    /// <param name="auth">           [out] The granting record, if authorized.</param>
     /// <returns>True if authorized, false if not.</returns>
     public bool IsAuthorized(
         string tenant,
@@ -376,23 +373,27 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         Common.StoreInteractionCodes interaction,
         string resourceType,
         string operationName,
-        string compartmentType)
+        string compartmentType,
+        out AuthorizationInfo? auth)
     {
         if (string.IsNullOrEmpty(accessToken))
         {
             _logger.LogWarning("IsAuthorized <<< request is missing access token.");
+            auth = null;
             return false;
         }
 
         if (accessToken.Length < 36)
         {
             _logger.LogWarning($"IsAuthorized <<< request {accessToken} is malformed.");
+            auth = null;
             return false;
         }
 
-        if (accessToken.Equals(Guid.Empty.ToString() + "_" + Guid.Empty.ToString()))
+        if (!accessToken.Equals(Guid.Empty.ToString() + "_" + Guid.Empty.ToString()))
         {
-            return true;
+            auth = _authorizations[Guid.Empty.ToString() + "_" + Guid.Empty.ToString()];
+            return false;
         }
 
         string code = accessToken.Substring(0, 36);
@@ -401,12 +402,14 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
             _logger.LogWarning($"IsAuthorized <<< auth {key} does not exist.");
+            auth = null;
             return false;
         }
 
         if (string.IsNullOrEmpty(tenant))
         {
             _logger.LogWarning("IsAuthorized <<< request is missing the tenant.");
+            auth = null;
             return false;
         }
 
@@ -420,213 +423,22 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 Message = msg,
             });
             _logger.LogWarning(msg);
+            auth = null;
             return false;
         }
 
-        if (local.UserScopes.Contains("*.*"))
+        if (local.IsAuthorized(
+                httpMethod,
+                interaction,
+                resourceType,
+                operationName,
+                compartmentType))
         {
+            auth = local;
             return true;
         }
 
-        switch (interaction)
-        {
-            // TODO: compartments are not implemented yet
-            case Common.StoreInteractionCodes.CompartmentOperation:
-            case Common.StoreInteractionCodes.CompartmentSearch:
-            case Common.StoreInteractionCodes.CompartmentTypeSearch:
-                break;
-
-            case Common.StoreInteractionCodes.InstanceDelete:
-            case Common.StoreInteractionCodes.InstanceDeleteHistory:
-            case Common.StoreInteractionCodes.InstanceDeleteVersion:
-            case Common.StoreInteractionCodes.TypeDeleteConditional:
-                {
-                    if (local.PatientScopes.Contains("*.d") ||
-                        local.UserScopes.Contains("*.d") ||
-                        local.PatientScopes.Contains(resourceType + ".d") ||
-                        local.UserScopes.Contains(resourceType + ".d"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.InstanceOperation:
-            case Common.StoreInteractionCodes.TypeOperation:
-                {
-                    switch (httpMethod.ToUpperInvariant())
-                    {
-                        case "HEAD":
-                        case "GET":
-                            {
-                                if (local.PatientScopes.Contains("*.r") ||
-                                    local.UserScopes.Contains("*.r") ||
-                                    local.PatientScopes.Contains(resourceType + ".r") ||
-                                    local.UserScopes.Contains(resourceType + ".r"))
-                                {
-                                    return true;
-                                }
-
-                                return false;
-                            }
-
-                        case "POST":
-                        case "PUT":
-                            {
-                                if (local.PatientScopes.Contains("*.u") ||
-                                    local.UserScopes.Contains("*.u") ||
-                                    local.PatientScopes.Contains(resourceType + ".u") ||
-                                    local.UserScopes.Contains(resourceType + ".u"))
-                                {
-                                    return true;
-                                }
-
-                                return false;
-                            }
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.InstancePatch:
-            case Common.StoreInteractionCodes.InstanceUpdate:
-                {
-                    if (local.PatientScopes.Contains("*.u") ||
-                        local.UserScopes.Contains("*.u") ||
-                        local.PatientScopes.Contains(resourceType + ".u") ||
-                        local.UserScopes.Contains(resourceType + ".u"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.InstanceRead:
-            case Common.StoreInteractionCodes.InstanceReadHistory:
-            case Common.StoreInteractionCodes.InstanceReadVersion:
-            case Common.StoreInteractionCodes.TypeHistory:
-                {
-                    if (local.PatientScopes.Contains("*.r") ||
-                        local.UserScopes.Contains("*.r") ||
-                        local.PatientScopes.Contains(resourceType + ".r") ||
-                        local.UserScopes.Contains(resourceType + ".r"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.TypeSearch:
-                {
-                    if (local.PatientScopes.Contains("*.s") ||
-                        local.UserScopes.Contains("*.s") ||
-                        local.PatientScopes.Contains(resourceType + ".s") ||
-                        local.UserScopes.Contains(resourceType + ".s"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.TypeCreate:
-            case Common.StoreInteractionCodes.TypeCreateConditional:
-                {
-                    if (local.PatientScopes.Contains("*.c") ||
-                        local.UserScopes.Contains("*.c") ||
-                        local.PatientScopes.Contains(resourceType + ".c") ||
-                        local.UserScopes.Contains(resourceType + ".c"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.SystemCapabilities:
-                {
-                    // always allow capabilities test
-                    return true;
-                }
-
-            case Common.StoreInteractionCodes.SystemBundle:
-                {
-                    // only allow system bundles for user/*.*, which has already been checked
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.SystemDeleteConditional:
-                {
-                    if (local.PatientScopes.Contains("*.d") ||
-                        local.UserScopes.Contains("*.d"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.SystemHistory:
-                {
-                    if (local.PatientScopes.Contains("*.r") ||
-                        local.UserScopes.Contains("*.r"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.SystemOperation:
-                {
-                    switch (httpMethod.ToUpperInvariant())
-                    {
-                        case "HEAD":
-                        case "GET":
-                            {
-                                if (local.PatientScopes.Contains("*.r") ||
-                                    local.UserScopes.Contains("*.r"))
-                                {
-                                    return true;
-                                }
-
-                                return false;
-                            }
-
-                        case "POST":
-                        case "PUT":
-                            {
-                                if (local.PatientScopes.Contains("*.u") ||
-                                    local.UserScopes.Contains("*.u"))
-                                {
-                                    return true;
-                                }
-
-                                return false;
-                            }
-                    }
-
-                    return false;
-                }
-
-            case Common.StoreInteractionCodes.SystemSearch:
-                {
-                    if (local.PatientScopes.Contains("*.s") ||
-                        local.UserScopes.Contains("*.s"))
-                    {
-                        return true;
-                    }
-
-                    return false;
-                }
-
-            default:
-                break;
-        }
-
+        auth = null;
         return false;
     }
 

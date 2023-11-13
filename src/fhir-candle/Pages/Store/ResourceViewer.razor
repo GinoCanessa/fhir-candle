@@ -107,6 +107,7 @@
             Id.Equals("metadata", StringComparison.Ordinal))
         {
             _ = _store.GetMetadata(
+                null,
                 $"application/fhir+{_resourceFormatCode}",
                 true,
                 out content,
@@ -117,6 +118,7 @@
         else
         {
             _ = _store.InstanceRead(
+                null,
                 ResourceType,
                 Id,
                 $"application/fhir+{_resourceFormatCode}",

@@ -106,7 +106,15 @@ public class R4TestsPatientLooped : IClassFixture<R4Tests>
 
         for (int i = 0; i < loopCount; i++)
         {
-            _fixture._store.TypeSearch("Patient", search, "application/fhir+json", string.Empty, false, out string bundle, out string outcome);
+            _fixture._store.TypeSearch(
+                null,
+                "Patient", 
+                search, 
+                "application/fhir+json", 
+                string.Empty, 
+                false, 
+                out string bundle, 
+                out string outcome);
             bundle.Should().NotBeNullOrEmpty();
         }
     }
@@ -174,7 +182,15 @@ public class R4TestsObservation : IClassFixture<R4Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
-        _fixture._store.TypeSearch("Observation", search, "application/fhir+json", string.Empty, false, out string bundle, out _);
+        _fixture._store.TypeSearch(
+            null,
+            "Observation", 
+            search, 
+            "application/fhir+json", 
+            string.Empty, 
+            false, 
+            out string bundle, 
+            out _);
 
         bundle.Should().NotBeNullOrEmpty();
 
@@ -265,7 +281,15 @@ public class R4TestsPatient : IClassFixture<R4Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
-        _fixture._store.TypeSearch("Patient", search, "application/fhir+json", string.Empty, false, out string bundle, out _);
+        _fixture._store.TypeSearch(
+            null,
+            "Patient", 
+            search, 
+            "application/fhir+json", 
+            string.Empty, 
+            false, 
+            out string bundle, 
+            out _);
 
         bundle.Should().NotBeNullOrEmpty();
 
@@ -399,6 +423,7 @@ public class R4TestConditionals : IClassFixture<R4Tests>
 
         // test conditional that has no matches
         HttpStatusCode sc = _fixture._store.InstanceCreate(
+            null,
             resourceType,
             ChangeId(json, id),
             "application/fhir+json",
@@ -442,6 +467,7 @@ public class R4TestConditionals : IClassFixture<R4Tests>
 
         // first, store our resource
         HttpStatusCode sc = _fixture._store.InstanceCreate(
+            null,
             resourceType,
             ChangeId(json, id),
             "application/fhir+json",
@@ -464,6 +490,7 @@ public class R4TestConditionals : IClassFixture<R4Tests>
 
         // now, store it conditionally with a single match
         sc = _fixture._store.InstanceCreate(
+            null,
             resourceType,
             ChangeId(json, id),
             "application/fhir+json",
@@ -510,6 +537,7 @@ public class R4TestConditionals : IClassFixture<R4Tests>
 
         // first, store our resource
         HttpStatusCode sc = _fixture._store.InstanceCreate(
+            null,
             resourceType,
             ChangeId(json, id1),
             "application/fhir+json",
@@ -543,6 +571,7 @@ public class R4TestConditionals : IClassFixture<R4Tests>
 
         // now store the second resource
         sc = _fixture._store.InstanceCreate(
+            null,
             resourceType,
             ChangeId(json, id2),
             "application/fhir+json",
@@ -565,6 +594,7 @@ public class R4TestConditionals : IClassFixture<R4Tests>
 
         // now attempt to store with a conditional create that matches both
         sc = _fixture._store.InstanceCreate(
+            null,
             resourceType,
             ChangeId(json, id3),
             "application/fhir+json",

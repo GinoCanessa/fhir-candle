@@ -64,6 +64,7 @@ public class FhirStoreTestsR5: IDisposable
         fhirStore.Init(_config);
 
         HttpStatusCode scCreate = fhirStore.InstanceCreate(
+            null,
             "SearchParameter",
             json,
             "application/fhir+json",
@@ -85,6 +86,7 @@ public class FhirStoreTestsR5: IDisposable
         location.Should().Contain("SearchParameter/");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
+            null,
             "SearchParameter",
             "Patient-multiplebirth",
             "application/fhir+json",
@@ -117,6 +119,7 @@ public class FhirStoreTestsR5: IDisposable
 
         // read the metadata
         HttpStatusCode scRead = fhirStore.GetMetadata(
+            null,
             "application/fhir+json",
             false,
             out string serializedResource,
@@ -151,6 +154,7 @@ public class FhirStoreTestsR5: IDisposable
 
         // add a search parameter for the patient resource
         HttpStatusCode scCreate = fhirStore.InstanceCreate(
+            null,
             "SearchParameter",
             json,
             "application/fhir+json",
@@ -166,6 +170,7 @@ public class FhirStoreTestsR5: IDisposable
 
         // read the metadata again
         scRead = fhirStore.GetMetadata(
+            null,
             "application/fhir+json",
             false,
             out serializedResource,
@@ -226,6 +231,7 @@ public class FhirStoreTestsR5: IDisposable
         location.Should().EndWith("SubscriptionTopic/encounter-create-interaction");
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
+            null,
             "SubscriptionTopic",
             "encounter-create-interaction",
             "application/fhir+json",
@@ -629,6 +635,7 @@ public class FhirStoreTestsR5: IDisposable
         out string location)
     {
         HttpStatusCode sc = fhirStore.InstanceCreate(
+            null,
             resourceType,
             json,
             "application/fhir+json",
@@ -668,6 +675,7 @@ public class FhirStoreTestsR5: IDisposable
         out string location)
     {
         HttpStatusCode sc = fhirStore.InstanceUpdate(
+            null,
             resourceType,
             id,
             json,

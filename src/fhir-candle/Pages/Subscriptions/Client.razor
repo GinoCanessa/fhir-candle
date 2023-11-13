@@ -126,6 +126,7 @@
         }
 
         System.Net.HttpStatusCode sc = _store.InstanceCreate(
+            null,
             "Subscription",
             serialized,
             "application/fhir+json",
@@ -165,6 +166,7 @@
             subscriptionLocation = string.Empty;
 
             _ = _store.InstanceDelete(
+                null,
                 "Subscription",
                 subscription.Id,
                 "application/fhir+json",
@@ -177,6 +179,7 @@
         if (!string.IsNullOrEmpty(handshakeBundleId))
         {
             _ = _store.InstanceDelete(
+                null,
                 "Bundle",
                 handshakeBundleId,
                 "application/fhir+json",
@@ -191,6 +194,7 @@
         foreach (string encId in postedEncounters)
         {
             _ = _store.InstanceDelete(
+                null,
                 "Encounter",
                 encId,
                 "application/fhir+json",

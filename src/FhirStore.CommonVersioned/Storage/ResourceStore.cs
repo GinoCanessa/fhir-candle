@@ -264,10 +264,14 @@ public class ResourceStore<T> : IVersionedResourceStore
     }
 
     /// <summary>Create an instance of a resource.</summary>
+    /// <param name="auth">           The authentication.</param>
     /// <param name="source">         [out] The resource.</param>
     /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
     /// <returns>The created resource, or null if it could not be created.</returns>
-    public Resource? InstanceCreate(Resource source, bool allowExistingId)
+    public Resource? InstanceCreate(
+        AuthorizationInfo? auth,
+        Resource source,
+        bool allowExistingId)
     {
         if ((source == null) ||
             (source is not T))
@@ -308,7 +312,28 @@ public class ResourceStore<T> : IVersionedResourceStore
                     // special handling for Vitals Write Project - https://hackmd.io/jgLf4IF4RNCqtDABAmVrug?view
                     if (source is Hl7.Fhir.Model.Observation obs)
                     {
-                        // check for a missing tag
+                        // if there is authorization info, check to see if this is a patient launch
+                        if (auth?.UserId.StartsWith("Patient", StringComparison.Ordinal) ?? false)
+                        {
+                            if (source.Meta == null)
+                            {
+                                source.Meta = new Meta();
+                            }
+
+                            if (source.Meta.Tag == null)
+                            {
+                                source.Meta.Tag = new List<Coding>();
+                            }
+
+                            if (!source.Meta.Tag.Any(c =>
+                                c.System.Equals("http://hl7.org/fhir/us/core/CodeSystem/us-core-tags", StringComparison.Ordinal) &&
+                                c.Code.Equals("patient-supplied")))
+                            {
+                                source.Meta.Tag.Add(new Coding("http://hl7.org/fhir/us/core/CodeSystem/us-core-tags", "patient-supplied"));
+                            }
+                        }
+
+                        // check for the performer being the subject
                         if (obs.Performer.Any(r => r.Reference.Equals(obs.Subject.Reference, StringComparison.Ordinal)))
                         {
                             if (source.Meta == null)

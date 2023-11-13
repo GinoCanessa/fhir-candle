@@ -64,19 +64,22 @@ public class OpSubscriptionStatus : IFhirOperation
     };
 
     /// <summary>Executes the Subscription/$status operation.</summary>
+    /// <param name="auth">            The authentication.</param>
     /// <param name="store">           The store.</param>
     /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
     /// <param name="instanceId">      Identifier for the instance.</param>
+    /// <param name="focusResource">   The focus resource.</param>
     /// <param name="queryString">     The query string.</param>
     /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="nonFhirBody">     The original body content.</param>
+    /// <param name="bodyContent">     The original body content.</param>
     /// <param name="contentType">     Type of the content.</param>
     /// <param name="responseResource">[out] The response resource.</param>
     /// <param name="responseOutcome"> [out] The response outcome.</param>
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
+        Models.AuthorizationInfo? auth,
         Storage.VersionedFhirStore store,
         string resourceType,
         Storage.IVersionedResourceStore? resourceStore,

@@ -376,6 +376,13 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         string compartmentType,
         out AuthorizationInfo? auth)
     {
+        // capabilities are always authorized
+        if (interaction == Common.StoreInteractionCodes.SystemCapabilities)
+        {
+            auth = null;
+            return true;
+        }
+
         if (string.IsNullOrEmpty(accessToken))
         {
             _logger.LogWarning("IsAuthorized <<< request is missing access token.");
@@ -390,14 +397,16 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             return false;
         }
 
-        if (!accessToken.Equals(Guid.Empty.ToString() + "_" + Guid.Empty.ToString()))
-        {
-            auth = _authorizations[Guid.Empty.ToString() + "_" + Guid.Empty.ToString()];
-            return false;
-        }
-
         string code = accessToken.Substring(0, 36);
         string key = tenant + ":" + code;
+
+        // check for special admin access
+        if (accessToken.Equals(Guid.Empty.ToString() + "_" + Guid.Empty.ToString()) &&
+            _authorizations.TryGetValue(tenant + ":" + Guid.Empty.ToString(), out auth))
+        {
+            auth = _authorizations[tenant + ":" + Guid.Empty.ToString()];
+            return true;
+        }
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
         {
@@ -988,7 +997,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                         "permission-user",                          // user-level scopes (e.g., user/Appointment.rs)
                         "permission-v1",                            // SMARTv1 scope syntax (e.g., patient/Observation.read)
                         "permission-v2",                            // SMARTv2 granular scope syntax (e.g., patient/Observation.rs?...)
-                                                                    //"smart-app-state",                    // managing SMART App State - experimental
+                        //"smart-app-state",                        // managing SMART App State - experimental
                 },
                 SupportedChallengeMethods = new string[]
                 {

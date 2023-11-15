@@ -310,6 +310,33 @@ public class FhirController : ControllerBase
         out int statusCode,
         out AuthorizationInfo? auth)
     {
+        Common.StoreInteractionCodes? interaction = store.DetermineInteraction(
+            requestMethod,
+            requestUrl,
+            out _,
+            out _,
+            out _,
+            out string requestResourceType,
+            out _,
+            out string requestOperationName,
+            out string requestCompartmentType,
+            out _);
+
+        if (interaction == null)
+        {
+            _logger.LogError($"IsAuthorized <<< could not parse request {Request.GetDisplayUrl()}!");
+            statusCode = 500;
+            auth = null;
+            return false;
+        }
+
+        if (interaction == Common.StoreInteractionCodes.SystemCapabilities)
+        {
+            statusCode = 200;
+            auth = null;
+            return true;
+        }
+
         if (string.IsNullOrEmpty(authHeader))
         {
             auth = null;
@@ -331,26 +358,6 @@ public class FhirController : ControllerBase
         {
             _logger.LogWarning($"IsAuthorized <<< malformed authorization header: {authHeader}!");
             statusCode = 400;
-            auth = null;
-            return false;
-        }
-
-        Common.StoreInteractionCodes? interaction = store.DetermineInteraction(
-            requestMethod,
-            requestUrl,
-            out _,
-            out _,
-            out _,
-            out string requestResourceType,
-            out _,
-            out string requestOperationName,
-            out string requestCompartmentType,
-            out _);
-
-        if (interaction == null)
-        {
-            _logger.LogError($"IsAuthorized <<< could not parse request {Request.GetDisplayUrl()}!");
-            statusCode = 500;
             auth = null;
             return false;
         }

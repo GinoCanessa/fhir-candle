@@ -12,17 +12,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Operations\**" />
     <Compile Remove="Services\**" />
-    <EmbeddedResource Remove="Operations\**" />
     <EmbeddedResource Remove="Services\**" />
-    <None Remove="Operations\**" />
     <None Remove="Services\**" />
     <None Remove="Extensions\" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Extensions\" />
+    <Folder Include="Operations\" />
   </ItemGroup>
 
   <ItemGroup>

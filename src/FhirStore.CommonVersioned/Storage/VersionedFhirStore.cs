@@ -4755,15 +4755,21 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Determine interaction.</summary>
-    /// <param name="verb">          The HTTP verb.</param>
-    /// <param name="url">           URL of the request.</param>
-    /// <param name="message">       [out] The message.</param>
-    /// <param name="pathComponents">[out] The path components.</param>
+    /// <param name="verb">           The HTTP verb.</param>
+    /// <param name="url">            URL of the request.</param>
+    /// <param name="errorMessage">   [out] Message describing the error.</param>
+    /// <param name="requestUrlPath"> [out] The path components.</param>
+    /// <param name="requestUrlQuery">[out] The request URL query.</param>
+    /// <param name="resourceType">   [out] Type of the resource.</param>
+    /// <param name="id">             [out] The identifier.</param>
+    /// <param name="operationName">  [out] Name of the operation.</param>
+    /// <param name="compartmentType">[out] Type of the compartment.</param>
+    /// <param name="version">        [out] The version.</param>
     /// <returns>A Common.StoreInteractionCodes?</returns>
     public Common.StoreInteractionCodes? DetermineInteraction(
         string verb,
         string url,
-        out string message,
+        out string errorMessage,
         out string requestUrlPath,
         out string requestUrlQuery,
         out string resourceType,
@@ -4801,8 +4807,8 @@ public partial class VersionedFhirStore : IFhirStore
 
             default:
                 {
-                    message = $"DetermineInteraction: Malformed URL: {url} cannot be parsed!";
-                    Console.WriteLine(message);
+                    errorMessage = $"DetermineInteraction: Malformed URL: {url} cannot be parsed!";
+                    Console.WriteLine(errorMessage);
 
                     requestUrlPath = string.Empty;
                     requestUrlQuery = string.Empty;
@@ -4829,8 +4835,8 @@ public partial class VersionedFhirStore : IFhirStore
             }
             else
             {
-                message = $"DetermineInteraction: Full URL: {url} cannot be parsed!";
-                Console.WriteLine(message);
+                errorMessage = $"DetermineInteraction: Full URL: {url} cannot be parsed!";
+                Console.WriteLine(errorMessage);
 
                 requestUrlPath = string.Empty;
                 requestUrlQuery = string.Empty;
@@ -4845,7 +4851,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         string[] pathComponents = requestUrlPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        message = string.Empty;
+        errorMessage = string.Empty;
         resourceType = string.Empty;
         id = string.Empty;
         operationName = string.Empty;
@@ -5180,8 +5186,8 @@ public partial class VersionedFhirStore : IFhirStore
                 break;
         }
 
-        message = $"DetermineInteraction: {verb}+{url} cannot be parsed!";
-        Console.WriteLine(message);
+        errorMessage = $"DetermineInteraction: {verb}+{url} cannot be parsed!";
+        Console.WriteLine(errorMessage);
 
         return null;
     }

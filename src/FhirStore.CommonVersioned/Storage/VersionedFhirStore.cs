@@ -4825,9 +4825,12 @@ public partial class VersionedFhirStore : IFhirStore
         if (requestUrlPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             requestUrlPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            if (requestUrlPath.StartsWith(_config.BaseUrl, StringComparison.OrdinalIgnoreCase))
+            requestUrlPath = requestUrlPath.Substring(requestUrlPath.IndexOf(':'));
+            string configUrl = _config.BaseUrl.Substring(_config.BaseUrl.IndexOf(':'));
+
+            if (requestUrlPath.StartsWith(configUrl, StringComparison.OrdinalIgnoreCase))
             {
-                requestUrlPath = requestUrlPath.Substring(_config.BaseUrl.Length);
+                requestUrlPath = requestUrlPath.Substring(configUrl.Length);
                 if (requestUrlPath.StartsWith('/'))
                 {
                     requestUrlPath = requestUrlPath.Substring(1);

@@ -63,11 +63,21 @@ public class FhirStoreTestsR5: IDisposable
         IFhirStore fhirStore = new VersionedFhirStore();
         fhirStore.Init(_config);
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "POST",
+            Url = fhirStore.Config.BaseUrl + "/SearchParameter",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode scCreate = fhirStore.InstanceCreate(
-            null,
+            ctx,
             "SearchParameter",
             json,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -85,11 +95,21 @@ public class FhirStoreTestsR5: IDisposable
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().Contain("SearchParameter/");
 
+        ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = fhirStore.Config.BaseUrl + "/SearchParameter/Patient-multiplebirth",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode scRead = fhirStore.InstanceRead(
-            null,
+            ctx,
             "SearchParameter",
             "Patient-multiplebirth",
-            "application/fhir+json",
             string.Empty,
             false,
             eTag,
@@ -117,10 +137,20 @@ public class FhirStoreTestsR5: IDisposable
         IFhirStore fhirStore = new VersionedFhirStore();
         fhirStore.Init(_config);
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = fhirStore.Config.BaseUrl + "/metadata",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // read the metadata
         HttpStatusCode scRead = fhirStore.GetMetadata(
-            null,
-            "application/fhir+json",
+            ctx,
             false,
             out string serializedResource,
             out string serializedOutcome,
@@ -152,12 +182,22 @@ public class FhirStoreTestsR5: IDisposable
             break;
         }
 
+        ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "POST",
+            Url = fhirStore.Config.BaseUrl + "/SearchParameter",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // add a search parameter for the patient resource
         HttpStatusCode scCreate = fhirStore.InstanceCreate(
-            null,
+            ctx,
             "SearchParameter",
             json,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -168,10 +208,20 @@ public class FhirStoreTestsR5: IDisposable
             out lastModified,
             out string location);
 
+        ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = fhirStore.Config.BaseUrl + "/metadata",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // read the metadata again
         scRead = fhirStore.GetMetadata(
-            null,
-            "application/fhir+json",
+            ctx,
             false,
             out serializedResource,
             out serializedOutcome,
@@ -230,11 +280,21 @@ public class FhirStoreTestsR5: IDisposable
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().EndWith("SubscriptionTopic/encounter-create-interaction");
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = fhirStore.Config.BaseUrl + "/SubscriptionTopic/encounter-create-interaction",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode scRead = fhirStore.InstanceRead(
-            null,
+            ctx,
             "SubscriptionTopic",
             "encounter-create-interaction",
-            "application/fhir+json",
             string.Empty,
             false,
             eTag,
@@ -634,11 +694,21 @@ public class FhirStoreTestsR5: IDisposable
         out string lastModified, 
         out string location)
     {
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "POST",
+            Url = $"{fhirStore.Config.BaseUrl}/{resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode sc = fhirStore.InstanceCreate(
-            null,
+            ctx,
             resourceType,
             json,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -674,12 +744,22 @@ public class FhirStoreTestsR5: IDisposable
         out string lastModified,
         out string location)
     {
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "PUT",
+            Url = $"{fhirStore.Config.BaseUrl}/{resourceType}/{id}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode sc = fhirStore.InstanceUpdate(
-            null,
+            ctx,
             resourceType,
             id,
             json,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,

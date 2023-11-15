@@ -7,8 +7,6 @@ using fhir.candle.Models;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using FhirStore.Smart;
-using Hl7.Fhir.Rest;
-using Hl7.Fhir.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -81,11 +79,33 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
     /// <summary>Attempts to get authorization.</summary>
     /// <param name="tenant">The tenant name.</param>
-    /// <param name="code">  The authorization code.</param>
+    /// <param name="code">  The authorization code or authorization header.</param>
     /// <param name="auth">  [out] The authentication.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryGetAuthorization(string tenant, string code, out AuthorizationInfo auth)
     {
+        if (string.IsNullOrEmpty(code))
+        {
+            auth = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(tenant))
+        {
+            auth = null!;
+            return false;
+        }
+
+        if (code.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            code = code.Substring(7);
+
+            if (code.Length >= 36)
+            {
+                code = code.Substring(0, 36);
+            }
+        }
+
         string key = tenant + ":" + code;
 
         if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
@@ -102,6 +122,20 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         auth = local;
         return true;
+    }
+
+    /// <summary>Gets an authorization.</summary>
+    /// <param name="tenant">The tenant.</param>
+    /// <param name="code">  The authorization code or authorization header.</param>
+    /// <returns>The authorization.</returns>
+    public AuthorizationInfo? GetAuthorization(string tenant, string code)
+    {
+        if (TryGetAuthorization(tenant, code, out AuthorizationInfo auth))
+        {
+            return auth;
+        }
+
+        return null;
     }
 
     /// <summary>Attempts to update authentication.</summary>
@@ -357,98 +391,63 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     }
 
     /// <summary>Query if this request is authorized.</summary>
-    /// <param name="tenant">         The tenant.</param>
-    /// <param name="accessToken">    The access token.</param>
-    /// <param name="httpMethod">     The HTTP method.</param>
-    /// <param name="interaction">    The interaction.</param>
-    /// <param name="resourceType">   Type of the resource.</param>
-    /// <param name="operationName">  Name of the operation.</param>
-    /// <param name="compartmentType">Type of the compartment.</param>
-    /// <param name="auth">           [out] The granting record, if authorized.</param>
+    /// <param name="ctx">The context.</param>
     /// <returns>True if authorized, false if not.</returns>
-    public bool IsAuthorized(
-        string tenant,
-        string accessToken,
-        string httpMethod,
-        Common.StoreInteractionCodes interaction,
-        string resourceType,
-        string operationName,
-        string compartmentType,
-        out AuthorizationInfo? auth)
+    public bool IsAuthorized(FhirRequestContext ctx)
     {
-        // capabilities are always authorized
-        if (interaction == Common.StoreInteractionCodes.SystemCapabilities)
+        // any request to a tenant without SMART is authorized
+        if ((!_tenants.TryGetValue(ctx.TenantName, out TenantConfiguration? tConfig)) ||
+            (tConfig == null) ||
+            ((tConfig.SmartRequired == false) && (tConfig.SmartAllowed == false)))
         {
-            auth = null;
             return true;
         }
 
-        if (string.IsNullOrEmpty(accessToken))
+        // capabilities are always authorized
+        if (ctx.FhirInteraction.Interaction == Common.StoreInteractionCodes.SystemCapabilities)
         {
-            _logger.LogWarning("IsAuthorized <<< request is missing access token.");
-            auth = null;
-            return false;
+            return true;
         }
 
-        if (accessToken.Length < 36)
+        // a request without auth is ok if SMART is optional
+        if (tConfig.SmartAllowed && (ctx.Authorization == null))
         {
-            _logger.LogWarning($"IsAuthorized <<< request {accessToken} is malformed.");
-            auth = null;
-            return false;
+            return true;
         }
 
-        string code = accessToken.Substring(0, 36);
-        string key = tenant + ":" + code;
+        // other requests without auth fail
+        if (ctx.Authorization == null)
+        {
+            _logger.LogWarning($"IsAuthorized <<< request {ctx.HttpMethod} {ctx.Url} requires authorization.");
+            return false;
+        }
 
         // check for special admin access
-        if (accessToken.Equals(Guid.Empty.ToString() + "_" + Guid.Empty.ToString()) &&
-            _authorizations.TryGetValue(tenant + ":" + Guid.Empty.ToString(), out auth))
+        if (ctx.Authorization.Key.Equals(Guid.Empty.ToString()))
         {
-            auth = _authorizations[tenant + ":" + Guid.Empty.ToString()];
             return true;
         }
 
-        if (!_authorizations.TryGetValue(key, out AuthorizationInfo? local))
+        if (string.IsNullOrEmpty(ctx.TenantName))
         {
-            _logger.LogWarning($"IsAuthorized <<< auth {key} does not exist.");
-            auth = null;
+            _logger.LogWarning($"IsAuthorized <<< request {ctx.HttpMethod} {ctx.Url} is missing the tenant.");
             return false;
         }
 
-        if (string.IsNullOrEmpty(tenant))
+        if (!ctx.TenantName.Equals(ctx.Authorization.Tenant, StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogWarning("IsAuthorized <<< request is missing the tenant.");
-            auth = null;
-            return false;
-        }
-
-        if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
-        {
-            string msg = $"TrySmartRefresh <<< {key} tenant ({local.Tenant}) does not match request: {tenant}.";
-            local.Activity.Add(new()
+            string msg = $"IsAuthorized <<< request {ctx.HttpMethod} {ctx.Url}: tenant {ctx.TenantName} does not match auth: {ctx.Authorization.Tenant}.";
+            ctx.Authorization.Activity.Add(new()
             {
                 RequestType = "refresh_token",
                 Success = false,
                 Message = msg,
             });
             _logger.LogWarning(msg);
-            auth = null;
             return false;
         }
 
-        if (local.IsAuthorized(
-                httpMethod,
-                interaction,
-                resourceType,
-                operationName,
-                compartmentType))
-        {
-            auth = local;
-            return true;
-        }
-
-        auth = null;
-        return false;
+        return ctx.Authorization.IsAuthorized(ctx.FhirInteraction);
     }
 
     /// <summary>Attempts to create smart response.</summary>

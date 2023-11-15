@@ -64,7 +64,7 @@ public class OpSubscriptionStatus : IFhirOperation
     };
 
     /// <summary>Executes the Subscription/$status operation.</summary>
-    /// <param name="auth">            The authentication.</param>
+    /// <param name="ctx">             The authentication.</param>
     /// <param name="store">           The store.</param>
     /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
@@ -79,7 +79,7 @@ public class OpSubscriptionStatus : IFhirOperation
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
-        Models.AuthorizationInfo? auth,
+        FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         string resourceType,
         Storage.IVersionedResourceStore? resourceStore,

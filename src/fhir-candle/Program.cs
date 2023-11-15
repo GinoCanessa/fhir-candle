@@ -389,6 +389,9 @@ public static partial class Program
 
             app.MapControllers();
 
+            // this is developer tooling - always respond with as much detail as we can
+            app.UseDeveloperExceptionPage();
+
             if (config.DisableUi != true)
             {
                 app.MapBlazorHub();

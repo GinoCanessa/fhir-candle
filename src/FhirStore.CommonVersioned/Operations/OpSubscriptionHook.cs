@@ -62,7 +62,7 @@ public class OpSubscriptionHook : IFhirOperation
     public HashSet<string> SupportedResources => new();
 
     /// <summary>Executes the system $subscription-hook operation.</summary>
-    /// <param name="auth">            The authentication.</param>
+    /// <param name="ctx">             The authentication.</param>
     /// <param name="store">           The store.</param>
     /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
@@ -77,7 +77,7 @@ public class OpSubscriptionHook : IFhirOperation
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
-        AuthorizationInfo? auth,
+        FhirRequestContext ctx,
         VersionedFhirStore store,
         string resourceType,
         IVersionedResourceStore? resourceStore,
@@ -125,7 +125,7 @@ public class OpSubscriptionHook : IFhirOperation
 
         // TODO: Clean up interfaces and types so we can avoid casts like this
         // store this bundle in our store
-        Hl7.Fhir.Model.Resource? r = ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(auth, bundle, true);
+        Hl7.Fhir.Model.Resource? r = ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(ctx, bundle, true);
 
         // register the notification received event
         store.RegisterReceivedNotification(r?.Id ?? bundle.Id, status);

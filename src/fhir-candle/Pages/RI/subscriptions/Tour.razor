@@ -2,6 +2,7 @@
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
 @inject IJSRuntime JS
 
 @implements IDisposable
@@ -544,11 +545,23 @@
             return;
         }
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = StoreName,
+            Store = _store,
+            HttpMethod = "POST",
+            Url = _store.Config.BaseUrl + "/Subscription",
+            Authorization = _store.Config.SmartRequired
+                ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
+                : null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         System.Net.HttpStatusCode sc = _store.InstanceCreate(
-            null,
+            ctx,
             "Subscription",
             serialized,
-            "application/fhir+json",
             "application/fhir+json",
             true,
             string.Empty,
@@ -585,11 +598,23 @@
 
         postingResource = true;
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = StoreName,
+            Store = _store,
+            HttpMethod = "POST",
+            Url = _store.Config.BaseUrl + "/Encounter",
+            Authorization = _store.Config.SmartRequired
+                ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
+                : null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         System.Net.HttpStatusCode sc = _store.InstanceCreate(
-            null,
+            ctx,
             "Encounter",
             getJsonEncounter(),
-            "application/fhir+json",
             "application/fhir+json",
             true,
             string.Empty,
@@ -637,11 +662,23 @@
         {
             subscriptionLocation = string.Empty;
 
+            FhirRequestContext ctx = new()
+            {
+                TenantName = StoreName,
+                Store = _store,
+                HttpMethod = "DELETE",
+                Url = _store.Config.BaseUrl + "/Subscription/" + subscription.Id,
+                Authorization = _store.Config.SmartRequired
+                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
+                    : null,
+                SourceFormat = "application/fhir+json",
+                DestinationFormat = "application/fhir+json",
+            };
+
             _ = _store.InstanceDelete(
-                null,
+                ctx,
                 "Subscription",
                 subscription.Id,
-                "application/fhir+json",
                 false,
                 string.Empty,
                 out _,
@@ -650,11 +687,23 @@
 
         if (!string.IsNullOrEmpty(handshakeBundleId))
         {
+            FhirRequestContext ctx = new()
+            {
+                TenantName = StoreName,
+                Store = _store,
+                HttpMethod = "DELETE",
+                Url = _store.Config.BaseUrl + "/Bundle/" + handshakeBundleId,
+                Authorization = _store.Config.SmartRequired
+                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
+                    : null,
+                SourceFormat = "application/fhir+json",
+                DestinationFormat = "application/fhir+json",
+            };
+
             _ = _store.InstanceDelete(
-                null,
+                ctx,
                 "Bundle",
                 handshakeBundleId,
-                "application/fhir+json",
                 false,
                 string.Empty,
                 out _,
@@ -665,11 +714,23 @@
 
         foreach (string encId in postedEncounters)
         {
+            FhirRequestContext ctx = new()
+            {
+                TenantName = StoreName,
+                Store = _store,
+                HttpMethod = "DELETE",
+                Url = _store.Config.BaseUrl + "/Encounter/" + encId,
+                Authorization = _store.Config.SmartRequired
+                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
+                    : null,
+                SourceFormat = "application/fhir+json",
+                DestinationFormat = "application/fhir+json",
+            };
+
             _ = _store.InstanceDelete(
-                null,
+                ctx,
                 "Encounter",
                 encId,
-                "application/fhir+json",
                 false,
                 string.Empty,
                 out _,

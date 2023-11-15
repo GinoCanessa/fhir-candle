@@ -49,6 +49,9 @@ public static partial class Common
         /// <summary>Gets or initializes the interaction.</summary>
         public StoreInteractionCodes? Interaction { get; init; } = null;
 
+        /// <summary>Gets or initializes the HTTP mehtod.</summary>
+        public string HttpMehtod { get; init; } = string.Empty;
+
         /// <summary>Gets or initializes a message describing the error.</summary>
         public string ErrorMessage { get; init; } = string.Empty;
 

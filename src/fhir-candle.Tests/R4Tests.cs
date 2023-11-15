@@ -104,13 +104,23 @@ public class R4TestsPatientLooped : IClassFixture<R4Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "GET",
+            Url = _fixture._store.Config.BaseUrl + "/Patient?" + search,
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         for (int i = 0; i < loopCount; i++)
         {
             _fixture._store.TypeSearch(
-                null,
+                ctx,
                 "Patient", 
                 search, 
-                "application/fhir+json", 
                 string.Empty, 
                 false, 
                 out string bundle, 
@@ -182,11 +192,21 @@ public class R4TestsObservation : IClassFixture<R4Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "GET",
+            Url = _fixture._store.Config.BaseUrl + "/Observation?" + search,
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         _fixture._store.TypeSearch(
-            null,
+            ctx,
             "Observation", 
             search, 
-            "application/fhir+json", 
             string.Empty, 
             false, 
             out string bundle, 
@@ -281,11 +301,21 @@ public class R4TestsPatient : IClassFixture<R4Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "GET",
+            Url = _fixture._store.Config.BaseUrl + "/Patient?" + search,
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         _fixture._store.TypeSearch(
-            null,
+            ctx,
             "Patient", 
             search, 
-            "application/fhir+json", 
             string.Empty, 
             false, 
             out string bundle, 
@@ -421,12 +451,22 @@ public class R4TestConditionals : IClassFixture<R4Tests>
     {
         string id = Guid.NewGuid().ToString();
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "POST",
+            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // test conditional that has no matches
         HttpStatusCode sc = _fixture._store.InstanceCreate(
-            null,
+            ctx,
             resourceType,
             ChangeId(json, id),
-            "application/fhir+json",
             "application/fhir+json",
             false,
             $"_id={id}",
@@ -465,12 +505,22 @@ public class R4TestConditionals : IClassFixture<R4Tests>
     {
         string id = Guid.NewGuid().ToString();
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "POST",
+            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // first, store our resource
         HttpStatusCode sc = _fixture._store.InstanceCreate(
-            null,
+            ctx,
             resourceType,
             ChangeId(json, id),
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -488,12 +538,22 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().Contain($"{resourceType}/{id}");
 
+        ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "POST",
+            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // now, store it conditionally with a single match
         sc = _fixture._store.InstanceCreate(
-            null,
+            ctx,
             resourceType,
             ChangeId(json, id),
-            "application/fhir+json",
             "application/fhir+json",
             false,
             $"_id={id}",
@@ -535,12 +595,22 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         string id2 = Guid.NewGuid().ToString();
         string id3 = Guid.NewGuid().ToString();
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "POST",
+            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // first, store our resource
         HttpStatusCode sc = _fixture._store.InstanceCreate(
-            null,
+            ctx,
             resourceType,
             ChangeId(json, id1),
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -569,12 +639,22 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         r!.TypeName.Should().Be(resourceType);
         r!.Id.Should().Be(id1);
 
+        ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "POST",
+            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // now store the second resource
         sc = _fixture._store.InstanceCreate(
-            null,
+            ctx,
             resourceType,
             ChangeId(json, id2),
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -592,12 +672,22 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().Contain($"{resourceType}/{id2}");
 
+        ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "POST",
+            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         // now attempt to store with a conditional create that matches both
         sc = _fixture._store.InstanceCreate(
-            null,
+            ctx,
             resourceType,
             ChangeId(json, id3),
-            "application/fhir+json",
             "application/fhir+json",
             false,
             $"_id={id1},{id2}",

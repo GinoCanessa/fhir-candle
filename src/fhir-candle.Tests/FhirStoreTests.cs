@@ -159,9 +159,19 @@ public class MetadataJson : IClassFixture<FhirStoreTests>
     {
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = fhirStore.Config.BaseUrl + "/metadata",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode scRead = fhirStore.GetMetadata(
-            null,
-            "application/fhir+json",
+            ctx,
             false,
             out string serializedResource,
             out string serializedOutcome,
@@ -209,9 +219,19 @@ public class MetadataXml : IClassFixture<FhirStoreTests>
     {
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = fhirStore.Config.BaseUrl + "/metadata",
+            Authorization = null,
+            SourceFormat = "application/fhir+xml",
+            DestinationFormat = "application/fhir+xml",
+        };
+
         HttpStatusCode scRead = fhirStore.GetMetadata(
-            null,
-            "application/fhir+xml",
+            ctx,
             false,
             out string serializedResource,
             out string serializedOutcome,
@@ -266,11 +286,21 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
 
         string serializedResource, serializedOutcome, eTag, lastModified, location;
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "POST",
+            Url = $"{fhirStore.Config.BaseUrl}/{_resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode sc = fhirStore.InstanceCreate(
-            null,
+            ctx,
             _resourceType,
             json1,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -290,11 +320,21 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().EndWith(_resourceType + "/" + _id);
 
+        ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = $"{fhirStore.Config.BaseUrl}/{_resourceType}/{_id}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         sc = fhirStore.InstanceRead(
-            null,
+            ctx,
             _resourceType,
             _id,
-            "application/fhir+json",
             string.Empty,
             false,
             eTag,
@@ -311,12 +351,22 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         eTag.Should().Be("W/\"1\"");
         location.Should().EndWith(_resourceType + "/" + _id);
 
+        ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "PUT",
+            Url = $"{fhirStore.Config.BaseUrl}/{_resourceType}/{_id}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         sc = fhirStore.InstanceUpdate(
-            null,
+            ctx,
             _resourceType,
             _id,
             json2,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -338,11 +388,21 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().EndWith(_resourceType + "/" + _id);
 
+        ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "DELETE",
+            Url = $"{fhirStore.Config.BaseUrl}/{_resourceType}/{_id}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         sc = fhirStore.InstanceDelete(
-            null,
+            ctx,
             _resourceType,
             _id,
-            "application/fhir+json",
             false,
             string.Empty,
             out serializedResource,
@@ -351,11 +411,21 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
         sc.Should().Be(HttpStatusCode.OK);
         location.Should().Contain(_resourceType);
 
+        ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "GET",
+            Url = $"{fhirStore.Config.BaseUrl}/{_resourceType}/{_id}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         sc = fhirStore.InstanceRead(
-            null,
+            ctx,
             _resourceType,
             _id,
-            "application/fhir+json",
             string.Empty,
             false,
             eTag,
@@ -400,11 +470,21 @@ public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
 
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "POST",
+            Url = $"{fhirStore.Config.BaseUrl}/{_resourceType2}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode sc = fhirStore.InstanceCreate(
-            null,
+            ctx,
             _resourceType2,
             json,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -448,11 +528,21 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
 
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = fhirStore.Config.ControllerName,
+            Store = fhirStore,
+            HttpMethod = "POST",
+            Url = $"{fhirStore.Config.BaseUrl}/{_resourceType}",
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         HttpStatusCode sc = fhirStore.InstanceCreate(
-            null,
+            ctx,
             _resourceType,
             json,
-            "application/fhir+json",
             "application/fhir+json",
             false,
             string.Empty,
@@ -583,17 +673,16 @@ public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
     {
         foreach (IFhirStore store in _fixture._stores.Values)
         {
-            store.DetermineInteraction(
-                verb, 
-                url, 
-                out string _,
-                out string _,
-                out string _,
-                out string _,
-                out string _,
-                out string _,
-                out string _,
-                out string _).Should().Be(expected);
+            FhirRequestContext ctx = new()
+            {
+                TenantName = store.Config.ControllerName,
+                Store = store,
+                HttpMethod = verb,
+                Url = url,
+                Authorization = null,
+            };
+
+            ctx?.FhirInteraction.Interaction.Should().Be(expected);
         }
     }
 }

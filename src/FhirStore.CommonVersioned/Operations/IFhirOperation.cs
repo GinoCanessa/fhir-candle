@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirCandle.Models;
 using System.Net;
 
 namespace FhirCandle.Operations;
@@ -54,7 +55,7 @@ public interface IFhirOperation
     // TODO: Consider return for non-FHIR responses to operations.
 
     /// <summary>Executes the operation operation.</summary>
-    /// <param name="auth">            The authentication.</param>
+    /// <param name="ctx">             The authentication.</param>
     /// <param name="store">           The store.</param>
     /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
@@ -69,7 +70,7 @@ public interface IFhirOperation
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode DoOperation(
-        Models.AuthorizationInfo? auth,
+        FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         string resourceType,
         Storage.IVersionedResourceStore? resourceStore,

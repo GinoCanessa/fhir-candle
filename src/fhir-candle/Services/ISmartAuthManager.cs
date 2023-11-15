@@ -27,25 +27,16 @@ public interface ISmartAuthManager : IHostedService
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryGetAuthorization(string tenant, string key, out AuthorizationInfo auth);
 
+    /// <summary>Gets an authorization.</summary>
+    /// <param name="tenant">The tenant name.</param>
+    /// <param name="key">   The key.</param>
+    /// <returns>The authorization.</returns>
+    AuthorizationInfo? GetAuthorization(string tenant, string key);
+
     /// <summary>Query if this request is authorized.</summary>
-    /// <param name="tenant">         The tenant name.</param>
-    /// <param name="accessToken">    The access token.</param>
-    /// <param name="httpMethod">     The HTTP method.</param>
-    /// <param name="interaction">    The interaction.</param>
-    /// <param name="resourceType">   Type of the resource.</param>
-    /// <param name="operationName">  Name of the operation.</param>
-    /// <param name="compartmentType">Type of the compartment.</param>
-    /// <param name="auth">           [out] The granting record, if authorized.</param>
+    /// <param name="ctx">The context.</param>
     /// <returns>True if authorized, false if not.</returns>
-    bool IsAuthorized(
-        string tenant,
-        string accessToken,
-        string httpMethod,
-        FhirCandle.Storage.Common.StoreInteractionCodes interaction,
-        string resourceType,
-        string operationName,
-        string compartmentType,
-        out AuthorizationInfo? auth);
+    bool IsAuthorized(FhirRequestContext ctx);
 
     /// <summary>Attempts to update authentication.</summary>
     /// <param name="tenant">The tenant name.</param>

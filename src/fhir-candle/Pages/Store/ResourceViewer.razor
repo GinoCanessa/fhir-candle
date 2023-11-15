@@ -8,6 +8,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
 @inject ProtectedLocalStorage BrowserStore
 
 @implements IDisposable
@@ -106,9 +107,21 @@
         if (ResourceType.Equals("CapabilityStatement", StringComparison.Ordinal) &&
             Id.Equals("metadata", StringComparison.Ordinal))
         {
+            FhirRequestContext ctx = new()
+            {
+                TenantName = StoreName,
+                Store = _store,
+                HttpMethod = "GET",
+                Url = _store.Config.BaseUrl + "/metadata",
+                Authorization = _store.Config.SmartRequired
+                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
+                    : null,
+                SourceFormat = $"application/fhir+{_resourceFormatCode}",
+                DestinationFormat = $"application/fhir+{_resourceFormatCode}",
+            };
+
             _ = _store.GetMetadata(
-                null,
-                $"application/fhir+{_resourceFormatCode}",
+                ctx,
                 true,
                 out content,
                 out _,
@@ -117,11 +130,23 @@
         }
         else
         {
+            FhirRequestContext ctx = new()
+            {
+                TenantName = StoreName,
+                Store = _store,
+                HttpMethod = "GET",
+                Url = $"{_store.Config.BaseUrl}/{ResourceType}/{Id}",
+                Authorization = _store.Config.SmartRequired
+                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
+                    : null,
+                SourceFormat = $"application/fhir+{_resourceFormatCode}",
+                DestinationFormat = $"application/fhir+{_resourceFormatCode}",
+            };
+
             _ = _store.InstanceRead(
-                null,
+                ctx,
                 ResourceType,
                 Id,
-                $"application/fhir+{_resourceFormatCode}",
                 string.Empty,
                 true,
                 string.Empty,

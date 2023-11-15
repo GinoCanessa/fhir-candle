@@ -108,13 +108,23 @@ public class R5TestsPatientLooped : IClassFixture<R5Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "GET",
+            Url = _fixture._store.Config.BaseUrl + "/Patient?" + search,
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         for (int i = 0; i < loopCount; i++)
         {
             _fixture._store.TypeSearch(
-                null,
+                ctx,
                 "Patient", 
                 search, 
-                "application/fhir+json", 
                 string.Empty, 
                 false, 
                 out string bundle, 
@@ -154,11 +164,21 @@ public class R5TestsEncounter : IClassFixture<R5Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "GET",
+            Url = _fixture._store.Config.BaseUrl + "/Encounter?" + search,
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         _fixture._store.TypeSearch(
-            null,
+            ctx,
             "Encounter", 
-            search, 
-            "application/fhir+json", 
+            search,
             string.Empty, 
             false, 
             out string bundle, 
@@ -251,11 +271,21 @@ public class R5TestsObservation : IClassFixture<R5Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "GET",
+            Url = _fixture._store.Config.BaseUrl + "/Observation?" + search,
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
         _fixture._store.TypeSearch(
-            null,
+            ctx,
             "Observation", 
             search, 
-            "application/fhir+json", 
             string.Empty, 
             false, 
             out string bundle, 
@@ -348,10 +378,21 @@ public class R5TestsPatient : IClassFixture<R5Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
-        _fixture._store.TypeSearch(null,
+        FhirRequestContext ctx = new()
+        {
+            TenantName = _fixture._store.Config.ControllerName,
+            Store = _fixture._store,
+            HttpMethod = "GET",
+            Url = _fixture._store.Config.BaseUrl + "/Patient?" + search,
+            Authorization = null,
+            SourceFormat = "application/fhir+json",
+            DestinationFormat = "application/fhir+json",
+        };
+
+        _fixture._store.TypeSearch(
+            ctx,
             "Patient",
             search, 
-            "application/fhir+json", 
             string.Empty, 
             false, 
             out string bundle, 

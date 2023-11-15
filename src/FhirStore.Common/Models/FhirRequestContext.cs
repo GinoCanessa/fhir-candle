@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirCandle.Storage;
+using System;
 using System.Diagnostics.CodeAnalysis;
 
 namespace FhirCandle.Models;
@@ -45,6 +46,7 @@ public record class FhirRequestContext
         HttpMethod = other.HttpMethod;
         Url = other.Url;
         _interaction = other._interaction;
+        Authorization = other.Authorization;
     }
 
     /// <summary>Gets or sets the name of the tenant.</summary>
@@ -62,9 +64,15 @@ public record class FhirRequestContext
     /// <summary>Gets or initializes the authorization.</summary>
     public required AuthorizationInfo? Authorization { get; init; }
 
+    /// <summary>Gets or initializes source format.</summary>
+    public string SourceFormat { get; init; } = string.Empty;
+    
+    /// <summary>Gets or initializes destination format (default to fhir+json).</summary>
+    public string DestinationFormat { get; init; } = "application/fhir+json";
+
     /// <summary>Gets the interaction.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
-    public Common.ParsedInteraction Interaction
+    public Common.ParsedInteraction FhirInteraction
     {
         get
         {
@@ -80,6 +88,10 @@ public record class FhirRequestContext
             }
 
             return (Common.ParsedInteraction)_interaction!;
+        }
+        init
+        {
+            _interaction = value;
         }
     }
 
@@ -121,25 +133,21 @@ public record class FhirRequestContext
                 break;
 
             default:
-                {
-                    errorMessage = $"TryParseRequest: Malformed URL: {_url} cannot be parsed!";
-                    Console.WriteLine(errorMessage);
-
-                    parsed = new()
-                    {
-                        ErrorMessage = errorMessage
-                    };
-
-                    return false;
-                }
+                // assume there are query parameters that contain '?'
+                requestUrlPath = pathAndQuery[0];
+                requestUrlQuery = string.Join('?', pathAndQuery[1..]);
+                break;
         }
 
         if (requestUrlPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             requestUrlPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            if (requestUrlPath.StartsWith(_store.Config.BaseUrl, StringComparison.OrdinalIgnoreCase))
+            requestUrlPath = requestUrlPath.Substring(requestUrlPath.IndexOf(':'));
+            string configUrl = _store.Config.BaseUrl.Substring(_store.Config.BaseUrl.IndexOf(':'));
+
+            if (requestUrlPath.StartsWith(configUrl, StringComparison.OrdinalIgnoreCase))
             {
-                requestUrlPath = requestUrlPath.Substring(_store.Config.BaseUrl.Length);
+                requestUrlPath = requestUrlPath.Substring(configUrl.Length);
                 if (requestUrlPath.StartsWith('/'))
                 {
                     requestUrlPath = requestUrlPath.Substring(1);
@@ -147,7 +155,7 @@ public record class FhirRequestContext
             }
             else
             {
-                errorMessage = $"TryParseRequest: Full URL: {_url} cannot be parsed!";
+                errorMessage = $"DetermineInteraction: Full URL: {_url} cannot be parsed!";
                 Console.WriteLine(errorMessage);
 
                 parsed = new()
@@ -180,6 +188,7 @@ public record class FhirRequestContext
                             {
                                 parsed = new()
                                 {
+                                    HttpMehtod = _httpMethod,
                                     UrlPath = requestUrlPath,
                                     UrlQuery = requestUrlQuery,
                                     Interaction = Common.StoreInteractionCodes.SystemSearch,
@@ -194,6 +203,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -207,6 +217,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         Interaction = Common.StoreInteractionCodes.SystemCapabilities,
@@ -219,6 +230,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         Interaction = Common.StoreInteractionCodes.SystemHistory,
@@ -231,6 +243,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         OperationName = pathComponents[0],
@@ -250,6 +263,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -262,6 +276,7 @@ public record class FhirRequestContext
 
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -282,6 +297,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -297,6 +313,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -311,6 +328,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -326,6 +344,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -348,6 +367,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -375,6 +395,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         Interaction = Common.StoreInteractionCodes.SystemCapabilities,
@@ -392,6 +413,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -412,6 +434,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -437,6 +460,7 @@ public record class FhirRequestContext
                             {
                                 parsed = new()
                                 {
+                                    HttpMehtod = _httpMethod,
                                     UrlPath = requestUrlPath,
                                     UrlQuery = requestUrlQuery,
                                     Interaction = Common.StoreInteractionCodes.SystemBundle,
@@ -451,6 +475,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -464,6 +489,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         Interaction = Common.StoreInteractionCodes.SystemSearch,
@@ -476,6 +502,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         OperationName = pathComponents[0],
@@ -495,6 +522,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -508,6 +536,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -529,6 +558,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -544,6 +574,7 @@ public record class FhirRequestContext
                                     {
                                         parsed = new()
                                         {
+                                            HttpMehtod = _httpMethod,
                                             UrlPath = requestUrlPath,
                                             UrlQuery = requestUrlQuery,
                                             ResourceType = resourceType,
@@ -565,6 +596,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -589,6 +621,7 @@ public record class FhirRequestContext
                             {
                                 parsed = new()
                                 {
+                                    HttpMehtod = _httpMethod,
                                     UrlPath = requestUrlPath,
                                     UrlQuery = requestUrlQuery,
                                     Interaction = Common.StoreInteractionCodes.SystemDeleteConditional,
@@ -603,6 +636,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -621,6 +655,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -640,6 +675,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -660,6 +696,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -687,6 +724,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -713,6 +751,7 @@ public record class FhirRequestContext
                                 {
                                     parsed = new()
                                     {
+                                        HttpMehtod = _httpMethod,
                                         UrlPath = requestUrlPath,
                                         UrlQuery = requestUrlQuery,
                                         ResourceType = resourceType,
@@ -735,6 +774,7 @@ public record class FhirRequestContext
         parsed = new()
         {
             ErrorMessage = errorMessage,
+            HttpMehtod = _httpMethod,
             UrlPath = requestUrlPath,
             UrlQuery = requestUrlQuery,
         };

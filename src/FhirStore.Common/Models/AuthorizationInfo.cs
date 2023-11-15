@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirCandle.Storage;
 using System.Net;
 using System.Text.Json.Serialization;
 
@@ -214,26 +215,15 @@ public class AuthorizationInfo
     public List<AuthActivityRecord> Activity { get; } = new();
 
     /// <summary>Query if this object is authorized.</summary>
-    /// <param name="httpMethod">     The HTTP method.</param>
-    /// <param name="interaction">    The interaction.</param>
-    /// <param name="resourceType">   Type of the resource.</param>
-    /// <param name="operationName">  Name of the operation.</param>
-    /// <param name="compartmentType">Type of the compartment.</param>
     /// <returns>True if authorized, false if not.</returns>
-    public bool IsAuthorized(
-        string httpMethod,
-        Storage.Common.StoreInteractionCodes interaction,
-        string resourceType,
-        string operationName,
-        string compartmentType)
+    public bool IsAuthorized(Common.ParsedInteraction parsed)
     {
-
         if (UserScopes.Contains("*.*"))
         {
             return true;
         }
 
-        switch (interaction)
+        switch (parsed.Interaction)
         {
             // TODO: compartments are not implemented yet
             case Storage.Common.StoreInteractionCodes.CompartmentOperation:
@@ -248,8 +238,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.d") ||
                         UserScopes.Contains("*.d") ||
-                        PatientScopes.Contains(resourceType + ".d") ||
-                        UserScopes.Contains(resourceType + ".d"))
+                        PatientScopes.Contains(parsed.ResourceType + ".d") ||
+                        UserScopes.Contains(parsed.ResourceType + ".d"))
                     {
                         return true;
                     }
@@ -260,15 +250,15 @@ public class AuthorizationInfo
             case Storage.Common.StoreInteractionCodes.InstanceOperation:
             case Storage.Common.StoreInteractionCodes.TypeOperation:
                 {
-                    switch (httpMethod.ToUpperInvariant())
+                    switch (parsed.HttpMehtod)
                     {
                         case "HEAD":
                         case "GET":
                             {
                                 if (PatientScopes.Contains("*.r") ||
                                     UserScopes.Contains("*.r") ||
-                                    PatientScopes.Contains(resourceType + ".r") ||
-                                    UserScopes.Contains(resourceType + ".r"))
+                                    PatientScopes.Contains(parsed.ResourceType + ".r") ||
+                                    UserScopes.Contains(parsed.ResourceType + ".r"))
                                 {
                                     return true;
                                 }
@@ -281,8 +271,8 @@ public class AuthorizationInfo
                             {
                                 if (PatientScopes.Contains("*.u") ||
                                     UserScopes.Contains("*.u") ||
-                                    PatientScopes.Contains(resourceType + ".u") ||
-                                    UserScopes.Contains(resourceType + ".u"))
+                                    PatientScopes.Contains(parsed.ResourceType + ".u") ||
+                                    UserScopes.Contains(parsed.ResourceType + ".u"))
                                 {
                                     return true;
                                 }
@@ -299,8 +289,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.u") ||
                         UserScopes.Contains("*.u") ||
-                        PatientScopes.Contains(resourceType + ".u") ||
-                        UserScopes.Contains(resourceType + ".u"))
+                        PatientScopes.Contains(parsed.ResourceType + ".u") ||
+                        UserScopes.Contains(parsed.ResourceType + ".u"))
                     {
                         return true;
                     }
@@ -315,8 +305,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.r") ||
                         UserScopes.Contains("*.r") ||
-                        PatientScopes.Contains(resourceType + ".r") ||
-                        UserScopes.Contains(resourceType + ".r"))
+                        PatientScopes.Contains(parsed.ResourceType + ".r") ||
+                        UserScopes.Contains(parsed.ResourceType + ".r"))
                     {
                         return true;
                     }
@@ -328,8 +318,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.s") ||
                         UserScopes.Contains("*.s") ||
-                        PatientScopes.Contains(resourceType + ".s") ||
-                        UserScopes.Contains(resourceType + ".s"))
+                        PatientScopes.Contains(parsed.ResourceType + ".s") ||
+                        UserScopes.Contains(parsed.ResourceType + ".s"))
                     {
                         return true;
                     }
@@ -342,8 +332,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.c") ||
                         UserScopes.Contains("*.c") ||
-                        PatientScopes.Contains(resourceType + ".c") ||
-                        UserScopes.Contains(resourceType + ".c"))
+                        PatientScopes.Contains(parsed.ResourceType + ".c") ||
+                        UserScopes.Contains(parsed.ResourceType + ".c"))
                     {
                         return true;
                     }
@@ -387,7 +377,7 @@ public class AuthorizationInfo
 
             case Storage.Common.StoreInteractionCodes.SystemOperation:
                 {
-                    switch (httpMethod.ToUpperInvariant())
+                    switch (parsed.HttpMehtod)
                     {
                         case "HEAD":
                         case "GET":

@@ -119,10 +119,6 @@ public class R4TestsPatientLooped : IClassFixture<R4Tests>
         {
             _fixture._store.TypeSearch(
                 ctx,
-                "Patient", 
-                search, 
-                string.Empty, 
-                false, 
                 out string bundle, 
                 out string outcome);
             bundle.Should().NotBeNullOrEmpty();
@@ -205,10 +201,6 @@ public class R4TestsObservation : IClassFixture<R4Tests>
 
         _fixture._store.TypeSearch(
             ctx,
-            "Observation", 
-            search, 
-            string.Empty, 
-            false, 
             out string bundle, 
             out _);
 
@@ -314,10 +306,6 @@ public class R4TestsPatient : IClassFixture<R4Tests>
 
         _fixture._store.TypeSearch(
             ctx,
-            "Patient", 
-            search, 
-            string.Empty, 
-            false, 
             out string bundle, 
             out _);
 
@@ -459,18 +447,16 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
             Authorization = null,
             SourceFormat = "application/fhir+json",
+            SourceContent = ChangeId(json, id),
             DestinationFormat = "application/fhir+json",
+            IfNoneExist = "_id=" + id,
+            AllowCreateAsUpdate = true,
+            AllowExistingId = true,
         };
 
         // test conditional that has no matches
         HttpStatusCode sc = _fixture._store.InstanceCreate(
             ctx,
-            resourceType,
-            ChangeId(json, id),
-            "application/fhir+json",
-            false,
-            $"_id={id}",
-            true,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
@@ -513,18 +499,15 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
             Authorization = null,
             SourceFormat = "application/fhir+json",
+            SourceContent = ChangeId(json, id),
             DestinationFormat = "application/fhir+json",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         // first, store our resource
         HttpStatusCode sc = _fixture._store.InstanceCreate(
             ctx,
-            resourceType,
-            ChangeId(json, id),
-            "application/fhir+json",
-            false,
-            string.Empty,
-            true,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
@@ -538,26 +521,14 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().Contain($"{resourceType}/{id}");
 
-        ctx = new()
+        ctx = ctx with
         {
-            TenantName = _fixture._store.Config.ControllerName,
-            Store = _fixture._store,
-            HttpMethod = "POST",
-            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
-            Authorization = null,
-            SourceFormat = "application/fhir+json",
-            DestinationFormat = "application/fhir+json",
+            IfNoneExist = "_id=" + id,
         };
 
         // now, store it conditionally with a single match
         sc = _fixture._store.InstanceCreate(
             ctx,
-            resourceType,
-            ChangeId(json, id),
-            "application/fhir+json",
-            false,
-            $"_id={id}",
-            true,
             out serializedResource,
             out serializedOutcome,
             out eTag,
@@ -603,18 +574,15 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
             Authorization = null,
             SourceFormat = "application/fhir+json",
+            SourceContent = ChangeId(json, id1),
             DestinationFormat = "application/fhir+json",
+            AllowCreateAsUpdate = true,
+            AllowExistingId = true,
         };
 
         // first, store our resource
         HttpStatusCode sc = _fixture._store.InstanceCreate(
             ctx,
-            resourceType,
-            ChangeId(json, id1),
-            "application/fhir+json",
-            false,
-            string.Empty,
-            true,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
@@ -639,26 +607,14 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         r!.TypeName.Should().Be(resourceType);
         r!.Id.Should().Be(id1);
 
-        ctx = new()
+        ctx = ctx with
         {
-            TenantName = _fixture._store.Config.ControllerName,
-            Store = _fixture._store,
-            HttpMethod = "POST",
-            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
-            Authorization = null,
-            SourceFormat = "application/fhir+json",
-            DestinationFormat = "application/fhir+json",
+            SourceContent = ChangeId(json, id2),
         };
 
         // now store the second resource
         sc = _fixture._store.InstanceCreate(
             ctx,
-            resourceType,
-            ChangeId(json, id2),
-            "application/fhir+json",
-            false,
-            string.Empty,
-            true,
             out serializedResource,
             out serializedOutcome,
             out eTag,
@@ -672,26 +628,15 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         lastModified.Should().NotBeNullOrEmpty();
         location.Should().Contain($"{resourceType}/{id2}");
 
-        ctx = new()
+        ctx = ctx with
         {
-            TenantName = _fixture._store.Config.ControllerName,
-            Store = _fixture._store,
-            HttpMethod = "POST",
-            Url = $"{_fixture._store.Config.BaseUrl}/{resourceType}",
-            Authorization = null,
-            SourceFormat = "application/fhir+json",
-            DestinationFormat = "application/fhir+json",
+            SourceContent = ChangeId(json, id3),
+            IfNoneExist = $"_id={id1},{id2}",
         };
 
         // now attempt to store with a conditional create that matches both
         sc = _fixture._store.InstanceCreate(
             ctx,
-            resourceType,
-            ChangeId(json, id3),
-            "application/fhir+json",
-            false,
-            $"_id={id1},{id2}",
-            true,
             out serializedResource,
             out serializedOutcome,
             out eTag,

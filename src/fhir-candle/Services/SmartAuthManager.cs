@@ -404,7 +404,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         }
 
         // capabilities are always authorized
-        if (ctx.FhirInteraction.Interaction == Common.StoreInteractionCodes.SystemCapabilities)
+        if (ctx.Interaction == Common.StoreInteractionCodes.SystemCapabilities)
         {
             return true;
         }
@@ -447,7 +447,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             return false;
         }
 
-        return ctx.Authorization.IsAuthorized(ctx.FhirInteraction);
+        return ctx.IsAuthorized();
     }
 
     /// <summary>Attempts to create smart response.</summary>

@@ -108,17 +108,16 @@ public class R4BTestsPatientLooped : IClassFixture<R4BTests>
             DestinationFormat = "application/fhir+json",
         };
 
+        HttpStatusCode sc;
+
         for (int i = 0; i < loopCount; i++)
         {
-            _fixture._store.TypeSearch(
+            sc = _fixture._store.TypeSearch(
                 ctx,
-                "Patient", 
-                search, 
-                string.Empty, 
-                false, 
-                out string bundle, 
-                out string outcome);
-            bundle.Should().NotBeNullOrEmpty();
+                out _, 
+                out _);
+
+            sc.Should().Be(HttpStatusCode.OK);
         }
     }
 }
@@ -198,10 +197,6 @@ public class R4BTestsObservation : IClassFixture<R4BTests>
 
         _fixture._store.TypeSearch(
             ctx,
-            "Observation", 
-            search, 
-            string.Empty, 
-            false, 
             out string bundle, 
             out _);
 
@@ -304,10 +299,6 @@ public class R4BTestsPatient : IClassFixture<R4BTests>
 
         _fixture._store.TypeSearch(
             ctx,
-            "Patient", 
-            search, 
-            string.Empty, 
-            false, 
             out string bundle, 
             out _);
 

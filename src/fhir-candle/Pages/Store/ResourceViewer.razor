@@ -107,55 +107,20 @@
         if (ResourceType.Equals("CapabilityStatement", StringComparison.Ordinal) &&
             Id.Equals("metadata", StringComparison.Ordinal))
         {
-            FhirRequestContext ctx = new()
-            {
-                TenantName = StoreName,
-                Store = _store,
-                HttpMethod = "GET",
-                Url = _store.Config.BaseUrl + "/metadata",
-                Authorization = _store.Config.SmartRequired
-                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
-                    : null,
-                SourceFormat = $"application/fhir+{_resourceFormatCode}",
-                DestinationFormat = $"application/fhir+{_resourceFormatCode}",
-            };
-
-            _ = _store.GetMetadata(
-                ctx,
+            _ = _store.TryGetMetadata(
+                $"application/fhir+{_resourceFormatCode}",
                 true,
-                out content,
-                out _,
-                out _,
-                out _);
+                out content);
+
         }
         else
         {
-            FhirRequestContext ctx = new()
-            {
-                TenantName = StoreName,
-                Store = _store,
-                HttpMethod = "GET",
-                Url = $"{_store.Config.BaseUrl}/{ResourceType}/{Id}",
-                Authorization = _store.Config.SmartRequired
-                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
-                    : null,
-                SourceFormat = $"application/fhir+{_resourceFormatCode}",
-                DestinationFormat = $"application/fhir+{_resourceFormatCode}",
-            };
-
-            _ = _store.InstanceRead(
-                ctx,
+            _ = _store.TryInstanceRead(
                 ResourceType,
                 Id,
-                string.Empty,
+                $"application/fhir+{_resourceFormatCode}",
                 true,
-                string.Empty,
-                string.Empty,
-                string.Empty,
-                out content,
-                out _,
-                out _,
-                out _);
+                out content);
         }
 
         _resourceContent = content;

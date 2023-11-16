@@ -216,14 +216,17 @@ public class AuthorizationInfo
 
     /// <summary>Query if this object is authorized.</summary>
     /// <returns>True if authorized, false if not.</returns>
-    public bool IsAuthorized(Common.ParsedInteraction parsed)
+    public bool IsAuthorized(
+        Common.StoreInteractionCodes interaction,
+        string httpMethod,
+        string resourceType)
     {
         if (UserScopes.Contains("*.*"))
         {
             return true;
         }
 
-        switch (parsed.Interaction)
+        switch (interaction)
         {
             // TODO: compartments are not implemented yet
             case Storage.Common.StoreInteractionCodes.CompartmentOperation:
@@ -238,8 +241,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.d") ||
                         UserScopes.Contains("*.d") ||
-                        PatientScopes.Contains(parsed.ResourceType + ".d") ||
-                        UserScopes.Contains(parsed.ResourceType + ".d"))
+                        PatientScopes.Contains(resourceType + ".d") ||
+                        UserScopes.Contains(resourceType + ".d"))
                     {
                         return true;
                     }
@@ -250,15 +253,15 @@ public class AuthorizationInfo
             case Storage.Common.StoreInteractionCodes.InstanceOperation:
             case Storage.Common.StoreInteractionCodes.TypeOperation:
                 {
-                    switch (parsed.HttpMehtod)
+                    switch (httpMethod)
                     {
                         case "HEAD":
                         case "GET":
                             {
                                 if (PatientScopes.Contains("*.r") ||
                                     UserScopes.Contains("*.r") ||
-                                    PatientScopes.Contains(parsed.ResourceType + ".r") ||
-                                    UserScopes.Contains(parsed.ResourceType + ".r"))
+                                    PatientScopes.Contains(resourceType + ".r") ||
+                                    UserScopes.Contains(resourceType + ".r"))
                                 {
                                     return true;
                                 }
@@ -271,8 +274,8 @@ public class AuthorizationInfo
                             {
                                 if (PatientScopes.Contains("*.u") ||
                                     UserScopes.Contains("*.u") ||
-                                    PatientScopes.Contains(parsed.ResourceType + ".u") ||
-                                    UserScopes.Contains(parsed.ResourceType + ".u"))
+                                    PatientScopes.Contains(resourceType + ".u") ||
+                                    UserScopes.Contains(resourceType + ".u"))
                                 {
                                     return true;
                                 }
@@ -289,8 +292,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.u") ||
                         UserScopes.Contains("*.u") ||
-                        PatientScopes.Contains(parsed.ResourceType + ".u") ||
-                        UserScopes.Contains(parsed.ResourceType + ".u"))
+                        PatientScopes.Contains(resourceType + ".u") ||
+                        UserScopes.Contains(resourceType + ".u"))
                     {
                         return true;
                     }
@@ -305,8 +308,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.r") ||
                         UserScopes.Contains("*.r") ||
-                        PatientScopes.Contains(parsed.ResourceType + ".r") ||
-                        UserScopes.Contains(parsed.ResourceType + ".r"))
+                        PatientScopes.Contains(resourceType + ".r") ||
+                        UserScopes.Contains(resourceType + ".r"))
                     {
                         return true;
                     }
@@ -318,8 +321,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.s") ||
                         UserScopes.Contains("*.s") ||
-                        PatientScopes.Contains(parsed.ResourceType + ".s") ||
-                        UserScopes.Contains(parsed.ResourceType + ".s"))
+                        PatientScopes.Contains(resourceType + ".s") ||
+                        UserScopes.Contains(resourceType + ".s"))
                     {
                         return true;
                     }
@@ -332,8 +335,8 @@ public class AuthorizationInfo
                 {
                     if (PatientScopes.Contains("*.c") ||
                         UserScopes.Contains("*.c") ||
-                        PatientScopes.Contains(parsed.ResourceType + ".c") ||
-                        UserScopes.Contains(parsed.ResourceType + ".c"))
+                        PatientScopes.Contains(resourceType + ".c") ||
+                        UserScopes.Contains(resourceType + ".c"))
                     {
                         return true;
                     }
@@ -377,7 +380,7 @@ public class AuthorizationInfo
 
             case Storage.Common.StoreInteractionCodes.SystemOperation:
                 {
-                    switch (parsed.HttpMehtod)
+                    switch (httpMethod)
                     {
                         case "HEAD":
                         case "GET":

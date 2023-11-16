@@ -126,43 +126,8 @@
             return;
         }
 
-        FhirRequestContext ctx = new()
-        {
-            TenantName = StoreName,
-            Store = _store,
-            HttpMethod = "POST",
-            Url = $"{_store.Config.BaseUrl}/Subscription",
-            Authorization = _store.Config.SmartRequired
-                ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
-                : null,
-            SourceFormat = "application/fhir+json",
-            DestinationFormat = "application/fhir+json",
-        };
 
-        System.Net.HttpStatusCode sc = _store.InstanceCreate(
-            ctx,
-            "Subscription",
-            serialized,
-            "application/fhir+json",
-            true,
-            string.Empty,
-            true,
-            out _,
-            out string outcome,
-            out _,
-            out _,
-            out string location
-        );
-
-        if ((sc == System.Net.HttpStatusCode.OK) ||
-            (sc == System.Net.HttpStatusCode.Created))
-        {
-            networkInUse = false;
-            subscriptionLocation = location;
-            return;
-        }
-
-        errorMessage = outcome;
+        errorMessage = string.Empty;
         networkInUse = false;
         return;
     }
@@ -177,80 +142,11 @@
         if (!string.IsNullOrEmpty(subscriptionLocation))
         {
             subscriptionLocation = string.Empty;
-
-            FhirRequestContext ctx = new()
-            {
-                TenantName = StoreName,
-                Store = _store,
-                HttpMethod = "DELETE",
-                Url = _store.Config.BaseUrl + "/Subscription/" + subscription.Id,
-                Authorization = _store.Config.SmartRequired
-                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
-                    : null,
-                SourceFormat = "application/fhir+json",
-                DestinationFormat = "application/fhir+json",
-            };
-
-            _ = _store.InstanceDelete(
-                ctx,
-                "Subscription",
-                subscription.Id,
-                false,
-                string.Empty,
-                out _,
-                out _);
         }
 
         if (!string.IsNullOrEmpty(handshakeBundleId))
         {
-            FhirRequestContext ctx = new()
-            {
-                TenantName = StoreName,
-                Store = _store,
-                HttpMethod = "DELETE",
-                Url = _store.Config.BaseUrl + "/Bundle/" + handshakeBundleId,
-                Authorization = _store.Config.SmartRequired
-                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
-                    : null,
-                SourceFormat = "application/fhir+json",
-                DestinationFormat = "application/fhir+json",
-            };
-
-            _ = _store.InstanceDelete(
-                ctx,
-                "Bundle",
-                handshakeBundleId,
-                false,
-                string.Empty,
-                out _,
-                out _);
-
             handshakeBundleId = string.Empty;
-        }
-
-        foreach (string encId in postedEncounters)
-        {
-            FhirRequestContext ctx = new()
-            {
-                TenantName = StoreName,
-                Store = _store,
-                HttpMethod = "DELETE",
-                Url = _store.Config.BaseUrl + "/Encounter/" + encId,
-                Authorization = _store.Config.SmartRequired
-                    ? AuthManager.GetAuthorization(StoreName, "Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000")!
-                    : null,
-                SourceFormat = "application/fhir+json",
-                DestinationFormat = "application/fhir+json",
-            };
-
-            _ = _store.InstanceDelete(
-                ctx,
-                "Encounter",
-                encId,
-                false,
-                string.Empty,
-                out _,
-                out _);
         }
 
         postedEncounters.Clear();

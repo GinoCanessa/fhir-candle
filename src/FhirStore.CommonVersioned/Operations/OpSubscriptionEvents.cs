@@ -66,14 +66,9 @@ public class OpSubscriptionEvents : IFhirOperation
     /// <summary>Executes the Subscription/$events operation.</summary>
     /// <param name="ctx">             The authentication.</param>
     /// <param name="store">           The store.</param>
-    /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="instanceId">      Identifier for the instance.</param>
     /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="queryString">     The query string.</param>
     /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="bodyContent">     The original body content.</param>
-    /// <param name="contentType">     Type of the content.</param>
     /// <param name="responseResource">[out] The response resource.</param>
     /// <param name="responseOutcome"> [out] The response outcome.</param>
     /// <param name="contentLocation"> [out] The content location.</param>
@@ -81,14 +76,9 @@ public class OpSubscriptionEvents : IFhirOperation
     public HttpStatusCode DoOperation(
         FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
-        string resourceType,
         Storage.IVersionedResourceStore? resourceStore,
-        string instanceId,
         Hl7.Fhir.Model.Resource? focusResource,
-        string queryString,
         Hl7.Fhir.Model.Resource? bodyResource,
-        string bodyContent,
-        string contentType,
         out Hl7.Fhir.Model.Resource? responseResource,
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation)
@@ -98,22 +88,22 @@ public class OpSubscriptionEvents : IFhirOperation
         string contentLevel = string.Empty;
 
         // check for a subscription ID
-        if (string.IsNullOrEmpty(instanceId) ||
-            (!store._subscriptions.ContainsKey(instanceId)))
+        if (string.IsNullOrEmpty(ctx.Id) ||
+            (!store._subscriptions.ContainsKey(ctx.Id)))
         {
             responseResource = null;
             responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
                 HttpStatusCode.NotFound,
-                $"Subscription {instanceId} was not found.");
+                $"Subscription {ctx.Id} was not found.");
             contentLocation = string.Empty;
 
             return HttpStatusCode.NotFound;
         }
 
         // check for query string parameters
-        if (!string.IsNullOrEmpty(queryString))
+        if (!string.IsNullOrEmpty(ctx.UrlQuery))
         {
-            System.Collections.Specialized.NameValueCollection query = System.Web.HttpUtility.ParseQueryString(queryString);
+            System.Collections.Specialized.NameValueCollection query = System.Web.HttpUtility.ParseQueryString(ctx.UrlQuery);
             foreach (string key in query)
             {
                 if (string.IsNullOrWhiteSpace(key) ||
@@ -164,7 +154,7 @@ public class OpSubscriptionEvents : IFhirOperation
                 .First() ?? string.Empty;
         }
 
-        long highestEvent = store._subscriptions[instanceId].CurrentEventCount;
+        long highestEvent = store._subscriptions[ctx.Id].CurrentEventCount;
 
         if (!long.TryParse(eventsSince, out long sinceNumber))
         {
@@ -183,7 +173,7 @@ public class OpSubscriptionEvents : IFhirOperation
         }
 
         responseResource = store.BundleForSubscriptionEvents(
-            instanceId,
+            ctx.Id,
             eventNumbers,
             "query-event",
             contentLevel);

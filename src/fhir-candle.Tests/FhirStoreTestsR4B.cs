@@ -68,17 +68,14 @@ public class FhirStoreTestsR4B: IDisposable
             Url = fhirStore.Config.BaseUrl + "/SearchParameter",
             Authorization = null,
             SourceFormat = "application/fhir+json",
+            SourceContent = json,
             DestinationFormat = "application/fhir+json",
+            AllowCreateAsUpdate = true,
+            AllowExistingId = true,
         };
 
         HttpStatusCode scCreate = fhirStore.InstanceCreate(
             ctx,
-            "SearchParameter",
-            json,
-            "application/fhir+json",
-            false,
-            string.Empty,
-            true,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
@@ -105,13 +102,6 @@ public class FhirStoreTestsR4B: IDisposable
 
         HttpStatusCode scRead = fhirStore.InstanceRead(
             ctx,
-            "SearchParameter",
-            "Patient-multiplebirth",
-            string.Empty,
-            false,
-            eTag,
-            lastModified,
-            string.Empty,
             out serializedResource,
             out serializedOutcome,
             out eTag,
@@ -148,7 +138,6 @@ public class FhirStoreTestsR4B: IDisposable
         // read the metadata
         HttpStatusCode scRead = fhirStore.GetMetadata(
             ctx,
-            false,
             out string serializedResource,
             out string serializedOutcome,
             out string eTag,
@@ -187,18 +176,15 @@ public class FhirStoreTestsR4B: IDisposable
             Url = fhirStore.Config.BaseUrl + "/SearchParameter",
             Authorization = null,
             SourceFormat = "application/fhir+json",
+            SourceContent = json,
             DestinationFormat = "application/fhir+json",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         // add a search parameter for the patient resource
         HttpStatusCode scCreate = fhirStore.InstanceCreate(
             ctx,
-            "SearchParameter",
-            json,
-            "application/fhir+json",
-            false,
-            string.Empty,
-            true,
             out serializedResource,
             out serializedOutcome,
             out eTag,
@@ -219,7 +205,6 @@ public class FhirStoreTestsR4B: IDisposable
         // read the metadata again
         scRead = fhirStore.GetMetadata(
             ctx,
-            false,
             out serializedResource,
             out serializedOutcome,
             out eTag,

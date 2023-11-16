@@ -208,42 +208,20 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "GET",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"GetMetadata <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"GetMetadata <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"GetMetadata <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            Interaction = Common.StoreInteractionCodes.SystemCapabilities,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -253,7 +231,6 @@ public class FhirController : ControllerBase
 
         HttpStatusCode sc = _fhirStoreManager[storeName].GetMetadata(
             ctx,
-            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string resource,
             out string outcome,
             out string eTag,
@@ -308,42 +285,21 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "GET",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request, true),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"GetTypeOperation <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"GetTypeOperation <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"GetTypeOperation <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            Interaction = Common.StoreInteractionCodes.TypeOperation,
+            OperationName = "$" + opName,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -353,12 +309,6 @@ public class FhirController : ControllerBase
 
         HttpStatusCode sc = store.TypeOperation(
             ctx,
-            resourceName,
-            "$" + opName,
-            Request.QueryString.ToString(),
-            string.Empty,
-            string.Empty,
-            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string resource,
             out string outcome);
 
@@ -406,41 +356,25 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "GET",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"GetResourceInstance <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"GetResourceInstance <<< exception: {ex.Message}!";
-            }
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"GetResourceInstance <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            Interaction = Common.StoreInteractionCodes.InstanceRead,
+            ResourceType = resourceName,
+            Id = id,
+            IfMatch = ifMatch ?? string.Empty,
+            IfModifiedSince = ifModifiedSince ?? string.Empty,
+            IfNoneMatch = ifNoneMatch ?? string.Empty,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -450,13 +384,6 @@ public class FhirController : ControllerBase
 
         HttpStatusCode sc = store.InstanceRead(
             ctx,
-            resourceName,
-            id,
-            summary ?? string.Empty,
-            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-            ifMatch ?? string.Empty,
-            ifModifiedSince ?? string.Empty,
-            ifNoneMatch ?? string.Empty,
             out string resource,
             out string outcome,
             out string eTag,
@@ -512,42 +439,24 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "GET",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request, true),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"GetInstanceOperation <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"GetInstanceOperation <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"GetInstanceOperation <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            SerializeSummaryFlag = summary ?? string.Empty,
+            Interaction = Common.StoreInteractionCodes.InstanceOperation,
+            ResourceType = resourceName,
+            Id = id,
+            OperationName = "$" + opName,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -561,13 +470,6 @@ public class FhirController : ControllerBase
         // operation
         sc = store.InstanceOperation(
             ctx,
-            resourceName,
-            "$" + opName,
-            id,
-            Request.QueryString.ToString(),
-            string.Empty,
-            string.Empty,
-            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out resource,
             out outcome);
 
@@ -614,49 +516,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "POST",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PostInstanceOperation <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PostInstanceOperation <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PostInstanceOperation <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
-            return;
-        }
-
         HttpStatusCode sc;
         string resource, outcome;
 
@@ -667,18 +526,42 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = Request.QueryString.ToString(),
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    Interaction = Common.StoreInteractionCodes.InstanceOperation,
+                    ResourceType = resourceName,
+                    Id = id,
+                    OperationName = "$" + opName,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                    SourceContent = content,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 // operation
                 sc = store.InstanceOperation(
                     ctx,
-                    resourceName,
-                    "$" + opName,
-                    id,
-                    Request.QueryString.ToString(),
-                    content,
-                    Request.ContentType ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out resource,
                     out outcome);
+
+                Response.ContentType = ctx.DestinationFormat; ;
+                Response.StatusCode = (int)sc;
+
+                await AddBody(Response, prefer, resource, outcome);
             }
         }
         catch (Exception ex)
@@ -696,11 +579,6 @@ public class FhirController : ControllerBase
             await LogAndReturnError(Response, 500, msg);
             return;
         }
-
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, prefer, resource, outcome);
     }
 
 
@@ -736,49 +614,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "POST",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PostResourceTypeSearch <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PostResourceTypeSearch <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PostResourceTypeSearch <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
-            return;
-        }
-
         // sanity check
         if (Request == null)
         {
@@ -806,12 +641,33 @@ public class FhirController : ControllerBase
                     }
                 }
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = queryString,
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    SerializeSummaryFlag = summary ?? string.Empty,
+                    Interaction = Common.StoreInteractionCodes.TypeSearch,
+                    ResourceType = resourceName,
+                    SourceContent = content,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 HttpStatusCode sc = _fhirStoreManager[storeName].TypeSearch(
                     ctx,
-                    resourceName,
-                    content,
-                    summary ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out string resource,
                     out string outcome);
 
@@ -873,49 +729,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "POST",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PostTypeOperation <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PostTypeOperation <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PostTypeOperation <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
-            return;
-        }
-
         HttpStatusCode sc;
         string resource, outcome;
 
@@ -926,17 +739,42 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = Request.QueryString.ToString(),
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    SerializeSummaryFlag = summary ?? string.Empty,
+                    Interaction = Common.StoreInteractionCodes.TypeOperation,
+                    ResourceType = resourceName,
+                    OperationName = "$" + opName,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                    SourceContent = content,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 // operation
                 sc = store.TypeOperation(
                     ctx,
-                    resourceName,
-                    "$" + opName,
-                    Request.QueryString.ToString(),
-                    content,
-                    Request.ContentType ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out resource,
                     out outcome);
+
+                Response.ContentType = ctx.DestinationFormat; ;
+                Response.StatusCode = (int)sc;
+
+                await AddBody(Response, prefer, resource, outcome);
             }
         }
         catch (Exception ex)
@@ -954,11 +792,6 @@ public class FhirController : ControllerBase
             await LogAndReturnError(Response, 500, msg);
             return;
         }
-
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, prefer, resource, outcome);
     }
 
     /// <summary>(An Action that handles HTTP POST requests) posts a system search.</summary>
@@ -980,49 +813,6 @@ public class FhirController : ControllerBase
             (store == null))
         {
             await LogAndReturnError(Response, 404, $"PostSystemSearch <<< no tenant at {storeName}!");
-            return;
-        }
-
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "POST",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PostSystemSearch <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PostSystemSearch <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PostSystemSearch <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
             return;
         }
 
@@ -1054,11 +844,32 @@ public class FhirController : ControllerBase
                     }
                 }
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = queryString,
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    SerializeSummaryFlag = summary ?? string.Empty,
+                    Interaction = Common.StoreInteractionCodes.SystemSearch,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                    SourceContent = content,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 HttpStatusCode sc = store.SystemSearch(
                     ctx,
-                    content,
-                    summary ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out string resource,
                     out string outcome);
 
@@ -1110,53 +921,10 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "POST",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, HttpContext.Request, true),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PostSystemOperation <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PostSystemOperation <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PostSystemOperation <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
-            return;
-        }
-
         // sanity check
         if (Request == null)
         {
-            _logger.LogWarning("PostResourceType <<< cannot process an operation POST without a Request!");
+            _logger.LogWarning("PostSystemOperation <<< cannot process an operation POST without a Request!");
             Response.StatusCode = 400;
             return;
         }
@@ -1168,15 +936,34 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = Request.QueryString.ToString(),
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    Interaction = Common.StoreInteractionCodes.SystemOperation,
+                    OperationName = "$" + opName,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                    SourceContent = content,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 // re-add the prefix $ character since it was stripped during routing
 
                 HttpStatusCode sc = store.SystemOperation(
                         ctx,
-                        "$" + opName,
-                        Request.QueryString.ToString(),
-                        content,
-                        Request.ContentType ?? string.Empty,
-                        pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                         out string resource,
                         out string outcome);
  
@@ -1236,49 +1023,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "POST",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, HttpContext.Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PostResourceType <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PostResourceType <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PostResourceType <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
-            return;
-        }
-
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
@@ -1294,17 +1038,37 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = Request.QueryString.ToString(),
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    Interaction = Common.StoreInteractionCodes.TypeCreate,
+                    ResourceType = resourceName,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                    SourceContent = content,
+                    IfNoneExist = ifNoneExist ?? string.Empty,
+                    AllowExistingId = true,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 HttpStatusCode sc;
                 string resource, outcome;
 
                 sc = store.InstanceCreate(
                     ctx,
-                    resourceName,
-                    content,
-                    Request.ContentType ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    ifNoneExist ?? string.Empty,
-                    true,
                     out resource,
                     out outcome,
                     out string eTag,
@@ -1386,49 +1150,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "PUT",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PutResourceInstance <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PutResourceInstance <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PutResourceInstance <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
-            return;
-        }
-
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
@@ -1444,17 +1165,36 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = Request.QueryString.ToString(),
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    Interaction = Common.StoreInteractionCodes.InstanceUpdate,
+                    ResourceType = resourceName,
+                    Id = id,
+                    IfMatch = ifMatch ?? string.Empty,
+                    IfNoneMatch = ifNoneMatch ?? string.Empty,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                    SourceContent = content,
+                    AllowCreateAsUpdate = true,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 HttpStatusCode sc = store.InstanceUpdate(
                     ctx,
-                    resourceName,
-                    id,
-                    content,
-                    HttpContext.Request.ContentType ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    Request.QueryString.ToString(),
-                    ifMatch ?? string.Empty,
-                    ifNoneMatch ?? string.Empty,
-                    true,
                     out string resource,
                     out string outcome,
                     out string eTag,
@@ -1508,6 +1248,7 @@ public class FhirController : ControllerBase
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="prefer">      The prefer.</param>
+    /// <param name="ifMatch">     A match specifying if.</param>
     /// <param name="authHeader">  The authentication header.</param>
     /// <returns>An asynchronous result.</returns>
     [HttpDelete, Route("{storeName}/{resourceName}/{id}")]
@@ -1518,6 +1259,7 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_format")] string? format,
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
         if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
@@ -1533,42 +1275,23 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "DELETE",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"DeleteResourceInstance <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"DeleteResourceInstance <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"DeleteResourceInstance <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            Interaction = Common.StoreInteractionCodes.InstanceDelete,
+            ResourceType = resourceName,
+            Id = id,
+            IfMatch = ifMatch ?? string.Empty,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -1578,10 +1301,6 @@ public class FhirController : ControllerBase
 
         HttpStatusCode sc = store.InstanceDelete(
             ctx,
-            resourceName,
-            id,
-            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-            string.Empty,
             out string resource,
             out string outcome);
 
@@ -1621,42 +1340,21 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "GET",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"GetResourceTypeSearch <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"GetResourceTypeSearch <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"GetResourceTypeSearch <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            Interaction = Common.StoreInteractionCodes.TypeSearch,
+            ResourceType = resourceName,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -1666,10 +1364,6 @@ public class FhirController : ControllerBase
 
         HttpStatusCode sc = store.TypeSearch(
             ctx,
-            resourceName,
-            Request.QueryString.ToString(),
-            summary ?? string.Empty,
-            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string resource,
             out string outcome);
 
@@ -1713,42 +1407,22 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "DELETE",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"DeleteResourceConditional <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"DeleteResourceConditional <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"DeleteResourceConditional <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            SerializeSummaryFlag = summary ?? string.Empty,
+            Interaction = Common.StoreInteractionCodes.TypeDeleteConditional,
+            ResourceType = resourceName,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -1770,9 +1444,6 @@ public class FhirController : ControllerBase
 
             HttpStatusCode sc = store.TypeDelete(
                 ctx,
-                resourceName,
-                queryString,
-                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                 out string resource,
                 out string outcome);
 
@@ -1821,49 +1492,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
-        {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "POST",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, HttpContext.Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"PostSystemBundle <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"PostSystemBundle <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"PostSystemBundle <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (!_smartAuthManager.IsAuthorized(ctx))
-        {
-            Response.StatusCode = 401;
-            return;
-        }
-
         // sanity check
         if ((Request == null) || (Request.Body == null))
         {
@@ -1879,11 +1507,31 @@ public class FhirController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
+                FhirRequestContext ctx = new()
+                {
+                    TenantName = storeName,
+                    Store = store,
+                    HttpMethod = Request.Method.ToUpperInvariant(),
+                    Url = Request.GetDisplayUrl(),
+                    UrlPath = Request.Path,
+                    UrlQuery = Request.QueryString.ToString(),
+                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                    DestinationFormat = GetMimeType(format, Request),
+                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                    Interaction = Common.StoreInteractionCodes.SystemBundle,
+                    SourceFormat = Request.ContentType ?? string.Empty,
+                    SourceContent = content,
+                };
+
+                if (!_smartAuthManager.IsAuthorized(ctx))
+                {
+                    Response.StatusCode = 401;
+                    return;
+                }
+
                 HttpStatusCode sc = store.ProcessBundle(
                     ctx,
-                    content,
-                    Request.ContentType ?? string.Empty,
-                    pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                     out string resource,
                     out string outcome);
 
@@ -1932,42 +1580,21 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "GET",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"GetSystemSearch <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"GetSystemSearch <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"GetSystemSearch <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            SerializeSummaryFlag = summary ?? string.Empty,
+            Interaction = Common.StoreInteractionCodes.SystemSearch,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -1977,9 +1604,6 @@ public class FhirController : ControllerBase
 
         HttpStatusCode sc = store.SystemSearch(
             ctx,
-            Request.QueryString.ToString(),
-            summary ?? string.Empty,
-            pretty?.Equals("true", StringComparison.Ordinal) ?? false,
             out string resource,
             out string outcome);
 
@@ -2015,42 +1639,21 @@ public class FhirController : ControllerBase
             return;
         }
 
-        FhirRequestContext ctx;
-
-        try
+        FhirRequestContext ctx = new()
         {
-            ctx = new()
-            {
-                TenantName = storeName,
-                Store = store,
-                HttpMethod = "DELETE",
-                Url = Request.GetDisplayUrl(),
-                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                DestinationFormat = GetMimeType(format, Request),
-            };
-        }
-        catch (Exception ex)
-        {
-            string msg;
-            if (ex.InnerException != null)
-            {
-                msg = $"DeleteSystemConditional <<< exception: {ex.Message}, inner: {ex.InnerException.Message}!";
-            }
-            else
-            {
-                msg = $"DeleteSystemConditional <<< exception: {ex.Message}!";
-            }
-
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
-
-        if (ctx == null)
-        {
-            string msg = $"DeleteSystemConditional <<< failed to parse request!";
-            await LogAndReturnError(Response, 500, msg);
-            return;
-        }
+            TenantName = storeName,
+            Store = store,
+            HttpMethod = Request.Method.ToUpperInvariant(),
+            Url = Request.GetDisplayUrl(),
+            UrlPath = Request.Path,
+            UrlQuery = Request.QueryString.ToString(),
+            RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+            DestinationFormat = GetMimeType(format, Request),
+            SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+            SerializeSummaryFlag = summary ?? string.Empty,
+            Interaction = Common.StoreInteractionCodes.SystemDeleteConditional,
+        };
 
         if (!_smartAuthManager.IsAuthorized(ctx))
         {
@@ -2072,8 +1675,6 @@ public class FhirController : ControllerBase
 
             HttpStatusCode sc = store.SystemDelete(
                 ctx,
-                queryString,
-                pretty?.Equals("true", StringComparison.Ordinal) ?? false,
                 out string resource,
                 out string outcome);
 

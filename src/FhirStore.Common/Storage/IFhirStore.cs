@@ -55,69 +55,68 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
     /// <returns>The metadata.</returns>
     HttpStatusCode GetMetadata(
-        AuthorizationInfo? auth,
-        string destFormat,
-        bool pretty,
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
         out string lastModified);
 
+    /// <summary>Attempts to get metadata a string from the given string.</summary>
+    /// <param name="mimeType">  Type of the mime.</param>
+    /// <param name="serialized">[out] The serialized.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryGetMetadata(
+        string mimeType,
+        bool pretty,
+        out string serialized);
+
     /// <summary>Instance read.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="resourceType">      Type of the resource.</param>
-    /// <param name="id">                [out] The identifier.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="summaryFlag">       The summary flag.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
-    /// <param name="ifMatch">           A match specifying if.</param>
-    /// <param name="ifModifiedSince">   if modified since.</param>
-    /// <param name="ifNoneMatch">       A match specifying if none.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceRead(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string id,
-        string destFormat,
-        string summaryFlag,
-        bool pretty,
-        string ifMatch,
-        string ifModifiedSince,
-        string ifNoneMatch,
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
         out string lastModified);
 
-    /// <summary>Attempts to read.</summary>
+    /// <summary>Attempts an instance read.</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <param name="resource">    [out] The resource.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryRead(string resourceType, string id, out object? resource);
+    bool TryInstanceRead(
+        string resourceType, 
+        string id, 
+        out object? resource);
+
+    /// <summary>Attempts an instance read.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="id">          The identifier.</param>
+    /// <param name="mimeType">    Type of the mime.</param>
+    /// <param name="pretty">      If the output should be 'pretty' formatted.</param>
+    /// <param name="serialized">  [out] The serialized.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryInstanceRead(
+        string resourceType,
+        string id,
+        string mimeType,
+        bool pretty,
+        out string serialized);
 
     /// <summary>Instance create.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="resourceType">      Type of the resource.</param>
-    /// <param name="content">           The content.</param>
-    /// <param name="sourceFormat">      Source format.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
-    /// <param name="ifNoneExist">       if none exist.</param>
-    /// <param name="allowExistingId">   True to allow an existing id.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
@@ -125,46 +124,41 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceCreate(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string content,
-        string sourceFormat,
-        string destFormat,
-        bool pretty,
-        string ifNoneExist,
-        bool allowExistingId,
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
         out string lastModified,
         out string location);
 
-    /// <summary>Attempts to create.</summary>
-    /// <param name="auth">           The authorization information, if available.</param>
-    /// <param name="resourceType">   Type of the resource.</param>
-    /// <param name="resource">       [out] The resource.</param>
-    /// <param name="id">             [out] The identifier.</param>
+    /// <summary>Attempts to create an instance.</summary>
+    /// <param name="resource">       The resource.</param>
     /// <param name="allowExistingId">True to allow an existing id.</param>
+    /// <param name="resourceType">   [out] Type of the resource.</param>
+    /// <param name="id">             [out] The identifier.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryCreate(
-        AuthorizationInfo? auth,
-        string resourceType, 
-        object resource, 
-        out string id, 
-        bool allowExistingId);
+    bool TryInstanceCreate(
+        object resource,
+        bool allowExistingId,
+        out string resourceType,
+        out string id);
+
+    /// <summary>Attempts to create an instance.</summary>
+    /// <param name="content">        The content.</param>
+    /// <param name="mimeType">       Type of the mime.</param>
+    /// <param name="allowExistingId">True to allow an existing id.</param>
+    /// <param name="resourceType">   [out] Type of the resource.</param>
+    /// <param name="id">             [out] The identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryInstanceCreate(
+        string content,
+        string mimeType,
+        bool allowExistingId,
+        out string resourceType,
+        out string id);
 
     /// <summary>Instance update.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="resourceType">      Type of the resource.</param>
-    /// <param name="id">                [out] The identifier.</param>
-    /// <param name="content">           The content.</param>
-    /// <param name="sourceFormat">      Source format.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
-    /// <param name="queryString">       The query string.</param>
-    /// <param name="ifMatch">           Criteria that must match to preform the update.</param>
-    /// <param name="ifNoneMatch">       Criteria that must NOT match to preform the update.</param>
-    /// <param name="allowCreate">       If the update should be allowed to create a new resource.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <param name="eTag">              [out] The tag.</param>
@@ -172,122 +166,92 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <param name="location">          [out] The location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceUpdate(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string id,
-        string content,
-        string sourceFormat,
-        string destFormat,
-        bool pretty,
-        string queryString,
-        string ifMatch,
-        string ifNoneMatch,
-        bool allowCreate,
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome,
         out string eTag,
         out string lastModified,
         out string location);
 
-    /// <summary>Attempts to update.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
+    /// <summary>Attempts to update an instance.</summary>
+    /// <param name="resource">    The resource.</param>
+    /// <param name="allowCreate"> True to allow, false to suppress the create.</param>
+    /// <param name="resourceType">[out] Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
-    /// <param name="resource">    [out] The resource.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryUpdate(string resourceType, string id, object resource);
+    bool TryInstanceUpdate(
+        object resource,
+        bool allowCreate,
+        out string resourceType,
+        out string id);
+
+    /// <summary>Attempts to update an instance.</summary>
+    /// <param name="content">     The content.</param>
+    /// <param name="mimeType">    Type of the mime.</param>
+    /// <param name="allowCreate"> True to allow, false to suppress the create.</param>
+    /// <param name="resourceType">[out] Type of the resource.</param>
+    /// <param name="id">          [out] The identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryInstanceUpdate(
+        string content,
+        string mimeType,
+        bool allowCreate,
+        out string resourceType,
+        out string id);
 
     /// <summary>Instance delete.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="resourceType">      Type of the resource.</param>
-    /// <param name="id">                [out] The identifier.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
-    /// <param name="ifMatch">           A match specifying if.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode InstanceDelete(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string id,
-        string destFormat,
-        bool pretty,
-        string ifMatch,
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome);
 
-    /// <summary>Attempts to delete a string from the given string.</summary>
+    /// <summary>Attempts to delete an instance from the store.</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryDelete(string resourceType, string id);
+    bool TryInstanceDelete(string resourceType, string id);
 
     /// <summary>Process a Batch or Transaction bundle.</summary>
-    /// <param name="content">           The content.</param>
-    /// <param name="sourceFormat">      Source format.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode ProcessBundle(
-        AuthorizationInfo? auth,
-        string content,
-        string sourceFormat,
-        string destFormat,
-        bool pretty,
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome);
 
     /// <summary>System delete.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="queryString">       The query string.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode SystemDelete(
-        AuthorizationInfo? auth,
-        string queryString,
-        string destFormat,
-        bool pretty,
+    HttpStatusCode SystemDelete(
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome);
 
     /// <summary>Type delete (based on search).</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="resourceType">      Type of the resource.</param>
-    /// <param name="queryString">       The query string.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode TypeDelete(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string queryString,
-        string destFormat,
-        bool pretty,
+    HttpStatusCode TypeDelete(
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome);
 
     /// <summary>System search.</summary>
-    /// <param name="auth">             The authorization information, if available.</param>
-    /// <param name="queryString">      The query string.</param>
-    /// <param name="destFormat">       Destination format.</param>
-    /// <param name="summaryFlag">      The summary flag.</param>
-    /// <param name="pretty">           If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">              The request context.</param>
     /// <param name="serializedBundle"> [out] The serialized bundle.</param>
     /// <param name="serializedOutcome">[out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode SystemSearch(
-        AuthorizationInfo? auth,
-        string queryString,
-        string destFormat,
-        string summaryFlag,
-        bool pretty,
+        FhirRequestContext ctx,
         out string serializedBundle,
         out string serializedOutcome);
 
@@ -300,22 +264,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out object? bundle);
 
     /// <summary>Type search.</summary>
-    /// <param name="auth">             The authorization information, if available.</param>
-    /// <param name="resourceType">     Type of the resource.</param>
-    /// <param name="queryString">      The query string.</param>
-    /// <param name="destFormat">       Destination format.</param>
-    /// <param name="summaryFlag">      Summary-element filtering to apply.</param>
-    /// <param name="pretty">           If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">              The request context.</param>
     /// <param name="serializedBundle"> [out] The serialized bundle.</param>
     /// <param name="serializedOutcome">[out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode TypeSearch(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string queryString,
-        string destFormat,
-        string summaryFlag,
-        bool pretty,
+        FhirRequestContext ctx,
         out string serializedBundle,
         out string serializedOutcome);
 
@@ -330,74 +284,32 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out object? bundle);
 
     /// <summary>System operation.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="operationName">     Name of the operation.</param>
-    /// <param name="queryString">       The query string.</param>
-    /// <param name="content">           The content.</param>
-    /// <param name="sourceFormat">      Source format.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode SystemOperation(
-        AuthorizationInfo? auth,
-        string operationName,
-        string queryString,
-        string content,
-        string sourceFormat,
-        string destFormat,
-        bool pretty,
+    HttpStatusCode SystemOperation(
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome);
 
     /// <summary>Type operation.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="resourceType">      Type of the resource.</param>
-    /// <param name="operationName">     Name of the operation.</param>
-    /// <param name="queryString">       The query string.</param>
-    /// <param name="content">           The content.</param>
-    /// <param name="sourceFormat">      Source format.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode TypeOperation(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string operationName,
-        string queryString,
-        string content,
-        string sourceFormat,
-        string destFormat,
-        bool pretty,
+    HttpStatusCode TypeOperation(
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome);
 
     /// <summary>Instance operation.</summary>
-    /// <param name="auth">              The authorization information, if available.</param>
-    /// <param name="resourceType">      Type of the resource.</param>
-    /// <param name="operationName">     Name of the operation.</param>
-    /// <param name="instanceId">        Identifier for the instance.</param>
-    /// <param name="queryString">       The query string.</param>
-    /// <param name="content">           The content.</param>
-    /// <param name="sourceFormat">      Source format.</param>
-    /// <param name="destFormat">        Destination format.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
+    /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
     /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode InstanceOperation(
-        AuthorizationInfo? auth,
-        string resourceType,
-        string operationName,
-        string instanceId,
-        string queryString,
-        string content,
-        string sourceFormat,
-        string destFormat,
-        bool pretty,
+    HttpStatusCode InstanceOperation(
+        FhirRequestContext ctx,
         out string serializedResource,
         out string serializedOutcome);
 
@@ -461,24 +373,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
 
     /// <summary>Gets the received notifications.</summary>
     ConcurrentDictionary<string, List<ParsedSubscriptionStatus>> ReceivedNotifications { get; }
-
-    /// <summary>Determine interaction.</summary>
-    /// <param name="verb">          The HTTP verb.</param>
-    /// <param name="url">           URL of the request.</param>
-    /// <param name="message">       [out] The message.</param>
-    /// <param name="pathComponents">[out] The path components.</param>
-    /// <returns>A Common.StoreInteractionCodes?</returns>
-    Common.StoreInteractionCodes? DetermineInteraction(
-        string verb,
-        string url,
-        out string message,
-        out string requestUrlPath,
-        out string requestUrlQuery,
-        out string resourceType,
-        out string id,
-        out string operationName,
-        out string compartmentType,
-        out string version);
 
     ///// <summary>
     ///// Get the metadata from a remote fhir server.

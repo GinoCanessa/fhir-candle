@@ -2,6 +2,7 @@
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
 @inject IJSRuntime JS
 
 @implements IDisposable
@@ -125,31 +126,8 @@
             return;
         }
 
-        System.Net.HttpStatusCode sc = _store.InstanceCreate(
-            null,
-            "Subscription",
-            serialized,
-            "application/fhir+json",
-            "application/fhir+json",
-            true,
-            string.Empty,
-            true,
-            out _,
-            out string outcome,
-            out _,
-            out _,
-            out string location
-        );
 
-        if ((sc == System.Net.HttpStatusCode.OK) ||
-            (sc == System.Net.HttpStatusCode.Created))
-        {
-            networkInUse = false;
-            subscriptionLocation = location;
-            return;
-        }
-
-        errorMessage = outcome;
+        errorMessage = string.Empty;
         networkInUse = false;
         return;
     }
@@ -164,44 +142,11 @@
         if (!string.IsNullOrEmpty(subscriptionLocation))
         {
             subscriptionLocation = string.Empty;
-
-            _ = _store.InstanceDelete(
-                null,
-                "Subscription",
-                subscription.Id,
-                "application/fhir+json",
-                false,
-                string.Empty,
-                out _,
-                out _);
         }
 
         if (!string.IsNullOrEmpty(handshakeBundleId))
         {
-            _ = _store.InstanceDelete(
-                null,
-                "Bundle",
-                handshakeBundleId,
-                "application/fhir+json",
-                false,
-                string.Empty,
-                out _,
-                out _);
-
             handshakeBundleId = string.Empty;
-        }
-
-        foreach (string encId in postedEncounters)
-        {
-            _ = _store.InstanceDelete(
-                null,
-                "Encounter",
-                encId,
-                "application/fhir+json",
-                false,
-                string.Empty,
-                out _,
-                out _);
         }
 
         postedEncounters.Clear();

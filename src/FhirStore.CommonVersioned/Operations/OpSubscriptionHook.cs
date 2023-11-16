@@ -62,31 +62,21 @@ public class OpSubscriptionHook : IFhirOperation
     public HashSet<string> SupportedResources => new();
 
     /// <summary>Executes the system $subscription-hook operation.</summary>
-    /// <param name="auth">            The authentication.</param>
+    /// <param name="ctx">             The authentication.</param>
     /// <param name="store">           The store.</param>
-    /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="instanceId">      Identifier for the instance.</param>
     /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="queryString">     The query string.</param>
     /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="bodyContent">     The original body content.</param>
-    /// <param name="contentType">     Type of the content.</param>
     /// <param name="responseResource">[out] The response resource.</param>
     /// <param name="responseOutcome"> [out] The response outcome.</param>
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     public HttpStatusCode DoOperation(
-        AuthorizationInfo? auth,
+        FhirRequestContext ctx,
         VersionedFhirStore store,
-        string resourceType,
         IVersionedResourceStore? resourceStore,
-        string instanceId,
         Hl7.Fhir.Model.Resource? focusResource,
-        string queryString,
         Hl7.Fhir.Model.Resource? bodyResource,
-        string bodyContent,
-        string contentType,
         out Hl7.Fhir.Model.Resource? responseResource,
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation)
@@ -125,7 +115,7 @@ public class OpSubscriptionHook : IFhirOperation
 
         // TODO: Clean up interfaces and types so we can avoid casts like this
         // store this bundle in our store
-        Hl7.Fhir.Model.Resource? r = ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(auth, bundle, true);
+        Hl7.Fhir.Model.Resource? r = ((IVersionedResourceStore)((IFhirStore)store)["Bundle"]).InstanceCreate(ctx, bundle, true);
 
         // register the notification received event
         store.RegisterReceivedNotification(r?.Id ?? bundle.Id, status);

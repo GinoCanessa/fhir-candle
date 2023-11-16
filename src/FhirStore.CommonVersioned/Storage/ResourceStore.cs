@@ -264,12 +264,12 @@ public class ResourceStore<T> : IVersionedResourceStore
     }
 
     /// <summary>Create an instance of a resource.</summary>
-    /// <param name="auth">           The authentication.</param>
+    /// <param name="ctx">            The context.</param>
     /// <param name="source">         [out] The resource.</param>
     /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
     /// <returns>The created resource, or null if it could not be created.</returns>
     public Resource? InstanceCreate(
-        AuthorizationInfo? auth,
+        FhirRequestContext ctx,
         Resource source,
         bool allowExistingId)
     {
@@ -313,7 +313,7 @@ public class ResourceStore<T> : IVersionedResourceStore
                     if (source is Hl7.Fhir.Model.Observation obs)
                     {
                         // if there is authorization info, check to see if this is a patient launch
-                        if (auth?.UserId.StartsWith("Patient", StringComparison.Ordinal) ?? false)
+                        if (ctx.Authorization?.UserId.StartsWith("Patient", StringComparison.Ordinal) ?? false)
                         {
                             if (source.Meta == null)
                             {

@@ -2,6 +2,7 @@
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
 @inject IJSRuntime JS
 
 @implements IDisposable
@@ -544,33 +545,23 @@
             return;
         }
 
-        System.Net.HttpStatusCode sc = _store.InstanceCreate(
-            null,
-            "Subscription",
+        bool success = _store.TryInstanceCreate(
             serialized,
             "application/fhir+json",
-            "application/fhir+json",
             true,
-            string.Empty,
-            true,
-            out _,
-            out string outcome,
-            out _,
-            out _,
-            out string location
-        );
+            out string rt,
+            out string id);
 
-        if ((sc == System.Net.HttpStatusCode.OK) ||
-            (sc == System.Net.HttpStatusCode.Created))
+        if (success)
         {
             postingResource = false;
-            subscriptionLocation = location;
+            subscriptionLocation = _store.Config.BaseUrl + "/" + rt + "/" + id;
             MoveToStep(5);
             return;
         }
 
         errorAtStep = 4;
-        errorMessage = outcome;
+        errorMessage = "Failed to create subscription!";
         postingResource = false;
         return;
     }
@@ -585,39 +576,24 @@
 
         postingResource = true;
 
-        System.Net.HttpStatusCode sc = _store.InstanceCreate(
-            null,
-            "Encounter",
+        bool success = _store.TryInstanceCreate(
             getJsonEncounter(),
             "application/fhir+json",
-            "application/fhir+json",
             true,
-            string.Empty,
-            false,
-            out _,
-            out string outcome,
-            out _,
-            out _,
-            out string location
-        );
+            out string rt,
+            out string id);
 
-        if ((sc == System.Net.HttpStatusCode.OK) ||
-            (sc == System.Net.HttpStatusCode.Created))
+        if (success)
         {
             postingResource = false;
-
-            int loc = location.LastIndexOf('/');
-            if (loc != -1)
-            {
-                postedEncounters.Add(location.Substring(loc + 1));
-            }
+            postedEncounters.Add(id);
 
             MoveToStep(7);
             return;
         }
 
         errorAtStep = 6;
-        errorMessage = outcome;
+        errorMessage = "Failed to create Encounter!";
         postingResource = false;
         return;
 
@@ -635,45 +611,20 @@
     {
         if (!string.IsNullOrEmpty(subscriptionLocation))
         {
+            _ = _store.TryInstanceDelete("Subscription", subscription.Id);
             subscriptionLocation = string.Empty;
-
-            _ = _store.InstanceDelete(
-                null,
-                "Subscription",
-                subscription.Id,
-                "application/fhir+json",
-                false,
-                string.Empty,
-                out _,
-                out _);
         }
 
         if (!string.IsNullOrEmpty(handshakeBundleId))
         {
-            _ = _store.InstanceDelete(
-                null,
-                "Bundle",
-                handshakeBundleId,
-                "application/fhir+json",
-                false,
-                string.Empty,
-                out _,
-                out _);
+            _ = _store.TryInstanceDelete("Bundle", handshakeBundleId);
 
             handshakeBundleId = string.Empty;
         }
 
         foreach (string encId in postedEncounters)
         {
-            _ = _store.InstanceDelete(
-                null,
-                "Encounter",
-                encId,
-                "application/fhir+json",
-                false,
-                string.Empty,
-                out _,
-                out _);
+            _ = _store.TryInstanceDelete("Encounter", encId);
         }
 
         postedEncounters.Clear();

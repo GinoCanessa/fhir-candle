@@ -10,11 +10,11 @@ namespace fhir.candle.Controllers;
 
 /// <summary>A controller processing version requests.
 /// Responds to:
-///     GET:    /api/
+///     GET:    /api/error/
 ///     GET:    /api/version/
 /// </summary>
 [Produces("application/json")]
-[Route("api/version")]
+[Route("api")]
 public class VersionController : ControllerBase
 {
     private const string _configPrefix = "Client_";
@@ -48,7 +48,7 @@ public class VersionController : ControllerBase
 
     /// <summary>(An Action that handles HTTP GET requests) gets version information.</summary>
     /// <returns>The version information.</returns>
-    [HttpGet, Route("")]
+    [HttpGet, Route("version")]
     public virtual IActionResult GetVersionInfo()
     {
         // create a basic tuple to return

@@ -61,7 +61,7 @@
             return;
         }
 
-        if ((!Store.TryRead("Task", id, out object? o)) ||
+        if ((!Store.TryInstanceRead("Task", id, out object? o)) ||
             (o == null) ||
             (!(o is Hl7.Fhir.Model.Task t)))
         {
@@ -71,7 +71,7 @@
 
         t.Status = ts;
 
-        if (!Store.TryUpdate("Task", id, t))
+        if (!Store.TryInstanceUpdate(t, true, out _, out _))
         {
             Console.WriteLine($"Error updating Task/{id}!");
         }

@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirCandle.Models;
 using System.Net;
 
 namespace FhirCandle.Operations;
@@ -54,31 +55,21 @@ public interface IFhirOperation
     // TODO: Consider return for non-FHIR responses to operations.
 
     /// <summary>Executes the operation operation.</summary>
-    /// <param name="auth">            The authentication.</param>
+    /// <param name="ctx">             The authentication.</param>
     /// <param name="store">           The store.</param>
-    /// <param name="resourceType">    Type of the resource.</param>
     /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="instanceId">      Identifier for the instance.</param>
     /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="queryString">     The query string.</param>
     /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="bodyContent">     The original body content.</param>
-    /// <param name="contentType">     Type of the content.</param>
     /// <param name="responseResource">[out] The response resource.</param>
     /// <param name="responseOutcome"> [out] The response outcome.</param>
     /// <param name="contentLocation"> [out] The content location.</param>
     /// <returns>A HttpStatusCode.</returns>
     HttpStatusCode DoOperation(
-        Models.AuthorizationInfo? auth,
+        FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
-        string resourceType,
         Storage.IVersionedResourceStore? resourceStore,
-        string instanceId,
         Hl7.Fhir.Model.Resource? focusResource,
-        string queryString,
         Hl7.Fhir.Model.Resource? bodyResource,
-        string bodyContent,
-        string contentType,
         out Hl7.Fhir.Model.Resource? responseResource,
         out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
         out string contentLocation);

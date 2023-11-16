@@ -4,17 +4,30 @@
 // </copyright>
 
 using FhirCandle.Storage;
+using Microsoft.Extensions.Primitives;
+using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Net.Mime;
+using System.Reflection.PortableExecutable;
+using static FhirCandle.Storage.Common;
 
 namespace FhirCandle.Models;
 
 /// <summary>A FHIR request context.</summary>
 public record class FhirRequestContext
 {
-    private Common.ParsedInteraction? _interaction = null;
-    private string _url = string.Empty;
+    private string? _url = null;
     private string _httpMethod = string.Empty;
     private IFhirStore _store = null!;
+    private StoreInteractionCodes? _interaction = null;
+    private string _errorMessage = string.Empty;
+    private string _urlPath = string.Empty;
+    private string _urlQuery = string.Empty;
+    private string _resourceType = string.Empty;
+    private string _id = string.Empty;
+    private string _operationName = string.Empty;
+    private string _compartmentType = string.Empty;
+    private string _version = string.Empty;
 
     /// <summary>Initializes a new instance of the <see cref="FhirRequestContext"/> class.</summary>
     public FhirRequestContext() { }
@@ -33,6 +46,7 @@ public record class FhirRequestContext
         TenantName = store.Config.ControllerName;
         HttpMethod = httpMethod;
         Url = url;
+        _ = TryParseRequest();
     }
 
     /// <summary>Initializes a new instance of the <see cref="FhirRequestContext"/> class.</summary>
@@ -40,58 +54,186 @@ public record class FhirRequestContext
     [SetsRequiredMembers]
     protected FhirRequestContext(FhirRequestContext other)
     {
-        Store = other.Store;
         TenantName = other.TenantName;
+        Store = other.Store;
         HttpMethod = other.HttpMethod;
         Url = other.Url;
-        _interaction = other._interaction;
+        Authorization = other.Authorization;
+        SourceContent = other.SourceContent;
+        SourceFormat = other.SourceFormat;
+        DestinationFormat = other.DestinationFormat;
+        SerializePretty = other.SerializePretty;
+        SerializeSummaryFlag = other.SerializeSummaryFlag;
+        IfMatch = other.IfMatch;
+        IfModifiedSince = other.IfModifiedSince;
+        IfNoneMatch = other.IfNoneMatch;
+        IfNoneExist = other.IfNoneExist;
+        AllowExistingId = other.AllowExistingId;
+        AllowCreateAsUpdate = other.AllowCreateAsUpdate;
+        _errorMessage = other.ErrorMessage;
+        RequestHeaders = other.RequestHeaders.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        // make sure to read interaction before other 'parseable' properties
+        Interaction = other.Interaction;
+        UrlPath = other.UrlPath;
+        UrlQuery = other.UrlQuery;
+        ResourceType = other.ResourceType;
+        Id = other.Id;
+        OperationName = other.OperationName;
+        CompartmentType = other.CompartmentType;
+        Version = other.Version;
     }
 
-    /// <summary>Gets or sets the name of the tenant.</summary>
+    /// <summary>Gets or initializes the name of the tenant.</summary>
     public required string TenantName { get; init; }
 
     /// <summary>Gets or sets the store.</summary>
-    public required IFhirStore Store { get => _store; init => _store = value; }
+    public required IFhirStore Store 
+    { 
+        get => _store;
+        init
+        {
+            _store = value;
+            _ = TryParseRequest();
+        }
+    }
 
-    /// <summary>Gets or sets the HTTP method.</summary>
-    public required string HttpMethod { get => _httpMethod; init => _httpMethod = value.ToUpperInvariant(); }
+    /// <summary>Gets or initializes the HTTP method.</summary>
+    public required string HttpMethod 
+    { 
+        get => _httpMethod;
+        init
+        {
+            _httpMethod = value.ToUpperInvariant();
+            _ = TryParseRequest();
+        }
+    }
 
-    /// <summary>Gets or sets URL of the document.</summary>
-    public required string Url { get => _url; init => _url = value; }
+    /// <summary>Gets or initializes the URL of the document.</summary>
+    public required string Url 
+    { 
+        get => _url ?? string.Empty;
+        init
+        {
+            _url = value;
+            _ = TryParseRequest();
+        }
+    }
 
     /// <summary>Gets or initializes the authorization.</summary>
     public required AuthorizationInfo? Authorization { get; init; }
 
-    /// <summary>Gets the interaction.</summary>
-    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
-    public Common.ParsedInteraction Interaction
+    /// <summary>Gets or initializes source format.</summary>
+    public string SourceFormat { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes source content.</summary>
+    public string SourceContent { get; init; } = string.Empty;
+    
+    /// <summary>Gets or initializes destination format (default to fhir+json).</summary>
+    public string DestinationFormat { get; init; } = "application/fhir+json";
+
+    /// <summary>Gets or initializes a value indicating whether the serialize pretty.</summary>
+    public bool SerializePretty { get; init; } = false;
+
+    /// <summary>Gets or initializes the serialize summary flag.</summary>
+    public string SerializeSummaryFlag { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes if match.</summary>
+    public string IfMatch { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes if modified since.</summary>
+    public string IfModifiedSince { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes if none match.</summary>
+    public string IfNoneMatch { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes if none exist.</summary>
+    public string IfNoneExist { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets or initializes a value indicating whether we allow existing identifier.
+    /// </summary>
+    public bool AllowExistingId { get; init; } = true;
+
+    /// <summary>
+    /// Gets or initializes a value indicating whether we allow create as update.
+    /// </summary>
+    public bool AllowCreateAsUpdate { get; init; } = true;
+
+    /// <summary>Gets a message describing the error.</summary>
+    public string ErrorMessage { get => _errorMessage; }
+
+    /// <summary>Gets the full pathname of the URL file.</summary>
+    public string UrlPath { get => _urlPath; init => _urlPath = value; }
+
+    /// <summary>Gets the URL query.</summary>
+    public string UrlQuery { get => _urlQuery; init => _urlQuery = value; }
+
+    /// <summary>Gets or initializes the request headers.</summary>
+    public Dictionary<string, StringValues> RequestHeaders { get; init; } = new Dictionary<string, StringValues>();
+
+    /// <summary>Gets the type of the resource.</summary>
+    public string ResourceType { get => _resourceType; init => _resourceType = value; }
+
+    /// <summary>Gets the identifier.</summary>
+    public string Id { get => _id; init => _id = value; }
+
+    /// <summary>Gets the name of the operation.</summary>
+    public string OperationName { get => _operationName; init => _operationName = value; }
+
+    /// <summary>Gets the type of the compartment.</summary>
+    public string CompartmentType { get => _compartmentType; init => _compartmentType = value; }
+
+    /// <summary>Get the version.</summary>
+    public string Version { get => _version; init => _version = value; }
+
+    /// <summary>Gets or intializes the interaction.</summary>
+    public StoreInteractionCodes? Interaction { get => _interaction; init => _interaction = value; }
+
+    /// <summary>Query if this object is authorized.</summary>
+    /// <returns>True if authorized, false if not.</returns>
+    public bool IsAuthorized()
     {
-        get
+        if (Authorization == null)
         {
-            if (_interaction == null)
+            if (Store.Config.SmartRequired)
             {
-                if (!TryParseRequest(out _interaction))
-                {
-                    if (_interaction == null)
-                    {
-                        throw new Exception($"Failed to parse: {_httpMethod} {_url}");
-                    }
-                }
+                return false;
             }
 
-            return (Common.ParsedInteraction)_interaction!;
+            return true;
         }
+
+        if (_interaction == null)
+        {
+            if ((!TryParseRequest()) ||
+                (_interaction == null))
+            {
+                return false;
+            }
+        }
+
+        return Authorization.IsAuthorized((StoreInteractionCodes)_interaction, _httpMethod, _resourceType);
     }
 
     /// <summary>Attempts to parse this request.</summary>
-    /// <param name="result">[out] The result.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryParseRequest(out Common.ParsedInteraction? parsed)
+    internal bool TryParseRequest()
     {
-        string errorMessage;
+        if ((_store == null) ||
+            string.IsNullOrEmpty(_httpMethod) ||
+            (_url == null))
+        {
+            return false;
+        }
+
+        if (_interaction != null)
+        {
+            return true;
+        }
+
         string requestUrlPath;
         string requestUrlQuery;
-        string resourceType = string.Empty;
 
         string[] pathAndQuery = _url.Split('?', StringSplitOptions.RemoveEmptyEntries);
 
@@ -121,25 +263,21 @@ public record class FhirRequestContext
                 break;
 
             default:
-                {
-                    errorMessage = $"TryParseRequest: Malformed URL: {_url} cannot be parsed!";
-                    Console.WriteLine(errorMessage);
-
-                    parsed = new()
-                    {
-                        ErrorMessage = errorMessage
-                    };
-
-                    return false;
-                }
+                // assume there are query parameters that contain '?'
+                requestUrlPath = pathAndQuery[0];
+                requestUrlQuery = string.Join('?', pathAndQuery[1..]);
+                break;
         }
 
         if (requestUrlPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             requestUrlPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            if (requestUrlPath.StartsWith(_store.Config.BaseUrl, StringComparison.OrdinalIgnoreCase))
+            requestUrlPath = requestUrlPath.Substring(requestUrlPath.IndexOf(':'));
+            string configUrl = _store.Config.BaseUrl.Substring(_store.Config.BaseUrl.IndexOf(':'));
+
+            if (requestUrlPath.StartsWith(configUrl, StringComparison.OrdinalIgnoreCase))
             {
-                requestUrlPath = requestUrlPath.Substring(_store.Config.BaseUrl.Length);
+                requestUrlPath = requestUrlPath.Substring(configUrl.Length);
                 if (requestUrlPath.StartsWith('/'))
                 {
                     requestUrlPath = requestUrlPath.Substring(1);
@@ -147,17 +285,15 @@ public record class FhirRequestContext
             }
             else
             {
-                errorMessage = $"TryParseRequest: Full URL: {_url} cannot be parsed!";
-                Console.WriteLine(errorMessage);
-
-                parsed = new()
-                {
-                    ErrorMessage = errorMessage
-                };
+                _errorMessage = $"DetermineInteraction: Full URL: {_url} cannot be parsed!";
+                Console.WriteLine(_errorMessage);
 
                 return false;
             }
         }
+
+        _urlPath = requestUrlPath;
+        _urlQuery = requestUrlQuery;
 
         string[] pathComponents = requestUrlPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
@@ -167,7 +303,7 @@ public record class FhirRequestContext
 
         if (hasValidResourceType)
         {
-            resourceType = pathComponents[0];
+            _resourceType = pathComponents[0];
         }
 
         switch (_httpMethod)
@@ -178,12 +314,7 @@ public record class FhirRequestContext
                     {
                         case 0:
                             {
-                                parsed = new()
-                                {
-                                    UrlPath = requestUrlPath,
-                                    UrlQuery = requestUrlQuery,
-                                    Interaction = Common.StoreInteractionCodes.SystemSearch,
-                                };
+                                _interaction = StoreInteractionCodes.SystemSearch;
 
                                 return true;
                             }
@@ -192,50 +323,29 @@ public record class FhirRequestContext
                             {
                                 if (hasValidResourceType)
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Interaction = Common.StoreInteractionCodes.TypeSearch,
-                                    };
+                                    _interaction = StoreInteractionCodes.TypeSearch;
 
                                     return true;
                                 }
 
                                 if (pathComponents[0].Equals("metadata", StringComparison.Ordinal))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        Interaction = Common.StoreInteractionCodes.SystemCapabilities,
-                                    };
+                                    _interaction = StoreInteractionCodes.SystemCapabilities;
 
                                     return true;
                                 }
 
                                 if (pathComponents[0].Equals("_history", StringComparison.Ordinal))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        Interaction = Common.StoreInteractionCodes.SystemHistory,
-                                    };
+                                    _interaction = StoreInteractionCodes.SystemHistory;
 
                                     return true;
                                 }
 
                                 if (pathComponents[0].StartsWith('$'))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        OperationName = pathComponents[0],
-                                        Interaction = Common.StoreInteractionCodes.SystemOperation,
-                                    };
+                                    _operationName = pathComponents[0];
+                                    _interaction = StoreInteractionCodes.SystemOperation;
 
                                     return true;
                                 }
@@ -248,26 +358,14 @@ public record class FhirRequestContext
                                 {
                                     if (pathComponents[1].StartsWith('$'))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            OperationName = pathComponents[1],
-                                            Interaction = Common.StoreInteractionCodes.TypeOperation,
-                                        };
+                                        _operationName = pathComponents[1];
+                                        _interaction = StoreInteractionCodes.TypeOperation;
 
                                         return true;
                                     }
 
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Interaction = Common.StoreInteractionCodes.InstanceRead,
-                                    };
+                                    _id = pathComponents[1];
+                                    _interaction = StoreInteractionCodes.InstanceRead;
 
                                     return true;
                                 }
@@ -280,59 +378,35 @@ public record class FhirRequestContext
                                 {
                                     if (pathComponents[2].StartsWith('$'))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            Id = pathComponents[1],
-                                            OperationName = pathComponents[2],
-                                            Interaction = Common.StoreInteractionCodes.InstanceOperation,
-                                        };
+                                        _id = pathComponents[1];
+                                        _operationName = pathComponents[2];
+                                        _interaction = StoreInteractionCodes.InstanceOperation;
 
                                         return true;
                                     }
 
                                     if (pathComponents[2].Equals("_history", StringComparison.Ordinal))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            Id = pathComponents[1],
-                                            Interaction = Common.StoreInteractionCodes.InstanceReadHistory,
-                                        };
-
+                                        _id = pathComponents[1];
+                                        _interaction = StoreInteractionCodes.InstanceReadHistory;
+                                    
                                         return true;
                                     }
 
                                     if (pathComponents[2].Equals("*", StringComparison.Ordinal))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            Id = pathComponents[1],
-                                            CompartmentType = pathComponents[2],
-                                            Interaction = Common.StoreInteractionCodes.CompartmentSearch,
-                                        };
+                                        _id = pathComponents[1];
+                                        _compartmentType = pathComponents[2];
+                                        _interaction = StoreInteractionCodes.CompartmentSearch;
 
                                         return true;
                                     }
 
                                     if (_store.Keys.Contains(pathComponents[2]))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            Id = pathComponents[1],
-                                            CompartmentType = pathComponents[2],
-                                            Interaction = Common.StoreInteractionCodes.CompartmentTypeSearch,
-                                        };
+                                        _id = pathComponents[1];
+                                        _compartmentType = pathComponents[2];
+                                        _interaction = StoreInteractionCodes.CompartmentTypeSearch;
 
                                         return true;
                                     }
@@ -346,15 +420,9 @@ public record class FhirRequestContext
                                     pathComponents[2].Equals("_history", StringComparison.Ordinal) &&
                                     (!pathComponents[3].StartsWith('$')))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Version = pathComponents[3],
-                                        Interaction = Common.StoreInteractionCodes.InstanceReadVersion,
-                                    };
+                                    _id = pathComponents[1];
+                                    _version = pathComponents[3];
+                                    _interaction = StoreInteractionCodes.InstanceReadVersion;
 
                                     return true;
                                 }
@@ -373,12 +441,7 @@ public record class FhirRequestContext
                             {
                                 if (pathComponents[0].Equals("metadata", StringComparison.Ordinal))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        Interaction = Common.StoreInteractionCodes.SystemCapabilities,
-                                    };
+                                    _interaction = StoreInteractionCodes.SystemCapabilities;
 
                                     return true;
                                 }
@@ -390,14 +453,8 @@ public record class FhirRequestContext
                                 if (hasValidResourceType &&
                                     (!pathComponents[1].StartsWith('$')))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Interaction = Common.StoreInteractionCodes.InstanceRead,
-                                    };
+                                    _id = pathComponents[1];
+                                    _interaction = StoreInteractionCodes.InstanceRead;
 
                                     return true;
                                 }
@@ -410,15 +467,9 @@ public record class FhirRequestContext
                                     pathComponents[2].Equals("_history", StringComparison.Ordinal) &&
                                     (!pathComponents[3].StartsWith('$')))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Version = pathComponents[3],
-                                        Interaction = Common.StoreInteractionCodes.InstanceReadVersion,
-                                    };
+                                    _id = pathComponents[1];
+                                    _version = pathComponents[3];
+                                    _interaction = StoreInteractionCodes.InstanceReadVersion;
 
                                     return true;
                                 }
@@ -435,12 +486,7 @@ public record class FhirRequestContext
                     {
                         case 0:
                             {
-                                parsed = new()
-                                {
-                                    UrlPath = requestUrlPath,
-                                    UrlQuery = requestUrlQuery,
-                                    Interaction = Common.StoreInteractionCodes.SystemBundle,
-                                };
+                                _interaction = StoreInteractionCodes.SystemBundle;
 
                                 return true;
                             }
@@ -449,38 +495,22 @@ public record class FhirRequestContext
                             {
                                 if (hasValidResourceType)
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Interaction = Common.StoreInteractionCodes.TypeCreate,
-                                    };
+                                    _interaction = StoreInteractionCodes.TypeCreate;
 
                                     return true;
                                 }
 
                                 if (pathComponents[0].Equals("_search", StringComparison.Ordinal))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        Interaction = Common.StoreInteractionCodes.SystemSearch,
-                                    };
+                                    _interaction = StoreInteractionCodes.SystemSearch;
 
                                     return true;
                                 }
 
                                 if (pathComponents[0].StartsWith('$'))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        OperationName = pathComponents[0],
-                                        Interaction = Common.StoreInteractionCodes.SystemOperation,
-                                    };
+                                    _operationName = pathComponents[0];
+                                    _interaction = StoreInteractionCodes.SystemOperation;
 
                                     return true;
                                 }
@@ -493,27 +523,15 @@ public record class FhirRequestContext
                                 {
                                     if (pathComponents[1].Equals("_search", StringComparison.Ordinal))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            Interaction = Common.StoreInteractionCodes.TypeSearch,
-                                        };
+                                        _interaction = StoreInteractionCodes.TypeSearch;
 
                                         return true;
                                     }
 
                                     if (pathComponents[1].StartsWith('$'))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            OperationName = pathComponents[1],
-                                            Interaction = Common.StoreInteractionCodes.TypeOperation,
-                                        };
+                                        _operationName = pathComponents[1];
+                                        _interaction = StoreInteractionCodes.TypeOperation;
 
                                         return true;
                                     }
@@ -527,29 +545,17 @@ public record class FhirRequestContext
                                 {
                                     if (pathComponents[2].StartsWith('$'))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            Id = pathComponents[1],
-                                            OperationName = pathComponents[2],
-                                            Interaction = Common.StoreInteractionCodes.InstanceOperation,
-                                        };
+                                        _id = pathComponents[1];
+                                        _operationName = pathComponents[2];
+                                        _interaction = StoreInteractionCodes.InstanceOperation;
 
                                         return true;
                                     }
 
                                     if (pathComponents[2].Equals("_search", StringComparison.Ordinal))
                                     {
-                                        parsed = new()
-                                        {
-                                            UrlPath = requestUrlPath,
-                                            UrlQuery = requestUrlQuery,
-                                            ResourceType = resourceType,
-                                            Id = pathComponents[1],
-                                            Interaction = Common.StoreInteractionCodes.CompartmentSearch,
-                                        };
+                                        _id = pathComponents[1];
+                                        _interaction = StoreInteractionCodes.CompartmentSearch;
 
                                         return true;
                                     }
@@ -563,15 +569,9 @@ public record class FhirRequestContext
                                     pathComponents[3].Equals("_search", StringComparison.Ordinal) &&
                                     _store.Keys.Contains(pathComponents[3]))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        CompartmentType = pathComponents[3],
-                                        Interaction = Common.StoreInteractionCodes.CompartmentTypeSearch,
-                                    };
+                                    _id = pathComponents[1];
+                                    _compartmentType = pathComponents[3];
+                                    _interaction = StoreInteractionCodes.CompartmentTypeSearch;
 
                                     return true;
                                 }
@@ -587,12 +587,7 @@ public record class FhirRequestContext
                     {
                         case 0:
                             {
-                                parsed = new()
-                                {
-                                    UrlPath = requestUrlPath,
-                                    UrlQuery = requestUrlQuery,
-                                    Interaction = Common.StoreInteractionCodes.SystemDeleteConditional,
-                                };
+                                _interaction = StoreInteractionCodes.SystemDeleteConditional;
 
                                 return true;
                             }
@@ -601,13 +596,7 @@ public record class FhirRequestContext
                             {
                                 if (hasValidResourceType)
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Interaction = Common.StoreInteractionCodes.TypeDeleteConditional,
-                                    };
+                                    _interaction = StoreInteractionCodes.TypeDeleteConditional;
 
                                     return true;
                                 }
@@ -619,14 +608,8 @@ public record class FhirRequestContext
                                 if (hasValidResourceType &&
                                     (!pathComponents[1].StartsWith('$')))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Interaction = Common.StoreInteractionCodes.InstanceDelete,
-                                    };
+                                    _id = pathComponents[1];
+                                    _interaction = StoreInteractionCodes.InstanceDelete;
 
                                     return true;
                                 }
@@ -638,14 +621,8 @@ public record class FhirRequestContext
                                 if (hasValidResourceType &&
                                     pathComponents[2].Equals("_history", StringComparison.Ordinal))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Interaction = Common.StoreInteractionCodes.InstanceDeleteHistory,
-                                    };
+                                    _id = pathComponents[1];
+                                    _interaction = StoreInteractionCodes.InstanceDeleteHistory;
 
                                     return true;
                                 }
@@ -658,15 +635,9 @@ public record class FhirRequestContext
                                     pathComponents[2].Equals("_history", StringComparison.Ordinal) &&
                                     (!pathComponents[3].StartsWith('$')))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Version = pathComponents[3],
-                                        Interaction = Common.StoreInteractionCodes.InstanceDeleteVersion,
-                                    };
+                                    _id = pathComponents[1];
+                                    _version = pathComponents[3];
+                                    _interaction = StoreInteractionCodes.InstanceDeleteVersion;
 
                                     return true;
                                 }
@@ -685,14 +656,8 @@ public record class FhirRequestContext
                                 if (hasValidResourceType &&
                                     (!pathComponents[1].StartsWith('$')))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Interaction = Common.StoreInteractionCodes.InstanceUpdate,
-                                    };
+                                    _id = pathComponents[1];
+                                    _interaction = StoreInteractionCodes.InstanceUpdate;
 
                                     return true;
                                 }
@@ -711,14 +676,8 @@ public record class FhirRequestContext
                                 if (hasValidResourceType &&
                                     (!pathComponents[1].StartsWith('$')))
                                 {
-                                    parsed = new()
-                                    {
-                                        UrlPath = requestUrlPath,
-                                        UrlQuery = requestUrlQuery,
-                                        ResourceType = resourceType,
-                                        Id = pathComponents[1],
-                                        Interaction = Common.StoreInteractionCodes.InstancePatch,
-                                    };
+                                    _id = pathComponents[1];
+                                    _interaction = StoreInteractionCodes.InstancePatch;
 
                                     return true;
                                 }
@@ -729,15 +688,8 @@ public record class FhirRequestContext
                 break;
         }
 
-        errorMessage = $"TryParseRequest: {_httpMethod} {_url} cannot be parsed into a valid interaction!";
-        Console.WriteLine(errorMessage);
-
-        parsed = new()
-        {
-            ErrorMessage = errorMessage,
-            UrlPath = requestUrlPath,
-            UrlQuery = requestUrlQuery,
-        };
+        _errorMessage = $"TryParseRequest: {_httpMethod} {_url} cannot be parsed into a valid interaction!";
+        Console.WriteLine(_errorMessage);
 
         return false;
     }

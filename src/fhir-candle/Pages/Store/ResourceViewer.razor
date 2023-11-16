@@ -8,6 +8,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
 @inject ProtectedLocalStorage BrowserStore
 
 @implements IDisposable
@@ -106,31 +107,20 @@
         if (ResourceType.Equals("CapabilityStatement", StringComparison.Ordinal) &&
             Id.Equals("metadata", StringComparison.Ordinal))
         {
-            _ = _store.GetMetadata(
-                null,
+            _ = _store.TryGetMetadata(
                 $"application/fhir+{_resourceFormatCode}",
                 true,
-                out content,
-                out _,
-                out _,
-                out _);
+                out content);
+
         }
         else
         {
-            _ = _store.InstanceRead(
-                null,
+            _ = _store.TryInstanceRead(
                 ResourceType,
                 Id,
                 $"application/fhir+{_resourceFormatCode}",
-                string.Empty,
                 true,
-                string.Empty,
-                string.Empty,
-                string.Empty,
-                out content,
-                out _,
-                out _,
-                out _);
+                out content);
         }
 
         _resourceContent = content;

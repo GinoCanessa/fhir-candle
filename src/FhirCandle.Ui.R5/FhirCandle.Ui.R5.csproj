@@ -30,6 +30,4 @@
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
-  <Import Project="..\FhirCandle.Ui.Versioned\FhirCandle.Ui.Versioned.projitems" Label="Shared" />
-
 </Project>

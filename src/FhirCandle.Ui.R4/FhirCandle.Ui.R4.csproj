@@ -27,10 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Components\Pickers\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
-
-  <Import Project="..\FhirCandle.Ui.Versioned\FhirCandle.Ui.Versioned.projitems" Label="Shared" />
 
 </Project>

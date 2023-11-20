@@ -238,12 +238,12 @@ public class FhirController : ControllerBase
 
         if (!string.IsNullOrEmpty(eTag))
         {
-            Response.Headers.Add(HeaderNames.ETag, eTag);
+            Response.Headers[HeaderNames.ETag] = eTag;
         }
 
         if (!string.IsNullOrEmpty(lastModified))
         {
-            Response.Headers.Add(HeaderNames.LastModified, lastModified);
+            Response.Headers[HeaderNames.LastModified] = lastModified;
         }
 
         Response.ContentType = ctx.DestinationFormat;
@@ -391,12 +391,12 @@ public class FhirController : ControllerBase
 
         if (!string.IsNullOrEmpty(eTag))
         {
-            Response.Headers.Add(HeaderNames.ETag, eTag);
+            Response.Headers[HeaderNames.ETag] = eTag;
         }
 
         if (!string.IsNullOrEmpty(lastModified))
         {
-            Response.Headers.Add(HeaderNames.LastModified, lastModified);
+            Response.Headers[HeaderNames.LastModified] = lastModified;
         }
  
         Response.ContentType = ctx.DestinationFormat;;
@@ -1077,17 +1077,17 @@ public class FhirController : ControllerBase
 
                 if (!string.IsNullOrEmpty(eTag))
                 {
-                    Response.Headers.Add(HeaderNames.ETag, eTag);
+                    Response.Headers[HeaderNames.ETag] = eTag;
                 }
 
                 if (!string.IsNullOrEmpty(lastModified))
                 {
-                    Response.Headers.Add(HeaderNames.LastModified, lastModified);
+                    Response.Headers[HeaderNames.LastModified] = lastModified;
                 }
 
                 if (!string.IsNullOrEmpty(location))
                 {
-                    Response.Headers.Add(HeaderNames.Location, location);
+                    Response.Headers[HeaderNames.Location] = location;
                 }
 
                 Response.ContentType = ctx.DestinationFormat;;
@@ -1203,17 +1203,17 @@ public class FhirController : ControllerBase
 
                 if (!string.IsNullOrEmpty(eTag))
                 {
-                    Response.Headers.Add(HeaderNames.ETag, eTag);
+                    Response.Headers[HeaderNames.ETag] = eTag;
                 }
 
                 if (!string.IsNullOrEmpty(lastModified))
                 {
-                    Response.Headers.Add(HeaderNames.LastModified, lastModified);
+                    Response.Headers[HeaderNames.LastModified] = lastModified;
                 }
 
                 if (!string.IsNullOrEmpty(location))
                 {
-                    Response.Headers.Add(HeaderNames.Location, location);
+                    Response.Headers[HeaderNames.Location] = location;
                 }
 
                 Response.ContentType = ctx.DestinationFormat;;

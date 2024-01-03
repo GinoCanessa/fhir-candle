@@ -132,6 +132,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>The storage capacity timer.</summary>
     private System.Threading.Timer? _capacityMonitor = null;
 
+    /// <summary>The terminology.</summary>
     private StoreTerminologyService _terminology = new();
 
     /// <summary>

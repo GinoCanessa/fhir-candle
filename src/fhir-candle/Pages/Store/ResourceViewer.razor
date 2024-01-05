@@ -63,7 +63,7 @@
         </MudGrid>
     </MudPaper>
 
-        <FhirCandle.Ui.Common.Components.FhirEditor
+    <FhirCandle.Ui.Common.Components.FhirEditor
         Language="@_resourceFormatCode"
         EditorContent="@_resourceContent"
         />
@@ -147,8 +147,6 @@
         if ((!string.IsNullOrEmpty(StoreName)) &&
             (StoreManager.TryGetValue(StoreName, out _store!)))
         {
-            Console.WriteLine($"Error, invalid store name: {StoreName}");
-            return;
         }
 
         if (NavTracker != null)

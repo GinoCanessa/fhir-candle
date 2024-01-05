@@ -429,6 +429,18 @@ public partial class VersionedFhirStore : IFhirStore
             // traverse all files
             foreach (FileInfo file in files)
             {
+                switch (file.Name)
+                {
+                    // skip
+                    case ".index.json":
+                    case "package.json":
+                        continue;
+
+                    // process normally
+                    default:
+                        break;
+                }
+
                 switch (file.Extension.ToLowerInvariant())
                 {
                     case ".json":
@@ -1587,7 +1599,8 @@ public partial class VersionedFhirStore : IFhirStore
             content,
             mimeType,
             out Resource? r,
-            out _);
+            out _,
+            _loadState == LoadStateCodes.Read);
 
         if ((!sc.IsSuccessful()) || (r == null))
         {

@@ -26,6 +26,13 @@ public static class Utils
         DisableBase64Decoding = false,
     });
 
+    /// <summary>The JSON parser lenient.</summary>
+    private static FhirJsonPocoDeserializer _jsonParserLenient = new(new FhirJsonPocoDeserializerSettings()
+    {
+        DisableBase64Decoding = false,
+        Validator = null,
+    });
+
     /// <summary>The JSON serializer for full resources.</summary>
     private static FhirJsonPocoSerializer _jsonSerializerFull = new(new FhirJsonPocoSerializerSettings()
     {
@@ -54,6 +61,13 @@ public static class Utils
     private static FhirXmlPocoDeserializer _xmlParser = new(new FhirXmlPocoDeserializerSettings()
     {
         DisableBase64Decoding = false,
+    });
+
+    /// <summary>The XML parser lenient.</summary>
+    private static FhirXmlPocoDeserializer _xmlParserLenient = new(new FhirXmlPocoDeserializerSettings()
+    {
+        DisableBase64Decoding = false,
+        Validator = null,
     });
 
     /// <summary>The XML serializer.</summary>
@@ -126,15 +140,18 @@ public static class Utils
 
     /// <summary>Try deserialize FHIR.</summary>
     /// <typeparam name="TResource">Type of the resource.</typeparam>
-    /// <param name="content"> The content.</param>
-    /// <param name="format">  Describes the format to use.</param>
-    /// <param name="resource">[out] The resource.</param>
+    /// <param name="content">  The content.</param>
+    /// <param name="format">   Describes the format to use.</param>
+    /// <param name="resource"> [out] The resource.</param>
+    /// <param name="exMessage">[out] Message describing the exception.</param>
+    /// <param name="lenient">  (Optional) True to lenient.</param>
     /// <returns>A HttpStatusCode.</returns>
     public static HttpStatusCode TryDeserializeFhir<TResource>(
         string content,
         string format,
         out TResource? resource,
-        out string exMessage)
+        out string exMessage,
+        bool lenient = false)
         where TResource : Resource
     {
         //string utf8Content = null!;
@@ -173,7 +190,9 @@ public static class Utils
             case "application/fhir+json":
                 try
                 {
-                    Resource parsed = _jsonParser.DeserializeResource(content);
+                    Resource parsed = lenient 
+                        ? _jsonParserLenient.DeserializeResource(content)
+                        : _jsonParser.DeserializeResource(content);
                     if (parsed is TResource)
                     {
                         resource = (TResource)parsed;
@@ -200,7 +219,9 @@ public static class Utils
             case "application/fhir+xml":
                 try
                 {
-                    Resource parsed = _xmlParser.DeserializeResource(content);
+                    Resource parsed = lenient
+                        ? _xmlParserLenient.DeserializeResource(content)
+                        : _xmlParser.DeserializeResource(content);
                     if (parsed is TResource)
                     {
                         resource = (TResource)parsed;

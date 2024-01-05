@@ -50,9 +50,9 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "davinci-pas": {
+    "davinci-cdex": {
       "commandName": "Project",
-      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-pas --ci-package HL7/davinci-pas --load-package hl7.fhir.us.davinci-cdex#2.0.0 --r4 provider --r4 intermediary --protect-source true -m 1000",
+      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-cdex --ci-package HL7/davinci-pas --load-package hl7.fhir.us.davinci-cdex#2.0.0 --r4 provider --r4 payer --protect-source true -m 1000",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {
@@ -62,15 +62,6 @@
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "davinci-cdex": {
-      "commandName": "Project",
-      "commandLineArgs": "--reference-implementation hl7.fhir.us.davinci-cdex --load-package hl7.fhir.us.davinci-cdex --r4 provider --r4 payer --protect-source true -m 1000 --load-examples false",
-      "launchBrowser": true,
-      "applicationUrl": "http://localhost:5826",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

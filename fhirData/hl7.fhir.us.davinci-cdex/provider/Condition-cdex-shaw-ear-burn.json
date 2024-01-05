@@ -1,0 +1,69 @@
+{
+  "resourceType": "Condition",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition"
+    ],
+    "tag": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/v3-ActReason",
+        "code": "HTEST",
+        "display": "test health data"
+      }
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/condition-assertedDate",
+      "valueDateTime": "2021-01-21"
+    }
+  ],
+  "clinicalStatus": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+        "code": "resolved",
+        "display": "Resolved"
+      }
+    ],
+    "text": "Active"
+  },
+  "verificationStatus": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+        "code": "confirmed",
+        "display": "Confirmed"
+      }
+    ],
+    "text": "Confirmed"
+  },
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+          "code": "problem-list-item",
+          "display": "Problem List Item"
+        }
+      ],
+      "text": "Problem List Item"
+    }
+  ],
+  "code": {
+    "coding": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "39065001",
+        "display": "Burn of ear",
+        "version": "http://snomed.info/sct/731000124108"
+      }
+    ],
+    "text": "Burn Of Ear"
+  },
+  "subject": {
+    "reference": "urn:uuid:81a90f68-4177-11ee-a1fc-daaf18ab2cba",
+    "display": "Amy V. Shaw"
+  },
+  "recordedDate": "2021-01-21"
+}

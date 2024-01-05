@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.Components.Web
+@using fhir.candle
 @namespace fhir.candle.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
@@ -15,7 +16,10 @@
 
     <link href="_content/MudBlazor/MudBlazor.min.css?v=6.8.0" rel="stylesheet" />
     @*<link href="css/site.css" rel="stylesheet" />*@
+
+    <!-- Load Blazor Monaco editor contents -->
     <link href="css/monaco.css" rel="stylesheet" />
+
     <link rel="stylesheet" href="highlight/styles/atom-one-dark.min.css" />
     <link rel="alternate stylesheet" href="highlight/styles/atom-one-light.min.css" disabled="disabled" />
 
@@ -35,6 +39,7 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <!-- Load Blazor Monaco editor contents -->
     <script src="_content/BlazorMonaco/jsInterop.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>

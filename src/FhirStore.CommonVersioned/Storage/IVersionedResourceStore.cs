@@ -134,9 +134,4 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <param name="topicUrl">URL of the topic.</param>
     /// <param name="id">      The subscription id.</param>
     void RemoveExecutableSubscription(string topicUrl, string id);
-
-    /// <summary>Adds a hook for this resource interaction.</summary>
-    /// <param name="interaction">The interaction.</param>
-    /// <param name="hook">       The hook.</param>
-    void AddHook(Common.StoreInteractionCodes interaction, IFhirInteractionHook hook);
 }

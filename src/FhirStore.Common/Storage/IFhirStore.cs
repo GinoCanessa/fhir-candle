@@ -54,6 +54,16 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <summary>Gets the configuration.</summary>
     public TenantConfiguration Config { get; }
 
+    /// <summary>Performs the interaction specified in the request.</summary>
+    /// <param name="ctx">            The request context.</param>
+    /// <param name="response">       [out] The response data.</param>
+    /// <param name="serializeReturn">True to serialize return objects (resource and outcome).</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool PerformInteraction(
+        FhirRequestContext ctx,
+        out FhirResponseContext response,
+        bool serializeReturn);
+
     /// <summary>Gets the metadata for this store.</summary>
     /// <param name="ctx">     The request context.</param>
     /// <param name="response">[out] The response data.</param>

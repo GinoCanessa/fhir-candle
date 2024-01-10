@@ -64,9 +64,6 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>The executable subscriptions, by subscription topic url.</summary>
     private Dictionary<string, ExecutableSubscriptionInfo> _executableSubscriptions = new();
 
-    /// <summary>The system hooks.</summary>
-    internal Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]> _hooksByInteraction = new();
-
     /// <summary>The supported includes.</summary>
     private string[] _supportedIncludes = Array.Empty<string>();
 
@@ -1330,22 +1327,6 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
         }
     }
-
-    /// <summary>Adds a hook for this resource interaction.</summary>
-    /// <param name="interaction">The interaction.</param>
-    /// <param name="hook">       The hook.</param>
-    public void AddHook(Common.StoreInteractionCodes interaction, IFhirInteractionHook hook)
-    {
-        if (!_hooksByInteraction.ContainsKey(interaction))
-        {
-            _hooksByInteraction.Add(interaction, new IFhirInteractionHook[] { hook });
-        }
-        else
-        {
-            _hooksByInteraction[interaction] = _hooksByInteraction[interaction].Append(hook).ToArray();
-        }
-    }
-
 
     /// <summary>Adds or updates an executable search parameter based on a SearchParameter resource.</summary>
     /// <param name="sp">    The sp.</param>

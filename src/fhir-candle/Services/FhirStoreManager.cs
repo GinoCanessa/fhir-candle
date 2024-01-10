@@ -254,6 +254,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                 RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
                 FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                OnlyShowOnEndpoint = pt.GetProperty("OnlyShowOnEndpoint", typeof(string))?.GetValue(null) as string ?? string.Empty,
             }));
 
         pages.AddRange(typeof(FhirCandle.Ui.R4.Subscriptions.TourUtils).Assembly.GetTypes()
@@ -266,6 +267,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                 RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                OnlyShowOnEndpoint = pt.GetProperty("OnlyShowOnEndpoint", typeof(string))?.GetValue(null) as string ?? string.Empty,
             }));
 
         pages.AddRange(typeof(FhirCandle.Ui.R4B.Subscriptions.TourUtils).Assembly.GetTypes()
@@ -278,6 +280,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                 RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                OnlyShowOnEndpoint = pt.GetProperty("OnlyShowOnEndpoint", typeof(string))?.GetValue(null) as string ?? string.Empty,
             }));
 
         pages.AddRange(typeof(FhirCandle.Ui.R5.Subscriptions.TourUtils).Assembly.GetTypes()
@@ -290,6 +293,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                 RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                OnlyShowOnEndpoint = pt.GetProperty("OnlyShowOnEndpoint", typeof(string))?.GetValue(null) as string ?? string.Empty,
             }));
 
         _additionalPagesByController = new();
@@ -323,7 +327,8 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
             foreach ((string name, IFhirStore store) in _storesByController)
             {
                 if ((store.Config.FhirVersion == pageFhirVersion) &&
-                    (store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor)))
+                    (store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor)) &&
+                    (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase)))
                 {
                     ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
                 }

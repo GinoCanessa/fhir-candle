@@ -58,6 +58,7 @@ public static class Utils
                     RoutePath = riPageType.GetProperty("RoutePath", typeof(string))?.GetValue(null) as string ?? string.Empty,
                     FhirVersionLiteral = riPageType.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
                     FhirVersionNumeric = riPageType.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+                    OnlyShowOnEndpoint = riPageType.GetProperty("OnlyShowOnEndpoint", typeof(string))?.GetValue(null) as string ?? string.Empty,
                 };
 
                 if (!info.ContentFor.Equals(currentRi, StringComparison.OrdinalIgnoreCase))

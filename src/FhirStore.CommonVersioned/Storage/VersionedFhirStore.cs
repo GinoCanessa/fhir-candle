@@ -26,6 +26,7 @@ using Hl7.Fhir.Language.Debugging;
 using System.Security.AccessControl;
 using System.Reflection.Metadata;
 using static Hl7.Fhir.Model.VerificationResult;
+using System.Linq;
 
 namespace FhirCandle.Storage;
 
@@ -100,7 +101,7 @@ public partial class VersionedFhirStore : IFhirStore
     private Dictionary<string, string> _hookNamesById = new();
 
     /// <summary>The system hooks.</summary>
-    private Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]> _hooksByInteraction = new();
+    private Dictionary<string, Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]>> _hooksByInteractionByResource = new();
 
     /// <summary>The loaded directives.</summary>
     private HashSet<string> _loadedDirectives = new();
@@ -401,15 +402,23 @@ public partial class VersionedFhirStore : IFhirStore
                     resource.Equals("Resource", StringComparison.Ordinal))
                 {
                     // add to all resources - use VersionedFhirStore
-                    foreach (Common.StoreInteractionCodes interaction in interactions)
+                    foreach (string resourceType in _store.Keys)
                     {
-                        if (!_hooksByInteraction.ContainsKey(interaction))
+                        if (!_hooksByInteractionByResource.ContainsKey(resourceType))
                         {
-                            _hooksByInteraction.Add(interaction, new IFhirInteractionHook[] { hook });
+                            _hooksByInteractionByResource.Add(resourceType, new());
                         }
-                        else
+
+                        foreach (Common.StoreInteractionCodes interaction in interactions)
                         {
-                            _hooksByInteraction[interaction] = _hooksByInteraction[interaction].Append(hook).ToArray();
+                            if (!_hooksByInteractionByResource[resourceType].ContainsKey(interaction))
+                            {
+                                _hooksByInteractionByResource[resourceType].Add(interaction, new IFhirInteractionHook[] { hook });
+                            }
+                            else
+                            {
+                                _hooksByInteractionByResource[resourceType][interaction] = _hooksByInteractionByResource[resourceType][interaction].Append(hook).ToArray();
+                            }
                         }
                     }
 
@@ -417,11 +426,20 @@ public partial class VersionedFhirStore : IFhirStore
                 }
 
                 // add to a single resource - use ResourceStore
-                if (_store.ContainsKey(resource))
+                if (!_hooksByInteractionByResource.ContainsKey(resource))
                 {
-                    foreach (Common.StoreInteractionCodes interaction in interactions)
+                    _hooksByInteractionByResource.Add(resource, new());
+                }
+
+                foreach (Common.StoreInteractionCodes interaction in interactions)
+                {
+                    if (!_hooksByInteractionByResource[resource].ContainsKey(interaction))
                     {
-                        _store[resource].AddHook(interaction, hook);
+                        _hooksByInteractionByResource[resource].Add(interaction, new IFhirInteractionHook[] { hook });
+                    }
+                    else
+                    {
+                        _hooksByInteractionByResource[resource][interaction] = _hooksByInteractionByResource[resource][interaction].Append(hook).ToArray();
                     }
                 }
             }
@@ -1010,6 +1028,251 @@ public partial class VersionedFhirStore : IFhirStore
         return resource.ToTypedElement().ToScopedNode();
     }
 
+    /// <summary>Performs the interaction specified in the request.</summary>
+    /// <param name="ctx">            The request context.</param>
+    /// <param name="response">       [out] The response data.</param>
+    /// <param name="serializeReturn">(Optional) True to serialize return.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool PerformInteraction(
+        FhirRequestContext ctx,
+        out FhirResponseContext response,
+        bool serializeReturn = true)
+    {
+        switch (ctx.Interaction)
+        {
+            case Common.StoreInteractionCodes.InstanceDelete:
+                {
+                    if (serializeReturn)
+                    {
+                        return InstanceDelete(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoInstanceDelete(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.InstanceOperation:
+                {
+                    if (serializeReturn)
+                    {
+                        return InstanceOperation(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoInstanceOperation(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.InstanceRead:
+                {
+                    if (serializeReturn)
+                    {
+                        return InstanceRead(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoInstanceRead(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.InstanceUpdate:
+            case Common.StoreInteractionCodes.InstanceUpdateConditional:
+                {
+                    if (serializeReturn || (ctx.SourceObject == null) || (ctx.SourceObject is not Resource r))
+                    {
+                        return InstanceUpdate(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoInstanceUpdate(ctx, r, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.TypeCreate:
+            case Common.StoreInteractionCodes.TypeCreateConditional:
+                {
+                    if (serializeReturn || (ctx.SourceObject == null) || (ctx.SourceObject is not Resource r))
+                    {
+                        return InstanceCreate(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoInstanceCreate(ctx, r, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.TypeDeleteConditional:
+            case Common.StoreInteractionCodes.TypeDeleteConditionalSingle:
+            case Common.StoreInteractionCodes.TypeDeleteConditionalMultiple:
+                {
+                    if (serializeReturn)
+                    {
+                        return TypeDelete(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoTypeDelete(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.TypeOperation:
+                {
+                    if (serializeReturn)
+                    {
+                        return TypeOperation(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoTypeOperation(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.TypeSearch:
+                {
+                    if (serializeReturn)
+                    {
+                        return TypeSearch(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoTypeSearch(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.SystemCapabilities:
+                {
+                    if (serializeReturn)
+                    {
+                        return GetMetadata(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoGetMetadata(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.SystemBundle:
+                {
+                    if (serializeReturn || (ctx.SourceObject == null) || (ctx.SourceObject is not Bundle b))
+                    {
+                        return ProcessBundle(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoProcessBundle(ctx, b, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.SystemDeleteConditional:
+                {
+                    if (serializeReturn)
+                    {
+                        return SystemDelete(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoSystemDelete(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.SystemOperation:
+                {
+                    if (serializeReturn)
+                    {
+                        return SystemOperation(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoSystemOperation(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.SystemSearch:
+                {
+                    if (serializeReturn)
+                    {
+                        return SystemSearch(ctx, out response);
+                    }
+                    else
+                    {
+                        return DoSystemSearch(ctx, out response);
+                    }
+                }
+
+            case Common.StoreInteractionCodes.CompartmentOperation:
+            case Common.StoreInteractionCodes.CompartmentSearch:
+            case Common.StoreInteractionCodes.CompartmentTypeSearch:
+            case Common.StoreInteractionCodes.InstanceDeleteHistory:
+            case Common.StoreInteractionCodes.InstanceDeleteVersion:
+            case Common.StoreInteractionCodes.InstancePatch:
+            case Common.StoreInteractionCodes.InstancePatchConditional:
+            case Common.StoreInteractionCodes.InstanceReadHistory:
+            case Common.StoreInteractionCodes.InstanceReadVersion:
+            case Common.StoreInteractionCodes.TypeHistory:
+            case Common.StoreInteractionCodes.SystemHistory:
+            default:
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.NotImplemented,
+                        $"Interaction not implemented: {ctx.Interaction}",
+                        OperationOutcome.IssueType.NotSupported),
+                    StatusCode = HttpStatusCode.NotImplemented,
+                };
+                return false;
+        }
+    }
+
+    /// <summary>Gets the hooks.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="interaction"> The interaction.</param>
+    /// <returns>An array of i FHIR interaction hook.</returns>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private IEnumerable<IFhirInteractionHook> GetHooks(string resourceType, Common.StoreInteractionCodes interaction)
+    {
+        if (!_hooksByInteractionByResource.TryGetValue(resourceType, out Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]>? hooksByInteraction))
+        {
+            return Enumerable.Empty<IFhirInteractionHook>();
+        }
+
+        if ((!hooksByInteraction.TryGetValue(interaction, out IFhirInteractionHook[]? hooks)) ||
+            (hooks == null))
+        {
+            return Enumerable.Empty<IFhirInteractionHook>();
+        }
+
+        return hooks;
+    }
+
+    /// <summary>Gets the hooks.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="interactions">The interactions.</param>
+    /// <returns>An array of i FHIR interaction hook.</returns>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private IEnumerable<IFhirInteractionHook> GetHooks(string resourceType, IEnumerable<Common.StoreInteractionCodes> interactions)
+    {
+        if (!_hooksByInteractionByResource.TryGetValue(resourceType, out Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]>? hooksByInteraction))
+        {
+            return Enumerable.Empty<IFhirInteractionHook>();
+        }
+
+        List<IFhirInteractionHook[]> collector = new();
+
+        foreach (Common.StoreInteractionCodes interaction in interactions)
+        {
+            if ((!hooksByInteraction.TryGetValue(interaction, out IFhirInteractionHook[]? hooks)) ||
+                (hooks == null))
+            {
+                continue;
+            }
+
+            collector.Add(hooks);
+        }
+
+        return collector.SelectMany(v => v);
+    }
+
     /// <summary>Instance create.</summary>
     /// <param name="ctx">     The request context.</param>
     /// <param name="response">[out] The response data.</param>
@@ -1107,9 +1370,9 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        _hooksByInteraction.TryGetValue(
-            string.IsNullOrEmpty(ctx.IfNoneExist) ? Common.StoreInteractionCodes.TypeCreate : Common.StoreInteractionCodes.TypeCreateConditional, 
-            out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(
+            resourceType,
+            string.IsNullOrEmpty(ctx.IfNoneExist) ? Common.StoreInteractionCodes.TypeCreate : Common.StoreInteractionCodes.TypeCreateConditional);
 
         if (hooks?.Any() ?? false)
         {
@@ -1284,27 +1547,41 @@ public partial class VersionedFhirStore : IFhirStore
     {
         const string resourceType = "Bundle";
 
-        HttpStatusCode sc = Utils.TryDeserializeFhir(ctx.SourceContent, ctx.SourceFormat, out Resource? r, out string exMessage);
+        Resource? r;
 
-        if ((!sc.IsSuccessful()) || (r == null))
+        if ((ctx.SourceObject != null) &&
+            (ctx.SourceObject is Resource))
         {
-            OperationOutcome outcome = Utils.BuildOutcomeForRequest(
-                sc,
-                $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
-                OperationOutcome.IssueType.Structure);
+            r = ctx.SourceObject as Resource;
+        }
+        else
+        {
+            HttpStatusCode sc = Utils.TryDeserializeFhir(
+                ctx.SourceContent,
+                ctx.SourceFormat,
+                out r,
+                out string exMessage);
 
-            response = new()
+            if ((!sc.IsSuccessful()) || (r == null))
             {
-                Outcome = outcome,
-                SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
-                StatusCode = sc,
-            };
+                OperationOutcome outcome = Utils.BuildOutcomeForRequest(
+                    sc,
+                    $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
+                    OperationOutcome.IssueType.Structure);
 
-            return false;
+                response = new()
+                {
+                    Outcome = outcome,
+                    SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                    StatusCode = sc,
+                };
+
+                return false;
+            }
         }
 
-        if ((r.TypeName != resourceType) ||
-            (!(r is Bundle requestBundle)))
+        if ((r!.TypeName != resourceType) ||
+            (r is not Bundle requestBundle))
         {
             OperationOutcome outcome = Utils.BuildOutcomeForRequest(
                 HttpStatusCode.UnprocessableEntity,
@@ -1321,6 +1598,34 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
+        bool success = DoProcessBundle(
+            ctx,
+            requestBundle,
+            out response);
+
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
+        {
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
+
+        return success;
+    }
+
+    /// <summary>Executes the process bundle operation.</summary>
+    /// <param name="ctx">          The request context.</param>
+    /// <param name="requestBundle">The request bundle.</param>
+    /// <param name="response">     [out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoProcessBundle(
+        FhirRequestContext ctx,
+        Bundle requestBundle,
+        out FhirResponseContext response)
+    {
         Bundle responseBundle = new Bundle()
         {
             Id = Guid.NewGuid().ToString(),
@@ -1356,18 +1661,10 @@ public partial class VersionedFhirStore : IFhirStore
                 }
         }
 
-        OperationOutcome successOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Processed {requestBundle.Type} bundle");
-
-        string sr = responseBundle == null ? string.Empty : Utils.SerializeFhir(responseBundle, ctx.DestinationFormat, ctx.SerializePretty);
-        string so = Utils.SerializeFhir(successOutcome, ctx.DestinationFormat, ctx.SerializePretty);
-
         response = new()
         {
-            MimeType = ctx.DestinationFormat,
             Resource = responseBundle,
-            SerializedResource = sr,
-            Outcome = successOutcome,
-            SerializedOutcome = so,
+            Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Processed {requestBundle.Type} bundle"),
             StatusCode = HttpStatusCode.OK,
         };
 
@@ -1420,7 +1717,7 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.InstanceDelete, out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.InstanceDelete);
 
         if (hooks?.Any() ?? false)
         {
@@ -1591,7 +1888,7 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.InstanceRead, out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.InstanceRead);
 
         if (hooks?.Any() ?? false)
         {
@@ -1946,9 +2243,9 @@ public partial class VersionedFhirStore : IFhirStore
 
         HttpStatusCode sc;
 
-        _hooksByInteraction.TryGetValue(
-            string.IsNullOrEmpty(ctx.UrlQuery) ? Common.StoreInteractionCodes.InstanceUpdate : Common.StoreInteractionCodes.InstanceUpdateConditional, 
-            out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(
+            ctx.ResourceType,
+            string.IsNullOrEmpty(ctx.UrlQuery) ? Common.StoreInteractionCodes.InstanceUpdate : Common.StoreInteractionCodes.InstanceUpdateConditional);
 
         if (hooks?.Any() ?? false)
         {
@@ -2968,7 +3265,7 @@ public partial class VersionedFhirStore : IFhirStore
             }
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemOperation, out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.SystemOperation);
 
         if (hooks?.Any() ?? false)
         {
@@ -3181,7 +3478,7 @@ public partial class VersionedFhirStore : IFhirStore
             }
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeOperation, out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.TypeOperation);
 
         if (hooks?.Any() ?? false)
         {
@@ -3407,7 +3704,7 @@ public partial class VersionedFhirStore : IFhirStore
             }
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.InstanceOperation, out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.InstanceOperation);
 
         if (hooks?.Any() ?? false)
         {
@@ -3588,7 +3885,7 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemDeleteConditional, out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.SystemDeleteConditional);
 
         if (hooks?.Any() ?? false)
         {
@@ -3795,26 +4092,14 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        IFhirInteractionHook[] hooks = Array.Empty<IFhirInteractionHook>();
-
-        if (_hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeDeleteConditional, out IFhirInteractionHook[]? subHooks) &&
-            (subHooks?.Any() ?? false))
-        {
-            hooks = hooks.Concat(subHooks).ToArray();
-        }
-
-        if (_hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeDeleteConditionalSingle, out subHooks) &&
-            (subHooks?.Any() ?? false))
-        {
-            hooks = hooks.Concat(subHooks).ToArray();
-        }
-
-        if (_hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeDeleteConditionalMultiple, out subHooks) &&
-            (subHooks?.Any() ?? false))
-        {
-            hooks = hooks.Concat(subHooks).ToArray();
-        }
-
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(
+            ctx.ResourceType,
+            new Common.StoreInteractionCodes[] 
+            { 
+                Common.StoreInteractionCodes.TypeDeleteConditional,
+                Common.StoreInteractionCodes.TypeDeleteConditionalSingle,
+                Common.StoreInteractionCodes.TypeDeleteConditionalMultiple,
+            });
         if (hooks?.Any() ?? false)
         {
             foreach (IFhirInteractionHook hook in hooks)
@@ -3963,7 +4248,7 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeSearch, out IFhirInteractionHook[]? hooks);
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.TypeSearch);
         if (hooks?.Any() ?? false)
         {
             foreach (IFhirInteractionHook hook in hooks)
@@ -4175,8 +4460,7 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemSearch, out IFhirInteractionHook[]? hooks);
-
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.SystemSearch);
         if (hooks?.Any() ?? false)
         {
             foreach (IFhirInteractionHook hook in hooks)
@@ -4646,8 +4930,7 @@ public partial class VersionedFhirStore : IFhirStore
         FhirRequestContext ctx,
         out FhirResponseContext response)
     {
-        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemCapabilities, out IFhirInteractionHook[]? hooks);
-
+        IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.SystemCapabilities);
         if (hooks?.Any() ?? false)
         {
             foreach (IFhirInteractionHook hook in hooks)
@@ -5112,10 +5395,12 @@ public partial class VersionedFhirStore : IFhirStore
 
                 HttpMethod = entry.Request.Method?.ToString() ?? string.Empty,
                 Url = entry.Request.Url,
-                IfMatch = entry.Request.IfMatch,
+                IfMatch = entry.Request.IfMatch ?? string.Empty,
                 IfModifiedSince = entry.Request.IfModifiedSince?.ToFhirDateTime() ?? string.Empty,
-                IfNoneMatch = entry.Request.IfNoneMatch,
+                IfNoneMatch = entry.Request.IfNoneMatch ?? string.Empty,
                 IfNoneExist = entry.Request.IfNoneExist ?? string.Empty,
+
+                SourceObject = entry.Resource,
             };
 
             if (entryCtx.Interaction == null)
@@ -5128,7 +5413,7 @@ public partial class VersionedFhirStore : IFhirStore
                         Status = HttpStatusCode.InternalServerError.ToString(),
                         Outcome = Utils.BuildOutcomeForRequest(
                             HttpStatusCode.NotImplemented,
-                            $"Unknown/unsupported request: {entry.Request.Method} {entry.Request.Url}",
+                            $"Request could not be parsed to known interaction: {entry.Request.Method} {entry.Request.Url}",
                             OperationOutcome.IssueType.NotSupported),
                     },
                 });
@@ -5156,384 +5441,53 @@ public partial class VersionedFhirStore : IFhirStore
                 continue;
             }
 
-            switch (entryCtx.Interaction)
+            // attempt the request specified
+            opSuccess = PerformInteraction(entryCtx, out opResponse, false);
+            if (opSuccess)
             {
-                case Common.StoreInteractionCodes.InstanceDelete:
-                    {
-                        opSuccess = DoInstanceDelete(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.InstanceOperation:
-                    {
-                        opSuccess = DoInstanceOperation(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.InstanceRead:
-                    {
-                        opSuccess = DoInstanceRead(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.InstanceUpdate:
-                case Common.StoreInteractionCodes.InstanceUpdateConditional:
-                    {
-                        if (entry.Resource == null)
-                        {
-                            response.Entry.Add(new Bundle.EntryComponent()
-                            {
-                                FullUrl = entry.FullUrl,
-                                Response = new Bundle.ResponseComponent()
-                                {
-                                    Status = HttpStatusCode.BadRequest.ToString(),
-                                    Outcome = Utils.BuildOutcomeForRequest(
-                                        HttpStatusCode.UnprocessableEntity, 
-                                        $"Update requests require Bundle.entry.resource: {entry.Request.Method} {entry.Request.Url}",
-                                        OperationOutcome.IssueType.Required),
-                                },
-                            });
-
-                            continue;
-                        }
-
-                        opSuccess = DoInstanceUpdate(
-                            entryCtx,
-                            entry.Resource,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.TypeCreate:
-                case Common.StoreInteractionCodes.TypeCreateConditional:
-                    {
-                        if (entry.Resource == null)
-                        {
-                            response.Entry.Add(new Bundle.EntryComponent()
-                            {
-                                FullUrl = entry.FullUrl,
-                                Response = new Bundle.ResponseComponent()
-                                {
-                                    Status = HttpStatusCode.BadRequest.ToString(),
-                                    Outcome = Utils.BuildOutcomeForRequest(
-                                        HttpStatusCode.UnprocessableEntity,
-                                        $"Create requests require Bundle.entry.resource: {entry.Request.Method} {entry.Request.Url}",
-                                        OperationOutcome.IssueType.Required),
-                                },
-                            });
-
-                            continue;
-                        }
-
-                        opSuccess = DoInstanceCreate(
-                            entryCtx,
-                            entry.Resource,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.TypeDeleteConditional:
-                case Common.StoreInteractionCodes.TypeDeleteConditionalSingle:
-                case Common.StoreInteractionCodes.TypeDeleteConditionalMultiple:
-                    {
-                        opSuccess = DoTypeDelete(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.TypeOperation:
-                    {
-                        opSuccess = DoTypeOperation(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.TypeSearch:
-                    {
-                        opSuccess = DoTypeSearch(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.SystemCapabilities:
-                    {
-                        opSuccess = DoGetMetadata(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.SystemBundle:
-                    {
-                        if ((entry.Resource != null) &&
-                            (entry.Resource is Bundle b) &&
-                            (b.Type == Bundle.BundleType.Batch))
-                        {
-                            Bundle responseBundle = new Bundle()
-                            {
-                                Id = Guid.NewGuid().ToString(),
-                                Type = Bundle.BundleType.BatchResponse,
-                            };
-
-                            ProcessBatch(entryCtx, b, responseBundle);
-
-                            response.Entry.Add(new Bundle.EntryComponent()
-                            {
-                                FullUrl = entry.FullUrl,
-                                Resource = responseBundle,
-                                Response = new Bundle.ResponseComponent()
-                                {
-                                    Status = HttpStatusCode.OK.ToString(),
-                                    Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, "Processed batch, see result bundle for details."),
-                                },
-                            });
-
-                            continue;
-                        }
-                    }
-                    break;
-
-                case Common.StoreInteractionCodes.SystemDeleteConditional:
-                    {
-                        opSuccess = DoSystemDelete(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.SystemOperation:
-                    {
-                        opSuccess = DoSystemOperation(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.SystemSearch:
-                    {
-                        opSuccess = DoSystemSearch(
-                            entryCtx,
-                            out opResponse);
-
-                        response.Entry.Add(new Bundle.EntryComponent()
-                        {
-                            FullUrl = entry.FullUrl,
-                            Resource = (Resource?)opResponse.Resource,
-                            Response = new Bundle.ResponseComponent()
-                            {
-                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
-                                Outcome = (Resource?)opResponse.Outcome,
-                                Etag = opResponse.ETag ?? string.Empty,
-                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
-                                Location = opResponse.Location ?? string.Empty,
-                            },
-                        });
-
-                        continue;
-                    }
-
-                case Common.StoreInteractionCodes.CompartmentOperation:
-                case Common.StoreInteractionCodes.CompartmentSearch:
-                case Common.StoreInteractionCodes.CompartmentTypeSearch:
-                case Common.StoreInteractionCodes.InstanceDeleteHistory:
-                case Common.StoreInteractionCodes.InstanceDeleteVersion:
-                case Common.StoreInteractionCodes.InstancePatch:
-                case Common.StoreInteractionCodes.InstancePatchConditional:
-                case Common.StoreInteractionCodes.InstanceReadHistory:
-                case Common.StoreInteractionCodes.InstanceReadVersion:
-                case Common.StoreInteractionCodes.TypeHistory:
-                case Common.StoreInteractionCodes.SystemHistory:
-                case null:
-                default:
-                    break;
-            }
-
-            response.Entry.Add(new Bundle.EntryComponent()
-            {
-                FullUrl = entry.FullUrl,
-                Response = new Bundle.ResponseComponent()
+                response.Entry.Add(new Bundle.EntryComponent()
                 {
-                    Status = HttpStatusCode.InternalServerError.ToString(),
-                    Outcome = Utils.BuildOutcomeForRequest(
-                        HttpStatusCode.NotImplemented, 
-                        $"Unknown/unsupported request: {entry.Request.Method} {entry.Request.Url}, parsed interaction: {entryCtx.Interaction}",
-                        OperationOutcome.IssueType.NotSupported),
-                },
-            });
+                    FullUrl = entry.FullUrl,
+                    Resource = (Resource?)opResponse.Resource,
+                    Response = new Bundle.ResponseComponent()
+                    {
+                        Status = (opResponse.StatusCode ?? HttpStatusCode.OK).ToString(),
+                        Outcome = (Resource?)opResponse.Outcome,
+                        Etag = opResponse.ETag ?? string.Empty,
+                        LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                        Location = opResponse.Location ?? string.Empty,
+                    },
+                });
+            }
+            else
+            {
+                if ((opResponse.Outcome == null) || (opResponse.Outcome is not OperationOutcome oo))
+                {
+                    oo = Utils.BuildOutcomeForRequest(
+                            HttpStatusCode.NotImplemented,
+                            $"Unsupported request: {entry.Request.Method} {entry.Request.Url}, parsed interaction: {entryCtx.Interaction}",
+                            OperationOutcome.IssueType.NotSupported);
+                }
+                else
+                {
+                    oo.Issue.Add(new OperationOutcome.IssueComponent()
+                    {
+                        Severity = OperationOutcome.IssueSeverity.Error,
+                        Code = OperationOutcome.IssueType.NotSupported,
+                        Diagnostics = $"Unsupported request: {entry.Request.Method} {entry.Request.Url}, parsed interaction: {entryCtx.Interaction}",
+                    });
+                }
 
+                response.Entry.Add(new Bundle.EntryComponent()
+                {
+                    FullUrl = entry.FullUrl,
+                    Response = new Bundle.ResponseComponent()
+                    {
+                        Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                        Outcome = oo,
+                    },
+                });
+            }
         }
     }
 

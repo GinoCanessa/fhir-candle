@@ -23,14 +23,18 @@ public static partial class Common
         InstanceDeleteVersion,
         InstanceOperation,
         InstancePatch,
+        InstancePatchConditional,
         InstanceRead,
         InstanceReadHistory,
         InstanceReadVersion,
         InstanceUpdate,
+        InstanceUpdateConditional,
 
         TypeCreate,
         TypeCreateConditional,
         TypeDeleteConditional,
+        TypeDeleteConditionalSingle,
+        TypeDeleteConditionalMultiple,
         TypeHistory,
         TypeOperation,
         TypeSearch,
@@ -41,5 +45,21 @@ public static partial class Common
         SystemHistory,
         SystemOperation,
         SystemSearch,
+    }
+
+    /// <summary>Values that represent hook request states.</summary>
+    public enum HookRequestStateCodes
+    {
+        /// <summary>Hooks executed before a request is processed.</summary>
+        Pre,
+
+        /// <summary>Hooks executed after a request is processed.</summary>
+        Post,
+
+        ///// <summary>Hooks executed after a request is sucessfully processed.</summary>
+        //OnSuccess,
+        
+        ///// <summary>Hooks executed after a request has failed.</summary>
+        //OnFail,
     }
 }

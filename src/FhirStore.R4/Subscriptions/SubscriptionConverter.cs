@@ -63,7 +63,7 @@ public class SubscriptionConverter
             ChannelSystem = string.Empty,
             ChannelCode = sub.Channel.Type == null
                 ? string.Empty
-                : Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Channel.Type),
+                : Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Channel.Type)!,
             Endpoint = sub.Channel.Endpoint ?? string.Empty,
             ContentType = sub.Channel.Payload?.ToString() ?? string.Empty,
             ExpirationTicks = sub.End?.Ticks ?? (DateTime.Now.Ticks + ParsedSubscription.DefaultSubscriptionExpiration),

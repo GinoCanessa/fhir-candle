@@ -12,13 +12,15 @@ namespace FhirCandle.Models;
 /// <param name="RoutePath">         Full pathname of the route file.</param>
 /// <param name="FhirVersionLiteral">The FHIR version literal.</param>
 /// <param name="FhirVersionNumeric">The FHIR version numeric.</param>
+/// <param name="OnlyShowOnEndpoint">The only show on endpoint.</param>
 public record struct PackagePageInfo(
     string ContentFor, 
     string PageName, 
     string Description, 
     string RoutePath, 
     string FhirVersionLiteral, 
-    string FhirVersionNumeric);
+    string FhirVersionNumeric,
+    string OnlyShowOnEndpoint);
 
 /// <summary>Interface for package/ri pages.</summary>
 public interface IPackagePage
@@ -40,4 +42,7 @@ public interface IPackagePage
 
     /// <summary>Gets the FHIR version numeric.</summary>
     public virtual static string FhirVersionNumeric { get => string.Empty; }
+
+    /// <summary>Gets the only show on endpoint.</summary>
+    public virtual static string OnlyShowOnEndpoint { get => string.Empty; }
 }

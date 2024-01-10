@@ -62,37 +62,35 @@ public class OpSubscriptionHook : IFhirOperation
     public HashSet<string> SupportedResources => new();
 
     /// <summary>Executes the system $subscription-hook operation.</summary>
-    /// <param name="ctx">             The authentication.</param>
-    /// <param name="store">           The store.</param>
-    /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="responseResource">[out] The response resource.</param>
-    /// <param name="responseOutcome"> [out] The response outcome.</param>
-    /// <param name="contentLocation"> [out] The content location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoOperation(
+    /// <param name="ctx">          The authentication.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="focusResource">The focus resource.</param>
+    /// <param name="bodyResource"> The body resource.</param>
+    /// <param name="opResponse">   [out] The response resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool DoOperation(
         FhirRequestContext ctx,
         VersionedFhirStore store,
         IVersionedResourceStore? resourceStore,
         Hl7.Fhir.Model.Resource? focusResource,
         Hl7.Fhir.Model.Resource? bodyResource,
-        out Hl7.Fhir.Model.Resource? responseResource,
-        out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation)
+        out FhirResponseContext opResponse)
     {
         if ((bodyResource == null) ||
             (!(bodyResource is Hl7.Fhir.Model.Bundle bundle)) ||
             (!bundle.Entry.Any()) ||
             (bundle.Entry.First().Resource == null))
         {
-            responseResource = null;
-            responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity,
-                "Posted content is not a valid Subscription notification bundle");
-            contentLocation = string.Empty;
+            opResponse = new()
+            {
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    "Posted content is not a valid Subscription notification bundle"),
+            };
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         if (string.IsNullOrEmpty(bundle.Id))
@@ -104,13 +102,15 @@ public class OpSubscriptionHook : IFhirOperation
 
         if (status == null)
         {
-            responseResource = null;
-            responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity,
-                "Posted content is not a valid Subscription notification bundle");
-            contentLocation = string.Empty;
+            opResponse = new()
+            {
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    "Posted content is not a valid Subscription notification bundle"),
+            };
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         // TODO: Clean up interfaces and types so we can avoid casts like this
@@ -120,10 +120,15 @@ public class OpSubscriptionHook : IFhirOperation
         // register the notification received event
         store.RegisterReceivedNotification(r?.Id ?? bundle.Id, status);
 
-        responseResource = null;
-        responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(HttpStatusCode.OK, "Subscription Notification Received");
-        contentLocation = string.Empty;
-        return HttpStatusCode.OK;
+        opResponse = new()
+        {
+            StatusCode = HttpStatusCode.OK,
+            Outcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                HttpStatusCode.OK,
+                "Subscription Notification Received"),
+        };
+
+        return true;
     }
 
     /// <summary>Gets an OperationDefinition for this operation.</summary>

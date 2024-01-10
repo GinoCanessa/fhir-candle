@@ -27,12 +27,12 @@
     <MudLink Href="@($"/subscriptions/tour?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
 </MudText>
 <br />
-<MudText Typo="Typo.body1">
+@* <MudText Typo="Typo.body1">
     If you are building or testing a topic-based subscription server implementation, there is a client available
     <MudLink Href="@($"/subscriptions/client?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
 </MudText>
 <br />
-
+ *@
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]

@@ -20,11 +20,11 @@
         <MudGrid Spacing="2" Justify="Justify.FlexStart" Style="align-items: center;">
             <MudItem xs="2">
                 <MudSelect T="string"
-                           Label="Format"
-                           Value="@_resourceFormatCode"
-                           ValueChanged="@OnUserFormatChanged"
-                           FullWidth="false"
-                           Variant="Variant.Outlined">
+                            Label="Format"
+                            Value="@_resourceFormatCode"
+                            ValueChanged="@OnUserFormatChanged"
+                            FullWidth="false"
+                            Variant="Variant.Outlined">
                     <MudSelectItem Value="@("json")">JSON</MudSelectItem>
                     <MudSelectItem Value="@("xml")">XML</MudSelectItem>
                 </MudSelect>
@@ -67,7 +67,7 @@
         Language="@_resourceFormatCode"
         EditorContent="@_resourceContent"
         />
-
+ 
 </MudStack>
 
 @code {
@@ -101,29 +101,32 @@
     /// <summary>Loads resource content.</summary>
     private void LoadResourceContent()
     {
-        string content;
+        FhirResponseContext response;
 
         // check for needing to generate metadata
         if (ResourceType.Equals("CapabilityStatement", StringComparison.Ordinal) &&
             Id.Equals("metadata", StringComparison.Ordinal))
         {
-            _ = _store.TryGetMetadata(
-                $"application/fhir+{_resourceFormatCode}",
-                true,
-                out content);
+            FhirRequestContext ctx = new FhirRequestContext(_store, "GET", $"{_store.Config.BaseUrl}/metadata")
+            {
+                DestinationFormat = $"application/fhir+{_resourceFormatCode}",
+                SerializePretty = true,
+            };
 
+            _ = _store.GetMetadata(ctx, out response);
         }
         else
         {
-            _ = _store.TryInstanceRead(
-                ResourceType,
-                Id,
-                $"application/fhir+{_resourceFormatCode}",
-                true,
-                out content);
+            FhirRequestContext ctx = new FhirRequestContext(_store, "GET", $"{_store.Config.BaseUrl}/{ResourceType}/{Id}")
+            {
+                DestinationFormat = $"application/fhir+{_resourceFormatCode}",
+                SerializePretty = true,
+            };
+
+            _ = _store.InstanceRead(ctx, out response);
         }
 
-        _resourceContent = content;
+        _resourceContent = response.SerializedResource;
     }
 
     private void OnUserFormatChanged(string format)

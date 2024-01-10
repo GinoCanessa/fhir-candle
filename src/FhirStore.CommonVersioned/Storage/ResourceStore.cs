@@ -16,6 +16,7 @@ using System.Collections;
 using System.Net;
 using FhirCandle.Serialization;
 using Hl7.Fhir.Language.Debugging;
+using FhirCandle.Interactions;
 
 namespace FhirCandle.Storage;
 

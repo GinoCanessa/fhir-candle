@@ -71,6 +71,8 @@ public class R4Tests
             ControllerName = "r4",
             BaseUrl = "http://localhost/fhir/r4",
             LoadDirectory = loadDirectory,
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _store = new VersionedFhirStore();
@@ -117,11 +119,7 @@ public class R4TestsPatientLooped : IClassFixture<R4Tests>
 
         for (int i = 0; i < loopCount; i++)
         {
-            _fixture._store.TypeSearch(
-                ctx,
-                out string bundle, 
-                out string outcome);
-            bundle.Should().NotBeNullOrEmpty();
+            _fixture._store.TypeSearch(ctx, out _).Should().BeTrue();
         }
     }
 }
@@ -199,14 +197,15 @@ public class R4TestsObservation : IClassFixture<R4Tests>
             DestinationFormat = "application/fhir+json",
         };
 
-        _fixture._store.TypeSearch(
+        bool success = _fixture._store.TypeSearch(
             ctx,
-            out string bundle, 
-            out _);
+            out FhirResponseContext response);
 
-        bundle.Should().NotBeNullOrEmpty();
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
 
-        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(bundle);
+        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(response.SerializedResource);
 
         results.Should().NotBeNull();
         results!.Total.Should().Be(matchCount);
@@ -304,14 +303,15 @@ public class R4TestsPatient : IClassFixture<R4Tests>
             DestinationFormat = "application/fhir+json",
         };
 
-        _fixture._store.TypeSearch(
+        bool success = _fixture._store.TypeSearch(
             ctx,
-            out string bundle, 
-            out _);
+            out FhirResponseContext response);
 
-        bundle.Should().NotBeNullOrEmpty();
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
 
-        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(bundle);
+        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(response.SerializedResource);
 
         results.Should().NotBeNull();
         results!.Total.Should().Be(matchCount);
@@ -450,28 +450,23 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             SourceContent = ChangeId(json, id),
             DestinationFormat = "application/fhir+json",
             IfNoneExist = "_id=" + id,
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
         // test conditional that has no matches
-        HttpStatusCode sc = _fixture._store.InstanceCreate(
+        bool success = _fixture._store.InstanceCreate(
             ctx,
-            out string serializedResource,
-            out string serializedOutcome,
-            out string eTag,
-            out string lastModified,
-            out string location);
+            out FhirResponseContext response);
 
-        sc.Should().Be(HttpStatusCode.Created);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Contain($"{resourceType}/{id}");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.LastModified.Should().NotBeNullOrEmpty();
+        response.Location.Should().Contain($"{resourceType}/{id}");
 
-        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
-            serializedResource,
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            response.SerializedResource,
             "application/fhir+json",
             out Hl7.Fhir.Model.Resource? r,
             out _);
@@ -501,25 +496,20 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             SourceFormat = "application/fhir+json",
             SourceContent = ChangeId(json, id),
             DestinationFormat = "application/fhir+json",
-            AllowExistingId = true,
-            AllowCreateAsUpdate = true,
         };
 
         // first, store our resource
-        HttpStatusCode sc = _fixture._store.InstanceCreate(
+        bool success = _fixture._store.InstanceCreate(
             ctx,
-            out string serializedResource,
-            out string serializedOutcome,
-            out string eTag,
-            out string lastModified,
-            out string location);
+            out FhirResponseContext response);
 
-        sc.Should().Be(HttpStatusCode.Created);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Contain($"{resourceType}/{id}");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.LastModified.Should().NotBeNullOrEmpty();
+        response.Location.Should().Contain($"{resourceType}/{id}");
 
         ctx = ctx with
         {
@@ -527,24 +517,21 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         };
 
         // now, store it conditionally with a single match
-        sc = _fixture._store.InstanceCreate(
+        success = _fixture._store.InstanceCreate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out response);
 
         // all contents should match original - not a new version
-        sc.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Contain($"{resourceType}/{id}");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.LastModified.Should().NotBeNullOrEmpty();
+        response.Location.Should().Contain($"{resourceType}/{id}");
 
-        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
-            serializedResource,
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            response.SerializedResource,
             "application/fhir+json",
             out Hl7.Fhir.Model.Resource? r,
             out _);
@@ -576,28 +563,23 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             SourceFormat = "application/fhir+json",
             SourceContent = ChangeId(json, id1),
             DestinationFormat = "application/fhir+json",
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
         // first, store our resource
-        HttpStatusCode sc = _fixture._store.InstanceCreate(
+        bool success = _fixture._store.InstanceCreate(
             ctx,
-            out string serializedResource,
-            out string serializedOutcome,
-            out string eTag,
-            out string lastModified,
-            out string location);
+            out FhirResponseContext response);
 
-        sc.Should().Be(HttpStatusCode.Created);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Contain($"{resourceType}/{id1}");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.LastModified.Should().NotBeNullOrEmpty();
+        response.Location.Should().Contain($"{resourceType}/{id1}");
 
-        sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
-            serializedResource,
+        HttpStatusCode sc = candleR4.FhirCandle.Serialization.Utils.TryDeserializeFhir(
+            response.SerializedResource,
             "application/fhir+json",
             out Hl7.Fhir.Model.Resource? r,
             out _);
@@ -613,20 +595,17 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         };
 
         // now store the second resource
-        sc = _fixture._store.InstanceCreate(
+        success = _fixture._store.InstanceCreate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out response);
 
-        sc.Should().Be(HttpStatusCode.Created);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Contain($"{resourceType}/{id2}");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.LastModified.Should().NotBeNullOrEmpty();
+        response.Location.Should().Contain($"{resourceType}/{id2}");
 
         ctx = ctx with
         {
@@ -635,21 +614,18 @@ public class R4TestConditionals : IClassFixture<R4Tests>
         };
 
         // now attempt to store with a conditional create that matches both
-        sc = _fixture._store.InstanceCreate(
+        success = _fixture._store.InstanceCreate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out response);
 
         // this should fail
-        sc.Should().Be(HttpStatusCode.PreconditionFailed);
-        serializedResource.Should().BeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().BeNullOrEmpty();
-        lastModified.Should().BeNullOrEmpty();
-        location.Should().BeNullOrEmpty();
+        success.Should().BeFalse();
+        response.StatusCode.Should().Be(HttpStatusCode.PreconditionFailed);
+        response.SerializedResource.Should().BeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().BeNullOrEmpty();
+        response.LastModified.Should().BeNullOrEmpty();
+        response.Location.Should().BeNullOrEmpty();
     }
 }
 

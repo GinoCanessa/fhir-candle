@@ -83,6 +83,8 @@ public class FhirStoreTests
             FhirVersion = TenantConfiguration.SupportedFhirVersions.R4,
             ControllerName = "r4",
             BaseUrl = "http://localhost/fhir/r4",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _configR4B = new()
@@ -90,6 +92,8 @@ public class FhirStoreTests
             FhirVersion = TenantConfiguration.SupportedFhirVersions.R4B,
             ControllerName = "r4b",
             BaseUrl = "http://localhost/fhir/r4b",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _configR5 = new()
@@ -97,6 +101,8 @@ public class FhirStoreTests
             FhirVersion = TenantConfiguration.SupportedFhirVersions.R5,
             ControllerName = "r5",
             BaseUrl = "http://localhost/fhir/r5",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _candleR4 = new candleR4::FhirCandle.Storage.VersionedFhirStore();
@@ -170,18 +176,17 @@ public class MetadataJson : IClassFixture<FhirStoreTests>
             DestinationFormat = "application/fhir+json",
         };
 
-        HttpStatusCode scRead = fhirStore.GetMetadata(
+        bool success = fhirStore.GetMetadata(
             ctx,
-            out string serializedResource,
-            out string serializedOutcome,
-            out _,
-            out _);
+            out FhirResponseContext? response);
 
-        scRead.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
+        success.Should().Be(true);
+        response.Should().NotBeNull();
+        response!.StatusCode.Should().Be(HttpStatusCode.OK);
+        response!.SerializedResource.Should().NotBeNullOrEmpty();
+        response!.SerializedOutcome.Should().NotBeNullOrEmpty();
 
-        MinimalCapabilities? capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(serializedResource);
+        MinimalCapabilities? capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(response!.SerializedResource);
 
         capabilities.Should().NotBeNull();
         capabilities!.Rest.Should().NotBeNullOrEmpty();
@@ -229,18 +234,16 @@ public class MetadataXml : IClassFixture<FhirStoreTests>
             DestinationFormat = "application/fhir+xml",
         };
 
-        HttpStatusCode scRead = fhirStore.GetMetadata(
+        bool success = fhirStore.GetMetadata(
             ctx,
-            out string serializedResource,
-            out string serializedOutcome,
-            out _,
-            out _);
+            out FhirResponseContext response);
 
-        scRead.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
+        success.Should().Be(true);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
 
-        using (MemoryStream ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(serializedResource)))
+        using (MemoryStream ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(response.SerializedResource)))
         {
             XElement parsed = XElement.Load(ms);
 
@@ -282,8 +285,6 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
 
         IFhirStore fhirStore = _fixture.GetStoreForVersion(version);
 
-        string serializedResource, serializedOutcome, eTag, lastModified, location;
-
         FhirRequestContext ctx = new()
         {
             TenantName = fhirStore.Config.ControllerName,
@@ -294,26 +295,21 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json1,
             DestinationFormat = "application/fhir+json",
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
-        HttpStatusCode sc = fhirStore.InstanceCreate(
+        bool success = fhirStore.InstanceCreate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out FhirResponseContext response);
 
-        sc.Should().Be(HttpStatusCode.Created);
-        location.Should().Contain(_resourceType);
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.Location.Should().Contain(_resourceType);
 
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().EndWith(_resourceType + "/" + _id);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.LastModified.Should().NotBeNullOrEmpty();
+        response.Location.Should().EndWith(_resourceType + "/" + _id);
 
         ctx = new()
         {
@@ -324,22 +320,20 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             Authorization = null,
             SourceFormat = "application/fhir+json",
             DestinationFormat = "application/fhir+json",
-            IfMatch = eTag,
-            IfModifiedSince = lastModified,
+            IfMatch = response.ETag,
+            IfModifiedSince = response.LastModified,
         };
 
-        sc = fhirStore.InstanceRead(
+        success = fhirStore.InstanceRead(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified);
+            out response);
 
-        sc.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        location.Should().EndWith(_resourceType + "/" + _id);
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.Location.Should().EndWith(_resourceType + "/" + _id);
 
         ctx = new()
         {
@@ -351,26 +345,21 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json2,
             DestinationFormat = "application/fhir+json",
-            AllowExistingId = true,
-            AllowCreateAsUpdate = true,
         };
 
-        sc = fhirStore.InstanceUpdate(
+        success = fhirStore.InstanceUpdate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out response);
 
-        sc.Should().Be(HttpStatusCode.OK);
-        location.Should().Contain(_resourceType);
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Location.Should().Contain(_resourceType);
 
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"2\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().EndWith(_resourceType + "/" + _id);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"2\"");
+        response.LastModified.Should().NotBeNullOrEmpty();
+        response.Location.Should().EndWith(_resourceType + "/" + _id);
 
         ctx = new()
         {
@@ -383,13 +372,13 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             DestinationFormat = "application/fhir+json",
         };
 
-        sc = fhirStore.InstanceDelete(
+        success = fhirStore.InstanceDelete(
             ctx,
-            out serializedResource,
-            out serializedOutcome);
+            out response);
 
-        sc.Should().Be(HttpStatusCode.OK);
-        location.Should().Contain(_resourceType);
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Location.Should().BeNullOrEmpty();
 
         ctx = new()
         {
@@ -402,14 +391,12 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             DestinationFormat = "application/fhir+json",
         };
 
-        sc = fhirStore.InstanceRead(
-            ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified);
+        success = fhirStore.InstanceRead(ctx, out response);
 
-        sc.Should().Be(HttpStatusCode.NotFound);
+        success.Should().BeFalse();
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.SerializedResource.Should().BeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
     }
 }
 
@@ -453,19 +440,14 @@ public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json,
             DestinationFormat = "application/fhir+json",
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
-        HttpStatusCode sc = fhirStore.InstanceCreate(
+        bool success = fhirStore.InstanceCreate(
             ctx,
-            out _,
-            out _,
-            out _,
-            out _,
-            out _);
+            out FhirResponseContext response);
 
-        sc.Should().Be(HttpStatusCode.UnprocessableEntity);
+        success.Should().BeFalse();
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 }
 
@@ -508,19 +490,14 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json,
             DestinationFormat = "application/fhir+json",
-            AllowExistingId = true,
-            AllowCreateAsUpdate = true,
         };
 
-        HttpStatusCode sc = fhirStore.InstanceCreate(
+        bool success = fhirStore.InstanceCreate(
             ctx,
-            out _,
-            out _,
-            out _,
-            out _,
-            out _);
+            out FhirResponseContext response);
 
-        sc.IsSuccessful().Should().BeFalse();
+        success.Should().BeFalse();
+        response.StatusCode?.IsSuccessful().Should().BeFalse();
     }
 }
 
@@ -595,7 +572,7 @@ public class TestBundleRequestParsing : IClassFixture<FhirStoreTests>
     [InlineData("POST", "$test?withParams=true", StoreInteractionCodes.SystemOperation)]
     [InlineData("POST", "Patient", StoreInteractionCodes.TypeCreate)]
     [InlineData("POST", "Invalid", null)]
-    [InlineData("POST", "Patient?withParams=true", StoreInteractionCodes.TypeCreate)]
+    [InlineData("POST", "Patient?withParams=true", StoreInteractionCodes.TypeCreateConditional)]
     [InlineData("POST", "Patient/_search", StoreInteractionCodes.TypeSearch)]
     [InlineData("POST", "Invalid/_search", null)]
     [InlineData("POST", "Patient/$test", StoreInteractionCodes.TypeOperation)]

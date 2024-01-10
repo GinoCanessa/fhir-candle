@@ -139,6 +139,16 @@ public static partial class Program
             getDefaultValue: () => new(),
             "FHIR Tenants that allow (but do not require) SMART auth");
 
+        Option<bool?> optCreateExistingId = new(
+            name: "--create-existing-id",
+            getDefaultValue: () => configuration.GetValue<bool>("Create_Existing_Id", true),
+            "Allow Create interactions (POST) to specify an ID.");
+
+        Option<bool?> optCreateAsUpdate = new(
+            name: "--create-as-update",
+            getDefaultValue: () => configuration.GetValue<bool>("Create_As_Update", true),
+            "Allow Update interactions (PUT) to create new resources.");
+
         Option<string> optZulipEmail = new(
             name: "--zulip-email",
             getDefaultValue: () => configuration.GetValue("Zulip_Email", string.Empty) ?? string.Empty,
@@ -198,6 +208,8 @@ public static partial class Program
             optTenantsR5,
             optTenantsSmartRequired,
             optTenantsSmartOptional,
+            optCreateExistingId,
+            optCreateAsUpdate,
             optZulipEmail,
             optZulipKey,
             optZulipUrl,
@@ -231,6 +243,8 @@ public static partial class Program
                 TenantsR5 = context.ParseResult.GetValueForOption(optTenantsR5) ?? new(),
                 SmartRequiredTenants = context.ParseResult.GetValueForOption(optTenantsSmartRequired) ?? new(),
                 SmartOptionalTenants = context.ParseResult.GetValueForOption(optTenantsSmartOptional) ?? new(),
+                AllowExistingId = context.ParseResult.GetValueForOption(optCreateExistingId) ?? true,
+                AllowCreateAsUpdate = context.ParseResult.GetValueForOption(optCreateAsUpdate) ?? true,
                 ZulipEmail = context.ParseResult.GetValueForOption(optZulipEmail) ?? string.Empty,
                 ZulipKey = context.ParseResult.GetValueForOption(optZulipKey) ?? string.Empty,
                 ZulipUrl = context.ParseResult.GetValueForOption(optZulipUrl) ?? string.Empty,
@@ -492,6 +506,8 @@ public static partial class Program
                 MaxResourceCount = config.MaxResourceCount,
                 SmartRequired = smartRequired.Contains(tenant),
                 SmartAllowed = smartOptional.Contains(tenant),
+                AllowExistingId = config.AllowExistingId,
+                AllowCreateAsUpdate = config.AllowCreateAsUpdate,
             });
         }
 
@@ -506,6 +522,8 @@ public static partial class Program
                 MaxResourceCount = config.MaxResourceCount,
                 SmartRequired = smartRequired.Contains(tenant),
                 SmartAllowed = smartOptional.Contains(tenant),
+                AllowExistingId = config.AllowExistingId,
+                AllowCreateAsUpdate = config.AllowCreateAsUpdate,
             });
         }
 
@@ -520,6 +538,8 @@ public static partial class Program
                 MaxResourceCount = config.MaxResourceCount,
                 SmartRequired = smartRequired.Contains(tenant),
                 SmartAllowed = smartOptional.Contains(tenant),
+                AllowExistingId = config.AllowExistingId,
+                AllowCreateAsUpdate = config.AllowCreateAsUpdate,
             });
         }
 

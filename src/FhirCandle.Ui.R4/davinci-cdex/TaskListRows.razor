@@ -61,9 +61,11 @@
             return;
         }
 
-        if ((!Store.TryInstanceRead("Task", id, out object? o)) ||
-            (o == null) ||
-            (!(o is Hl7.Fhir.Model.Task t)))
+        FhirRequestContext ctx = new(Store, "GET", $"Task/{id}");
+
+        if ((!Store.InstanceRead(ctx, out FhirResponseContext response)) ||
+            (response.Resource == null) ||
+            (response.Resource is not Hl7.Fhir.Model.Task t))
         {
             Console.WriteLine($"Error retrieving Task/{id}");
             return;
@@ -71,7 +73,9 @@
 
         t.Status = ts;
 
-        if (!Store.TryInstanceUpdate(t, true, out _, out _))
+        ctx = new(Store, "PUT", $"Task/{id}", t);
+
+        if (!Store.InstanceUpdate(ctx, out _))
         {
             Console.WriteLine($"Error updating Task/{id}!");
         }

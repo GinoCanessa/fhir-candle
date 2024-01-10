@@ -784,9 +784,9 @@
     {
         List<ResourceInfo> patients = new();
 
-        if (ProviderStore.TryTypeSearch("Patient", string.Empty, out object? pb) &&
-            (pb != null) &&
-            (pb is Hl7.Fhir.Model.Bundle patientBundle))
+        if (ProviderStore.TypeSearch(new FhirRequestContext(ProviderStore, "GET", "Patient"), out FhirResponseContext opResponse) &&
+            (opResponse.Resource != null) &&
+            (opResponse.Resource is Hl7.Fhir.Model.Bundle patientBundle))
         {
             foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in patientBundle.Entry)
             {
@@ -823,9 +823,9 @@
         List<ResourceInfo> coverages = new();
         string query;
 
-        if (ProviderStore.TryTypeSearch("Encounter", $"patient={_patient.Id}", out object? eb) &&
-            (eb != null) &&
-            (eb is Hl7.Fhir.Model.Bundle encounterBundle))
+        if (ProviderStore.TypeSearch(new FhirRequestContext(ProviderStore, "GET", $"Encounter?patient={_patient.Id}"), out FhirResponseContext opResponse) &&
+            (opResponse.Resource != null) &&
+            (opResponse.Resource is Hl7.Fhir.Model.Bundle encounterBundle))
         {
             foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in encounterBundle.Entry)
             {
@@ -842,9 +842,9 @@
             }
         }
 
-        if (ProviderStore.TryTypeSearch("Coverage", $"patient={_patient.Id}", out object? cb) &&
-            (cb != null) &&
-            (cb is Hl7.Fhir.Model.Bundle coverageBundle))
+        if (ProviderStore.TypeSearch(new FhirRequestContext(ProviderStore, "GET", $"Coverage?patient={_patient.Id}"), out opResponse) &&
+            (opResponse.Resource != null) &&
+            (opResponse.Resource is Hl7.Fhir.Model.Bundle coverageBundle))
         {
             foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in coverageBundle.Entry)
             {
@@ -861,11 +861,11 @@
             }
         }
 
-        query = $"patient={_patient.Id}&_type={string.Join(',', _allowedPatientRequestTypes)}";
+        query = $"?patient={_patient.Id}&_type={string.Join(',', _allowedPatientRequestTypes)}";
 
-        if (ProviderStore.TrySystemSearch(query, out object? pb) &&
-            (pb != null) &&
-            (pb is Hl7.Fhir.Model.Bundle patientBundle))
+        if (ProviderStore.SystemSearch(new FhirRequestContext(ProviderStore, "GET", query), out opResponse) &&
+            (opResponse.Resource != null) &&
+            (opResponse.Resource is Hl7.Fhir.Model.Bundle patientBundle))
         {
             foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in patientBundle.Entry)
             {
@@ -882,9 +882,9 @@
             }
         }
 
-        if (ProviderStore.TryTypeSearch("Organization", string.Empty, out object? rb) &&
-            (rb != null) &&
-            (rb is Hl7.Fhir.Model.Bundle relatedBundle))
+        if (ProviderStore.TypeSearch(new FhirRequestContext(ProviderStore, "GET", "Organization"), out opResponse) &&
+            (opResponse.Resource != null) &&
+            (opResponse.Resource is Hl7.Fhir.Model.Bundle relatedBundle))
         {
             foreach (Hl7.Fhir.Model.Bundle.EntryComponent entry in relatedBundle.Entry)
             {

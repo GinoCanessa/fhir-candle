@@ -69,92 +69,94 @@ public class OpPasClaimSubmit : IFhirOperation
     };
 
     /// <summary>Executes the Subscription/$events operation.</summary>
-    /// <param name="ctx">             The authentication.</param>
-    /// <param name="store">           The store.</param>
-    /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="responseResource">[out] The response resource.</param>
-    /// <param name="responseOutcome"> [out] The response outcome.</param>
-    /// <param name="contentLocation"> [out] The content location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoOperation(
+    /// <param name="ctx">          The authentication.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="focusResource">The focus resource.</param>
+    /// <param name="bodyResource"> The body resource.</param>
+    /// <param name="opResponse">   [out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool DoOperation(
         FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         Storage.IVersionedResourceStore? resourceStore,
         Hl7.Fhir.Model.Resource? focusResource,
         Hl7.Fhir.Model.Resource? bodyResource,
-        out Hl7.Fhir.Model.Resource? responseResource,
-        out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation)
+        out FhirResponseContext opResponse)
     {
         if ((bodyResource == null) ||
             (bodyResource is not Bundle cb))
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new FhirResponseContext()
             {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
                 {
-                    new OperationOutcome.IssueComponent()
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "PAS Claim Submit requires a PASRequestBundle as input.",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "PAS Claim Submit requires a PASRequestBundle as input.",
+                        },
                     },
                 },
             };
-            contentLocation = string.Empty;
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         if (cb.Type != Bundle.BundleType.Collection)
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new FhirResponseContext()
             {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
                 {
-                    new OperationOutcome.IssueComponent()
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "PAS Claim Submit PASRequestBundle SHALL be a `collection`.",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "PAS Claim Submit PASRequestBundle SHALL be a `collection`.",
+                        },
                     },
                 },
             };
-            contentLocation = string.Empty;
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         IEnumerable<Resource> claims = cb.Entry.Select(e => e.Resource).Where(r => r is Claim);
 
         if (!claims.Any())
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new FhirResponseContext()
             {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
                 {
-                    new OperationOutcome.IssueComponent()
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "Submitted bundle does not contain any Claim resources.",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "Submitted bundle does not contain any Claim resources.",
+                        },
                     },
                 },
             };
-            contentLocation = string.Empty;
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
-        responseOutcome = new OperationOutcome()
+        OperationOutcome responseOutcome = new OperationOutcome()
         {
             Id = Guid.NewGuid().ToString(),
             Issue = new List<OperationOutcome.IssueComponent>(),
@@ -169,10 +171,14 @@ public class OpPasClaimSubmit : IFhirOperation
                 Code = OperationOutcome.IssueType.BusinessRule,
                 Diagnostics = $"First entry in bundle is not a Claim.",
             });
-            
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.BadRequest;
+
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.BadRequest,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
         if (!c.Identifier.Any())
@@ -184,9 +190,13 @@ public class OpPasClaimSubmit : IFhirOperation
                 Diagnostics = $"Claim {c.Id} is missing mandatory `identifier` element.",
             });
 
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.BadRequest;
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.BadRequest,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
         if (c.Provider == null)
@@ -198,9 +208,13 @@ public class OpPasClaimSubmit : IFhirOperation
                 Diagnostics = $"Claim {c.Id} is missing mandatory `provider` element.",
             });
 
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.BadRequest;
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.BadRequest,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
         if (!c.Insurance.Any())
@@ -212,9 +226,13 @@ public class OpPasClaimSubmit : IFhirOperation
                 Diagnostics = $"Claim {c.Id} is missing mandatory `insurance` element.",
             });
 
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.BadRequest;
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.BadRequest,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
         if (!c.Item.Any())
@@ -226,13 +244,18 @@ public class OpPasClaimSubmit : IFhirOperation
                 Diagnostics = $"Claim {c.Id} is missing mandatory `item` element.",
             });
 
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.BadRequest;
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.BadRequest,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
         // store the bundle
-        if (!store.TryInstanceCreate(cb, true, out _, out string id))
+        //if (!store.TryInstanceCreate(cb, true, out _, out string id))
+        if (!store.InstanceCreate(new FhirRequestContext(store, "POST", "Bundle", cb), out _))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
@@ -241,9 +264,13 @@ public class OpPasClaimSubmit : IFhirOperation
                 Diagnostics = $"Failed to store claim request bundle.",
             });
 
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.InternalServerError;
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.InternalServerError,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
         // build a claim response
@@ -310,7 +337,7 @@ public class OpPasClaimSubmit : IFhirOperation
         };
 
         // store the claim response locally
-        if (!store.TryInstanceCreate(cr, true, out _, out string claimResponseId))
+        if (!store.InstanceCreate(new FhirRequestContext(store, "POST", "ClaimResponse", cr), out _))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
@@ -319,9 +346,13 @@ public class OpPasClaimSubmit : IFhirOperation
                 Diagnostics = $"Failed to store claim response.",
             });
 
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.InternalServerError;
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.InternalServerError,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
         // build a claim response bundle
@@ -383,7 +414,7 @@ public class OpPasClaimSubmit : IFhirOperation
         }
 
         // store the claim response bundle
-        if (!store.TryInstanceCreate(crb, true, out _, out string claimResponseBundleId))
+        if (!store.InstanceCreate(new FhirRequestContext(store, "POST", "Bundle", crb), out _))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
@@ -392,12 +423,15 @@ public class OpPasClaimSubmit : IFhirOperation
                 Diagnostics = $"Failed to store claim response bundle.",
             });
 
-            responseResource = null;
-            contentLocation = string.Empty;
-            return HttpStatusCode.InternalServerError;
+            opResponse = new FhirResponseContext()
+            {
+                StatusCode = HttpStatusCode.InternalServerError,
+                Outcome = responseOutcome,
+            };
+
+            return false;
         }
 
-        responseResource = crb;
         responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
         {
             Severity = OperationOutcome.IssueSeverity.Success,
@@ -405,9 +439,14 @@ public class OpPasClaimSubmit : IFhirOperation
             Diagnostics = $"Claim request has been accepted and a claim response bundle stored.",
         });
 
-        contentLocation = string.Empty;;
+        opResponse = new FhirResponseContext()
+        {
+            StatusCode = HttpStatusCode.OK,
+            Resource = crb,
+            Outcome = responseOutcome,
+        };
 
-        return HttpStatusCode.OK;
+        return true;
     }
 
 

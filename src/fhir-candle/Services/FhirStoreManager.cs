@@ -309,16 +309,21 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
             {
                 foreach ((string name, IFhirStore store) in _storesByController)
                 {
-                    if ((store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor)))
+                    if (store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor))
                     {
-                        ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                        Console.WriteLine($"Testing page: {page.PageName} (only for: {page.OnlyShowOnEndpoint}) against store {name}");
+
+                        if (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                        }
                     }
                 }
 
                 continue;
             }
 
-            if ((!page.FhirVersionLiteral.TryFhirEnum(out TenantConfiguration.SupportedFhirVersions pageFhirVersion)))
+            if (!page.FhirVersionLiteral.TryFhirEnum(out TenantConfiguration.SupportedFhirVersions pageFhirVersion))
             {
                 continue;
             }
@@ -327,10 +332,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
             foreach ((string name, IFhirStore store) in _storesByController)
             {
                 if ((store.Config.FhirVersion == pageFhirVersion) &&
-                    (store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor)) &&
-                    (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                    (store.LoadedPackages.Contains(page.ContentFor) || store.LoadedSupplements.Contains(page.ContentFor)))
                 {
-                    ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                    Console.WriteLine($"Testing page: {page.PageName} (only for: {page.OnlyShowOnEndpoint}) against store {name}");
+
+                    if (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                    }
                 }
             }
         }

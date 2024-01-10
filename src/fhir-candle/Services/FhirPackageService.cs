@@ -529,20 +529,20 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                 continue;
             }
 
-            if (TryDownloadCoreViaPublication(sequencedName, version, out directory, out fhirVersion, out resolvedDirective))
-            {
-                packageList.Add(new()
-                {
-                    fhirVersion = fhirVersion,
-                    directory = directory,
-                    resolvedDirective = resolvedDirective,
-                    name = sequencedName,
-                    version = version,
-                    umbrellaPackageName = name,
-                });
+            //if (TryDownloadCoreViaPublication(sequencedName, version, out directory, out fhirVersion, out resolvedDirective))
+            //{
+            //    packageList.Add(new()
+            //    {
+            //        fhirVersion = fhirVersion,
+            //        directory = directory,
+            //        resolvedDirective = resolvedDirective,
+            //        name = sequencedName,
+            //        version = version,
+            //        umbrellaPackageName = name,
+            //    });
 
-                continue;
-            }
+            //    continue;
+            //}
         }
 
         if (packageList.Any())

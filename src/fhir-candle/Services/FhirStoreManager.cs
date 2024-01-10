@@ -244,7 +244,20 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
         // get all page types
         List<PackagePageInfo> pages = new();
 
-        pages.AddRange(System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
+        //pages.AddRange(System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
+        //    .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)))
+        //    .Select(pt => new PackagePageInfo()
+        //    {
+        //        ContentFor = pt.GetProperty("ContentFor", typeof(string))?.GetValue(null) as string ?? string.Empty,
+        //        PageName = pt.GetProperty("PageName", typeof(string))?.GetValue(null) as string ?? string.Empty,
+        //        Description = pt.GetProperty("Description", typeof(string))?.GetValue(null) as string ?? string.Empty,
+        //        RoutePath = pt.GetProperty("RoutePath", typeof(string))?.GetValue(null, null) as string ?? string.Empty,
+        //        FhirVersionLiteral = pt.GetProperty("FhirVersionLiteral", typeof(string))?.GetValue(null) as string ?? string.Empty,
+        //        FhirVersionNumeric = pt.GetProperty("FhirVersionNumeric", typeof(string))?.GetValue(null) as string ?? string.Empty,
+        //        OnlyShowOnEndpoint = pt.GetProperty("OnlyShowOnEndpoint", typeof(string))?.GetValue(null) as string ?? string.Empty,
+        //    }));
+
+        pages.AddRange(typeof(fhir.candle.Pages.RI.subscriptions.Tour).Assembly.GetTypes()
             .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)))
             .Select(pt => new PackagePageInfo()
             {

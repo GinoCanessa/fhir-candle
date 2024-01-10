@@ -64,24 +64,20 @@ public class OpSubscriptionStatus : IFhirOperation
     };
 
     /// <summary>Executes the Subscription/$status operation.</summary>
-    /// <param name="ctx">             The authentication.</param>
-    /// <param name="store">           The store.</param>
-    /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="responseResource">[out] The response resource.</param>
-    /// <param name="responseOutcome"> [out] The response outcome.</param>
-    /// <param name="contentLocation"> [out] The content location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoOperation(
+    /// <param name="ctx">          The authentication.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="focusResource">The focus resource.</param>
+    /// <param name="bodyResource"> The body resource.</param>
+    /// <param name="opResponse">   [out] The response resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool DoOperation(
         FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         Storage.IVersionedResourceStore? resourceStore,
         Hl7.Fhir.Model.Resource? focusResource,
         Hl7.Fhir.Model.Resource? bodyResource,
-        out Hl7.Fhir.Model.Resource? responseResource,
-        out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation)
+        out FhirResponseContext opResponse)
     {
         List<string> subscriptionIds = new();
         List<string> statusFilters = new();
@@ -213,11 +209,16 @@ public class OpSubscriptionStatus : IFhirOperation
             bundle.AddSearchEntry(r, $"urn:uuid:{r.Id}", Hl7.Fhir.Model.Bundle.SearchEntryMode.Match);
         }
 
-        responseResource = bundle;
-        responseOutcome = null;
-        contentLocation = string.Empty;
+        opResponse = new()
+        {
+            StatusCode = HttpStatusCode.OK,
+            Resource = bundle,
+            Outcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                HttpStatusCode.OK,
+                "See resource for $status data"),
+        };
 
-        return HttpStatusCode.OK;
+        return true;
     }
 
 

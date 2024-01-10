@@ -55,43 +55,22 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     public TenantConfiguration Config { get; }
 
     /// <summary>Gets the metadata for this store.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
-    /// <returns>The metadata.</returns>
-    HttpStatusCode GetMetadata(
-        FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified);
-
-    /// <summary>Attempts to get metadata a string from the given string.</summary>
-    /// <param name="mimeType">  Type of the mime.</param>
-    /// <param name="serialized">[out] The serialized.</param>
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryGetMetadata(
-        string mimeType,
-        bool pretty,
-        out string serialized);
+    bool GetMetadata(
+        FhirRequestContext ctx,
+        out FhirResponseContext response);
 
     /// <summary>Instance read.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode InstanceRead(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool InstanceRead(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified);
+        out FhirResponseContext response);
 
-    /// <summary>Attempts an instance read.</summary>
+    /// <summary>Attempts to read with minimal processing (e.g., no Hooks are called).</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <param name="resource">    [out] The resource.</param>
@@ -101,37 +80,15 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         string id, 
         out object? resource);
 
-    /// <summary>Attempts an instance read.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="id">          The identifier.</param>
-    /// <param name="mimeType">    Type of the mime.</param>
-    /// <param name="pretty">      If the output should be 'pretty' formatted.</param>
-    /// <param name="serialized">  [out] The serialized.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryInstanceRead(
-        string resourceType,
-        string id,
-        string mimeType,
-        bool pretty,
-        out string serialized);
-
     /// <summary>Instance create.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
-    /// <param name="location">          [out] The location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode InstanceCreate(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool InstanceCreate(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified,
-        out string location);
+        out FhirResponseContext response);
 
-    /// <summary>Attempts to create an instance.</summary>
+    /// <summary>Attempts to create an instance with minimal processing (e.g., no Hooks are called).</summary>
     /// <param name="resource">       The resource.</param>
     /// <param name="allowExistingId">True to allow an existing id.</param>
     /// <param name="resourceType">   [out] Type of the resource.</param>
@@ -143,7 +100,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string resourceType,
         out string id);
 
-    /// <summary>Attempts to create an instance.</summary>
+    /// <summary>Attempts to create an instance with minimal processing (e.g., no Hooks are called).</summary>
     /// <param name="content">        The content.</param>
     /// <param name="mimeType">       Type of the mime.</param>
     /// <param name="allowExistingId">True to allow an existing id.</param>
@@ -158,20 +115,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string id);
 
     /// <summary>Instance update.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
-    /// <param name="location">          [out] The location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode InstanceUpdate(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool InstanceUpdate(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified,
-        out string location);
+        out FhirResponseContext response);
 
     /// <summary>Attempts to update an instance.</summary>
     /// <param name="resource">    The resource.</param>
@@ -185,7 +134,7 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string resourceType,
         out string id);
 
-    /// <summary>Attempts to update an instance.</summary>
+    /// <summary>Attempts to update an instance with minimal processing (e.g., no Hooks are called).</summary>
     /// <param name="content">     The content.</param>
     /// <param name="mimeType">    Type of the mime.</param>
     /// <param name="allowCreate"> True to allow, false to suppress the create.</param>
@@ -200,60 +149,50 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string id);
 
     /// <summary>Instance delete.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode InstanceDelete(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool InstanceDelete(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
-    /// <summary>Attempts to delete an instance from the store.</summary>
+    /// <summary>Attempts to delete an instance from the store with minimal processing (e.g., no Hooks are called).</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryInstanceDelete(string resourceType, string id);
 
     /// <summary>Process a Batch or Transaction bundle.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode ProcessBundle(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool ProcessBundle(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>System delete.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode SystemDelete(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool SystemDelete(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>Type delete (based on search).</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode TypeDelete(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TypeDelete(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>System search.</summary>
-    /// <param name="ctx">              The request context.</param>
-    /// <param name="serializedBundle"> [out] The serialized bundle.</param>
-    /// <param name="serializedOutcome">[out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode SystemSearch(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool SystemSearch(
         FhirRequestContext ctx,
-        out string serializedBundle,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>Attempts to system search an object from the given string.</summary>
     /// <param name="queryString">The query string.</param>
@@ -264,14 +203,12 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out object? bundle);
 
     /// <summary>Type search.</summary>
-    /// <param name="ctx">              The request context.</param>
-    /// <param name="serializedBundle"> [out] The serialized bundle.</param>
-    /// <param name="serializedOutcome">[out] The serialized outcome.</param>
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
     /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode TypeSearch(
+    bool TypeSearch(
         FhirRequestContext ctx,
-        out string serializedBundle,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>Attempts to system search an object from the given string.</summary>
     /// <param name="resourceType">Type of the resource.</param>
@@ -284,34 +221,28 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out object? bundle);
 
     /// <summary>System operation.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode SystemOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool SystemOperation(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>Type operation.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode TypeOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TypeOperation(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>Instance operation.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode InstanceOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool InstanceOperation(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome);
+        out FhirResponseContext response);
 
     /// <summary>
     /// Serialize one or more subscription events into the desired format and content level.

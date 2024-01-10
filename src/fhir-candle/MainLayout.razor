@@ -4,6 +4,7 @@
 
 @inject ProtectedLocalStorage BrowserStore
 @inject IFhirStoreManager StoreManager
+@inject ServerConfiguration ServerConfig
 @inject IJSRuntime JS
 
 @implements INavTracker
@@ -144,6 +145,12 @@
         {
             try
             {
+                // use the RI name if there is one
+                if (!string.IsNullOrEmpty(ServerConfig.ReferenceImplementation))
+                {
+                    _crumbs[0] = new BreadcrumbItem($"Candle ({ServerConfig.ReferenceImplementation})", "#");
+                }
+
                 ProtectedBrowserStorageResult<bool> optReadResult = await BrowserStore.GetAsync<bool>("darkMode");
 
                 IsDarkMode = optReadResult.Value;

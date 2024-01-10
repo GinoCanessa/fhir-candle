@@ -52,27 +52,26 @@ public interface IFhirOperation
     /// <summary>Gets the supported resources.</summary>
     HashSet<string> SupportedResources { get; }
 
+    ///// <summary>Gets or sets a value indicating whether this object is enabled.</summary>
+    //bool Enabled { get; set; }
+
     // TODO: Consider return for non-FHIR responses to operations.
 
-    /// <summary>Executes the operation operation.</summary>
-    /// <param name="ctx">             The authentication.</param>
-    /// <param name="store">           The store.</param>
-    /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="responseResource">[out] The response resource.</param>
-    /// <param name="responseOutcome"> [out] The response outcome.</param>
-    /// <param name="contentLocation"> [out] The content location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    HttpStatusCode DoOperation(
+    /// <summary>Executes the FHIR operation.</summary>
+    /// <param name="ctx">          The authentication.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="focusResource">The focus resource.</param>
+    /// <param name="bodyResource"> The body resource.</param>
+    /// <param name="response">     [out] The response resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool DoOperation(
         FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         Storage.IVersionedResourceStore? resourceStore,
         Hl7.Fhir.Model.Resource? focusResource,
         Hl7.Fhir.Model.Resource? bodyResource,
-        out Hl7.Fhir.Model.Resource? responseResource,
-        out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation);
+        out FhirResponseContext response);
 
     /// <summary>Gets an OperationDefinition resource describing this operation.</summary>
     /// <param name="fhirVersion">The FHIR version.</param>

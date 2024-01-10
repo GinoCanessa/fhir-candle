@@ -21,6 +21,11 @@ using System.Collections.Concurrent;
 using static FhirCandle.Search.SearchDefinitions;
 using FhirCandle.Serialization;
 using System.Xml.Linq;
+using FhirCandle.Interactions;
+using Hl7.Fhir.Language.Debugging;
+using System.Security.AccessControl;
+using System.Reflection.Metadata;
+using static Hl7.Fhir.Model.VerificationResult;
 
 namespace FhirCandle.Storage;
 
@@ -90,6 +95,12 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>The operations supported by this server, by name.</summary>
     private Dictionary<string, IFhirOperation> _operations = new();
+
+    /// <summary>The loaded hooks.</summary>
+    private Dictionary<string, string> _hookNamesById = new();
+
+    /// <summary>The system hooks.</summary>
+    private Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]> _hooksByInteraction = new();
 
     /// <summary>The loaded directives.</summary>
     private HashSet<string> _loadedDirectives = new();
@@ -298,6 +309,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         CheckLoadedOperations();
+        DiscoverInteractionHooks();
 
         // create a timer to check max resource count if we are monitoring that
         _maxResourceCount = config.MaxResourceCount;
@@ -356,6 +368,72 @@ public partial class VersionedFhirStore : IFhirStore
                     Console.WriteLine($"Error loading operation definition {fhirOp.OperationName}: {ex.Message}");
                 }
             }
+        }
+    }
+
+    /// <summary>Discover interaction hooks.</summary>
+    private void DiscoverInteractionHooks()
+    {
+        // load hooks for this fhir version
+        IEnumerable<Type> hookTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
+            .Where(t => t.GetInterfaces().Contains(typeof(IFhirInteractionHook)));
+
+        foreach (Type hookType in hookTypes)
+        {
+            IFhirInteractionHook? hook = (IFhirInteractionHook?)Activator.CreateInstance(hookType);
+
+            if ((hook == null) ||
+                (hook.SupportedFhirVersions.Any() && !hook.SupportedFhirVersions.Contains(_config.FhirVersion)))
+            {
+                continue;
+            }
+
+            if ((!string.IsNullOrEmpty(hook.RequiresPackage)) &&
+                (!_loadedDirectives.Contains(hook.RequiresPackage)))
+            {
+                continue;
+            }
+
+            if (_hookNamesById.ContainsKey(hook.Id))
+            {
+                continue;
+            }
+
+            // determine where this hook belongs
+            foreach ((string resource, HashSet<Common.StoreInteractionCodes> interactions) in hook.InteractionsByResource)
+            {
+                if (string.IsNullOrEmpty(resource) || 
+                    resource.Equals("*", StringComparison.Ordinal) ||
+                    resource.Equals("Resource", StringComparison.Ordinal))
+                {
+                    // add to all resources - use VersionedFhirStore
+                    foreach (Common.StoreInteractionCodes interaction in interactions)
+                    {
+                        if (!_hooksByInteraction.ContainsKey(interaction))
+                        {
+                            _hooksByInteraction.Add(interaction, new IFhirInteractionHook[] { hook });
+                        }
+                        else
+                        {
+                            _hooksByInteraction[interaction] = _hooksByInteraction[interaction].Append(hook).ToArray();
+                        }
+                    }
+
+                    continue;
+                }
+
+                // add to a single resource - use ResourceStore
+                if (_store.ContainsKey(resource))
+                {
+                    foreach (Common.StoreInteractionCodes interaction in interactions)
+                    {
+                        _store[resource].AddHook(interaction, hook);
+                    }
+                }
+            }
+
+            // log we loaded this hook
+            _hookNamesById.Add(hook.Id, hook.Name);
         }
     }
 
@@ -551,6 +629,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         CheckLoadedOperations();
+        DiscoverInteractionHooks();
 
         _loadState = LoadStateCodes.None;
         _loadReprocess = null;
@@ -982,17 +1061,13 @@ public partial class VersionedFhirStore : IFhirStore
             AllowExistingId = allowExistingId,
         };
 
-        HttpStatusCode sc = DoInstanceCreate(
+        bool success = DoInstanceCreate(
             ctx,
             r,
-            out Hl7.Fhir.Model.Resource? created,
-            out _,
-            out _,
-            out _,
-            out _);
+            out FhirResponseContext response);
 
-        id = created?.Id ?? string.Empty;
-        return sc.IsSuccessful();
+        id = ((Resource?)response.Resource)?.Id ?? string.Empty;
+        return success;
     }
 
     /// <summary>Attempts to create an instance.</summary>
@@ -1026,20 +1101,12 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Instance create.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
-    /// <param name="location">          [out] The location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode InstanceCreate(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool InstanceCreate(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified,
-        out string location)
+        out FhirResponseContext response)
     {
         HttpStatusCode sc = Utils.TryDeserializeFhir(
             ctx.SourceContent, 
@@ -1049,99 +1116,120 @@ public partial class VersionedFhirStore : IFhirStore
 
         if ((!sc.IsSuccessful()) || (r == null))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(
-                sc, 
+            OperationOutcome outcome = Utils.BuildOutcomeForRequest(
+                sc,
                 $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
                 OperationOutcome.IssueType.Structure);
-            serializedOutcome = Utils.SerializeFhir(oo, ctx.DestinationFormat, ctx.SerializePretty);
 
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return sc;
+            response = new()
+            {
+                Outcome = outcome,
+                SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                StatusCode = sc,
+            };
+
+            return false;
         }
 
-        sc = DoInstanceCreate(
+        bool success = DoInstanceCreate(
             ctx,
             r,
-            out Resource? resource,
-            out OperationOutcome outcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the instance create operation.</summary>
-    /// <param name="ctx">         The request context.</param>
-    /// <param name="content">     The content.</param>
-    /// <param name="stored">      [out] The stored.</param>
-    /// <param name="outcome">     [out] The outcome.</param>
-    /// <param name="eTag">        [out] The tag.</param>
-    /// <param name="lastModified">[out] The last modified.</param>
-    /// <param name="location">    [out] The location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoInstanceCreate(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="content"> The content.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoInstanceCreate(
         FhirRequestContext ctx,
         Resource content,
-        out Resource? stored,
-        out OperationOutcome outcome,
-        out string eTag,
-        out string lastModified,
-        out string location)
+        out FhirResponseContext response)
     {
         string resourceType = string.IsNullOrEmpty(ctx.ResourceType) ? content.TypeName : ctx.ResourceType;
 
         if (content.TypeName != resourceType)
         {
-            stored = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity, 
-                $"Resource type: {content.TypeName} does not match request: {resourceType}",
-                OperationOutcome.IssueType.Invalid);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    $"Resource type: {content.TypeName} does not match request: {resourceType}",
+                    OperationOutcome.IssueType.Invalid),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+            return false;
         }
 
         if (!_store.ContainsKey(resourceType))
         {
-            stored = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound, 
-                $"Resource type: {resourceType} is not supported",
-                OperationOutcome.IssueType.NotSupported);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type: {resourceType} is not supported",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
+        }
+
+        _hooksByInteraction.TryGetValue(
+            string.IsNullOrEmpty(ctx.IfNoneExist) ? Common.StoreInteractionCodes.TypeCreate : Common.StoreInteractionCodes.TypeCreateConditional, 
+            out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[resourceType],
+                            content,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        content = (Resource)hr.Resource;
+                    }
+                }
+            }
         }
 
         // check for conditional create
         if (!string.IsNullOrEmpty(ctx.IfNoneExist))
         {
-            HttpStatusCode sc = DoTypeSearch(
-                resourceType,
-                ctx.IfNoneExist,
-                out Bundle? bundle,
-                out outcome);
+            bool success = DoTypeSearch(
+                ctx with { UrlQuery = ctx.IfNoneExist },
+                out FhirResponseContext searchResp);
 
-            if (sc.IsSuccessful())
+            if (success &&
+                (searchResp.Resource != null) &&
+                (searchResp.Resource is Bundle bundle))
             {
                 switch (bundle?.Total)
                 {
@@ -1152,48 +1240,91 @@ public partial class VersionedFhirStore : IFhirStore
                     // one match - return the match as if just stored except with OK instead of Created
                     case 1:
                         {
-                            stored = bundle.Entry[0].Resource;
-                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Created {stored.TypeName}/{stored.Id}");
-                            eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
-                            lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
-                            location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
-                            return HttpStatusCode.OK;
+                            Resource r = bundle.Entry[0].Resource;
+
+                            response = new()
+                            {
+                                Resource = r,
+                                ETag = string.IsNullOrEmpty(r.Meta?.VersionId) ? string.Empty : $"W/\"{r.Meta.VersionId}\"",
+                                LastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
+                                Location = $"{_config.BaseUrl}/{resourceType}/{r.Id}",
+                                Outcome = Utils.BuildOutcomeForRequest(
+                                    HttpStatusCode.OK,
+                                    $"Created {resourceType}/{r.Id}"),
+                                StatusCode = HttpStatusCode.OK,
+                            };
+                            return true;
                         }
 
                     // multiple matches - fail the request
                     default:
                         {
-                            stored = null;
-                            outcome = Utils.BuildOutcomeForRequest(
-                                HttpStatusCode.PreconditionFailed,
-                                $"If-None-Exist query returned too many matches: {bundle?.Total}");
-                            eTag = string.Empty;
-                            lastModified = string.Empty;
-                            location = string.Empty;
-                            return HttpStatusCode.PreconditionFailed;
+                            response = new()
+                            {
+                                Outcome = Utils.BuildOutcomeForRequest(
+                                    HttpStatusCode.PreconditionFailed,
+                                    $"If-None-Exist query returned too many matches: {bundle?.Total}"),
+                                StatusCode = HttpStatusCode.PreconditionFailed,
+                            };
+                            return false;
                         }
                 }
             }
             else
             {
-                stored = null;
-                eTag = string.Empty;
-                lastModified = string.Empty;
-                location = string.Empty;
-                return HttpStatusCode.PreconditionFailed;
+                response = new()
+                {
+                    Outcome = searchResp.Outcome ?? Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.PreconditionFailed,
+                        $"If-None-Exist search failed: {ctx.IfNoneExist}"),
+                    StatusCode = HttpStatusCode.PreconditionFailed,
+                };
+                return false;
             }
         }
 
         // create the resource
-        stored = _store[resourceType].InstanceCreate(ctx, content, ctx.AllowExistingId);
+        Resource? stored = _store[resourceType].InstanceCreate(ctx, content, ctx.AllowExistingId);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[resourceType],
+                            stored,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        stored = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
 
         if (stored == null)
         {
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Failed to create resource");
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return HttpStatusCode.InternalServerError;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    "Failed to create resource"),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
         }
 
         if ((_loadState != LoadStateCodes.None) && _hasProtected)
@@ -1205,22 +1336,27 @@ public partial class VersionedFhirStore : IFhirStore
             _resourceQ.Enqueue(resourceType + "/" + stored.Id + "/" + stored.Meta.VersionId);
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.Created, $"Created {stored.TypeName}/{stored.Id}");
-        eTag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"";
-        lastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
-        location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}";
-        return HttpStatusCode.Created;
+        response = new()
+        {
+            Resource = stored,
+            ETag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"",
+            LastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
+            Location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}",
+            Outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.Created,
+                $"Created {resourceType}/{stored.Id}"),
+            StatusCode = HttpStatusCode.Created,
+        };
+        return true;
     }
 
     /// <summary>Process a Batch or Transaction bundle.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode ProcessBundle(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool ProcessBundle(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
         const string resourceType = "Bundle";
 
@@ -1228,29 +1364,37 @@ public partial class VersionedFhirStore : IFhirStore
 
         if ((!sc.IsSuccessful()) || (r == null))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(
+            OperationOutcome outcome = Utils.BuildOutcomeForRequest(
                 sc,
                 $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
                 OperationOutcome.IssueType.Structure);
-            serializedOutcome = Utils.SerializeFhir(oo, ctx.DestinationFormat, ctx.SerializePretty);
 
-            return sc;
+            response = new()
+            {
+                Outcome = outcome,
+                SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                StatusCode = sc,
+            };
+
+            return false;
         }
 
         if ((r.TypeName != resourceType) ||
             (!(r is Bundle requestBundle)))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(
+            OperationOutcome outcome = Utils.BuildOutcomeForRequest(
                 HttpStatusCode.UnprocessableEntity,
                 $"Cannot process non-Bundle resource type ({r.TypeName}) as a Bundle",
                 OperationOutcome.IssueType.Invalid);
-            serializedOutcome = Utils.SerializeFhir(oo, ctx.DestinationFormat, ctx.SerializePretty);
 
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = outcome,
+                SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+
+            return false;
         }
 
         Bundle responseBundle = new Bundle()
@@ -1272,23 +1416,38 @@ public partial class VersionedFhirStore : IFhirStore
 
             default:
                 {
-                    serializedResource = string.Empty;
-
-                    OperationOutcome oo = Utils.BuildOutcomeForRequest(
-                        HttpStatusCode.UnprocessableEntity, 
+                    OperationOutcome outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.UnprocessableEntity,
                         $"Unsupported Bundle process request! Type: {requestBundle.Type}",
                         OperationOutcome.IssueType.NotSupported);
-                    serializedOutcome = Utils.SerializeFhir(oo, ctx.DestinationFormat, ctx.SerializePretty);
 
-                    return HttpStatusCode.UnprocessableEntity;
+                    response = new()
+                    {
+                        Outcome = outcome,
+                        SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                        StatusCode = HttpStatusCode.UnprocessableEntity,
+                    };
+
+                    return false;
                 }
         }
 
-        serializedResource = Utils.SerializeFhir(responseBundle, ctx.DestinationFormat, ctx.SerializePretty, string.Empty);
-        OperationOutcome sucessOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Processed {requestBundle.Type} bundle");
-        serializedOutcome = Utils.SerializeFhir(sucessOutcome, ctx.DestinationFormat, ctx.SerializePretty);
+        OperationOutcome successOutcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Processed {requestBundle.Type} bundle");
 
-        return HttpStatusCode.OK;
+        string sr = responseBundle == null ? string.Empty : Utils.SerializeFhir(responseBundle, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = Utils.SerializeFhir(successOutcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = new()
+        {
+            MimeType = ctx.DestinationFormat,
+            Resource = responseBundle,
+            SerializedResource = sr,
+            Outcome = successOutcome,
+            SerializedOutcome = so,
+            StatusCode = HttpStatusCode.OK,
+        };
+
+        return true;
     }
 
     /// <summary>Attempts to delete a string from the given string.</summary>
@@ -1316,73 +1475,135 @@ public partial class VersionedFhirStore : IFhirStore
             Id = id,
         };
 
-        HttpStatusCode sc = DoInstanceDelete(ctx, out _, out _);
-        return sc.IsSuccessful();
+        bool success = DoInstanceDelete(ctx, out _);
+        return success;
     }
 
     /// <summary>Instance delete.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode InstanceDelete(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool InstanceDelete(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoInstanceDelete(
+        bool success = DoInstanceDelete(
             ctx,
-            out Resource? resource,
-            out OperationOutcome outcome);
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the instance delete operation.</summary>
     /// <param name="ctx">     The request context.</param>
-    /// <param name="resource">[out] The resource.</param>
-    /// <param name="outcome"> [out] The outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoInstanceDelete(
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoInstanceDelete(
         FhirRequestContext ctx,
-        out Resource? resource,
-        out OperationOutcome outcome)
+        out FhirResponseContext response)
     {
         if (!_store.ContainsKey(ctx.ResourceType))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound, 
-                $"Resource type: {ctx.ResourceType} is not supported",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type: {ctx.ResourceType} is not supported",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
+        }
+
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.InstanceDelete, out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            null,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+                }
+            }
         }
 
         // attempt delete
-        resource = _store[ctx.ResourceType].InstanceDelete(ctx.Id, _protectedResources);
+        Resource? resource = _store[ctx.ResourceType].InstanceDelete(ctx.Id, _protectedResources);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            resource,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        resource = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
 
         if (resource == null)
         {
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource {ctx.Id} not found");
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource {ctx.ResourceType}/{ctx.Id} not found"),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {ctx.ResourceType}/{ctx.Id}");
-        return HttpStatusCode.OK;
+        response = new()
+        {
+            Resource = resource,
+            Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {ctx.ResourceType}/{ctx.Id}"),
+            StatusCode = HttpStatusCode.OK,
+        };
+        return true;
     }
 
-    /// <summary>Attempts to read.</summary>
+    /// <summary>Attempts to read with minimal processing (e.g., no Hooks are called).</summary>
     /// <param name="resourceType">Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <param name="resource">    [out] The resource.</param>
@@ -1400,33 +1621,6 @@ public partial class VersionedFhirStore : IFhirStore
         return true;
     }
 
-    /// <summary>Attempts an instance read.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="id">          The identifier.</param>
-    /// <param name="mimeType">    Type of the mime.</param>
-    /// <param name="pretty">      If the output should be 'pretty' formatted.</param>
-    /// <param name="serialized">  [out] The serialized.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryInstanceRead(
-        string resourceType,
-        string id,
-        string mimeType,
-        bool pretty,
-        out string serialized)
-    {
-        if ((!_store.ContainsKey(resourceType)) ||
-            (!_store[resourceType].TryGetValue(id, out object? resource)) ||
-            (resource == null) ||
-            (resource is not Hl7.Fhir.Model.Resource r))
-        {
-            serialized = string.Empty;
-            return false;
-        }
-
-        serialized = Utils.SerializeFhir(r, mimeType, pretty);
-        return true;
-    }
-
     /// <summary>Instance read.</summary>
     /// <param name="ctx">               The request context.</param>
     /// <param name="serializedResource">[out] The serialized resource.</param>
@@ -1434,151 +1628,217 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="eTag">              [out] The tag.</param>
     /// <param name="lastModified">      [out] The last modified.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode InstanceRead(
+    public bool InstanceRead(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoInstanceRead(
-            ctx,
-            out Resource? resource,
-            out OperationOutcome outcome,
-            out eTag,
-            out lastModified);
+        bool success = DoInstanceRead(ctx, out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the instance read operation.</summary>
-    /// <param name="ctx">         The request context.</param>
-    /// <param name="resource">    [out] The resource.</param>
-    /// <param name="outcome">     [out] The outcome.</param>
-    /// <param name="eTag">        [out] The tag.</param>
-    /// <param name="lastModified">[out] The last modified.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoInstanceRead(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoInstanceRead(
         FhirRequestContext ctx,
-        out Resource? resource,
-        out OperationOutcome outcome,
-        out string eTag,
-        out string lastModified)
+        out FhirResponseContext response)
     {
         if (string.IsNullOrEmpty(ctx.ResourceType))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.BadRequest,
-                "Resource type is required",
-                OperationOutcome.IssueType.Structure);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.BadRequest;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.BadRequest,
+                    "Resource type is required",
+                    OperationOutcome.IssueType.Structure),
+                StatusCode = HttpStatusCode.BadRequest,
+            };
+            return false;
         }
 
         if (!_store.ContainsKey(ctx.ResourceType))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Resource type: {ctx.ResourceType} is not supported",
-                OperationOutcome.IssueType.NotSupported);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type: {ctx.ResourceType} is not supported",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
         if (string.IsNullOrEmpty(ctx.Id))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.BadRequest,
-                "ID required for instance level read.",
-                OperationOutcome.IssueType.Structure);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.BadRequest;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.BadRequest,
+                    "ID required for instance level read.",
+                    OperationOutcome.IssueType.Structure),
+                StatusCode = HttpStatusCode.BadRequest,
+            };
+            return false;
         }
 
-        resource = _store[ctx.ResourceType].InstanceRead(ctx.Id);
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.InstanceRead, out IFhirInteractionHook[]? hooks);
 
-        if (resource == null)
+        if (hooks?.Any() ?? false)
         {
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.NotFound, $"Resource: {ctx.ResourceType}/{ctx.Id} not found");
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.NotFound;
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            null,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+                }
+            }
         }
 
-        eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
+        Resource? r = _store[ctx.ResourceType].InstanceRead(ctx.Id);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            r,
+                            out FhirResponseContext hr);
+
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource?)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        if (r == null)
+        {
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource: {ctx.ResourceType}/{ctx.Id} not found",
+                    OperationOutcome.IssueType.Exception),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+
+            return false;
+        }
+
+        string eTag = string.IsNullOrEmpty(r.Meta?.VersionId) ? string.Empty : $"W/\"{r.Meta.VersionId}\"";
 
         if ((!string.IsNullOrEmpty(ctx.IfMatch)) &&
             (!eTag.Equals(ctx.IfMatch, StringComparison.Ordinal)))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.PreconditionFailed,
-                $"If-Match: {ctx.IfMatch} does not equal found eTag: {eTag}",
-                OperationOutcome.IssueType.BusinessRule);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.PreconditionFailed;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.PreconditionFailed,
+                    $"If-Match: {ctx.IfMatch} does not equal found eTag: {eTag}",
+                    OperationOutcome.IssueType.BusinessRule),
+                StatusCode = HttpStatusCode.PreconditionFailed,
+            };
+
+            return false;
         }
 
-        lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        string lastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
 
         if ((!string.IsNullOrEmpty(ctx.IfModifiedSince)) &&
             (lastModified.CompareTo(ctx.IfModifiedSince) < 0))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotModified,
-                $"Last modified: {lastModified} is prior to If-Modified-Since: {ctx.IfModifiedSince}",
-                OperationOutcome.IssueType.Informational);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.NotModified;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotModified,
+                    $"Last modified: {lastModified} is prior to If-Modified-Since: {ctx.IfModifiedSince}",
+                    OperationOutcome.IssueType.Informational),
+                ETag = eTag,
+                LastModified = lastModified,
+                StatusCode = HttpStatusCode.NotModified,
+            };
+
+            return true;
         }
 
         if (ctx.IfNoneMatch.Equals("*", StringComparison.Ordinal))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.PreconditionFailed,
-                "Prior version exists, but If-None-Match is *");
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.PreconditionFailed;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.PreconditionFailed,
+                    "Prior version exists, but If-None-Match is *"),
+                StatusCode = HttpStatusCode.PreconditionFailed,
+            };
+
+            return false;
         }
 
         if (!string.IsNullOrEmpty(ctx.IfNoneMatch))
         {
             if (ctx.IfNoneMatch.Equals(eTag, StringComparison.Ordinal))
             {
-                resource = null;
-                outcome = Utils.BuildOutcomeForRequest(
-                    HttpStatusCode.NotModified,
-                    $"Read {ctx.ResourceType}/{ctx.Id} found version: {eTag}, equals If-None-Match: {ctx.IfNoneMatch}");
-                eTag = string.Empty;
-                lastModified = string.Empty;
-                return HttpStatusCode.NotModified;
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.NotModified,
+                        $"Read {ctx.ResourceType}/{ctx.Id} found version: {eTag}, equals If-None-Match: {ctx.IfNoneMatch}"),
+                    StatusCode = HttpStatusCode.NotModified,
+                };
+
+                return false;
+
             }
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {resource.TypeName}/{resource.Id}");
-        return HttpStatusCode.OK;
+        response = new()
+        {
+            Resource = r,
+            ETag = eTag,
+            LastModified = lastModified,
+            Location = string.IsNullOrEmpty(r.Id) ? string.Empty : $"{_config.BaseUrl}/{r.TypeName}/{r.Id}",
+            Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Read {r.TypeName}/{r.Id}"),
+            StatusCode = HttpStatusCode.OK,
+        };
+
+        return true;
     }
 
     /// <summary>Attempts to update.</summary>
@@ -1661,33 +1921,21 @@ public partial class VersionedFhirStore : IFhirStore
             AllowCreateAsUpdate = allowCreate,
         };
 
-        HttpStatusCode sc = DoInstanceUpdate(
+        bool success = DoInstanceUpdate(
             ctx,
             r,
-            out _,
-            out _,
-            out _,
-            out _,
             out _);
 
-        return sc.IsSuccessful();
+        return success;
     }
 
     /// <summary>Instance update.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
-    /// <param name="location">          [out] The location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode InstanceUpdate(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool InstanceUpdate(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified,
-        out string location)
+        out FhirResponseContext response)
     {
         HttpStatusCode sc = Utils.TryDeserializeFhir(
             ctx.SourceContent, 
@@ -1697,60 +1945,48 @@ public partial class VersionedFhirStore : IFhirStore
 
         if ((!sc.IsSuccessful()) || (r == null))
         {
-            serializedResource = string.Empty;
-
-            OperationOutcome oo = Utils.BuildOutcomeForRequest(
+            OperationOutcome outcome = Utils.BuildOutcomeForRequest(
                 sc,
                 $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
                 OperationOutcome.IssueType.Structure);
-            serializedOutcome = Utils.SerializeFhir(oo, ctx.DestinationFormat, ctx.SerializePretty);
 
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return sc;
+            response = new()
+            {
+                Outcome = outcome,
+                SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                StatusCode = sc,
+            };
+
+            return false;
         }
 
-        sc = DoInstanceUpdate(
+        bool success = DoInstanceUpdate(
             ctx,
             r,
-            out Resource? resource,
-            out OperationOutcome outcome,
-            out eTag,
-            out lastModified,
-            out location);
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the instance update operation.</summary>
-    /// <param name="ctx">         The request context.</param>
-    /// <param name="content">     The content.</param>
-    /// <param name="resource">    [out] The resource.</param>
-    /// <param name="outcome">     [out] The outcome.</param>
-    /// <param name="eTag">        [out] The tag.</param>
-    /// <param name="lastModified">[out] The last modified.</param>
-    /// <param name="location">    [out] The location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoInstanceUpdate(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="content"> The content.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoInstanceUpdate(
         FhirRequestContext ctx,
         Resource content,
-        out Resource? resource,
-        out OperationOutcome outcome,
-        out string eTag,
-        out string lastModified,
-        out string location)
+        out FhirResponseContext response)
     {
         string resourceType = string.IsNullOrEmpty(ctx.ResourceType) ? content.TypeName : ctx.ResourceType;
         string id = ctx.Id;
@@ -1766,42 +2002,77 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (content.TypeName != resourceType)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity, 
-                $"Resource type: {content.TypeName} does not match request: {resourceType}",
-                OperationOutcome.IssueType.Structure);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    $"Resource type: {content.TypeName} does not match request: {resourceType}",
+                    OperationOutcome.IssueType.Invalid),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+            return false;
         }
 
         if (!_store.ContainsKey(resourceType))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound, 
-                $"Resource type: {resourceType} is not supported",
-                OperationOutcome.IssueType.NotSupported);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type: {resourceType} is not supported",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
         HttpStatusCode sc;
 
+        _hooksByInteraction.TryGetValue(
+            string.IsNullOrEmpty(ctx.UrlQuery) ? Common.StoreInteractionCodes.InstanceUpdate : Common.StoreInteractionCodes.InstanceUpdateConditional, 
+            out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            content,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        content = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        OperationOutcome outcome;
+
         // check for conditional update
         if (!string.IsNullOrEmpty(ctx.UrlQuery))
         {
-            sc = DoTypeSearch(
-                resourceType,
-                ctx.UrlQuery,
-                out Bundle? bundle,
-                out outcome);
+            bool success = DoTypeSearch(
+                ctx,
+                out FhirResponseContext searchResp);
 
-            if (sc.IsSuccessful())
+            if (success &&
+                (searchResp.Resource != null) &&
+                (searchResp.Resource is Bundle bundle))
             {
                 switch (bundle?.Total)
                 {
@@ -1815,14 +2086,14 @@ public partial class VersionedFhirStore : IFhirStore
                             if ((!string.IsNullOrEmpty(id)) &&
                                 (!bundle.Entry[0].Resource.Id.Equals(id, StringComparison.Ordinal)))
                             {
-                                resource = null;
-                                outcome = Utils.BuildOutcomeForRequest(
-                                    HttpStatusCode.PreconditionFailed, 
-                                    $"Conditional update query returned a match with a id: {bundle.Entry[0].Resource.Id}, expected {id}");
-                                eTag = string.Empty;
-                                lastModified = string.Empty;
-                                location = string.Empty;
-                                return HttpStatusCode.PreconditionFailed;
+                                response = new()
+                                {
+                                    Outcome = Utils.BuildOutcomeForRequest(
+                                        HttpStatusCode.PreconditionFailed,
+                                        $"Conditional update query returned a match with a id: {bundle.Entry[0].Resource.Id}, expected {id}"),
+                                    StatusCode = HttpStatusCode.PreconditionFailed,
+                                };
+                                return false;
                             }
                         }
                         break;
@@ -1830,26 +2101,31 @@ public partial class VersionedFhirStore : IFhirStore
                     // multiple matches - fail the request
                     default:
                         {
-                            resource = null;
-                            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.PreconditionFailed, $"Conditional update query returned too many matches: {bundle?.Total}");
-                            eTag = string.Empty;
-                            lastModified = string.Empty;
-                            location = string.Empty;
-                            return HttpStatusCode.PreconditionFailed;
+                            response = new()
+                            {
+                                Outcome = Utils.BuildOutcomeForRequest(
+                                    HttpStatusCode.PreconditionFailed,
+                                    $"Conditional update query returned too many matches: {bundle?.Total}"),
+                                StatusCode = HttpStatusCode.PreconditionFailed,
+                            };
+                            return false;
                         }
                 }
             }
             else
             {
-                resource = null;
-                eTag = string.Empty;
-                lastModified = string.Empty;
-                location = string.Empty;
-                return HttpStatusCode.PreconditionFailed;
+                response = new()
+                {
+                    Outcome = searchResp.Outcome ?? Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.PreconditionFailed,
+                        $"Conditional update query failed: {ctx.UrlQuery}"),
+                    StatusCode = HttpStatusCode.PreconditionFailed,
+                };
+                return false;
             }
         }
 
-        resource = _store[resourceType].InstanceUpdate(
+        Resource? resource = _store[resourceType].InstanceUpdate(
             content, 
             ctx.AllowCreateAsUpdate,
             ctx.IfMatch,
@@ -1858,18 +2134,57 @@ public partial class VersionedFhirStore : IFhirStore
             out sc,
             out outcome);
 
-        if (resource == null)
+        if (hooks?.Any() ?? false)
         {
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            location = string.Empty;
-            return sc;
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            resource,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        content = (Resource)hr.Resource;
+                    }
+                }
+            }
         }
 
-        eTag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"";
-        lastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
-        location = $"{_config.BaseUrl}/{resourceType}/{resource.Id}";
-        return sc;
+        if (resource == null)
+        {
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    "Failed to update resource"),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
+        }
+
+        response = new()
+        {
+            Resource = resource,
+            ETag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"",
+            LastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
+            Location = $"{_config.BaseUrl}/{resourceType}/{resource.Id}",
+            Outcome = outcome,
+            StatusCode = sc,
+        };
+        return true;
     }
 
     /// <summary>
@@ -2609,33 +2924,28 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Perform a FHIR System-level operation.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode SystemOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool SystemOperation(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoSystemOperation(
+        bool success = DoSystemOperation(
             ctx,
-            null,
-            out Resource? resource,
-            out OperationOutcome outcome);
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the system operation operation.</summary>
@@ -2644,526 +2954,967 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="resource">       [out] The resource.</param>
     /// <param name="outcome">        [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoSystemOperation(
+    internal bool DoSystemOperation(
         FhirRequestContext ctx,
-        Resource? contentResource,
-        out Resource? resource,
-        out OperationOutcome outcome)
+        out FhirResponseContext response)
     {
         if (!_operations.ContainsKey(ctx.OperationName))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound, 
-                $"Operation {ctx.OperationName} does not have an executable implementation on this server.");
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Operation {ctx.OperationName} does not have an executable implementation on this server."),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
         IFhirOperation op = _operations[ctx.OperationName];
 
         if (!op.AllowSystemLevel)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity,
-                $"Operation {ctx.OperationName} does not allow system-level execution.",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    $"Operation {ctx.OperationName} does not allow system-level execution.",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+            return false;
         }
 
         Resource? r = null;
 
-        if (contentResource != null)
-        {
-            r = contentResource;
-        }
-        else if (!string.IsNullOrEmpty(ctx.SourceContent))
+        if (!string.IsNullOrEmpty(ctx.SourceContent))
         {
             HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(ctx.SourceContent, ctx.SourceFormat, out r, out _);
 
             if ((!deserializeSc.IsSuccessful()) &&
                 (!op.AcceptsNonFhir))
             {
-                resource = null;
-                outcome = Utils.BuildOutcomeForRequest(
-                    HttpStatusCode.UnsupportedMediaType,
-                    $"Operation {ctx.OperationName} does not consume non-FHIR content.",
-                    OperationOutcome.IssueType.Invalid);
-                return HttpStatusCode.UnsupportedMediaType;
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.UnsupportedMediaType,
+                        $"Operation {ctx.OperationName} does not consume non-FHIR content.",
+                        OperationOutcome.IssueType.Invalid),
+                    StatusCode = HttpStatusCode.UnsupportedMediaType,
+                };
+                return false;
             }
         }
 
-        HttpStatusCode sc = op.DoOperation(
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemOperation, out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            null,
+                            null,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the content resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        bool success = op.DoOperation(
             ctx,
             this,
             null,
             null,
             r,
-            out resource,
-            out OperationOutcome? responseOutcome,
-            out _);
+            out FhirResponseContext opResponse);
 
-        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"System-Level Operation {ctx.OperationName} returned {sc}");
+        if ((opResponse.Resource != null) &&
+            (opResponse.Resource is Resource))
+        {
+            r = (Resource)opResponse.Resource;
+        }
 
-        return sc;
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            null,
+                            r,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        response = new()
+        {
+            Resource = r,
+            Outcome = opResponse.Outcome ?? Utils.BuildOutcomeForRequest(
+                opResponse.StatusCode ?? (success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError), 
+                $"System-Level Operation {ctx.OperationName} {(success ? "succeeded" : "failed")}: {opResponse.StatusCode}"),
+            StatusCode = success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError,
+        };
+        return success;
     }
 
     /// <summary>Perform a FHIR Type-level operation.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode TypeOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TypeOperation(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoTypeOperation(
+        bool success = DoTypeOperation(
             ctx,
-            null,
-            out Resource? resource,
-            out OperationOutcome outcome);
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the type operation operation.</summary>
-    /// <param name="ctx">            The request context.</param>
-    /// <param name="contentResource">The content resource.</param>
-    /// <param name="resource">       [out] The resource.</param>
-    /// <param name="outcome">        [out] The outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoTypeOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoTypeOperation(
         FhirRequestContext ctx,
-        Resource? contentResource,
-        out Resource? resource,
-        out OperationOutcome outcome)
+        out FhirResponseContext response)
     {
         if (!_store.ContainsKey(ctx.ResourceType))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Resource type {ctx.ResourceType} does not exist on this server.",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type {ctx.ResourceType} does not exist on this server.",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
         if (!_operations.ContainsKey(ctx.OperationName))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Operation {ctx.OperationName} does not have an executable implementation on this server.");
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Operation {ctx.OperationName} does not have an executable implementation on this server."),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
         IFhirOperation op = _operations[ctx.OperationName];
 
         if (!op.AllowResourceLevel)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity,
-                $"Operation {ctx.OperationName} does not allow type-level execution.",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    $"Operation {ctx.OperationName} does not allow type-level execution.",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+            return false;
         }
 
         if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(ctx.ResourceType)))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity,
-                $"Operation {ctx.OperationName} is not allowed on {ctx.ResourceType}.",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    $"Operation {ctx.OperationName} is not defined for resource: {ctx.ResourceType}.",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+            return false;
         }
 
         Resource? r = null;
 
-        if (contentResource != null)
-        {
-            r = contentResource;
-        }
-        else if (!string.IsNullOrEmpty(ctx.SourceContent))
+        if (!string.IsNullOrEmpty(ctx.SourceContent))
         {
             HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(ctx.SourceContent, ctx.SourceFormat, out r, out _);
 
             if ((!deserializeSc.IsSuccessful()) &&
                 (!op.AcceptsNonFhir))
             {
-                resource = null;
-                outcome = Utils.BuildOutcomeForRequest(
-                    HttpStatusCode.UnsupportedMediaType,
-                    $"Operation {ctx.OperationName} does not consume non-FHIR content.",
-                    OperationOutcome.IssueType.Invalid);
-                return HttpStatusCode.UnsupportedMediaType;
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.UnsupportedMediaType,
+                        $"Operation {ctx.OperationName} does not consume non-FHIR content.",
+                        OperationOutcome.IssueType.Invalid),
+                    StatusCode = HttpStatusCode.UnsupportedMediaType,
+                };
+                return false;
             }
         }
 
-        HttpStatusCode sc = op.DoOperation(
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeOperation, out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            r,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        bool success = op.DoOperation(
             ctx,
             this,
             _store[ctx.ResourceType],
             null,
             r,
-            out resource,
-            out OperationOutcome? responseOutcome,
-            out _);
+            out FhirResponseContext opResponse);
 
-        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(sc, $"Resource-Level Operation {ctx.ResourceType}/{ctx.OperationName} returned {sc}");
-        return sc;
+        if ((opResponse.Resource != null) &&
+            (opResponse.Resource is Resource))
+        {
+            r = (Resource)opResponse.Resource;
+        }
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            r,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        response = new()
+        {
+            Resource = r,
+            Outcome = opResponse.Outcome ?? Utils.BuildOutcomeForRequest(
+                opResponse.StatusCode ?? (success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError),
+                $"Type-Level Operation {ctx.ResourceType}/{ctx.OperationName} {(success ? "succeeded" : "failed")}: {opResponse.StatusCode}"),
+            StatusCode = success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError,
+        };
+        return success;
     }
 
     /// <summary>Performa FHIR Instance-level operation.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode InstanceOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool InstanceOperation(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoInstanceOperation(
+        bool success = DoInstanceOperation(
             ctx,
-            null,
-            out Resource? resource,
-            out OperationOutcome outcome);
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the instance operation operation.</summary>
-    /// <param name="ctx">            The request context.</param>
-    /// <param name="contentResource">The content resource.</param>
-    /// <param name="resource">       [out] The resource.</param>
-    /// <param name="outcome">        [out] The outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoInstanceOperation(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoInstanceOperation(
         FhirRequestContext ctx,
-        Resource? contentResource,
-        out Resource? resource,
-        out OperationOutcome outcome)
+        out FhirResponseContext response)
     {
         if (!_store.ContainsKey(ctx.ResourceType))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Resource type: {ctx.ResourceType} is not supported",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type {ctx.ResourceType} does not exist on this server.",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
         if (string.IsNullOrEmpty(ctx.Id) ||
             !((IReadOnlyDictionary<string, Resource>)_store[ctx.ResourceType]).ContainsKey(ctx.Id))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Instance {ctx.ResourceType}/{ctx.Id} does not exist on this server.");
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Instance {ctx.ResourceType}/{ctx.Id} does not exist on this server."),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
-
-        Resource focusResource = ((IReadOnlyDictionary<string, Resource>)_store[ctx.ResourceType])[ctx.Id];
 
         if (!_operations.ContainsKey(ctx.OperationName))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Operation {ctx.OperationName} does not have an executable implementation on this server.");
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Operation {ctx.OperationName} does not have an executable implementation on this server."),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
         }
 
         IFhirOperation op = _operations[ctx.OperationName];
 
         if (!op.AllowInstanceLevel)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity,
-                $"Operation {ctx.OperationName} does not allow instance-level execution.",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    $"Operation {ctx.OperationName} does not allow instance-level execution.",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+            return false;
         }
 
         if (op.SupportedResources.Any() && (!op.SupportedResources.Contains(ctx.ResourceType)))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.UnprocessableEntity,
-                $"Operation {ctx.OperationName} is not allowed on {ctx.ResourceType}.",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.UnprocessableEntity;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.UnprocessableEntity,
+                    $"Operation {ctx.OperationName} is not defined for resource: {ctx.ResourceType}.",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+            };
+            return false;
         }
 
         Resource? r = null;
 
-        if (contentResource != null)
-        {
-            r = contentResource;
-        }
-        else if (!string.IsNullOrEmpty(ctx.SourceContent))
+        if (!string.IsNullOrEmpty(ctx.SourceContent))
         {
             HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(ctx.SourceContent, ctx.SourceFormat, out r, out _);
 
             if ((!deserializeSc.IsSuccessful()) &&
                 (!op.AcceptsNonFhir))
             {
-                resource = null;
-                outcome = Utils.BuildOutcomeForRequest(
-                    HttpStatusCode.UnsupportedMediaType,
-                    $"Operation {ctx.OperationName} does not consume non-FHIR content.",
-                    OperationOutcome.IssueType.Invalid);
-                return HttpStatusCode.UnsupportedMediaType;
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.UnsupportedMediaType,
+                        $"Operation {ctx.OperationName} does not consume non-FHIR content.",
+                        OperationOutcome.IssueType.Invalid),
+                    StatusCode = HttpStatusCode.UnsupportedMediaType,
+                };
+                return false;
             }
         }
 
-        HttpStatusCode sc = op.DoOperation(
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.InstanceOperation, out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            r,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        Resource focusResource = ((IReadOnlyDictionary<string, Resource>)_store[ctx.ResourceType])[ctx.Id];
+
+        bool success = op.DoOperation(
             ctx,
             this,
             _store[ctx.ResourceType],
             focusResource,
             r,
-            out resource,
-            out OperationOutcome? responseOutcome,
-            out _);
+            out FhirResponseContext opResponse);
 
-        outcome = responseOutcome ?? Utils.BuildOutcomeForRequest(
-            sc, 
-            $"Instance-Level Operation {ctx.ResourceType}/{ctx.Id}/{ctx.OperationName} returned {sc}");
-        return sc;
+        if ((opResponse.Resource != null) &&
+            (opResponse.Resource is Resource))
+        {
+            r = (Resource)opResponse.Resource;
+        }
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            r,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        response = new()
+        {
+            Resource = r,
+            Outcome = opResponse.Outcome ?? Utils.BuildOutcomeForRequest(
+                opResponse.StatusCode ?? (success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError),
+                $"Instance-Level Operation {ctx.ResourceType}/{ctx.Id}/{ctx.OperationName} {(success ? "succeeded" : "failed")}: {opResponse.StatusCode}"),
+            StatusCode = success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError,
+        };
+        return success;
     }
 
     /// <summary>System delete.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode SystemDelete(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool SystemDelete(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoSystemDelete(
-            ctx.UrlQuery,
-            out Resource? resource,
-            out OperationOutcome outcome);
+        bool success = DoSystemDelete(
+            ctx,
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the system delete operation.</summary>
     /// <param name="queryString">The query string.</param>
-    /// <param name="resource">   [out] The resource.</param>
-    /// <param name="outcome">    [out] The outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoSystemDelete(
-        string queryString,
-        out Resource? resource,
-        out OperationOutcome outcome)
+    /// <param name="response">   [out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoSystemDelete(
+        FhirRequestContext ctx,
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoSystemSearch(queryString, out Bundle? resultBundle, out _);
+        bool success = DoSystemSearch(ctx, out FhirResponseContext searchResp);
 
-        // we are done if there are no results found
-        if ((resultBundle == null) || (resultBundle.Total == 0))
+        // check for failed search
+        if ((!success) ||
+            (searchResp.Resource == null) ||
+            (searchResp.Resource is not Bundle resultBundle))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(sc, $"No matches found for system delete");
-            return sc;
+            response = new()
+            {
+                Outcome = searchResp.Outcome ?? Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    "System search failed"),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
         }
 
+        // we are done if there are no results found
+        if (resultBundle.Total == 0)
+        {
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    "No matches found for system delete"),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
+        }
+
+        // TODO(ginoc): Determine if we want to support conditional-delete-multiple
         if (resultBundle.Total > 1)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.PreconditionFailed,
-                $"Too many matches found for system delete: ({resultBundle.Total})",
-                OperationOutcome.IssueType.MultipleMatches);
-            return HttpStatusCode.PreconditionFailed;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.PreconditionFailed,
+                    $"Too many matches found for system delete: ({resultBundle.Total})",
+                    OperationOutcome.IssueType.MultipleMatches),
+                StatusCode = HttpStatusCode.PreconditionFailed,
+            };
+            return false;
         }
 
         Resource? match = resultBundle.Entry.First().Resource;
 
         if (match == null)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Resource not retrieved during search!",
-                OperationOutcome.IssueType.NotFound);
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    $"Resource ({resultBundle.Entry.First().FullUrl}) not accessible post search!",
+                    OperationOutcome.IssueType.Processing),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
+        }
+
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemDeleteConditional, out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            match,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        match = (Resource)hr.Resource;
+                    }
+                }
+            }
         }
 
         string resourceType = match.TypeName;
         string id = match.Id;
 
         // attempt delete
-        resource = _store[resourceType].InstanceDelete(id, _protectedResources);
+        Resource? resource = _store[resourceType].InstanceDelete(id, _protectedResources);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            resource,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        resource = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
 
         if (resource == null)
         {
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Matched delete resource {id} could not be deleted");
-            return HttpStatusCode.InternalServerError;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    $"Matched delete resource {id} could not be deleted"),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}");
-        return HttpStatusCode.OK;
+        response = new()
+        {
+            Resource = resource,
+            Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}"),
+            StatusCode = HttpStatusCode.OK,
+        };
+        return true;
     }
 
     /// <summary>Type delete.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode TypeDelete(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The serialized resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TypeDelete(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoTypeDelete(
-            ctx.ResourceType,
-            ctx.UrlQuery,
-            out Resource? resource,
-            out OperationOutcome outcome);
+        bool success = DoTypeDelete(
+            ctx,
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Executes the type delete operation.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="queryString"> The query string.</param>
-    /// <param name="resource">    [out] The resource.</param>
-    /// <param name="outcome">     [out] The outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoTypeDelete(
-        string resourceType,
-        string queryString,
-        out Resource? resource,
-        out OperationOutcome outcome)
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoTypeDelete(
+        FhirRequestContext ctx,
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoTypeSearch(resourceType, queryString, out Bundle? resultBundle, out _);
-
-        // we are done if there are no results found
-        if ((resultBundle == null) || (resultBundle.Total == 0))
+        if (string.IsNullOrEmpty(ctx.ResourceType))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(sc, $"No matches found for type delete");
-            return sc;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.BadRequest,
+                    "Resource type is required for type-delete interactions",
+                    OperationOutcome.IssueType.Structure),
+                StatusCode = HttpStatusCode.BadRequest,
+            };
+            return false;
         }
 
+        if (!_store.ContainsKey(ctx.ResourceType))
+        {
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type: {ctx.ResourceType} is not supported",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
+        }
+
+        bool success = DoTypeSearch(ctx, out FhirResponseContext searchResp);
+
+        // check for failed search
+        if ((!success) ||
+            (searchResp.Resource == null) ||
+            (searchResp.Resource is not Bundle resultBundle))
+        {
+            response = new()
+            {
+                Outcome = searchResp.Outcome ?? Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    $"Type search against {ctx.ResourceType} failed"),
+                StatusCode = searchResp.StatusCode ?? HttpStatusCode.InternalServerError,
+            };
+            return false;
+        }
+
+        // we are done if there are no results found
+        if (resultBundle.Total == 0)
+        {
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"No matches found for type ({ctx.ResourceType}) delete"),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
+        }
+
+        // TODO(ginoc): Determine if we want to support conditional-delete-multiple
         if (resultBundle.Total > 1)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.PreconditionFailed,
-                $"Too many matches found for type delete: ({resultBundle.Total})",
-                OperationOutcome.IssueType.MultipleMatches);
-            return HttpStatusCode.PreconditionFailed;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.PreconditionFailed,
+                    $"Too many matches found for type ({ctx.ResourceType}) delete: ({resultBundle.Total})",
+                    OperationOutcome.IssueType.MultipleMatches),
+                StatusCode = HttpStatusCode.PreconditionFailed,
+            };
+            return false;
         }
 
         Resource? match = resultBundle.Entry.First().Resource;
 
         if (match == null)
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Resource not retrieved during search!",
-                OperationOutcome.IssueType.NotFound);
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    $"Resource ({resultBundle.Entry.First().FullUrl}) not accessible post search!",
+                    OperationOutcome.IssueType.Processing),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
         }
 
+        IFhirInteractionHook[] hooks = Array.Empty<IFhirInteractionHook>();
+
+        if (_hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeDeleteConditional, out IFhirInteractionHook[]? subHooks) &&
+            (subHooks?.Any() ?? false))
+        {
+            hooks = hooks.Concat(subHooks).ToArray();
+        }
+
+        if (_hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeDeleteConditionalSingle, out subHooks) &&
+            (subHooks?.Any() ?? false))
+        {
+            hooks = hooks.Concat(subHooks).ToArray();
+        }
+
+        if (_hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeDeleteConditionalMultiple, out subHooks) &&
+            (subHooks?.Any() ?? false))
+        {
+            hooks = hooks.Concat(subHooks).ToArray();
+        }
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            match,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        match = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        string resourceType = match.TypeName;
         string id = match.Id;
 
         // attempt delete
-        resource = _store[resourceType].InstanceDelete(id, _protectedResources);
+        Resource? resource = _store[resourceType].InstanceDelete(id, _protectedResources);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            resource,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        resource = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
 
         if (resource == null)
         {
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"Matched delete resource {id} could not be deleted");
-            return HttpStatusCode.InternalServerError;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    $"Matched delete resource {id} could not be deleted"),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}");
-        return HttpStatusCode.OK;
+        response = new()
+        {
+            Resource = resource,
+            Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}"),
+            StatusCode = HttpStatusCode.OK,
+        };
+        return true;
     }
 
     /// <summary>Type search.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized bundle.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
     /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode TypeSearch(
+    public bool TypeSearch(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoTypeSearch(
-            ctx.ResourceType,
-            ctx.UrlQuery,
-            out Bundle? resource,
-            out OperationOutcome outcome);
+        bool success = DoTypeSearch(
+            ctx,
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Attempts to system search an object from the given string.</summary>
@@ -3176,15 +3927,13 @@ public partial class VersionedFhirStore : IFhirStore
         string queryString,
         out object? bundle)
     {
-        HttpStatusCode sc = DoTypeSearch(
-            resourceType,
-            queryString,
-            out Bundle? b,
-            out _);
+        bool success = DoTypeSearch(
+            new FhirRequestContext(this, "GET", $"{resourceType}?{queryString}"),
+            out FhirResponseContext resp);
 
-        bundle = b;
+        bundle = resp.Resource;
 
-        return sc.IsSuccessful();
+        return success;
     }
 
 
@@ -3194,54 +3943,88 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="bundle">      [out] The bundle.</param>
     /// <param name="outcome">     [out] The outcome.</param>
     /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoTypeSearch(
-        string resourceType,
-        string queryString,
-        out Bundle? bundle,
-        out OperationOutcome outcome)
+    internal bool DoTypeSearch(
+        FhirRequestContext ctx,
+        out FhirResponseContext response)
     {
-        if (string.IsNullOrEmpty(resourceType))
+        if (string.IsNullOrEmpty(ctx.ResourceType))
         {
-            bundle = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.BadRequest, 
-                "Resource type is required",
-                OperationOutcome.IssueType.Structure);
-            return HttpStatusCode.BadRequest;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.BadRequest,
+                    "Resource type is required for type-delete interactions",
+                    OperationOutcome.IssueType.Structure),
+                StatusCode = HttpStatusCode.BadRequest,
+            };
+            return false;
         }
 
-        if (!_store.ContainsKey(resourceType))
+        if (!_store.ContainsKey(ctx.ResourceType))
         {
-            bundle = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Resource type: {resourceType} is not supported",
-                OperationOutcome.IssueType.NotSupported);
-            return HttpStatusCode.NotFound;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Resource type: {ctx.ResourceType} is not supported",
+                    OperationOutcome.IssueType.NotSupported),
+                StatusCode = HttpStatusCode.NotFound,
+            };
+            return false;
+        }
+
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.TypeSearch, out IFhirInteractionHook[]? hooks);
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            null,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+                }
+            }
         }
 
         // parse search parameters
         IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(
-            queryString,
+            ctx.UrlQuery,
             this,
-            _store[resourceType],
-            resourceType);
+            _store[ctx.ResourceType],
+            ctx.ResourceType);
 
         // execute search
-        IEnumerable<Resource>? results = _store[resourceType].TypeSearch(parameters);
+        IEnumerable<Resource>? results = _store[ctx.ResourceType].TypeSearch(parameters);
 
         // parse search result parameters
-        ParsedResultParameters resultParameters = new ParsedResultParameters(queryString, this);
+        ParsedResultParameters resultParameters = new ParsedResultParameters(ctx.UrlQuery, this);
 
         // null results indicates failure
         if (results == null)
         {
-            bundle = null;
-            outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.InternalServerError, $"{resourceType} Search Failed");
-            return HttpStatusCode.InternalServerError;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    $"Type Search against {ctx.ResourceType} failed",
+                    OperationOutcome.IssueType.Processing),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+            return false;
         }
 
-        string selfLink = $"{_config.BaseUrl}/{resourceType}";
+        string selfLink = $"{_config.BaseUrl}/{ctx.ResourceType}";
         string selfSearchParams = string.Join('&', parameters.Where(p => !p.IgnoredParameter).Select(p => p.GetAppliedQueryString()));
         string selfResultParams = resultParameters.GetAppliedQueryString();
 
@@ -3256,7 +4039,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         // create our bundle for results
-        bundle = new Bundle
+        Bundle bundle = new Bundle
         {
             Type = Bundle.BundleType.Searchset,
             Total = results.Count(),
@@ -3301,37 +4084,68 @@ public partial class VersionedFhirStore : IFhirStore
             AddReverseInclusions(bundle, resource, resultParameters, addedIds);
         }
 
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Search {resourceType}");
-        return HttpStatusCode.OK;
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            bundle,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if ((hr.Resource != null) &&
+                        (hr.Resource is Bundle opBundle))
+                    {
+                        bundle = opBundle;
+                    }
+                }
+            }
+        }
+
+        response = new()
+        {
+            Resource = bundle,
+            Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"System search successful"),
+            StatusCode = HttpStatusCode.OK,
+        };
+        return true;
     }
 
     /// <summary>System search.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized bundle.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode SystemSearch(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool SystemSearch(
         FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome)
+        out FhirResponseContext response)
     {
-        HttpStatusCode sc = DoSystemSearch(
-            ctx.UrlQuery,
-            out Bundle? resource,
-            out OperationOutcome outcome);
+        bool success = DoSystemSearch(
+            ctx,
+            out response);
 
-        if (resource == null)
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            serializedResource = string.Empty;
-        }
-        else
-        {
-            serializedResource = Utils.SerializeFhir(resource, ctx.DestinationFormat, ctx.SerializePretty);
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        return sc;
+        return success;
     }
 
     /// <summary>Attempts to system search an object from the given string.</summary>
@@ -3342,30 +4156,27 @@ public partial class VersionedFhirStore : IFhirStore
         string queryString,
         out object? bundle)
     {
-        HttpStatusCode sc = DoSystemSearch(
-            queryString,
-            out Bundle? b,
-            out _);
+        bool success = DoSystemSearch(
+            new FhirRequestContext(this, "GET", "?" + queryString),
+            out FhirResponseContext resp);
 
-        bundle = b;
+        bundle = resp.Resource;
 
-        return sc.IsSuccessful();
+        return success;
     }
 
     /// <summary>Executes the system search operation.</summary>
-    /// <param name="queryString">The query string.</param>
-    /// <param name="bundle">     [out] The bundle.</param>
-    /// <param name="outcome">    [out] The outcome.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoSystemSearch(
-        string queryString,
-        out Bundle? bundle,
-        out OperationOutcome outcome)
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoSystemSearch(
+        FhirRequestContext ctx,
+        out FhirResponseContext response)
     {
         string[] resourceTypes = Array.Empty<string>();
 
         // check for _type parameter
-        System.Collections.Specialized.NameValueCollection query = System.Web.HttpUtility.ParseQueryString(queryString);
+        System.Collections.Specialized.NameValueCollection query = System.Web.HttpUtility.ParseQueryString(ctx.UrlQuery);
 
         foreach (string key in query)
         {
@@ -3379,12 +4190,40 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (!resourceTypes.Any())
         {
-            bundle = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.Forbidden,
-                $"System search with no resource types is too costly.",
-                OperationOutcome.IssueType.TooCostly);
-            return HttpStatusCode.Forbidden;
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.Forbidden,
+                    $"System search with no resource types is too costly.",
+                    OperationOutcome.IssueType.TooCostly),
+                StatusCode = HttpStatusCode.Forbidden,
+            };
+            return false;
+        }
+
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemSearch, out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            null,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+                }
+            }
         }
 
         List<IEnumerable<ParsedSearchParameter>> allParameters = new();
@@ -3394,7 +4233,7 @@ public partial class VersionedFhirStore : IFhirStore
         {
             // parse search parameters
             IEnumerable<ParsedSearchParameter> parameters = ParsedSearchParameter.Parse(
-                queryString,
+                ctx.UrlQuery,
                 this,
                 _store[resourceType],
                 resourceType);
@@ -3405,11 +4244,14 @@ public partial class VersionedFhirStore : IFhirStore
             // null results indicates failure
             if (results == null)
             {
-                bundle = null;
-                outcome = Utils.BuildOutcomeForRequest(
-                    HttpStatusCode.InternalServerError,
-                    $"{resourceType} Search Failed");
-                return HttpStatusCode.InternalServerError;
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.InternalServerError,
+                        $"System search into {resourceType} failed"),
+                    StatusCode = HttpStatusCode.InternalServerError,
+                };
+                return false;
             }
 
             allParameters.Add(parameters);
@@ -3417,7 +4259,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         // parse search result parameters
-        ParsedResultParameters resultParameters = new ParsedResultParameters(queryString, this);
+        ParsedResultParameters resultParameters = new ParsedResultParameters(ctx.UrlQuery, this);
 
         // filter parameters from use across all performed searches
         IEnumerable<ParsedSearchParameter> filteredParameters = allParameters.SelectMany(e => e.Select(p => p)).DistinctBy(p => p.Name);
@@ -3437,7 +4279,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         // create our bundle for results
-        bundle = new Bundle
+        Bundle bundle = new()
         {
             Type = Bundle.BundleType.Searchset,
             Link = new()
@@ -3484,14 +4326,51 @@ public partial class VersionedFhirStore : IFhirStore
             AddReverseInclusions(bundle, resource, resultParameters, addedIds);
         }
 
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store[ctx.ResourceType],
+                            bundle,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if ((hr.Resource != null) &&
+                        (hr.Resource is Bundle opBundle))
+                    {
+                        bundle = opBundle;
+                    }
+                }
+            }
+        }
+
+        // set the total number of results aggregated across types
         bundle.Total = resultCount;
-        outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"System Search succeded");
-        return HttpStatusCode.OK;
+
+        response = new()
+        {
+            Resource = bundle,
+            Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"System search successful"),
+            StatusCode = HttpStatusCode.OK,
+        };
+        return true;
     }
 
     private void AddIterativeInclusions()
     {
-        // TODO: Add iterative inclusions!
+        // TODO(ginoc): Add iterative inclusions!
     }
 
     /// <summary>Enumerates resolve reverse inclusions in this collection.</summary>
@@ -3762,123 +4641,137 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Gets the server capabilities.</summary>
-    /// <param name="ctx">               The authorization information, if available.</param>
-    /// <param name="pretty">            If the output should be 'pretty' formatted.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
-    /// <returns>The capabilities.</returns>
-    public HttpStatusCode GetMetadata(
-        FhirRequestContext ctx,
-        out string serializedResource,
-        out string serializedOutcome,
-        out string eTag,
-        out string lastModified)
-    {
-        if (_capabilitiesAreStale)
-        {
-            UpdateCapabilities();
-        }
-
-        _ = TryInstanceRead("CapabilityStatement", _capabilityStatementId, out object? resource);
-
-        OperationOutcome outcome;
-
-        if ((resource == null) || (resource is not Hl7.Fhir.Model.Resource r))
-        {
-            serializedResource = string.Empty;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.InternalServerError,
-                $"CapabilityStatement could not be retrieved",
-                OperationOutcome.IssueType.Exception);
-            serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.InternalServerError;
-        }
-
-        serializedResource = Utils.SerializeFhir(r, ctx.DestinationFormat, ctx.SerializePretty);
-        outcome = Utils.BuildOutcomeForRequest(
-            HttpStatusCode.OK,
-            $"Retreived current CapabilityStatement",
-            OperationOutcome.IssueType.Success);
-        serializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty);
-
-        eTag = string.IsNullOrEmpty(r.Meta?.VersionId) ? string.Empty : $"W/\"{r.Meta.VersionId}\"";
-        lastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
-
-        return HttpStatusCode.OK;
-    }
-
-    /// <summary>Attempts to get metadata a string from the given string.</summary>
-    /// <param name="mimeType">  Type of the mime.</param>
-    /// <param name="serialized">[out] The serialized.</param>
+    /// <param name="ctx">     The authorization information, if available.</param>
+    /// <param name="response">[out] The response data.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryGetMetadata(string mimeType, bool pretty, out string serialized)
+    public bool GetMetadata(
+        FhirRequestContext ctx,
+        out FhirResponseContext response)
     {
-        if (_capabilitiesAreStale)
+        bool success = DoGetMetadata(ctx, out response);
+
+        string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
+        string so = response.Outcome == null ? string.Empty : Utils.SerializeFhir((Resource)response.Outcome, ctx.DestinationFormat, ctx.SerializePretty);
+
+        response = response with
         {
-            UpdateCapabilities();
-        }
+            MimeType = ctx.DestinationFormat,
+            SerializedResource = sr,
+            SerializedOutcome = so,
+        };
 
-        _ = TryInstanceRead("CapabilityStatement", _capabilityStatementId, out object? resource);
-
-        if ((resource == null) || (resource is not Hl7.Fhir.Model.Resource r))
-        {
-            serialized = string.Empty;
-            return false;
-        }
-
-        serialized = Utils.SerializeFhir(r, mimeType, pretty);
-        return true;
+        return success;
     }
 
     /// <summary>Executes the get metadata operation.</summary>
-    /// <param name="ctx">         The request context.</param>
-    /// <param name="resource">    [out] The resource.</param>
-    /// <param name="outcome">     [out] The outcome.</param>
-    /// <param name="eTag">        [out] The tag.</param>
-    /// <param name="lastModified">[out] The last modified.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    internal HttpStatusCode DoGetMetadata(
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response data.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    internal bool DoGetMetadata(
         FhirRequestContext ctx,
-        out Resource? resource,
-        out OperationOutcome outcome,
-        out string eTag,
-        out string lastModified)
+        out FhirResponseContext response)
     {
         if (_capabilitiesAreStale)
         {
             UpdateCapabilities();
+        }
+
+        _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemCapabilities, out IFhirInteractionHook[]? hooks);
+
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store["CapabilityStatement"],
+                            null,
+                            out FhirResponseContext hr);
+
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+                }
+            }
         }
 
         _ = TryInstanceRead("CapabilityStatement", _capabilityStatementId, out object? obj);
 
-        if ((obj == null) || (obj is not Hl7.Fhir.Model.Resource r))
+        Hl7.Fhir.Model.Resource? r;
+
+        if ((obj == null) || (obj is not Hl7.Fhir.Model.Resource))
         {
-            resource = null;
-            outcome = Utils.BuildOutcomeForRequest(
-                HttpStatusCode.InternalServerError,
-                $"CapabilityStatement could not be retrieved",
-                OperationOutcome.IssueType.Exception);
-            eTag = string.Empty;
-            lastModified = string.Empty;
-            return HttpStatusCode.InternalServerError;
+            r = null;
+        }
+        else
+        {
+            r = (Hl7.Fhir.Model.Resource)obj;
         }
 
-        resource = r;
-        outcome = Utils.BuildOutcomeForRequest(
-            HttpStatusCode.OK,
-            $"Retreived current CapabilityStatement",
-            OperationOutcome.IssueType.Success);
-        
-        eTag = string.IsNullOrEmpty(r.Meta?.VersionId) ? string.Empty : $"W/\"{r.Meta.VersionId}\"";
-        lastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
+        if (hooks?.Any() ?? false)
+        {
+            foreach (IFhirInteractionHook hook in hooks)
+            {
+                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                {
+                    _ = hook.DoInteractionHook(
+                            ctx,
+                            this,
+                            _store["CapabilityStatement"],
+                            r,
+                            out FhirResponseContext hr);
 
-        return HttpStatusCode.OK;
+                    // check for the hook indicating processing is complete
+                    if (hr.StatusCode != null)
+                    {
+                        response = hr;
+                        return true;
+                    }
+
+                    // if the hook modified the resource, use that moving forward
+                    if (hr.Resource != null)
+                    {
+                        r = (Resource)hr.Resource;
+                    }
+                }
+            }
+        }
+
+        if (r == null)
+        {
+            response = new()
+            {
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.InternalServerError,
+                    $"CapabilityStatement could not be retrieved",
+                    OperationOutcome.IssueType.Exception),
+                StatusCode = HttpStatusCode.InternalServerError,
+            };
+
+            return false;
+        }
+
+        response = new()
+        {
+            Resource = r,
+            Outcome = Utils.BuildOutcomeForRequest(
+                HttpStatusCode.OK,
+                $"Retreived current CapabilityStatement",
+                OperationOutcome.IssueType.Success),
+            ETag = string.IsNullOrEmpty(r.Meta?.VersionId) ? string.Empty : $"W/\"{r.Meta.VersionId}\"",
+            LastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
+            Location = string.IsNullOrEmpty(r.Id) ? string.Empty : $"{_config.BaseUrl}/{r.TypeName}/{r.Id}",
+            StatusCode = HttpStatusCode.OK,
+        };
+
+        return true;
     }
-
 
     /// <summary>Common to firely version.</summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when one or more arguments are outside the
@@ -4214,14 +5107,11 @@ public partial class VersionedFhirStore : IFhirStore
         Bundle batch,
         Bundle response)
     {
-        HttpStatusCode sc;
-        Resource? resource;
-        OperationOutcome outcome;
+        bool opSuccess;
+        FhirResponseContext opResponse;
 
         foreach (Bundle.EntryComponent entry in batch.Entry)
         {
-            resource = null;
-
             if (entry.Request == null)
             {
                 response.Entry.Add(new Bundle.EntryComponent()
@@ -4299,19 +5189,21 @@ public partial class VersionedFhirStore : IFhirStore
             {
                 case Common.StoreInteractionCodes.InstanceDelete:
                     {
-                        sc = DoInstanceDelete(
+                        opSuccess = DoInstanceDelete(
                             entryCtx,
-                            out resource,
-                            out outcome);
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4320,20 +5212,21 @@ public partial class VersionedFhirStore : IFhirStore
 
                 case Common.StoreInteractionCodes.InstanceOperation:
                     {
-                        sc = DoInstanceOperation(
+                        opSuccess = DoInstanceOperation(
                             entryCtx,
-                            entry.Resource,
-                            out resource,
-                            out outcome);
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4342,23 +5235,21 @@ public partial class VersionedFhirStore : IFhirStore
 
                 case Common.StoreInteractionCodes.InstanceRead:
                     {
-                        sc = DoInstanceRead(
+                        opSuccess = DoInstanceRead(
                             entryCtx,
-                            out resource,
-                            out outcome,
-                            out string eTag,
-                            out string lastModified);
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
-                                Etag = eTag,
-                                LastModified = resource?.Meta?.LastUpdated ?? null,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4366,6 +5257,7 @@ public partial class VersionedFhirStore : IFhirStore
                     }
 
                 case Common.StoreInteractionCodes.InstanceUpdate:
+                case Common.StoreInteractionCodes.InstanceUpdateConditional:
                     {
                         if (entry.Resource == null)
                         {
@@ -4385,26 +5277,22 @@ public partial class VersionedFhirStore : IFhirStore
                             continue;
                         }
 
-                        sc = DoInstanceUpdate(
+                        opSuccess = DoInstanceUpdate(
                             entryCtx,
                             entry.Resource,
-                            out resource,
-                            out outcome,
-                            out string eTag,
-                            out string lastModified,
-                            out string location);
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
-                                Etag = eTag,
-                                LastModified = resource?.Meta?.LastUpdated ?? null,
-                                Location = location,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4432,26 +5320,22 @@ public partial class VersionedFhirStore : IFhirStore
                             continue;
                         }
 
-                        sc = DoInstanceCreate(
+                        opSuccess = DoInstanceCreate(
                             entryCtx,
                             entry.Resource,
-                            out resource,
-                            out outcome,
-                            out string eTag,
-                            out string lastModified,
-                            out string location);
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
-                                Etag = eTag,
-                                LastModified = resource?.Meta?.LastUpdated ?? null,
-                                Location = location,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4459,43 +5343,46 @@ public partial class VersionedFhirStore : IFhirStore
                     }
 
                 case Common.StoreInteractionCodes.TypeDeleteConditional:
+                case Common.StoreInteractionCodes.TypeDeleteConditionalSingle:
+                case Common.StoreInteractionCodes.TypeDeleteConditionalMultiple:
                     {
-                        sc = DoTypeDelete(
-                            entryCtx.ResourceType,
-                            entryCtx.UrlQuery,
-                            out resource,
-                            out outcome);
+                        opSuccess = DoTypeDelete(
+                            entryCtx,
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
-
                         continue;
                     }
 
                 case Common.StoreInteractionCodes.TypeOperation:
                     {
-                        sc = DoTypeOperation(
+                        opSuccess = DoTypeOperation(
                             entryCtx,
-                            entry.Resource,
-                            out resource,
-                            out outcome);
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4504,20 +5391,21 @@ public partial class VersionedFhirStore : IFhirStore
 
                 case Common.StoreInteractionCodes.TypeSearch:
                     {
-                        sc = DoTypeSearch(
-                            entryCtx.ResourceType,
-                            entryCtx.UrlQuery,
-                            out Bundle? bundle,
-                            out outcome);
+                        opSuccess = DoTypeSearch(
+                            entryCtx,
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = bundle,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4526,23 +5414,21 @@ public partial class VersionedFhirStore : IFhirStore
 
                 case Common.StoreInteractionCodes.SystemCapabilities:
                     {
-                        sc = DoGetMetadata(
-                            ctx,
-                            out resource,
-                            out outcome,
-                            out string eTag,
-                            out string lastModified);
+                        opSuccess = DoGetMetadata(
+                            entryCtx,
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
-                                Etag = eTag,
-                                LastModified = resource?.Meta?.LastUpdated ?? null,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4581,19 +5467,21 @@ public partial class VersionedFhirStore : IFhirStore
 
                 case Common.StoreInteractionCodes.SystemDeleteConditional:
                     {
-                        sc = DoSystemDelete(
-                            entryCtx.UrlQuery,
-                            out resource,
-                            out outcome);
+                        opSuccess = DoSystemDelete(
+                            entryCtx,
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4602,20 +5490,21 @@ public partial class VersionedFhirStore : IFhirStore
 
                 case Common.StoreInteractionCodes.SystemOperation:
                     {
-                        sc = DoSystemOperation(
+                        opSuccess = DoSystemOperation(
                             entryCtx,
-                            entry.Resource,
-                            out resource,
-                            out outcome);
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = resource,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4624,19 +5513,21 @@ public partial class VersionedFhirStore : IFhirStore
 
                 case Common.StoreInteractionCodes.SystemSearch:
                     {
-                        sc = DoSystemSearch(
-                            entryCtx.UrlQuery,
-                            out Bundle? bundle,
-                            out outcome);
+                        opSuccess = DoSystemSearch(
+                            entryCtx,
+                            out opResponse);
 
                         response.Entry.Add(new Bundle.EntryComponent()
                         {
                             FullUrl = entry.FullUrl,
-                            Resource = bundle,
+                            Resource = (Resource?)opResponse.Resource,
                             Response = new Bundle.ResponseComponent()
                             {
-                                Status = sc.ToString(),
-                                Outcome = outcome,
+                                Status = (opResponse.StatusCode ?? HttpStatusCode.InternalServerError).ToString(),
+                                Outcome = (Resource?)opResponse.Outcome,
+                                Etag = opResponse.ETag ?? string.Empty,
+                                LastModified = ((Resource?)opResponse.Resource)?.Meta?.LastUpdated ?? null,
+                                Location = opResponse.Location ?? string.Empty,
                             },
                         });
 
@@ -4649,6 +5540,7 @@ public partial class VersionedFhirStore : IFhirStore
                 case Common.StoreInteractionCodes.InstanceDeleteHistory:
                 case Common.StoreInteractionCodes.InstanceDeleteVersion:
                 case Common.StoreInteractionCodes.InstancePatch:
+                case Common.StoreInteractionCodes.InstancePatchConditional:
                 case Common.StoreInteractionCodes.InstanceReadHistory:
                 case Common.StoreInteractionCodes.InstanceReadVersion:
                 case Common.StoreInteractionCodes.TypeHistory:

@@ -295,6 +295,27 @@ public record class FhirRequestContext
         _urlPath = requestUrlPath;
         _urlQuery = requestUrlQuery;
 
+        bool hasQueryParameters = false;
+        if (!string.IsNullOrEmpty(requestUrlQuery))
+        {
+            // need to parse into KVPs
+
+            System.Collections.Specialized.NameValueCollection queryParams = System.Web.HttpUtility.ParseQueryString(requestUrlQuery);
+
+            foreach (string? key in queryParams.AllKeys ?? Array.Empty<string>())
+            {
+                if (string.IsNullOrEmpty(key) ||
+                    Search.Common.HttpParameters.Contains(key) ||
+                    Search.Common.SearchResultParameters.Contains(key))
+                {
+                    continue;
+                }
+
+                hasQueryParameters = true;
+                break;
+            }
+        }
+
         string[] pathComponents = requestUrlPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         bool hasValidResourceType = pathComponents.Any()
@@ -495,7 +516,7 @@ public record class FhirRequestContext
                             {
                                 if (hasValidResourceType)
                                 {
-                                    _interaction = StoreInteractionCodes.TypeCreate;
+                                    _interaction = hasQueryParameters ? StoreInteractionCodes.TypeCreateConditional : StoreInteractionCodes.TypeCreate;
 
                                     return true;
                                 }
@@ -657,7 +678,7 @@ public record class FhirRequestContext
                                     (!pathComponents[1].StartsWith('$')))
                                 {
                                     _id = pathComponents[1];
-                                    _interaction = StoreInteractionCodes.InstanceUpdate;
+                                    _interaction = hasQueryParameters ? StoreInteractionCodes.InstanceUpdateConditional : StoreInteractionCodes.InstanceUpdate;
 
                                     return true;
                                 }
@@ -677,7 +698,7 @@ public record class FhirRequestContext
                                     (!pathComponents[1].StartsWith('$')))
                                 {
                                     _id = pathComponents[1];
-                                    _interaction = StoreInteractionCodes.InstancePatch;
+                                    _interaction = hasQueryParameters ? StoreInteractionCodes.InstancePatchConditional : StoreInteractionCodes.InstancePatch;
 
                                     return true;
                                 }

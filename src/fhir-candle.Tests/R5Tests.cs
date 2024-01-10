@@ -119,15 +119,9 @@ public class R5TestsPatientLooped : IClassFixture<R5Tests>
             DestinationFormat = "application/fhir+json",
         };
 
-        HttpStatusCode sc;
-
         for (int i = 0; i < loopCount; i++)
         {
-            sc = _fixture._store.TypeSearch(
-                ctx,
-                out _, 
-                out _);
-            sc.Should().Be(HttpStatusCode.OK);
+            _fixture._store.TypeSearch(ctx, out _).Should().BeTrue();
         }
     }
 }
@@ -173,14 +167,15 @@ public class R5TestsEncounter : IClassFixture<R5Tests>
             DestinationFormat = "application/fhir+json",
         };
 
-        _fixture._store.TypeSearch(
+        bool success = _fixture._store.TypeSearch(
             ctx,
-            out string bundle, 
-            out _);
+            out FhirResponseContext response);
 
-        bundle.Should().NotBeNullOrEmpty();
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
 
-        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(bundle);
+        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(response.SerializedResource);
 
         results.Should().NotBeNull();
         results!.Total.Should().Be(matchCount);
@@ -276,14 +271,15 @@ public class R5TestsObservation : IClassFixture<R5Tests>
             DestinationFormat = "application/fhir+json",
         };
 
-        _fixture._store.TypeSearch(
+        bool success = _fixture._store.TypeSearch(
             ctx,
-            out string bundle, 
-            out _);
+            out FhirResponseContext response);
 
-        bundle.Should().NotBeNullOrEmpty();
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
 
-        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(bundle);
+        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(response.SerializedResource);
 
         results.Should().NotBeNull();
         results!.Total.Should().Be(matchCount);
@@ -379,14 +375,15 @@ public class R5TestsPatient : IClassFixture<R5Tests>
             DestinationFormat = "application/fhir+json",
         };
 
-        _fixture._store.TypeSearch(
+        bool success = _fixture._store.TypeSearch(
             ctx,
-            out string bundle, 
-            out _);
+            out FhirResponseContext response);
 
-        bundle.Should().NotBeNullOrEmpty();
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
 
-        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(bundle);
+        MinimalBundle? results = JsonSerializer.Deserialize<MinimalBundle>(response.SerializedResource);
 
         results.Should().NotBeNull();
         results!.Total.Should().Be(matchCount);

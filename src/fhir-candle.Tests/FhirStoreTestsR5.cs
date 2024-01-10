@@ -77,20 +77,16 @@ public class FhirStoreTestsR5: IDisposable
             AllowExistingId = true,
         };
 
-        HttpStatusCode scCreate = fhirStore.InstanceCreate(
+        bool success = fhirStore.InstanceCreate(
             ctx,
-            out string serializedResource,
-            out string serializedOutcome,
-            out string eTag,
-            out string lastModified,
-            out string location);
+            out FhirResponseContext response);
 
-        scCreate.Should().Be(HttpStatusCode.Created);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        lastModified.Should().NotBeNullOrEmpty();
-        location.Should().Contain("SearchParameter/");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Created, response.SerializedOutcome);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.Location.Should().Contain("SearchParameter/");
 
         ctx = new()
         {
@@ -101,22 +97,20 @@ public class FhirStoreTestsR5: IDisposable
             Authorization = null,
             SourceFormat = "application/fhir+json",
             DestinationFormat = "application/fhir+json",
-            IfMatch = eTag,
-            IfModifiedSince = lastModified,
+            IfMatch = response.ETag,
+            IfModifiedSince = response.LastModified,
         };
 
-        HttpStatusCode scRead = fhirStore.InstanceRead(
+        success = fhirStore.InstanceRead(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified);
+            out response);
 
-        scRead.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        location.Should().EndWith("SearchParameter/Patient-multiplebirth");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, response.SerializedOutcome);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.Location.Should().EndWith("SearchParameter/Patient-multiplebirth");
         //_testOutputHelper.WriteLine(bundle);
     }
 
@@ -141,18 +135,16 @@ public class FhirStoreTestsR5: IDisposable
         };
 
         // read the metadata
-        HttpStatusCode scRead = fhirStore.GetMetadata(
+        bool success = fhirStore.GetMetadata(
             ctx,
-            out string serializedResource,
-            out string serializedOutcome,
-            out string eTag,
-            out string lastModified);
+            out FhirResponseContext response);
 
-        scRead.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
+        success.Should().Be(true);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
 
-        MinimalCapabilities? capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(serializedResource);
+        MinimalCapabilities? capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(response.SerializedResource);
 
         capabilities.Should().NotBeNull();
         capabilities!.Rest.Should().NotBeNullOrEmpty();
@@ -188,13 +180,12 @@ public class FhirStoreTestsR5: IDisposable
         };
 
         // add a search parameter for the patient resource
-        HttpStatusCode scCreate = fhirStore.InstanceCreate(
+        success = fhirStore.InstanceCreate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out string location);
+            out response);
+
+        success.Should().Be(true);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         ctx = new()
         {
@@ -208,18 +199,16 @@ public class FhirStoreTestsR5: IDisposable
         };
 
         // read the metadata again
-        scRead = fhirStore.GetMetadata(
+        success = fhirStore.GetMetadata(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified);
+            out response);
 
-        scRead.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
+        success.Should().Be(true);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
 
-        capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(serializedResource);
+        capabilities = JsonSerializer.Deserialize<MinimalCapabilities>(response.SerializedResource);
 
         capabilities.Should().NotBeNull();
         capabilities!.Rest.Should().NotBeNullOrEmpty();
@@ -280,18 +269,16 @@ public class FhirStoreTestsR5: IDisposable
             IfModifiedSince = lastModified,
         };
 
-        HttpStatusCode scRead = fhirStore.InstanceRead(
+        bool success = fhirStore.InstanceRead(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified);
+            out FhirResponseContext response);
 
-        scRead.Should().Be(HttpStatusCode.OK);
-        serializedResource.Should().NotBeNullOrEmpty();
-        serializedOutcome.Should().NotBeNullOrEmpty();
-        eTag.Should().Be("W/\"1\"");
-        location.Should().EndWith("SubscriptionTopic/encounter-create-interaction");
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, serializedOutcome);
+        response.SerializedResource.Should().NotBeNullOrEmpty();
+        response.SerializedOutcome.Should().NotBeNullOrEmpty();
+        response.ETag.Should().Be("W/\"1\"");
+        response.Location.Should().EndWith("SubscriptionTopic/encounter-create-interaction");
         //_testOutputHelper.WriteLine(bundle);
     }
 
@@ -690,16 +677,21 @@ public class FhirStoreTestsR5: IDisposable
             AllowExistingId = true,
         };
 
-        HttpStatusCode sc = fhirStore.InstanceCreate(
+        bool success = fhirStore.InstanceCreate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
-        sc.Should().Be(HttpStatusCode.Created);
-        location.Should().Contain(resourceType);
-        return sc;
+            out FhirResponseContext response);
+
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.Location.Should().Contain(resourceType);
+
+        serializedResource = response.SerializedResource;
+        serializedOutcome = response.SerializedOutcome;
+        eTag = response.ETag;
+        lastModified = response.LastModified;
+        location = response.Location;
+
+        return response.StatusCode ?? HttpStatusCode.InternalServerError;
     }
 
     /// <summary>Executes the update operation.</summary>
@@ -737,15 +729,20 @@ public class FhirStoreTestsR5: IDisposable
             AllowCreateAsUpdate = true,
         };
 
-        HttpStatusCode sc = fhirStore.InstanceUpdate(
+        bool success = fhirStore.InstanceUpdate(
             ctx,
-            out serializedResource,
-            out serializedOutcome,
-            out eTag,
-            out lastModified,
-            out location);
-        sc.Should().Be(HttpStatusCode.OK);
-        location.Should().Contain(resourceType);
-        return sc;
+            out FhirResponseContext response);
+
+        success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Location.Should().Contain(resourceType);
+
+        serializedResource = response.SerializedResource;
+        serializedOutcome = response.SerializedOutcome;
+        eTag = response.ETag;
+        lastModified = response.LastModified;
+        location = response.Location;
+
+        return response.StatusCode ?? HttpStatusCode.InternalServerError;
     }
 }

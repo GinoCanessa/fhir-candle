@@ -5,10 +5,13 @@
 
 using System.Net;
 using fhir.candle.Services;
+using Fhir.Metrics;
 using FhirCandle.Models;
 using FhirCandle.Storage;
+using Hl7.Fhir.Rest;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 
 namespace fhir.candle.Controllers;
@@ -147,6 +150,65 @@ public class FhirController : ControllerBase
         }
     }
 
+    /// <summary>Adds a FHIR response.</summary>
+    /// <param name="response">  The response.</param>
+    /// <param name="prefer">    The prefer.</param>
+    /// <param name="success">   True if the operation was a success, false if it failed.</param>
+    /// <param name="opResponse">The operation response.</param>
+    /// <returns>An asynchronous result.</returns>
+    private async Task AddFhirResponse(HttpResponse response, string? prefer, bool success, FhirResponseContext opResponse)
+    {
+        if (!string.IsNullOrEmpty(opResponse.ETag))
+        {
+            Response.Headers[HeaderNames.ETag] = opResponse.ETag;
+        }
+
+        if (!string.IsNullOrEmpty(opResponse.LastModified))
+        {
+            Response.Headers[HeaderNames.LastModified] = opResponse.LastModified;
+        }
+
+        if (!string.IsNullOrEmpty(opResponse.Location))
+        {
+            Response.Headers[HeaderNames.Location] = opResponse.Location;
+        }
+
+        Response.ContentType = opResponse.MimeType;
+        if (opResponse.StatusCode == null)
+        {
+            Response.StatusCode = success ? (int)HttpStatusCode.OK : (int)HttpStatusCode.InternalServerError;
+        }
+        else
+        {
+            Response.StatusCode = (int)opResponse.StatusCode;
+        }
+
+        switch (prefer)
+        {
+            case "return=minimal":
+                break;
+
+            default:
+            case "return=representation":
+                if (!string.IsNullOrEmpty(opResponse.SerializedResource))
+                {
+                    await response.WriteAsync(opResponse.SerializedResource);
+                }
+                else if (!string.IsNullOrEmpty(opResponse.SerializedOutcome))
+                {
+                    await response.WriteAsync(opResponse.SerializedOutcome);
+                }
+                break;
+
+            case "return=OperationOutcome":
+                if (!string.IsNullOrEmpty(opResponse.SerializedOutcome))
+                {
+                    await response.WriteAsync(opResponse.SerializedOutcome);
+                }
+                break;
+        }
+    }
+
     /// <summary>Logs and return error.</summary>
     /// <param name="response">The response.</param>
     /// <param name="code">    The code.</param>
@@ -229,27 +291,11 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc = _fhirStoreManager[storeName].GetMetadata(
+        bool success = _fhirStoreManager[storeName].GetMetadata(
             ctx,
-            out string resource,
-            out string outcome,
-            out string eTag,
-            out string lastModified);
+            out FhirResponseContext opResponse);
 
-        if (!string.IsNullOrEmpty(eTag))
-        {
-            Response.Headers[HeaderNames.ETag] = eTag;
-        }
-
-        if (!string.IsNullOrEmpty(lastModified))
-        {
-            Response.Headers[HeaderNames.LastModified] = lastModified;
-        }
-
-        Response.ContentType = ctx.DestinationFormat;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, null, resource, outcome);
+        await AddFhirResponse(Response, null, success, opResponse);
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets type operation.</summary>
@@ -307,15 +353,11 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc = store.TypeOperation(
+        bool success = store.TypeOperation(
             ctx,
-            out string resource,
-            out string outcome);
+            out FhirResponseContext opResponse);
 
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, prefer, resource, outcome);
+        await AddFhirResponse(Response, prefer, success, opResponse);
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets resource instance.</summary>
@@ -382,27 +424,12 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc = store.InstanceRead(
+        bool success = store.InstanceRead(
             ctx,
-            out string resource,
-            out string outcome,
-            out string eTag,
-            out string lastModified);
+            out FhirResponseContext opResponse);
 
-        if (!string.IsNullOrEmpty(eTag))
-        {
-            Response.Headers[HeaderNames.ETag] = eTag;
-        }
-
-        if (!string.IsNullOrEmpty(lastModified))
-        {
-            Response.Headers[HeaderNames.LastModified] = lastModified;
-        }
- 
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, null, resource, outcome);
+        // cannot prefer outcome on a read
+        await AddFhirResponse(Response, null, success, opResponse);
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets instance operation.</summary>
@@ -464,19 +491,12 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc;
-        string resource, outcome;
-
         // operation
-        sc = store.InstanceOperation(
+        bool success = store.InstanceOperation(
             ctx,
-            out resource,
-            out outcome);
+            out FhirResponseContext opResponse);
 
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, prefer, resource, outcome);
+        await AddFhirResponse(Response, prefer, success, opResponse);
     }
 
     /// <summary>
@@ -516,9 +536,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc;
-        string resource, outcome;
-
         try
         {
             // read the post body to process
@@ -553,15 +570,11 @@ public class FhirController : ControllerBase
                 }
 
                 // operation
-                sc = store.InstanceOperation(
+                bool success = store.InstanceOperation(
                     ctx,
-                    out resource,
-                    out outcome);
+                    out FhirResponseContext opResponse);
 
-                Response.ContentType = ctx.DestinationFormat; ;
-                Response.StatusCode = (int)sc;
-
-                await AddBody(Response, prefer, resource, outcome);
+                await AddFhirResponse(Response, prefer, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -666,15 +679,12 @@ public class FhirController : ControllerBase
                     return;
                 }
 
-                HttpStatusCode sc = _fhirStoreManager[storeName].TypeSearch(
+                bool success = _fhirStoreManager[storeName].TypeSearch(
                     ctx,
-                    out string resource,
-                    out string outcome);
+                    out FhirResponseContext opResponse);
 
-                Response.ContentType = ctx.DestinationFormat;;
-                Response.StatusCode = (int)sc;
-
-                await AddBody(Response, null, resource, outcome);
+                // cannot prefer outcome on search
+                await AddFhirResponse(Response, null, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -729,9 +739,6 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc;
-        string resource, outcome;
-
         try
         {
             // read the post body to process
@@ -766,15 +773,11 @@ public class FhirController : ControllerBase
                 }
 
                 // operation
-                sc = store.TypeOperation(
+                bool success = store.TypeOperation(
                     ctx,
-                    out resource,
-                    out outcome);
+                    out FhirResponseContext opResponse);
 
-                Response.ContentType = ctx.DestinationFormat; ;
-                Response.StatusCode = (int)sc;
-
-                await AddBody(Response, prefer, resource, outcome);
+                await AddFhirResponse(Response, prefer, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -868,15 +871,12 @@ public class FhirController : ControllerBase
                     return;
                 }
 
-                HttpStatusCode sc = store.SystemSearch(
+                bool success = store.SystemSearch(
                     ctx,
-                    out string resource,
-                    out string outcome);
+                    out FhirResponseContext opResponse);
 
-                Response.ContentType = ctx.DestinationFormat;;
-                Response.StatusCode = (int)sc;
-
-                await AddBody(Response, null, resource, outcome);
+                // cannot prefer outcome on search
+                await AddFhirResponse(Response, null, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -962,15 +962,11 @@ public class FhirController : ControllerBase
 
                 // re-add the prefix $ character since it was stripped during routing
 
-                HttpStatusCode sc = store.SystemOperation(
-                        ctx,
-                        out string resource,
-                        out string outcome);
- 
-                Response.ContentType = ctx.DestinationFormat;;
-                Response.StatusCode = (int)sc;
+                bool success= store.SystemOperation(
+                    ctx,
+                    out FhirResponseContext opResponse);
 
-                await AddBody(Response, prefer, resource, outcome);
+                await AddFhirResponse(Response, prefer, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -1064,36 +1060,11 @@ public class FhirController : ControllerBase
                     return;
                 }
 
-                HttpStatusCode sc;
-                string resource, outcome;
-
-                sc = store.InstanceCreate(
+                bool success = store.InstanceCreate(
                     ctx,
-                    out resource,
-                    out outcome,
-                    out string eTag,
-                    out string lastModified,
-                    out string location);
+                    out FhirResponseContext opResponse);
 
-                if (!string.IsNullOrEmpty(eTag))
-                {
-                    Response.Headers[HeaderNames.ETag] = eTag;
-                }
-
-                if (!string.IsNullOrEmpty(lastModified))
-                {
-                    Response.Headers[HeaderNames.LastModified] = lastModified;
-                }
-
-                if (!string.IsNullOrEmpty(location))
-                {
-                    Response.Headers[HeaderNames.Location] = location;
-                }
-
-                Response.ContentType = ctx.DestinationFormat;;
-                Response.StatusCode = (int)sc;
-
-                await AddBody(Response, prefer, resource, outcome);
+                await AddFhirResponse(Response, prefer, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -1193,33 +1164,11 @@ public class FhirController : ControllerBase
                     return;
                 }
 
-                HttpStatusCode sc = store.InstanceUpdate(
+                bool success = store.InstanceUpdate(
                     ctx,
-                    out string resource,
-                    out string outcome,
-                    out string eTag,
-                    out string lastModified,
-                    out string location);
+                    out FhirResponseContext opResponse);
 
-                if (!string.IsNullOrEmpty(eTag))
-                {
-                    Response.Headers[HeaderNames.ETag] = eTag;
-                }
-
-                if (!string.IsNullOrEmpty(lastModified))
-                {
-                    Response.Headers[HeaderNames.LastModified] = lastModified;
-                }
-
-                if (!string.IsNullOrEmpty(location))
-                {
-                    Response.Headers[HeaderNames.Location] = location;
-                }
-
-                Response.ContentType = ctx.DestinationFormat;;
-                Response.StatusCode = (int)sc;
-
-                await AddBody(Response, prefer, resource, outcome);
+                await AddFhirResponse(Response, prefer, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -1299,15 +1248,11 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc = store.InstanceDelete(
+        bool success = store.InstanceDelete(
             ctx,
-            out string resource,
-            out string outcome);
+            out FhirResponseContext opResponse);
 
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, prefer, resource, outcome);
+        await AddFhirResponse(Response, prefer, success, opResponse);
     }
 
     /// <summary>(An Action that handles HTTP GET requests) gets resource type search.</summary>
@@ -1362,15 +1307,12 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc = store.TypeSearch(
+        bool success = store.TypeSearch(
             ctx,
-            out string resource,
-            out string outcome);
+            out FhirResponseContext opResponse);
 
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, null, resource, outcome);
+        // cannot prefer outcome on search
+        await AddFhirResponse(Response, null, success, opResponse);
     }
 
     /// <summary>
@@ -1442,15 +1384,11 @@ public class FhirController : ControllerBase
         {
             string queryString = Request.QueryString.ToString();
 
-            HttpStatusCode sc = store.TypeDelete(
+            bool success = store.TypeDelete(
                 ctx,
-                out string resource,
-                out string outcome);
+                out FhirResponseContext opResponse);
 
-            Response.ContentType = ctx.DestinationFormat;;
-            Response.StatusCode = (int)sc;
-
-            await AddBody(Response, prefer, resource, outcome);
+            await AddFhirResponse(Response, prefer, success, opResponse);
         }
         catch (Exception ex)
         {
@@ -1530,15 +1468,11 @@ public class FhirController : ControllerBase
                     return;
                 }
 
-                HttpStatusCode sc = store.ProcessBundle(
+                bool success = store.ProcessBundle(
                     ctx,
-                    out string resource,
-                    out string outcome);
+                    out FhirResponseContext opResponse);
 
-                Response.ContentType = ctx.DestinationFormat;;
-                Response.StatusCode = (int)sc;
-
-                await AddBody(Response, prefer, resource, outcome);
+                await AddFhirResponse(Response, prefer, success, opResponse);
             }
         }
         catch (Exception ex)
@@ -1602,15 +1536,12 @@ public class FhirController : ControllerBase
             return;
         }
 
-        HttpStatusCode sc = store.SystemSearch(
+        bool success = store.SystemSearch(
             ctx,
-            out string resource,
-            out string outcome);
+            out FhirResponseContext opResponse);
 
-        Response.ContentType = ctx.DestinationFormat;;
-        Response.StatusCode = (int)sc;
-
-        await AddBody(Response, null, resource, outcome);
+        // cannot prefer outcome on search
+        await AddFhirResponse(Response, null, success, opResponse);
     }
 
     /// <summary>
@@ -1673,15 +1604,11 @@ public class FhirController : ControllerBase
         {
             string queryString = Request.QueryString.ToString();
 
-            HttpStatusCode sc = store.SystemDelete(
+            bool success = store.SystemDelete(
                 ctx,
-                out string resource,
-                out string outcome);
+                out FhirResponseContext opResponse);
 
-            Response.ContentType = ctx.DestinationFormat;;
-            Response.StatusCode = (int)sc;
-
-            await AddBody(Response, prefer, resource, outcome);
+            await AddFhirResponse(Response, prefer, success, opResponse);
         }
         catch (Exception ex)
         {

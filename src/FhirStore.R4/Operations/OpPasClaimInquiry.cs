@@ -66,89 +66,91 @@ public class OpPasClaimInquiry : IFhirOperation
     };
 
     /// <summary>Executes the Subscription/$events operation.</summary>
-    /// <param name="ctx">             The authentication.</param>
-    /// <param name="store">           The store.</param>
-    /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="responseResource">[out] The response resource.</param>
-    /// <param name="responseOutcome"> [out] The response outcome.</param>
-    /// <param name="contentLocation"> [out] The content location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoOperation(
+    /// <param name="ctx">          The authentication.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="focusResource">The focus resource.</param>
+    /// <param name="bodyResource"> The body resource.</param>
+    /// <param name="opResponse">   [out] The response resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool DoOperation(
         FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         Storage.IVersionedResourceStore? resourceStore,
         Hl7.Fhir.Model.Resource? focusResource,
         Hl7.Fhir.Model.Resource? bodyResource,
-        out Hl7.Fhir.Model.Resource? responseResource,
-        out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation)
+        out FhirResponseContext opResponse)
     {
         if ((bodyResource == null) ||
             (bodyResource is not Bundle b))
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new FhirResponseContext()
             {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
                 {
-                    new OperationOutcome.IssueComponent()
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "PAS Claim Inquiry requires a PASClaimInquiryBundle as input.",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "PAS Claim Inquiry requires a PASClaimInquiryBundle as input.",
+                        },
                     },
                 },
             };
-            contentLocation = string.Empty;
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         if (b.Type != Bundle.BundleType.Collection)
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new FhirResponseContext()
             {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
                 {
-                    new OperationOutcome.IssueComponent()
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "PAS Claim Inquiry PASClaimInquiryBundle SHALL be a `collection`.",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "PAS Claim Inquiry PASClaimInquiryBundle SHALL be a `collection`.",
+                        },
                     },
                 },
             };
-            contentLocation = string.Empty;
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         IEnumerable<Resource> claims = b.Entry.Select(e => e.Resource).Where(r => r is Claim);
 
         if (!claims.Any())
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new FhirResponseContext()
             {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
                 {
-                    new OperationOutcome.IssueComponent()
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "Submitted bundle does not contain any Claim resources.",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "Submitted bundle does not contain any Claim resources.",
+                        },
                     },
                 },
             };
-            contentLocation = string.Empty;
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         Bundle response = new()
@@ -247,23 +249,26 @@ public class OpPasClaimInquiry : IFhirOperation
             });
         }
 
-        responseResource = response;
-        responseOutcome = new OperationOutcome()
+        opResponse = new FhirResponseContext()
         {
-            Id = Guid.NewGuid().ToString(),
-            Issue = new List<OperationOutcome.IssueComponent>()
-                {
-                    new OperationOutcome.IssueComponent()
+            StatusCode = HttpStatusCode.OK,
+            Resource = response,
+            Outcome = new OperationOutcome()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Success,
-                        Code = OperationOutcome.IssueType.Success,
-                        Diagnostics = "See response bundle for details.",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Success,
+                            Code = OperationOutcome.IssueType.Success,
+                            Diagnostics = "See response bundle for details.",
+                        },
                     },
-                },
+            },
         };
-        contentLocation = string.Empty;
 
-        return HttpStatusCode.OK;
+        return true;
     }
 
 

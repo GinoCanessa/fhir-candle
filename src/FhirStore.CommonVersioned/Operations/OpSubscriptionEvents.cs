@@ -7,6 +7,7 @@ using FhirCandle.Extensions;
 using FhirCandle.Models;
 using FhirCandle.Subscriptions;
 using FhirCandle.Versioned;
+using Hl7.Fhir.Model;
 using System.Net;
 
 namespace FhirCandle.Operations;
@@ -64,24 +65,20 @@ public class OpSubscriptionEvents : IFhirOperation
     };
 
     /// <summary>Executes the Subscription/$events operation.</summary>
-    /// <param name="ctx">             The authentication.</param>
-    /// <param name="store">           The store.</param>
-    /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="responseResource">[out] The response resource.</param>
-    /// <param name="responseOutcome"> [out] The response outcome.</param>
-    /// <param name="contentLocation"> [out] The content location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoOperation(
+    /// <param name="ctx">          The authentication.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="focusResource">The focus resource.</param>
+    /// <param name="bodyResource"> The body resource.</param>
+    /// <param name="opResponse">   [out] The response resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool DoOperation(
         FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         Storage.IVersionedResourceStore? resourceStore,
         Hl7.Fhir.Model.Resource? focusResource,
         Hl7.Fhir.Model.Resource? bodyResource,
-        out Hl7.Fhir.Model.Resource? responseResource,
-        out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation)
+        out FhirResponseContext opResponse)
     {
         string eventsSince = string.Empty;
         string eventsUntil = string.Empty;
@@ -91,13 +88,15 @@ public class OpSubscriptionEvents : IFhirOperation
         if (string.IsNullOrEmpty(ctx.Id) ||
             (!store._subscriptions.ContainsKey(ctx.Id)))
         {
-            responseResource = null;
-            responseOutcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
-                HttpStatusCode.NotFound,
-                $"Subscription {ctx.Id} was not found.");
-            contentLocation = string.Empty;
+            opResponse = new()
+            {
+                StatusCode = HttpStatusCode.NotFound,
+                Outcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.NotFound,
+                    $"Subscription {ctx.Id} was not found."),
+            };
 
-            return HttpStatusCode.NotFound;
+            return false;
         }
 
         // check for query string parameters
@@ -172,16 +171,20 @@ public class OpSubscriptionEvents : IFhirOperation
             eventNumbers.Add(i);
         }
 
-        responseResource = store.BundleForSubscriptionEvents(
-            ctx.Id,
-            eventNumbers,
-            "query-event",
-            contentLevel);
+        opResponse = new()
+        {
+            StatusCode = HttpStatusCode.OK,
+            Resource = store.BundleForSubscriptionEvents(
+                ctx.Id,
+                eventNumbers,
+                "query-event",
+                contentLevel),
+            Outcome = FhirCandle.Serialization.Utils.BuildOutcomeForRequest(
+                HttpStatusCode.OK,
+                $"Events for subscription {ctx.Id}."),
+        };
 
-        responseOutcome = null;
-        contentLocation = string.Empty;
-
-        return HttpStatusCode.OK;
+        return true;
     }
 
     /// <summary>Gets an OperationDefinition for this operation.</summary>

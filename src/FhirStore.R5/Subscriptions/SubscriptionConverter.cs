@@ -48,7 +48,7 @@ public class SubscriptionConverter
             ContentType = sub.ContentType,
             ContentLevel =
                 sub.Content != null
-                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Content)
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Content)!
                 : string.Empty,
             MaxEventsPerNotification = sub.MaxCount ?? 0,
             ExpirationTicks = sub.End?.Ticks ?? (DateTime.Now.Ticks + ParsedSubscription.DefaultSubscriptionExpiration),
@@ -227,11 +227,11 @@ public class SubscriptionConverter
             SubscriptionTopicCanonical = status.Topic ?? string.Empty,
             Status =
                 status.Status != null
-                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Status)
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Status)!
                 : string.Empty,
             NotificationType =
                 status.Type != null
-                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Type).ToFhirEnum<ParsedSubscription.NotificationTypeCodes>()
+                ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(status.Type)!.ToFhirEnum<ParsedSubscription.NotificationTypeCodes>()
                 : null,
             EventsSinceSubscriptionStart = status.EventsSinceSubscriptionStart,
             NotificationEvents = notificationEvents.ToArray(),

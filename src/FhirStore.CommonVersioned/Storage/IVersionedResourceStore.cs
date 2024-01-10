@@ -3,6 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
+using FhirCandle.Interactions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using Hl7.Fhir.Model;
@@ -133,4 +134,9 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <param name="topicUrl">URL of the topic.</param>
     /// <param name="id">      The subscription id.</param>
     void RemoveExecutableSubscription(string topicUrl, string id);
+
+    /// <summary>Adds a hook for this resource interaction.</summary>
+    /// <param name="interaction">The interaction.</param>
+    /// <param name="hook">       The hook.</param>
+    void AddHook(Common.StoreInteractionCodes interaction, IFhirInteractionHook hook);
 }

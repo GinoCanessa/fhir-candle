@@ -18,7 +18,7 @@ public static class ResourceTypeExtensions
     public static ResourceType[]? CopyTargetsToRt(IEnumerable<VersionIndependentResourceTypesAll?>? targets)
     {
         return targets?
-            .Where<VersionIndependentResourceTypesAll?>(r => (r != null) && (ModelInfo.FhirTypeToCsType.ContainsKey(r.ToString())))
+            .Where<VersionIndependentResourceTypesAll?>(r => (r != null) && (ModelInfo.FhirTypeToCsType.ContainsKey(r.ToString()!)))
             .Select(r => (ResourceType)ModelInfo.FhirTypeNameToResourceType(r.ToString()!)!)
             .ToArray<ResourceType>() ?? null;
     }

@@ -64,72 +64,74 @@ public class OpTestIfFhir : IFhirOperation
     public HashSet<string> SupportedResources => new();
 
     /// <summary>Executes the Subscription/$events operation.</summary>
-    /// <param name="ctx">             The context.</param>
-    /// <param name="store">           The store.</param>
-    /// <param name="resourceStore">   The resource store.</param>
-    /// <param name="focusResource">   The focus resource.</param>
-    /// <param name="bodyResource">    The body resource.</param>
-    /// <param name="responseResource">[out] The response resource.</param>
-    /// <param name="responseOutcome"> [out] The response outcome.</param>
-    /// <param name="contentLocation"> [out] The content location.</param>
-    /// <returns>A HttpStatusCode.</returns>
-    public HttpStatusCode DoOperation(
+    /// <param name="ctx">          The context.</param>
+    /// <param name="store">        The store.</param>
+    /// <param name="resourceStore">The resource store.</param>
+    /// <param name="focusResource">The focus resource.</param>
+    /// <param name="bodyResource"> The body resource.</param>
+    /// <param name="opResponse">   [out] The response resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool DoOperation(
         FhirRequestContext ctx,
         Storage.VersionedFhirStore store,
         Storage.IVersionedResourceStore? resourceStore,
         Hl7.Fhir.Model.Resource? focusResource,
         Hl7.Fhir.Model.Resource? bodyResource,
-        out Hl7.Fhir.Model.Resource? responseResource,
-        out Hl7.Fhir.Model.OperationOutcome? responseOutcome,
-        out string contentLocation)
+        out FhirResponseContext opResponse)
     {
         if (string.IsNullOrEmpty(ctx.SourceContent))
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new()
             {
-                Id = Guid.NewGuid().ToString(),
-                Issue = new List<OperationOutcome.IssueComponent>()
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
                 {
-                    new OperationOutcome.IssueComponent()
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
                     {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "Body is empty",
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "Body is empty",
+                        },
                     },
-                },
+                }
             };
-            contentLocation = string.Empty;
 
-            return HttpStatusCode.UnprocessableEntity;
+            return false;
         }
 
         if (bodyResource == null)
         {
-            responseResource = null;
-            responseOutcome = new OperationOutcome()
+            opResponse = new()
+            {
+                StatusCode = HttpStatusCode.UnprocessableEntity,
+                Outcome = new OperationOutcome()
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Issue = new List<OperationOutcome.IssueComponent>()
+                    {
+                        new OperationOutcome.IssueComponent()
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Fatal,
+                            Code = OperationOutcome.IssueType.Structure,
+                            Diagnostics = "Content is not parseable as FHIR",
+                        },
+                    },
+                }
+            };
+
+            return false;
+        }
+
+        opResponse = new()
+        {
+            StatusCode = HttpStatusCode.OK,
+            Outcome = new OperationOutcome()
             {
                 Id = Guid.NewGuid().ToString(),
                 Issue = new List<OperationOutcome.IssueComponent>()
-                {
-                    new OperationOutcome.IssueComponent()
-                    {
-                        Severity = OperationOutcome.IssueSeverity.Fatal,
-                        Code = OperationOutcome.IssueType.Structure,
-                        Diagnostics = "Content is not parseable as FHIR",
-                    },
-                },
-            };
-            contentLocation = string.Empty;
-
-            return HttpStatusCode.UnprocessableEntity;
-        }
-
-        responseResource = null;
-        responseOutcome = new OperationOutcome()
-        {
-            Id = Guid.NewGuid().ToString(),
-            Issue = new List<OperationOutcome.IssueComponent>()
                 {
                     new OperationOutcome.IssueComponent()
                     {
@@ -138,10 +140,10 @@ public class OpTestIfFhir : IFhirOperation
                         Diagnostics = "Content is a structurally-parseable FHIR resource",
                     },
                 },
+            }
         };
-        contentLocation = string.Empty;
 
-        return HttpStatusCode.OK;
+        return true;
     }
 
 

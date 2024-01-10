@@ -310,7 +310,7 @@ public record class FhirRequestContext
             }
         }
 
-        _urlPath = requestUrlPath;
+        _urlPath = requestUrlPath.TrimEnd('/');
         _urlQuery = requestUrlQuery;
 
         bool hasQueryParameters = false;

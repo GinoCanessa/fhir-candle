@@ -2087,6 +2087,12 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         resourceType = r.TypeName;
+
+        if (string.IsNullOrEmpty(r.Id))
+        {
+            r.Id = Guid.NewGuid().ToString();
+        }
+
         id = r.Id;
 
         if (!_store.ContainsKey(resourceType))

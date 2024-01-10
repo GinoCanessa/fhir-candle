@@ -25,9 +25,9 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
 
-	<PackageReference Include="Hl7.Fhir.R4" Version="5.4.0" Aliases="coreR4" />
-	<PackageReference Include="Hl7.Fhir.R4B" Version="5.4.0" Aliases="coreR4B" />
-	<PackageReference Include="Hl7.Fhir.R5" Version="5.4.0" Aliases="coreR5" />
+	<PackageReference Include="Hl7.Fhir.R4" Version="5.5.0" Aliases="coreR4" />
+	<PackageReference Include="Hl7.Fhir.R4B" Version="5.5.0" Aliases="coreR4B" />
+	<PackageReference Include="Hl7.Fhir.R5" Version="5.5.0" Aliases="coreR5" />
   </ItemGroup>
 
   <ItemGroup>

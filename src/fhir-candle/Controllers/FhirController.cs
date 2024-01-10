@@ -1051,7 +1051,6 @@ public class FhirController : ControllerBase
                     SourceFormat = Request.ContentType ?? string.Empty,
                     SourceContent = content,
                     IfNoneExist = ifNoneExist ?? string.Empty,
-                    AllowExistingId = true,
                 };
 
                 if (!_smartAuthManager.IsAuthorized(ctx))
@@ -1155,7 +1154,6 @@ public class FhirController : ControllerBase
                     IfNoneMatch = ifNoneMatch ?? string.Empty,
                     SourceFormat = Request.ContentType ?? string.Empty,
                     SourceContent = content,
-                    AllowCreateAsUpdate = true,
                 };
 
                 if (!_smartAuthManager.IsAuthorized(ctx))

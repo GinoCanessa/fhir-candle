@@ -537,33 +537,27 @@
 
         postingResource = true;
 
-        if (!_store.TrySerializeToSubscription(subscription, out string serialized, false))
+        if (!_store.TryGetSubscription(subscription, out object? s))
         {
             errorAtStep = 4;
-            errorMessage = "Failed to serialize request content.";
+            errorMessage = "Failed to build subscription object.";
             postingResource = false;
             return;
         }
 
-        bool success = _store.TryInstanceCreate(
-            serialized,
-            "application/fhir+json",
-            true,
-            out string rt,
-            out string id);
+        FhirRequestContext ctx = new(_store, "POST", "Subscription", s);
 
-        if (success)
+        if (!_store.InstanceCreate(ctx, out FhirResponseContext response))
         {
+            errorAtStep = 4;
+            errorMessage = "Failed to create subscription!\n" + response.SerializedOutcome;
             postingResource = false;
-            subscriptionLocation = _store.Config.BaseUrl + "/" + rt + "/" + id;
-            MoveToStep(5);
             return;
         }
 
-        errorAtStep = 4;
-        errorMessage = "Failed to create subscription!";
         postingResource = false;
-        return;
+        subscriptionLocation = response.Location;
+        MoveToStep(5);
     }
 
     /// <summary>Posts the encounter.</summary>
@@ -576,25 +570,23 @@
 
         postingResource = true;
 
-        bool success = _store.TryInstanceCreate(
-            getJsonEncounter(),
-            "application/fhir+json",
-            true,
-            out string rt,
-            out string id);
-
-        if (success)
+        FhirRequestContext ctx = new(_store, "POST", "Encounter")
         {
-            postingResource = false;
-            postedEncounters.Add(id);
+            SourceContent = getJsonEncounter(),
+            SourceFormat = "application/fhir+json",
+        };
 
-            MoveToStep(7);
+        if (!_store.InstanceCreate(ctx, out FhirResponseContext response))
+        {
+            errorAtStep = 6;
+            errorMessage = "Failed to create Encounter!\n" + response.SerializedOutcome;
+            postingResource = false;
             return;
         }
 
-        errorAtStep = 6;
-        errorMessage = "Failed to create Encounter!";
         postingResource = false;
+        postedEncounters.Add(response.Id);
+        MoveToStep(7);
         return;
 
         string getJsonEncounter() => _store.Config.FhirVersion switch
@@ -611,20 +603,19 @@
     {
         if (!string.IsNullOrEmpty(subscriptionLocation))
         {
-            _ = _store.TryInstanceDelete("Subscription", subscription.Id);
+            _ = _store.InstanceDelete(new FhirRequestContext(_store, "DELETE", subscriptionLocation), out _);
             subscriptionLocation = string.Empty;
         }
 
         if (!string.IsNullOrEmpty(handshakeBundleId))
         {
-            _ = _store.TryInstanceDelete("Bundle", handshakeBundleId);
-
+            _ = _store.InstanceDelete(new FhirRequestContext(_store, "DELETE", "Bundle/" + handshakeBundleId), out _);
             handshakeBundleId = string.Empty;
         }
 
         foreach (string encId in postedEncounters)
         {
-            _ = _store.TryInstanceDelete("Encounter", encId);
+            _ = _store.InstanceDelete(new FhirRequestContext(_store, "DELETE", "Encounter/" + encId), out _);
         }
 
         postedEncounters.Clear();

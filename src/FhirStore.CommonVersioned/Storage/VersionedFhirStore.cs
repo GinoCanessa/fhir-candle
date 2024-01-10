@@ -252,7 +252,6 @@ public partial class VersionedFhirStore : IFhirStore
                             success = TryInstanceUpdate(
                                 File.ReadAllText(file.FullName),
                                 "application/fhir+json",
-                                true,
                                 out _,
                                 out _);
                         }
@@ -263,7 +262,6 @@ public partial class VersionedFhirStore : IFhirStore
                             success = TryInstanceUpdate(
                                 File.ReadAllText(file.FullName),
                                 "application/fhir+xml",
-                                true,
                                 out _,
                                 out _);
                         }
@@ -356,11 +354,7 @@ public partial class VersionedFhirStore : IFhirStore
 
                     if (opDef != null)
                     {
-                        _ = TryInstanceCreate(
-                            opDef,
-                            true,
-                            out _,
-                            out _);
+                        _ = InstanceCreate(new FhirRequestContext(this, "POST", "OperationDefinition", opDef), out _);
                     }
                 }
                 catch (Exception ex)
@@ -526,7 +520,6 @@ public partial class VersionedFhirStore : IFhirStore
                             success = TryInstanceUpdate(
                                 File.ReadAllText(file.FullName),
                                 "application/fhir+json",
-                                true,
                                 out _,
                                 out _);
                         }
@@ -537,7 +530,6 @@ public partial class VersionedFhirStore : IFhirStore
                             success = TryInstanceUpdate(
                                 File.ReadAllText(file.FullName),
                                 "application/fhir+xml",
-                                true,
                                 out _,
                                 out _);
                         }
@@ -575,7 +567,6 @@ public partial class VersionedFhirStore : IFhirStore
                             success = TryInstanceUpdate(
                                 File.ReadAllText(file.FullName),
                                 "application/fhir+json",
-                                true,
                                 out _,
                                 out _);
                         }
@@ -586,7 +577,6 @@ public partial class VersionedFhirStore : IFhirStore
                             success = TryInstanceUpdate(
                                 File.ReadAllText(file.FullName),
                                 "application/fhir+xml",
-                                true,
                                 out _,
                                 out _);
                         }
@@ -1020,86 +1010,6 @@ public partial class VersionedFhirStore : IFhirStore
         return resource.ToTypedElement().ToScopedNode();
     }
 
-    /// <summary>Attempts to create.</summary>
-    /// <param name="resource">       The resource.</param>
-    /// <param name="allowExistingId">True to allow, false to suppress the existing identifier.</param>
-    /// <param name="resourceType">   [out] Type of the resource.</param>
-    /// <param name="id">             [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryInstanceCreate(
-        object resource,
-        bool allowExistingId,
-        out string resourceType,
-        out string id)
-    {
-        if ((resource == null) ||
-            (resource is not Hl7.Fhir.Model.Resource r))
-        {
-            resourceType = string.Empty;
-            id = string.Empty;
-            return false;
-        }
-
-        resourceType = r.TypeName;
-
-        if (!_store.ContainsKey(resourceType))
-        {
-            id = string.Empty;
-            return false;
-        }
-
-        FhirRequestContext ctx = new()
-        {
-            TenantName = _config.ControllerName,
-            Store = this,
-            HttpMethod = "POST",
-            Url = _config.BaseUrl + "/" + resourceType,
-            UrlPath = resourceType,
-            Authorization = null,
-            Interaction = Common.StoreInteractionCodes.TypeCreate,
-            ResourceType = resourceType,
-            AllowExistingId = allowExistingId,
-        };
-
-        bool success = DoInstanceCreate(
-            ctx,
-            r,
-            out FhirResponseContext response);
-
-        id = ((Resource?)response.Resource)?.Id ?? string.Empty;
-        return success;
-    }
-
-    /// <summary>Attempts to create an instance.</summary>
-    /// <param name="content">        The content.</param>
-    /// <param name="mimeType">       Type of the mime.</param>
-    /// <param name="allowExistingId">True to allow an existing id.</param>
-    /// <param name="resourceType">   [out] Type of the resource.</param>
-    /// <param name="id">             [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryInstanceCreate(
-        string content,
-        string mimeType,
-        bool allowExistingId,
-        out string resourceType,
-        out string id)
-    {
-        HttpStatusCode sc = Utils.TryDeserializeFhir(
-            content,
-            mimeType,
-            out Resource? r,
-            out _);
-
-        if ((!sc.IsSuccessful()) || (r == null))
-        {
-            resourceType = string.Empty;
-            id = string.Empty;
-            return false;
-        }
-
-        return TryInstanceCreate(r, allowExistingId, out resourceType, out id);
-    }
-
     /// <summary>Instance create.</summary>
     /// <param name="ctx">     The request context.</param>
     /// <param name="response">[out] The response data.</param>
@@ -1108,32 +1018,42 @@ public partial class VersionedFhirStore : IFhirStore
         FhirRequestContext ctx,
         out FhirResponseContext response)
     {
-        HttpStatusCode sc = Utils.TryDeserializeFhir(
-            ctx.SourceContent, 
-            ctx.SourceFormat, 
-            out Resource? r, 
-            out string exMessage);
+        Resource? r;
 
-        if ((!sc.IsSuccessful()) || (r == null))
+        if ((ctx.SourceObject != null) &&
+            (ctx.SourceObject is Resource))
         {
-            OperationOutcome outcome = Utils.BuildOutcomeForRequest(
-                sc,
-                $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
-                OperationOutcome.IssueType.Structure);
+            r = ctx.SourceObject as Resource;
+        }
+        else
+        {
+            HttpStatusCode sc = Utils.TryDeserializeFhir(
+                ctx.SourceContent,
+                ctx.SourceFormat,
+                out r,
+                out string exMessage);
 
-            response = new()
+            if ((!sc.IsSuccessful()) || (r == null))
             {
-                Outcome = outcome,
-                SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
-                StatusCode = sc,
-            };
+                OperationOutcome outcome = Utils.BuildOutcomeForRequest(
+                    sc,
+                    $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
+                    OperationOutcome.IssueType.Structure);
 
-            return false;
+                response = new()
+                {
+                    Outcome = outcome,
+                    SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                    StatusCode = sc,
+                };
+
+                return false;
+            }
         }
 
         bool success = DoInstanceCreate(
             ctx,
-            r,
+            r!,
             out response);
 
         string sr = response.Resource == null ? string.Empty : Utils.SerializeFhir((Resource)response.Resource, ctx.DestinationFormat, ctx.SerializePretty);
@@ -1245,6 +1165,8 @@ public partial class VersionedFhirStore : IFhirStore
                             response = new()
                             {
                                 Resource = r,
+                                ResourceType = r.TypeName,
+                                Id = r.Id,
                                 ETag = string.IsNullOrEmpty(r.Meta?.VersionId) ? string.Empty : $"W/\"{r.Meta.VersionId}\"",
                                 LastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
                                 Location = $"{_config.BaseUrl}/{resourceType}/{r.Id}",
@@ -1284,7 +1206,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         // create the resource
-        Resource? stored = _store[resourceType].InstanceCreate(ctx, content, ctx.AllowExistingId);
+        Resource? stored = _store[resourceType].InstanceCreate(ctx, content, _config.AllowExistingId);
 
         if (hooks?.Any() ?? false)
         {
@@ -1339,6 +1261,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = stored,
+            ResourceType = stored.TypeName,
+            Id = stored.Id,
             ETag = string.IsNullOrEmpty(stored.Meta?.VersionId) ? string.Empty : $"W/\"{stored.Meta.VersionId}\"",
             LastModified = stored.Meta?.LastUpdated == null ? string.Empty : stored.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
             Location = $"{_config.BaseUrl}/{resourceType}/{stored.Id}",
@@ -1448,35 +1372,6 @@ public partial class VersionedFhirStore : IFhirStore
         };
 
         return true;
-    }
-
-    /// <summary>Attempts to delete a string from the given string.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="id">          [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryInstanceDelete(string resourceType, string id)
-    {
-        if ((!_store.ContainsKey(resourceType)) ||
-            (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)))
-        {
-            return false;
-        }
-
-        FhirRequestContext ctx = new()
-        {
-            TenantName = _config.ControllerName,
-            Store = this,
-            HttpMethod = "DELETE",
-            Url = _config.BaseUrl + "/" + resourceType + "/" + id,
-            UrlPath = resourceType + "/" + id,
-            Authorization = null,
-            Interaction = Common.StoreInteractionCodes.InstanceDelete,
-            ResourceType = resourceType,
-            Id = id,
-        };
-
-        bool success = DoInstanceDelete(ctx, out _);
-        return success;
     }
 
     /// <summary>Instance delete.</summary>
@@ -1597,6 +1492,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = resource,
+            ResourceType = resource.TypeName,
+            Id = resource.Id,
             Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {ctx.ResourceType}/{ctx.Id}"),
             StatusCode = HttpStatusCode.OK,
         };
@@ -1831,6 +1728,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = r,
+            ResourceType = r.TypeName,
+            Id = r.Id,
             ETag = eTag,
             LastModified = lastModified,
             Location = string.IsNullOrEmpty(r.Id) ? string.Empty : $"{_config.BaseUrl}/{r.TypeName}/{r.Id}",
@@ -1844,14 +1743,12 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>Attempts to update.</summary>
     /// <param name="content">     The content.</param>
     /// <param name="mimeType">    Type of the mime.</param>
-    /// <param name="allowCreate"> True to allow, false to suppress the create.</param>
     /// <param name="resourceType">[out] Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryInstanceUpdate(
         string content,
         string mimeType,
-        bool allowCreate,
         out string resourceType,
         out string id)
     {
@@ -1869,7 +1766,7 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        return TryInstanceUpdate(r, allowCreate, out resourceType, out id);
+        return TryInstanceUpdate(r, out resourceType, out id);
     }
 
 
@@ -1881,7 +1778,6 @@ public partial class VersionedFhirStore : IFhirStore
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryInstanceUpdate(
         object resource,
-        bool allowCreate,
         out string resourceType,
         out string id)
     {
@@ -1901,7 +1797,7 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        if ((!allowCreate) &&
+        if ((!_config.AllowCreateAsUpdate) &&
             (!((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store[resourceType]).ContainsKey(id)))
         {
             return false;
@@ -1918,7 +1814,6 @@ public partial class VersionedFhirStore : IFhirStore
             Interaction = Common.StoreInteractionCodes.InstanceUpdate,
             ResourceType = resourceType,
             Id = id,
-            AllowCreateAsUpdate = allowCreate,
         };
 
         bool success = DoInstanceUpdate(
@@ -1937,26 +1832,49 @@ public partial class VersionedFhirStore : IFhirStore
         FhirRequestContext ctx,
         out FhirResponseContext response)
     {
-        HttpStatusCode sc = Utils.TryDeserializeFhir(
-            ctx.SourceContent, 
-            ctx.SourceFormat, 
-            out Resource? r, 
-            out string exMessage);
+        Resource? r;
 
-        if ((!sc.IsSuccessful()) || (r == null))
+        if ((ctx.SourceObject != null) &&
+            (ctx.SourceObject is Resource))
         {
-            OperationOutcome outcome = Utils.BuildOutcomeForRequest(
-                sc,
-                $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
-                OperationOutcome.IssueType.Structure);
+            r = ctx.SourceObject as Resource;
+        }
+        else
+        {
+            HttpStatusCode sc = Utils.TryDeserializeFhir(
+                ctx.SourceContent,
+                ctx.SourceFormat,
+                out r,
+                out string exMessage);
 
+            if ((!sc.IsSuccessful()) || (r == null))
+            {
+                OperationOutcome outcome = Utils.BuildOutcomeForRequest(
+                    sc,
+                    $"Failed to deserialize resource, format: {ctx.SourceFormat}, error: {exMessage}",
+                    OperationOutcome.IssueType.Structure);
+
+                response = new()
+                {
+                    Outcome = outcome,
+                    SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
+                    StatusCode = sc,
+                };
+
+                return false;
+            }
+        }
+
+        if (r == null)
+        {
             response = new()
             {
-                Outcome = outcome,
-                SerializedOutcome = Utils.SerializeFhir(outcome, ctx.DestinationFormat, ctx.SerializePretty),
-                StatusCode = sc,
+                Outcome = Utils.BuildOutcomeForRequest(
+                    HttpStatusCode.BadRequest,
+                    "Resource is required",
+                    OperationOutcome.IssueType.Structure),
+                StatusCode = HttpStatusCode.BadRequest,
             };
-
             return false;
         }
 
@@ -2126,8 +2044,8 @@ public partial class VersionedFhirStore : IFhirStore
         }
 
         Resource? resource = _store[resourceType].InstanceUpdate(
-            content, 
-            ctx.AllowCreateAsUpdate,
+            content,
+            _config.AllowCreateAsUpdate,
             ctx.IfMatch,
             ctx.IfNoneMatch,
             _protectedResources,
@@ -2178,6 +2096,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = resource,
+            ResourceType = resource.TypeName,
+            Id = resource.Id,
             ETag = string.IsNullOrEmpty(resource.Meta?.VersionId) ? string.Empty : $"W/\"{resource.Meta.VersionId}\"",
             LastModified = resource.Meta?.LastUpdated == null ? string.Empty : resource.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
             Location = $"{_config.BaseUrl}/{resourceType}/{resource.Id}",
@@ -2695,6 +2615,12 @@ public partial class VersionedFhirStore : IFhirStore
         return string.Empty;
     }
 
+    /// <summary>Attempts to serialize to subscription.</summary>
+    /// <param name="subscriptionInfo">Information describing the subscription.</param>
+    /// <param name="serialized">      [out] The serialized.</param>
+    /// <param name="pretty">          If the output should be 'pretty' formatted.</param>
+    /// <param name="destFormat">      (Optional) Destination format.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TrySerializeToSubscription(
         ParsedSubscription subscriptionInfo,
         out string serialized,
@@ -2716,6 +2642,23 @@ public partial class VersionedFhirStore : IFhirStore
         return true;
     }
 
+    /// <summary>Attempts to serialize to subscription.</summary>
+    /// <param name="parsed">      Information describing the subscription.</param>
+    /// <param name="subscription">[out] The serialized.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryGetSubscription(
+        ParsedSubscription parsed,
+        out object? subscription)
+    {
+        if (_subscriptionConverter.TryParse(parsed, out Hl7.Fhir.Model.Subscription s))
+        {
+            subscription = s;
+            return true;
+        }
+
+        subscription = null;
+        return false;
+    }
 
     /// <summary>Bundle for subscription events.</summary>
     /// <param name="subscriptionId">  Identifier for the subscription.</param>
@@ -2987,7 +2930,26 @@ public partial class VersionedFhirStore : IFhirStore
 
         Resource? r = null;
 
-        if (!string.IsNullOrEmpty(ctx.SourceContent))
+        if (ctx.SourceObject != null)
+        {
+            if (ctx.SourceObject is Resource)
+            {
+                r = ctx.SourceObject as Resource;
+            }
+            else if (!op.AcceptsNonFhir)
+            {
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.UnsupportedMediaType,
+                        $"Operation {ctx.OperationName} does not consume non-FHIR content.",
+                        OperationOutcome.IssueType.Invalid),
+                    StatusCode = HttpStatusCode.UnsupportedMediaType,
+                };
+                return false;
+            }
+        }
+        else if (!string.IsNullOrEmpty(ctx.SourceContent))
         {
             HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(ctx.SourceContent, ctx.SourceFormat, out r, out _);
 
@@ -3083,6 +3045,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = r,
+            ResourceType = r?.TypeName ?? string.Empty,
+            Id = r?.Id ?? string.Empty,
             Outcome = opResponse.Outcome ?? Utils.BuildOutcomeForRequest(
                 opResponse.StatusCode ?? (success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError), 
                 $"System-Level Operation {ctx.OperationName} {(success ? "succeeded" : "failed")}: {opResponse.StatusCode}"),
@@ -3179,7 +3143,26 @@ public partial class VersionedFhirStore : IFhirStore
 
         Resource? r = null;
 
-        if (!string.IsNullOrEmpty(ctx.SourceContent))
+        if (ctx.SourceObject != null)
+        {
+            if (ctx.SourceObject is Resource)
+            {
+                r = ctx.SourceObject as Resource;
+            }
+            else if (!op.AcceptsNonFhir)
+            {
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.UnsupportedMediaType,
+                        $"Operation {ctx.OperationName} does not consume non-FHIR content.",
+                        OperationOutcome.IssueType.Invalid),
+                    StatusCode = HttpStatusCode.UnsupportedMediaType,
+                };
+                return false;
+            }
+        }
+        else if (!string.IsNullOrEmpty(ctx.SourceContent))
         {
             HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(ctx.SourceContent, ctx.SourceFormat, out r, out _);
 
@@ -3275,6 +3258,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = r,
+            ResourceType = r?.TypeName ?? string.Empty,
+            Id = r?.Id ?? string.Empty,
             Outcome = opResponse.Outcome ?? Utils.BuildOutcomeForRequest(
                 opResponse.StatusCode ?? (success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError),
                 $"Type-Level Operation {ctx.ResourceType}/{ctx.OperationName} {(success ? "succeeded" : "failed")}: {opResponse.StatusCode}"),
@@ -3384,7 +3369,26 @@ public partial class VersionedFhirStore : IFhirStore
 
         Resource? r = null;
 
-        if (!string.IsNullOrEmpty(ctx.SourceContent))
+        if (ctx.SourceObject != null)
+        {
+            if (ctx.SourceObject is Resource)
+            {
+                r = ctx.SourceObject as Resource;
+            }
+            else if (!op.AcceptsNonFhir)
+            {
+                response = new()
+                {
+                    Outcome = Utils.BuildOutcomeForRequest(
+                        HttpStatusCode.UnsupportedMediaType,
+                        $"Operation {ctx.OperationName} does not consume non-FHIR content.",
+                        OperationOutcome.IssueType.Invalid),
+                    StatusCode = HttpStatusCode.UnsupportedMediaType,
+                };
+                return false;
+            }
+        }
+        else if (!string.IsNullOrEmpty(ctx.SourceContent))
         {
             HttpStatusCode deserializeSc = Utils.TryDeserializeFhir(ctx.SourceContent, ctx.SourceFormat, out r, out _);
 
@@ -3482,6 +3486,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = r,
+            ResourceType = r?.TypeName ?? string.Empty,
+            Id = r?.Id ?? string.Empty,
             Outcome = opResponse.Outcome ?? Utils.BuildOutcomeForRequest(
                 opResponse.StatusCode ?? (success ? HttpStatusCode.OK : HttpStatusCode.InternalServerError),
                 $"Instance-Level Operation {ctx.ResourceType}/{ctx.Id}/{ctx.OperationName} {(success ? "succeeded" : "failed")}: {opResponse.StatusCode}"),
@@ -3663,6 +3669,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = resource,
+            ResourceType = resourceType,
+            Id = id,
             Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}"),
             StatusCode = HttpStatusCode.OK,
         };
@@ -3886,6 +3894,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = resource,
+            ResourceType = resourceType,
+            Id = id,
             Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"Deleted {resourceType}/{id}"),
             StatusCode = HttpStatusCode.OK,
         };
@@ -3916,26 +3926,6 @@ public partial class VersionedFhirStore : IFhirStore
 
         return success;
     }
-
-    /// <summary>Attempts to system search an object from the given string.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="queryString"> The query string.</param>
-    /// <param name="bundle">      [out] The bundle.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryTypeSearch(
-        string resourceType,
-        string queryString,
-        out object? bundle)
-    {
-        bool success = DoTypeSearch(
-            new FhirRequestContext(this, "GET", $"{resourceType}?{queryString}"),
-            out FhirResponseContext resp);
-
-        bundle = resp.Resource;
-
-        return success;
-    }
-
 
     /// <summary>Executes the type search operation.</summary>
     /// <param name="resourceType">Type of the resource.</param>
@@ -4117,6 +4107,7 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = bundle,
+            ResourceType = "Bundle",
             Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"System search successful"),
             StatusCode = HttpStatusCode.OK,
         };
@@ -4144,23 +4135,6 @@ public partial class VersionedFhirStore : IFhirStore
             SerializedResource = sr,
             SerializedOutcome = so,
         };
-
-        return success;
-    }
-
-    /// <summary>Attempts to system search an object from the given string.</summary>
-    /// <param name="queryString">The query string.</param>
-    /// <param name="bundle">     [out] The bundle.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TrySystemSearch(
-        string queryString,
-        out object? bundle)
-    {
-        bool success = DoSystemSearch(
-            new FhirRequestContext(this, "GET", "?" + queryString),
-            out FhirResponseContext resp);
-
-        bundle = resp.Resource;
 
         return success;
     }
@@ -4362,6 +4336,7 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = bundle,
+            ResourceType = "Bundle",
             Outcome = Utils.BuildOutcomeForRequest(HttpStatusCode.OK, $"System search successful"),
             StatusCode = HttpStatusCode.OK,
         };
@@ -4671,11 +4646,6 @@ public partial class VersionedFhirStore : IFhirStore
         FhirRequestContext ctx,
         out FhirResponseContext response)
     {
-        if (_capabilitiesAreStale)
-        {
-            UpdateCapabilities();
-        }
-
         _hooksByInteraction.TryGetValue(Common.StoreInteractionCodes.SystemCapabilities, out IFhirInteractionHook[]? hooks);
 
         if (hooks?.Any() ?? false)
@@ -4701,17 +4671,16 @@ public partial class VersionedFhirStore : IFhirStore
             }
         }
 
-        _ = TryInstanceRead("CapabilityStatement", _capabilityStatementId, out object? obj);
-
         Hl7.Fhir.Model.Resource? r;
 
-        if ((obj == null) || (obj is not Hl7.Fhir.Model.Resource))
+        if (_capabilitiesAreStale)
         {
-            r = null;
+            r = UpdateCapabilities();
         }
         else
         {
-            r = (Hl7.Fhir.Model.Resource)obj;
+            // bypass read to avoid instance read hooks (firing meta hooks)
+            r = (Resource)((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store["CapabilityStatement"])[_capabilityStatementId].DeepCopy();
         }
 
         if (hooks?.Any() ?? false)
@@ -4760,6 +4729,8 @@ public partial class VersionedFhirStore : IFhirStore
         response = new()
         {
             Resource = r,
+            ResourceType = "CapabilityStatement",
+            Id = _capabilityStatementId,
             Outcome = Utils.BuildOutcomeForRequest(
                 HttpStatusCode.OK,
                 $"Retreived current CapabilityStatement",
@@ -4797,7 +4768,7 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Updates the current capabilities of this store.</summary>
-    private void UpdateCapabilities()
+    private CapabilityStatement UpdateCapabilities()
     {
         CapabilityStatement cs = new()
         {
@@ -4942,6 +4913,8 @@ public partial class VersionedFhirStore : IFhirStore
             out _,
             out _);
         _capabilitiesAreStale = false;
+
+        return cs;
     }
 
     private record class TransactionResourceInfo
@@ -5143,8 +5116,6 @@ public partial class VersionedFhirStore : IFhirStore
                 IfModifiedSince = entry.Request.IfModifiedSince?.ToFhirDateTime() ?? string.Empty,
                 IfNoneMatch = entry.Request.IfNoneMatch,
                 IfNoneExist = entry.Request.IfNoneExist ?? string.Empty,
-                AllowCreateAsUpdate = true,
-                AllowExistingId = true,
             };
 
             if (entryCtx.Interaction == null)

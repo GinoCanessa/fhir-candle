@@ -83,6 +83,8 @@ public class FhirStoreTests
             FhirVersion = TenantConfiguration.SupportedFhirVersions.R4,
             ControllerName = "r4",
             BaseUrl = "http://localhost/fhir/r4",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _configR4B = new()
@@ -90,6 +92,8 @@ public class FhirStoreTests
             FhirVersion = TenantConfiguration.SupportedFhirVersions.R4B,
             ControllerName = "r4b",
             BaseUrl = "http://localhost/fhir/r4b",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _configR5 = new()
@@ -97,6 +101,8 @@ public class FhirStoreTests
             FhirVersion = TenantConfiguration.SupportedFhirVersions.R5,
             ControllerName = "r5",
             BaseUrl = "http://localhost/fhir/r5",
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _candleR4 = new candleR4::FhirCandle.Storage.VersionedFhirStore();
@@ -289,8 +295,6 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json1,
             DestinationFormat = "application/fhir+json",
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
         bool success = fhirStore.InstanceCreate(
@@ -341,8 +345,6 @@ public class TestPatientCRUD : IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json2,
             DestinationFormat = "application/fhir+json",
-            AllowExistingId = true,
-            AllowCreateAsUpdate = true,
         };
 
         success = fhirStore.InstanceUpdate(
@@ -438,8 +440,6 @@ public class TestResourceWrongLocation: IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json,
             DestinationFormat = "application/fhir+json",
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
         bool success = fhirStore.InstanceCreate(
@@ -490,8 +490,6 @@ public class TestResourceInvalidElement : IClassFixture<FhirStoreTests>
             SourceFormat = "application/fhir+json",
             SourceContent = json,
             DestinationFormat = "application/fhir+json",
-            AllowExistingId = true,
-            AllowCreateAsUpdate = true,
         };
 
         bool success = fhirStore.InstanceCreate(

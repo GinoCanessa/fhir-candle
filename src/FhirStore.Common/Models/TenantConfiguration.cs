@@ -70,4 +70,10 @@ public class TenantConfiguration
 
     /// <summary>Gets or sets a value indicating whether smart is allowed.</summary>
     public bool SmartAllowed { get; set; } = false;
+
+    /// <summary>Gets or sets a value indicating whether we allow existing identifier.</summary>
+    public bool AllowExistingId { get; set; } = true;
+
+    /// <summary>Gets or sets a value indicating whether we allow create as update.</summary>
+    public bool AllowCreateAsUpdate { get; set; } = true;
 }

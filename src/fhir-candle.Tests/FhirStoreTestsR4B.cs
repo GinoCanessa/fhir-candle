@@ -29,6 +29,8 @@ public class FhirStoreTestsR4B: IDisposable
         FhirVersion = TenantConfiguration.SupportedFhirVersions.R4B,
         ControllerName = "r4b",
         BaseUrl = "http://localhost/fhir/r4b",
+        AllowExistingId = true,
+        AllowCreateAsUpdate = true,
     };
 
     private const int _expectedRestResources = 140;
@@ -70,8 +72,6 @@ public class FhirStoreTestsR4B: IDisposable
             SourceFormat = "application/fhir+json",
             SourceContent = json,
             DestinationFormat = "application/fhir+json",
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
         bool success = fhirStore.InstanceCreate(
@@ -170,8 +170,6 @@ public class FhirStoreTestsR4B: IDisposable
             SourceFormat = "application/fhir+json",
             SourceContent = json,
             DestinationFormat = "application/fhir+json",
-            AllowExistingId = true,
-            AllowCreateAsUpdate = true,
         };
 
         // add a search parameter for the patient resource

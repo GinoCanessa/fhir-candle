@@ -59,6 +59,12 @@ public class ServerConfiguration
     /// <summary>Gets or sets the tenants that allow SMART launch.</summary>
     public List<string> SmartOptionalTenants { get; set; } = new();
 
+    /// <summary>Gets or sets a value indicating whether we allow existing identifier.</summary>
+    public bool AllowExistingId { get; set; } = true;
+
+    /// <summary>Gets or sets a value indicating whether we allow create as update.</summary>
+    public bool AllowCreateAsUpdate { get; set; } = true;
+
     /// <summary>Gets or sets the zulip email.</summary>
     public string ZulipEmail { get; set; } = string.Empty;
 

@@ -5,10 +5,7 @@
 
 using FhirCandle.Storage;
 using Microsoft.Extensions.Primitives;
-using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Net.Mime;
-using System.Reflection.PortableExecutable;
 using static FhirCandle.Storage.Common;
 
 namespace FhirCandle.Models;
@@ -32,6 +29,36 @@ public record class FhirRequestContext
     /// <summary>Initializes a new instance of the <see cref="FhirRequestContext"/> class.</summary>
     public FhirRequestContext() { }
 
+    /// <summary>Initializes a new instance of the FhirRequestContext class.</summary>
+    /// <param name="store">       The store.</param>
+    /// <param name="httpMethod">  The HTTP method.</param>
+    /// <param name="url">         URL of the resource.</param>
+    /// <param name="sourceObject">Source object.</param>
+    [SetsRequiredMembers]
+    public FhirRequestContext(
+        IFhirStore store,
+        string httpMethod,
+        string url,
+        object? sourceObject)
+    {
+        Store = store;
+        TenantName = store.Config.ControllerName;
+        HttpMethod = httpMethod;
+
+        if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            Url = url;
+        }
+        else
+        {
+            Url = $"{store.Config.BaseUrl.TrimEnd('/')}/{url.TrimStart('/')}";
+        }
+
+        SourceObject = sourceObject;
+
+        _ = TryParseRequest();
+    }
+
     /// <summary>Initializes a new instance of the <see cref="FhirRequestContext"/> class.</summary>
     /// <param name="store">     The store.</param>
     /// <param name="httpMethod">The HTTP method.</param>
@@ -41,24 +68,24 @@ public record class FhirRequestContext
         IFhirStore store,
         string httpMethod,
         string url)
+        : this(store, httpMethod, url, null)
     {
-        Store = store;
-        TenantName = store.Config.ControllerName;
-        HttpMethod = httpMethod;
-        Url = url;
-        _ = TryParseRequest();
     }
 
     /// <summary>Initializes a new instance of the <see cref="FhirRequestContext"/> class.</summary>
     /// <param name="other">The other.</param>
     [SetsRequiredMembers]
+    // compiler is confused here - it thinks the constructor is not setting required members
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     protected FhirRequestContext(FhirRequestContext other)
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
     {
         TenantName = other.TenantName;
         Store = other.Store;
         HttpMethod = other.HttpMethod;
         Url = other.Url;
         Authorization = other.Authorization;
+        SourceObject = other.SourceObject;
         SourceContent = other.SourceContent;
         SourceFormat = other.SourceFormat;
         DestinationFormat = other.DestinationFormat;
@@ -68,8 +95,6 @@ public record class FhirRequestContext
         IfModifiedSince = other.IfModifiedSince;
         IfNoneMatch = other.IfNoneMatch;
         IfNoneExist = other.IfNoneExist;
-        AllowExistingId = other.AllowExistingId;
-        AllowCreateAsUpdate = other.AllowCreateAsUpdate;
         _errorMessage = other.ErrorMessage;
         RequestHeaders = other.RequestHeaders.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
@@ -128,6 +153,9 @@ public record class FhirRequestContext
 
     /// <summary>Gets or initializes source content.</summary>
     public string SourceContent { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes source object.</summary>
+    public object? SourceObject { get; init; }
     
     /// <summary>Gets or initializes destination format (default to fhir+json).</summary>
     public string DestinationFormat { get; init; } = "application/fhir+json";
@@ -149,16 +177,6 @@ public record class FhirRequestContext
 
     /// <summary>Gets or initializes if none exist.</summary>
     public string IfNoneExist { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Gets or initializes a value indicating whether we allow existing identifier.
-    /// </summary>
-    public bool AllowExistingId { get; init; } = true;
-
-    /// <summary>
-    /// Gets or initializes a value indicating whether we allow create as update.
-    /// </summary>
-    public bool AllowCreateAsUpdate { get; init; } = true;
 
     /// <summary>Gets a message describing the error.</summary>
     public string ErrorMessage { get => _errorMessage; }

@@ -71,6 +71,8 @@ public class R4Tests
             ControllerName = "r4",
             BaseUrl = "http://localhost/fhir/r4",
             LoadDirectory = loadDirectory,
+            AllowExistingId = true,
+            AllowCreateAsUpdate = true,
         };
 
         _store = new VersionedFhirStore();
@@ -448,8 +450,6 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             SourceContent = ChangeId(json, id),
             DestinationFormat = "application/fhir+json",
             IfNoneExist = "_id=" + id,
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
         // test conditional that has no matches
@@ -496,8 +496,6 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             SourceFormat = "application/fhir+json",
             SourceContent = ChangeId(json, id),
             DestinationFormat = "application/fhir+json",
-            AllowExistingId = true,
-            AllowCreateAsUpdate = true,
         };
 
         // first, store our resource
@@ -565,8 +563,6 @@ public class R4TestConditionals : IClassFixture<R4Tests>
             SourceFormat = "application/fhir+json",
             SourceContent = ChangeId(json, id1),
             DestinationFormat = "application/fhir+json",
-            AllowCreateAsUpdate = true,
-            AllowExistingId = true,
         };
 
         // first, store our resource

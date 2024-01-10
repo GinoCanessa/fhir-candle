@@ -70,16 +70,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         FhirRequestContext ctx,
         out FhirResponseContext response);
 
-    /// <summary>Attempts to read with minimal processing (e.g., no Hooks are called).</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="id">          [out] The identifier.</param>
-    /// <param name="resource">    [out] The resource.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryInstanceRead(
-        string resourceType, 
-        string id, 
-        out object? resource);
-
     /// <summary>Instance create.</summary>
     /// <param name="ctx">     The request context.</param>
     /// <param name="response">[out] The response data.</param>
@@ -87,32 +77,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     bool InstanceCreate(
         FhirRequestContext ctx,
         out FhirResponseContext response);
-
-    /// <summary>Attempts to create an instance with minimal processing (e.g., no Hooks are called).</summary>
-    /// <param name="resource">       The resource.</param>
-    /// <param name="allowExistingId">True to allow an existing id.</param>
-    /// <param name="resourceType">   [out] Type of the resource.</param>
-    /// <param name="id">             [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryInstanceCreate(
-        object resource,
-        bool allowExistingId,
-        out string resourceType,
-        out string id);
-
-    /// <summary>Attempts to create an instance with minimal processing (e.g., no Hooks are called).</summary>
-    /// <param name="content">        The content.</param>
-    /// <param name="mimeType">       Type of the mime.</param>
-    /// <param name="allowExistingId">True to allow an existing id.</param>
-    /// <param name="resourceType">   [out] Type of the resource.</param>
-    /// <param name="id">             [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryInstanceCreate(
-        string content,
-        string mimeType,
-        bool allowExistingId,
-        out string resourceType,
-        out string id);
 
     /// <summary>Instance update.</summary>
     /// <param name="ctx">     The request context.</param>
@@ -122,32 +86,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         FhirRequestContext ctx,
         out FhirResponseContext response);
 
-    /// <summary>Attempts to update an instance.</summary>
-    /// <param name="resource">    The resource.</param>
-    /// <param name="allowCreate"> True to allow, false to suppress the create.</param>
-    /// <param name="resourceType">[out] Type of the resource.</param>
-    /// <param name="id">          [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryInstanceUpdate(
-        object resource,
-        bool allowCreate,
-        out string resourceType,
-        out string id);
-
-    /// <summary>Attempts to update an instance with minimal processing (e.g., no Hooks are called).</summary>
-    /// <param name="content">     The content.</param>
-    /// <param name="mimeType">    Type of the mime.</param>
-    /// <param name="allowCreate"> True to allow, false to suppress the create.</param>
-    /// <param name="resourceType">[out] Type of the resource.</param>
-    /// <param name="id">          [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryInstanceUpdate(
-        string content,
-        string mimeType,
-        bool allowCreate,
-        out string resourceType,
-        out string id);
-
     /// <summary>Instance delete.</summary>
     /// <param name="ctx">     The request context.</param>
     /// <param name="response">[out] The response data.</param>
@@ -155,12 +93,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     bool InstanceDelete(
         FhirRequestContext ctx,
         out FhirResponseContext response);
-
-    /// <summary>Attempts to delete an instance from the store with minimal processing (e.g., no Hooks are called).</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="id">          [out] The identifier.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryInstanceDelete(string resourceType, string id);
 
     /// <summary>Process a Batch or Transaction bundle.</summary>
     /// <param name="ctx">     The request context.</param>
@@ -194,14 +126,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         FhirRequestContext ctx,
         out FhirResponseContext response);
 
-    /// <summary>Attempts to system search an object from the given string.</summary>
-    /// <param name="queryString">The query string.</param>
-    /// <param name="bundle">     [out] The bundle.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TrySystemSearch(
-        string queryString,
-        out object? bundle);
-
     /// <summary>Type search.</summary>
     /// <param name="ctx">     The request context.</param>
     /// <param name="response">[out] The response data.</param>
@@ -209,16 +133,6 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     bool TypeSearch(
         FhirRequestContext ctx,
         out FhirResponseContext response);
-
-    /// <summary>Attempts to system search an object from the given string.</summary>
-    /// <param name="resourceType">Type of the resource.</param>
-    /// <param name="queryString"> The query string.</param>
-    /// <param name="bundle">      [out] The bundle.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    bool TryTypeSearch(
-        string resourceType,
-        string queryString,
-        out object? bundle);
 
     /// <summary>System operation.</summary>
     /// <param name="ctx">     The request context.</param>
@@ -275,6 +189,14 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
         out string serialized,
         bool pretty,
         string destFormat = "");
+
+    /// <summary>Attempts to serialize to subscription.</summary>
+    /// <param name="parsed">      Information describing the subscription.</param>
+    /// <param name="subscription">[out] The serialized.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryGetSubscription(
+        ParsedSubscription parsed,
+        out object? subscription);
 
     /// <summary>Change subscription status.</summary>
     /// <param name="id">    [out] The identifier.</param>

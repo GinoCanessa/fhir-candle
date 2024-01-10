@@ -254,7 +254,8 @@ public class OpPasClaimSubmit : IFhirOperation
         }
 
         // store the bundle
-        if (!store.TryInstanceCreate(cb, true, out _, out string id))
+        //if (!store.TryInstanceCreate(cb, true, out _, out string id))
+        if (!store.InstanceCreate(new FhirRequestContext(store, "POST", "Bundle", cb), out _))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
@@ -336,7 +337,7 @@ public class OpPasClaimSubmit : IFhirOperation
         };
 
         // store the claim response locally
-        if (!store.TryInstanceCreate(cr, true, out _, out string claimResponseId))
+        if (!store.InstanceCreate(new FhirRequestContext(store, "POST", "ClaimResponse", cr), out _))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {
@@ -413,7 +414,7 @@ public class OpPasClaimSubmit : IFhirOperation
         }
 
         // store the claim response bundle
-        if (!store.TryInstanceCreate(crb, true, out _, out string claimResponseBundleId))
+        if (!store.InstanceCreate(new FhirRequestContext(store, "POST", "Bundle", crb), out _))
         {
             responseOutcome.Issue.Add(new OperationOutcome.IssueComponent()
             {

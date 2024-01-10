@@ -19,6 +19,12 @@ public record class FhirResponseContext
     /// <summary>Gets or initializes the resource.</summary>
     public object? Resource { get; init; }
 
+    /// <summary>Gets or initializes the type of the resource.</summary>
+    public string ResourceType { get; init; } = string.Empty;
+
+    /// <summary>Gets or initializes the identifier.</summary>
+    public string Id { get; init; } = string.Empty;
+
     /// <summary>Gets or initializes the serialized resource.</summary>
     public string SerializedResource { get; init; } = string.Empty;
 

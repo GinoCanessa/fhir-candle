@@ -318,6 +318,8 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
         // traverse page types to build package info
         foreach (PackagePageInfo page in pages)
         {
+            Console.WriteLine($"Package page: {page.PageName}, FhirVersion: {page.FhirVersionLiteral} ({page.FhirVersionNumeric}), ContentFor: {page.ContentFor}, OnlyOnEndpoint: {page.OnlyShowOnEndpoint}");
+
             if (string.IsNullOrEmpty(page.FhirVersionLiteral))
             {
                 foreach ((string name, IFhirStore store) in _storesByController)
@@ -330,6 +332,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                         {
                             ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
                         }
+                        else
+                        {
+                            Console.WriteLine($"Skipping page: {page.PageName} against store {name} - no endpoint match");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Skipping page: {page.PageName} against store {name} - no content match");
                     }
                 }
 
@@ -353,6 +363,14 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
                     {
                         ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
                     }
+                    else
+                    {
+                        Console.WriteLine($"Skipping page: {page.PageName} against store {name} - no endpoint match");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Skipping page: {page.PageName} against store {name} - no FHIR version or content match");
                 }
             }
         }

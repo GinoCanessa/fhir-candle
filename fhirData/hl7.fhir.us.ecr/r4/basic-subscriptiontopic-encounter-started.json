@@ -1,10 +1,10 @@
 {
   "resourceType": "Basic",
-  "id": "encounter-started",
+  "id": "encounter-start",
   "extension": [
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
-      "valueUri": "http://example.org/FHIR/SubscriptionTopic/encounter-started"
+      "valueUri": "http://hl7.org/fhir/us/ecr/SubscriptionTopic/encounter-start"
     },
     {
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.version",

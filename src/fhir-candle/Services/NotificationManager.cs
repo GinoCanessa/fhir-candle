@@ -199,6 +199,8 @@ public class NotificationManager : INotificationManager
             store.ChangeSubscriptionStatus(e.Subscription.Id, "active");
         }
 
+        e.Subscription.RegisterSerializedSend(e.NotificationEvents.Select(ne => ne.EventNumber).Max(), contents);
+
         return success;
     }
 

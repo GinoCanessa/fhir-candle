@@ -40,6 +40,13 @@
                         }
                     }
 
+@*                     @if (_subscription?.SerializedEvents.TryGetValue(subEvent.EventNumber, out string? content) == true)
+                    {
+                        <MudField Label="Content">
+                            <MudText Typo="Typo.body2">@content</MudText>
+                        </MudField>
+                    }
+ *@
                 </MudCardContent>
             </MudCard>
         </MudItem>

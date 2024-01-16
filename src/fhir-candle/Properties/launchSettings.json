@@ -43,7 +43,7 @@
     },
     "ecr": {
       "commandName": "Project",
-      "commandLineArgs": "--reference-implementation hl7.fhir.us.ecr --load-package hl7.fhir.us.ecr --r4 r4 --protect-source true -m 1000 --load-examples true --max-subscription-minutes 240",
+      "commandLineArgs": "--reference-implementation hl7.fhir.us.ecr --load-package hl7.fhir.us.ecr --r4 r4 --smart-optional r4 --protect-source true -m 1000 --load-examples true --max-subscription-minutes 240",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5826",
       "environmentVariables": {

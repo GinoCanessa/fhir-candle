@@ -4,12 +4,16 @@
 // </copyright>
 
 using fhir.candle.Models;
+using fhir.candle.Pages.Subscriptions;
 using FhirCandle.Models;
+using FhirCandle.Smart;
 using FhirCandle.Storage;
 using FhirStore.Smart;
+using Hl7.Fhir.Rest;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace fhir.candle.Services;
@@ -43,6 +47,15 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
     /// <summary>The smart configs.</summary>
     private Dictionary<string, SmartWellKnown> _smartConfigs = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The smart clients.</summary>
+    private Dictionary<string, SmartClientRegistration> _smartClientsById = new(StringComparer.Ordinal);
+
+    /// <summary>Name of the smart identifiers by.</summary>
+    private Dictionary<string, string> _smartIdsByName = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Identifier for the keys by issuer.</summary>
+    private Dictionary<string, SecurityKey> _keysByIssuerId = new(StringComparer.Ordinal);
 
     /// <summary>The authorizations.</summary>
     private Dictionary<string, AuthorizationInfo> _authorizations = new();
@@ -450,13 +463,132 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         return ctx.IsAuthorized();
     }
 
+    /// <summary>
+    /// Attempts to register client a string from the given SmartClientRegistration.
+    /// </summary>
+    /// <param name="registration">The registration.</param>
+    /// <param name="clientId">    [out] The client's identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryRegisterClient(
+        SmartClientRegistration registration,
+        out string clientId)
+    {
+        // check for this client already existing
+
+        if (string.IsNullOrEmpty(registration.ClientName))
+        {
+            _logger.LogWarning($"TryRegisterClient <<< request is missing client name.");
+            clientId = string.Empty;
+            return false;
+        }
+
+        string clientName = registration.ClientName;
+
+        if (_smartIdsByName.ContainsKey(clientName))
+        {
+            _logger.LogWarning($"TryRegisterClient <<< request {clientName} already exists.");
+            clientId = string.Empty;
+            return false;
+        }
+
+        if (!registration.Keys.Any())
+        {
+            _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing keys.");
+            clientId = string.Empty;
+            return false;
+        }
+
+        SmartClientRegistration.SmartJwksKey key = registration.Keys.First();
+
+        clientId = Guid.NewGuid().ToString();
+        
+        switch (key.Algorithm)
+        {
+            case "RS384":
+                {
+                    if (string.IsNullOrEmpty(key.RsaModulus))
+                    {
+                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the RSA Modulus (n).");
+                        clientId = string.Empty;
+                        return false;
+                    }
+
+                    if (string.IsNullOrEmpty(key.RsaExponent))
+                    {
+                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the RSA Exponent (e).");
+                        clientId = string.Empty;
+                        return false;
+                    }
+
+                    using (System.Security.Cryptography.RSACryptoServiceProvider rsa = new())
+                    {
+                        rsa.ImportParameters(new System.Security.Cryptography.RSAParameters()
+                        {
+                            Modulus = System.Text.Encoding.UTF8.GetBytes(key.RsaModulus),
+                            Exponent = System.Text.Encoding.UTF8.GetBytes(key.RsaExponent),
+                        });
+
+                        _keysByIssuerId.Add(clientId, new RsaSecurityKey(rsa));
+                    }
+                }
+                break;
+
+            case "ES384":
+                {
+                    if (string.IsNullOrEmpty(key.EcdsaCurve))
+                    {
+                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the ECDSA Curve (crv).");
+                        clientId = string.Empty;
+                        return false;
+                    }
+
+                    if (string.IsNullOrEmpty(key.EcdsaX))
+                    {
+                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the ECDSA X coordinate (x).");
+                        clientId = string.Empty;
+                        return false;
+                    }
+
+                    if (string.IsNullOrEmpty(key.EcdsaY))
+                    {
+                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the ECDSA Y coordinate (y).");
+                        clientId = string.Empty;
+                        return false;
+                    }
+
+                    ECCurve curve = ECCurve.NamedCurves.nistP384;
+
+                    ECParameters parameters = new()
+                    {
+                        Curve = curve,
+                        Q = new()
+                        {
+                            X = System.Text.Encoding.UTF8.GetBytes(key.EcdsaX),
+                            Y = System.Text.Encoding.UTF8.GetBytes(key.EcdsaY),
+                        },
+                    };
+
+                    using (System.Security.Cryptography.ECDsa ecdsa = System.Security.Cryptography.ECDsaCng.Create(parameters))
+                    {
+                        _keysByIssuerId.Add(clientId, new ECDsaSecurityKey(ecdsa));
+                    }
+                }
+                break;
+        }
+
+        _smartClientsById.Add(clientId, registration);
+        _smartIdsByName.Add(clientName, clientId);
+
+        return true;
+    }
+
     /// <summary>Attempts to create smart response.</summary>
-    /// <param name="tenant">      The tenant name.</param>
-    /// <param name="authCode">    The authorization code.</param>
-    /// <param name="clientId">    The client's identifier.</param>
-    /// <param name="clientSecret">The client secret.</param>
-    /// <param name="codeVerifier">The code verifier.</param>
-    /// <param name="response">    [out] The response.</param>
+    /// <param name="tenant">             The tenant name.</param>
+    /// <param name="authCode">           The authorization code.</param>
+    /// <param name="clientId">           The client's identifier.</param>
+    /// <param name="clientSecret">       The client secret.</param>
+    /// <param name="codeVerifier">       The code verifier.</param>
+    /// <param name="response">           [out] The response.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryCreateSmartResponse(
         string tenant,
@@ -629,7 +761,6 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             };
         }
 
-
         local.Activity.Add(new()
         {
             RequestType = "authorization_code",
@@ -638,6 +769,208 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         });
 
         response = local.Response!;
+        return true;
+    }
+
+    /// <summary>Attempts to client assertion exchange.</summary>
+    /// <param name="tenant">             The tenant.</param>
+    /// <param name="clientAssertionType">Type of the client assertion.</param>
+    /// <param name="clientAssertion">    The client assertion.</param>
+    /// <param name="scope">              The scope.</param>
+    /// <param name="response">           [out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    public bool TryClientAssertionExchange(
+        string tenant,
+        string clientAssertionType,
+        string clientAssertion,
+        IEnumerable<string> scopes,
+        out AuthorizationInfo.SmartResponse response)
+    {
+        if (!clientAssertionType.Equals("urn:ietf:params:oauth:client-assertion-type:jwt-bearer"))
+        {
+            _logger.LogWarning($"TryClientAssertionExchange <<< invalid client assertion type: {clientAssertionType}.");
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(clientAssertion))
+        {
+            _logger.LogWarning($"TryClientAssertionExchange <<< missing client assertion.");
+            response = null!;
+            return false;
+        }
+
+        JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+
+        if (!tokenHandler.CanReadToken(clientAssertion))
+        {
+            _logger.LogWarning($"TryClientAssertionExchange <<< invalid client assertion.");
+            response = null!;
+            return false;
+        }
+
+        // read the token so we can get the claims
+        JwtSecurityToken jwtToken = tokenHandler.ReadJwtToken(clientAssertion);
+
+        string iss = jwtToken.Issuer;
+        string sub = jwtToken.Subject;
+        string aud = jwtToken.Audiences.Any() ? jwtToken.Audiences.First() : string.Empty;
+
+        SmartClientRegistration? clientRegistration;
+        bool found;
+
+        string? clientId;
+
+        // check to see if this token was issued by client name
+        if (_smartIdsByName.TryGetValue(iss, out clientId) && (!string.IsNullOrEmpty(clientId)))
+        {
+            found = _smartClientsById.TryGetValue(clientId, out clientRegistration);
+        }
+        else
+        {
+            clientId = iss;
+            found = _smartClientsById.TryGetValue(iss, out clientRegistration);
+        }
+
+        //if ((!found) || (clientAssertion == null))
+        //{
+        //    _logger.LogWarning($"TryClientAssertionExchange <<< client assertion issuer {iss} is not registered.");
+        //    response = null!;
+        //    return false;
+        //}
+
+        //if (!_keysByIssuerId.TryGetValue(resolvedId, out SecurityKey? key) || (key == null))
+        //{
+        //    _logger.LogWarning($"TryClientAssertionExchange <<< client assertion issuer {iss} does not have any security keys.");
+        //    response = null!;
+        //    return false;
+        //}
+
+        //TokenValidationParameters tokenValidationParameters = new()
+        //{
+        //    ValidateIssuer = true,
+        //    //ValidateAudience = true,
+        //    ValidateLifetime = true,
+        //    ValidateIssuerSigningKey = true,
+        //    ValidIssuer = iss,
+        //    //ValidAudience = _serverConfig.BaseUrl,
+        //    IssuerSigningKey = key,
+        //};
+
+        //System.Security.Claims.ClaimsPrincipal claims = tokenHandler.ValidateToken(clientAssertion, tokenValidationParameters, out SecurityToken validatedToken);
+
+        //response = null!;
+        //return false;
+
+        string code = Guid.NewGuid().ToString();
+        string key = tenant + ":" + code;
+
+        if (string.IsNullOrEmpty(tenant))
+        {
+            string msg = $"TryClientAssertionExchange <<< request {clientAssertion} is missing the tenant.";
+            _logger.LogWarning(msg);
+            response = null!;
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(clientId))
+        {
+            string msg = $"TryCreateSmartResponse <<< request {clientAssertion} is missing the client id.";
+            _logger.LogWarning(msg);
+            response = null!;
+            return false;
+        }
+
+        //if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
+        //{
+        //    string msg = $"TryCreateSmartResponse <<< {key} tenant ({local.Tenant}) does not match request: {tenant}.";
+        //    local.Activity.Add(new()
+        //    {
+        //        RequestType = "authorization_code",
+        //        Success = false,
+        //        Message = msg,
+        //    });
+        //    _logger.LogWarning(msg);
+        //    response = null!;
+        //    return false;
+        //}
+
+        //if (!clientId.Equals(local.RequestParameters.ClientId, StringComparison.Ordinal))
+        //{
+        //    string msg = $"TryCreateSmartResponse <<< {key} client ({local.RequestParameters.ClientId}) does not match request: {clientId}.";
+        //    local.Activity.Add(new()
+        //    {
+        //        RequestType = "authorization_code",
+        //        Success = false,
+        //        Message = msg,
+        //    });
+        //    _logger.LogWarning(msg);
+        //    response = null!;
+        //    return false;
+        //}
+
+        ExtractScopes(scopes, out HashSet<string> userScopes, out HashSet<string> patientScopes);
+        //local.UserScopes = userScopes;
+        //local.PatientScopes = patientScopes;
+
+        //// check for 'special' code
+        //if (code.Equals(Guid.Empty.ToString()))
+        //{
+        //    // update our last access
+        //    local.LastAccessed = DateTimeOffset.UtcNow;
+
+        //    // create our response
+        //    local.Response = new()
+        //    {
+        //        PatientId = local.LaunchPatient,
+        //        TokenType = "bearer",
+        //        Scopes = string.Join(" ", permittedScopes),
+        //        ClientId = local.RequestParameters.ClientId,
+        //        IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
+        //        AccessToken = code + "_" + code,
+        //        RefreshToken = code + "_" + code,
+        //    };
+        //}
+        //else
+        //{
+        //    // update our last access and expiration
+        //    local.LastAccessed = DateTimeOffset.UtcNow;
+        //    local.Expires = DateTimeOffset.UtcNow.AddMinutes(_tokenExpirationMinutes);
+
+        //    // create our response
+        //    local.Response = new()
+        //    {
+        //        PatientId = local.LaunchPatient,
+        //        TokenType = "bearer",
+        //        Scopes = string.Join(" ", permittedScopes),
+        //        ClientId = local.RequestParameters.ClientId,
+        //        IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
+        //        AccessToken = code + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
+        //        RefreshToken = code + "_" + Guid.NewGuid().ToString()
+        //    };
+        //}
+
+        //local.Activity.Add(new()
+        //{
+        //    RequestType = "authorization_code",
+        //    Success = true,
+        //    Message = $"Granted access token: {local.Response.AccessToken}, refresh token: {local.Response.RefreshToken}"
+        //});
+
+        //response = local.Response!;
+        //return true;
+
+
+        response = new()
+        {
+            TokenType = "bearer",
+            Scopes = string.Join(" ", scopes),
+            ClientId = clientId,
+            IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, clientId, clientId, DateTime.UtcNow.AddHours(24), _tenants[tenant].BaseUrl),
+            AccessToken = code + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
+            RefreshToken = code + "_" + Guid.NewGuid().ToString()
+        };
+
         return true;
     }
 
@@ -902,6 +1235,34 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         return tokenHandler.WriteToken(token);
     }
 
+    internal string GenerateIdJwt(
+        string rootUrl, 
+        string subRoot, 
+        string userId,
+        DateTime expires,
+        string audience)
+    {
+        JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+        SecurityTokenDescriptor tokenDescriptor = new()
+        {
+            Subject = new System.Security.Claims.ClaimsIdentity(new System.Security.Claims.Claim[]
+            {
+                new("sub", subRoot + "_" + Guid.NewGuid().ToString()),
+                new("profile", userId),
+                new("fhirUser", userId),
+                new("jti", Guid.NewGuid().ToString()),
+            }),
+            Expires = expires,
+            Audience = audience,
+            Issuer = rootUrl,
+            IssuedAt = DateTime.Now,
+            SigningCredentials = new(new SymmetricSecurityKey(_jwtBytes), SecurityAlgorithms.HmacSha256Signature),
+        };
+
+        SecurityToken token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+
     /// <summary>Initializes this service.</summary>
     /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
     public void Init()
@@ -936,14 +1297,14 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                 {
                     //"client_secret_post",
                     "client_secret_basic",
-                    //"private_key_jwt",
+                    "private_key_jwt",
                 },
-                //TokenEndpointAuthSigningAlgs = new string[]
-                //{
-                //    //"RS384",
-                //    //"ES384",
-                //},
-                //RegistrationEndpoint = $"{config.BaseUrl}/auth/register",
+                TokenEndpointAuthSigningAlgs = new string[]
+                {
+                    "RS384",
+                    "ES384",
+                },
+                RegistrationEndpoint = $"{_serverConfig.PublicUrl}/_smart/{name}/register",
                 //AppStateEndpoint = $"{config.BaseUrl}/auth/appstate",
                 SupportedScopes = new string[]
                 {
@@ -982,7 +1343,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                         //"authorize-post",                         // POST-based authorization
                         "client-public",                            // SMART's public client profile (no client authentication)
                         "client-confidential-symmetric",            // SMART's symmetric confidential client profile ("client secret" authentication)
-                        //"client-confidential-asymmetric",         // SMART's asymmetric confidential client profile ("JWT authentication")
+                        "client-confidential-asymmetric",         // SMART's asymmetric confidential client profile ("JWT authentication")
                         //"sso-openid-connect",                     // SMART's OpenID Connect profile
                         //"context-banner",                         // "need patient banner" launch context (conveyed via need_patient_banner token parameter)
                         //"context-style",                          // "SMART style URL" launch context (conveyed via smart_style_url token parameter). This capability is deemed experimental.

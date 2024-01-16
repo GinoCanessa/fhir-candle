@@ -865,6 +865,7 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
+    /// <summary>Check expired subscriptions.</summary>
     private void CheckExpiredSubscriptions()
     {
         if (!_subscriptions.Any())

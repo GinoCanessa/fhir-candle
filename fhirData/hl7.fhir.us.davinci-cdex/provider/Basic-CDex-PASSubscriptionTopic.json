@@ -1,6 +1,6 @@
 {
   "resourceType" : "Basic",
-  "id": "cdex-task-topic",
+  "id": "PASSubscriptionTopic",
   "modifierExtension": [{
       "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
       "valueCode": "active"

@@ -424,7 +424,7 @@ public class SubscriptionConverter
                 new()
                 {
                     Name = "subscription",
-                    Value = new FhirString(baseUrl + "/Subscription/" + subscription.Id)
+                    Value = new ResourceReference(baseUrl + "/Subscription/" + subscription.Id)
                 },
                 new()
                 {

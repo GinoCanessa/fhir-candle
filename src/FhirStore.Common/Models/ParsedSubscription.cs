@@ -149,7 +149,7 @@ public class ParsedSubscription
     /// <param name="content">    The content.</param>
     public void RegisterSerializedSend(long eventNumber, string content)
     {
-        System.Console.WriteLine($"Sending content for event: Subscription/{Id}:{eventNumber}: \n-----{content}\n-----");
+        System.Console.WriteLine($"Sending content for event: Subscription/{Id}:{eventNumber}: \n-----\n{content}\n-----");
 
         if (_serializedEvents.ContainsKey(eventNumber))
         {

@@ -73,7 +73,7 @@ public partial class VersionedFhirStore : IFhirStore
     internal static TopicConverter _topicConverter = new();
     
     /// <summary>The subscription converter.</summary>
-    internal static SubscriptionConverter _subscriptionConverter = new();
+    internal static SubscriptionConverter _subscriptionConverter = null!;
 
     /// <summary>(Immutable) The topics, by id.</summary>
     internal readonly ConcurrentDictionary<string, ParsedSubscriptionTopic> _topics = new();
@@ -183,6 +183,11 @@ public partial class VersionedFhirStore : IFhirStore
 
         _config = config;
         //_baseUri = new Uri(config.ControllerName);
+
+        if (_subscriptionConverter == null!)
+        {
+            _subscriptionConverter = new(config.MaxSubscriptionExpirationMinutes);
+        }
 
         SymbolTable st = new SymbolTable().AddStandardFP().AddFhirExtensions();
         _compiler = new(st);

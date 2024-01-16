@@ -65,6 +65,9 @@ public class TenantConfiguration
     /// <summary>Gets or sets the number of maximum resources.</summary>
     public int MaxResourceCount { get; set; } = 0;
 
+    /// <summary>Gets or sets the max allowed subscription expiration minutes.</summary>
+    public int MaxSubscriptionExpirationMinutes { get; set; } = 30;
+
     /// <summary>Gets or sets a value indicating whether the smart required.</summary>
     public bool SmartRequired { get; set; } = false;
 

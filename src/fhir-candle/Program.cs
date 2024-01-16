@@ -39,6 +39,9 @@ public static partial class Program
     /// <summary>(Immutable) The default listen port.</summary>
     private const int _defaultListenPort = 5826;
 
+    /// <summary>(Immutable) The default subscription expiration.</summary>
+    private static readonly int DefaultSubscriptionExpirationMinutes = 30;
+
     ///// <summary>Candle server delegate.</summary>
     ///// <param name="config">The configuration.</param>
     ///// <returns>An int.</returns>
@@ -149,6 +152,11 @@ public static partial class Program
             getDefaultValue: () => configuration.GetValue<bool>("Create_As_Update", true),
             "Allow Update interactions (PUT) to create new resources.");
 
+        Option<int?> optMaxSubscriptionExpirationMinutes = new(
+            name: "--max-subscription-minutes",
+            getDefaultValue: () => configuration.GetValue<int?>("Max_Subscription_Minutes", null),
+            "Maximum number of minutes a subscription is allowed to expire in.");
+
         Option<string> optZulipEmail = new(
             name: "--zulip-email",
             getDefaultValue: () => configuration.GetValue("Zulip_Email", string.Empty) ?? string.Empty,
@@ -210,6 +218,7 @@ public static partial class Program
             optTenantsSmartOptional,
             optCreateExistingId,
             optCreateAsUpdate,
+            optMaxSubscriptionExpirationMinutes,
             optZulipEmail,
             optZulipKey,
             optZulipUrl,
@@ -245,6 +254,7 @@ public static partial class Program
                 SmartOptionalTenants = context.ParseResult.GetValueForOption(optTenantsSmartOptional) ?? new(),
                 AllowExistingId = context.ParseResult.GetValueForOption(optCreateExistingId) ?? true,
                 AllowCreateAsUpdate = context.ParseResult.GetValueForOption(optCreateAsUpdate) ?? true,
+                MaxSubscriptionExpirationMinutes = context.ParseResult.GetValueForOption(optMaxSubscriptionExpirationMinutes) ?? DefaultSubscriptionExpirationMinutes,
                 ZulipEmail = context.ParseResult.GetValueForOption(optZulipEmail) ?? string.Empty,
                 ZulipKey = context.ParseResult.GetValueForOption(optZulipKey) ?? string.Empty,
                 ZulipUrl = context.ParseResult.GetValueForOption(optZulipUrl) ?? string.Empty,
@@ -457,6 +467,8 @@ public static partial class Program
         }
     }
 
+    /// <summary>Executes the browser operation.</summary>
+    /// <param name="url">URL of the resource.</param>
     private static void LaunchBrowser(string url)
     {
         ProcessStartInfo psi = new();
@@ -504,6 +516,7 @@ public static partial class Program
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
                 ProtectLoadedContent = config.ProtectLoadedContent,
                 MaxResourceCount = config.MaxResourceCount,
+                MaxSubscriptionExpirationMinutes = config.MaxSubscriptionExpirationMinutes,
                 SmartRequired = smartRequired.Contains(tenant),
                 SmartAllowed = smartOptional.Contains(tenant),
                 AllowExistingId = config.AllowExistingId,
@@ -520,6 +533,7 @@ public static partial class Program
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
                 ProtectLoadedContent = config.ProtectLoadedContent,
                 MaxResourceCount = config.MaxResourceCount,
+                MaxSubscriptionExpirationMinutes = config.MaxSubscriptionExpirationMinutes,
                 SmartRequired = smartRequired.Contains(tenant),
                 SmartAllowed = smartOptional.Contains(tenant),
                 AllowExistingId = config.AllowExistingId,
@@ -536,6 +550,7 @@ public static partial class Program
                 BaseUrl = config.PublicUrl + "/fhir/" + tenant,
                 ProtectLoadedContent = config.ProtectLoadedContent,
                 MaxResourceCount = config.MaxResourceCount,
+                MaxSubscriptionExpirationMinutes = config.MaxSubscriptionExpirationMinutes,
                 SmartRequired = smartRequired.Contains(tenant),
                 SmartAllowed = smartOptional.Contains(tenant),
                 AllowExistingId = config.AllowExistingId,

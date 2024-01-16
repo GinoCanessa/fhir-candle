@@ -11,8 +11,6 @@ namespace FhirCandle.Models;
 /// <summary>A common subscription.</summary>
 public class ParsedSubscription
 {
-    public static readonly long DefaultSubscriptionExpiration = TimeSpan.FromMinutes(10).Ticks;
-
     private long _currentEventCount = 0;
     private Dictionary<long, SubscriptionEvent> _generatedEvents = new();
     private List<string> _notificationErrors = new();
@@ -112,7 +110,8 @@ public class ParsedSubscription
     /// <summary>Gets or sets the system tick (time) when the last communication was sent.</summary>
     public long LastCommunicationTicks { get; set; } = 0;
 
-    public long ExpirationTicks { get; set; } = DateTime.Now.Ticks + DefaultSubscriptionExpiration;
+    /// <summary>Gets or sets the expiration ticks.</summary>
+    public required long ExpirationTicks { get; set; }
 
     /// <summary>Gets or sets the number of current events.</summary>
     public long CurrentEventCount { get => _currentEventCount; }

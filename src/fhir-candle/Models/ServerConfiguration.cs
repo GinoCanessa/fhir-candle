@@ -65,6 +65,9 @@ public class ServerConfiguration
     /// <summary>Gets or sets a value indicating whether we allow create as update.</summary>
     public bool AllowCreateAsUpdate { get; set; } = true;
 
+    /// <summary>Gets or sets the max allowed subscription expiration minutes.</summary>
+    public int MaxSubscriptionExpirationMinutes { get; set; } = 30;
+
     /// <summary>Gets or sets the zulip email.</summary>
     public string ZulipEmail { get; set; } = string.Empty;
 

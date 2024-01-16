@@ -20,6 +20,19 @@ public class SubscriptionConverter
     /// <summary>URL of the payload content value set.</summary>
     public static string PayloadContentVsUrl = "http://hl7.org/fhir/ValueSet/subscription-payload-content";
 
+    /// <summary>(Immutable) The maximum subscription ticks.</summary>
+    private readonly long _maxSubscriptionTicks;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SubscriptionConverter"/> class.
+    /// </summary>
+    /// <param name="MaxSubscriptionExpirationMinutes">The maximum subscription expiration in
+    ///  minutes.</param>
+    public SubscriptionConverter(int MaxSubscriptionExpirationMinutes)
+    {
+        _maxSubscriptionTicks = TimeSpan.FromMinutes(MaxSubscriptionExpirationMinutes).Ticks;
+    }
+
     /// <summary>Attempts to parse a ParsedSubscription from the given object.</summary>
     /// <param name="subscription">The subscription.</param>
     /// <param name="common">      [out] The common.</param>
@@ -34,6 +47,13 @@ public class SubscriptionConverter
         {
             common = null!;
             return false;
+        }
+
+        long expirationTicks = sub.End?.Ticks ?? _maxSubscriptionTicks;
+
+        if (expirationTicks > _maxSubscriptionTicks)
+        {
+            expirationTicks = _maxSubscriptionTicks;
         }
 
         common = new()
@@ -51,7 +71,7 @@ public class SubscriptionConverter
                 ? Hl7.Fhir.Utility.EnumUtility.GetLiteral(sub.Content)!
                 : string.Empty,
             MaxEventsPerNotification = sub.MaxCount ?? 0,
-            ExpirationTicks = sub.End?.Ticks ?? (DateTime.Now.Ticks + ParsedSubscription.DefaultSubscriptionExpiration),
+            ExpirationTicks = expirationTicks,
         };
 
         // add parameters

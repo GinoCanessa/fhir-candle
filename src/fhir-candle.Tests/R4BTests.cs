@@ -390,7 +390,7 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
         sc.Should().Be(HttpStatusCode.OK);
         r.Should().NotBeNull();
         r!.TypeName.Should().Be("Subscription");
-        candleR4B.FhirCandle.Subscriptions.SubscriptionConverter converter = new candleR4B.FhirCandle.Subscriptions.SubscriptionConverter();
+        candleR4B.FhirCandle.Subscriptions.SubscriptionConverter converter = new candleR4B.FhirCandle.Subscriptions.SubscriptionConverter(10);
 
         bool success = converter.TryParse(r, out ParsedSubscription s);
 
@@ -502,6 +502,7 @@ public class R4BTestSubscriptions : IClassFixture<R4BTests>
             {
                 { resourceType, new List<ParsedSubscription.SubscriptionFilter>() },
             },
+            ExpirationTicks = DateTime.Now.AddMinutes(10).Ticks,
             ChannelSystem = string.Empty,
             ChannelCode = "rest-hook",
             ContentType = "application/fhir+json",

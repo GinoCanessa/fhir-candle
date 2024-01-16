@@ -80,7 +80,8 @@
         ChannelSystem = "http://terminology.hl7.org/CodeSystem/subscription-channel-type",
         Endpoint = string.Empty,
         HeartbeatSeconds = 120,
-        ContentType = "application/fhir+json",
+            ExpirationTicks = DateTime.Now.AddMinutes(10).Ticks,
+            ContentType = "application/fhir+json",
         ContentLevel = "id-only",
         Filters = new()
         {

@@ -38,5 +38,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Interactions\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Subscriptions\" />
   </ItemGroup>
 </Project>

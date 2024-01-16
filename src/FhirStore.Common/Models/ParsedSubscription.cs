@@ -13,6 +13,7 @@ public class ParsedSubscription
 {
     private long _currentEventCount = 0;
     private Dictionary<long, SubscriptionEvent> _generatedEvents = new();
+    private Dictionary<long, string> _serializedEvents = new();
     private List<string> _notificationErrors = new();
 
     public enum NotificationTypeCodes
@@ -126,6 +127,9 @@ public class ParsedSubscription
     /// <summary>Gets or sets the generated events.</summary>
     public Dictionary<long, SubscriptionEvent> GeneratedEvents { get => _generatedEvents; }
 
+    /// <summary>Gets the serialized events.</summary>
+    public Dictionary<long, string> SerializedEvents { get => _serializedEvents; }
+
     /// <summary>Registers the event described by subscriptionEvent.</summary>
     /// <param name="subscriptionEvent">The subscription event.</param>
     public void RegisterEvent(SubscriptionEvent subscriptionEvent)
@@ -138,6 +142,23 @@ public class ParsedSubscription
         }
 
         _generatedEvents.Add(subscriptionEvent.EventNumber, subscriptionEvent);
+    }
+
+    /// <summary>Registers the serialized send.</summary>
+    /// <param name="eventNumber">The event number.</param>
+    /// <param name="content">    The content.</param>
+    public void RegisterSerializedSend(long eventNumber, string content)
+    {
+        System.Console.WriteLine($"Sending content for event: Subscription/{Id}:{eventNumber}: \n-----{content}\n-----");
+
+        if (_serializedEvents.ContainsKey(eventNumber))
+        {
+            // TODO: for now just overwrite, figure out what we want to do later
+            _serializedEvents[eventNumber] = content;
+            return;
+        }
+
+        _serializedEvents.Add(eventNumber, content);
     }
 
     /// <summary>Clears the events.</summary>

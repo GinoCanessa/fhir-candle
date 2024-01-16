@@ -1,0 +1,169 @@
+{
+  "resourceType": "Basic",
+  "id": "encounter-started",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.url",
+      "valueUri": "http://example.org/FHIR/SubscriptionTopic/encounter-started"
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.version",
+      "valueString": "1.0.0-fhir.r4"
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.name",
+      "valueString": "Example Encounter Started Topic"
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.title",
+      "valueString": "encounter-started"
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.date",
+      "valueDateTime": "2019-01-01"
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.description",
+      "valueMarkdown": "Example topic for started encounters"
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.resourceTrigger",
+      "extension": [
+        {
+          "url": "description",
+          "valueMarkdown": "An Encounter has been started"
+        },
+        {
+          "url": "resource",
+          "valueUri": "http://hl7.org/fhir/StructureDefinition/Encounter"
+        },
+        {
+          "url": "supportedInteraction",
+          "valueCode": "create"
+        },
+        {
+          "url": "supportedInteraction",
+          "valueCode": "update"
+        },
+        {
+          "url": "queryCriteria",
+          "extension": [
+            {
+              "url": "previous",
+              "valueString": "status:not=in-progress"
+            },
+            {
+              "url": "resultForCreate",
+              "valueCode": "test-passes"
+            },
+            {
+              "url": "current",
+              "valueString": "status=in-progress"
+            },
+            {
+              "url": "resultForDelete",
+              "valueCode": "test-fails"
+            },
+            {
+              "url": "requireBoth",
+              "valueBoolean": true
+            }
+          ]
+        },
+        {
+          "url": "fhirPathCriteria",
+          "valueString": "(%previous.id.empty() or (%previous.status != 'in-progress')) and (%current.status = 'in-progress')"
+        }
+      ]
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.canFilterBy",
+      "extension": [
+        {
+          "url": "description",
+          "valueMarkdown": "Filter based on the subject of an encounter."
+        },
+        {
+          "url": "resource",
+          "valueUri": "Encounter"
+        },
+        {
+          "url": "filterParameter",
+          "valueString": "subject"
+        }
+      ]
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.canFilterBy",
+      "extension": [
+        {
+          "url": "description",
+          "valueMarkdown": "Filter based on the group membership of the subject of an encounter."
+        },
+        {
+          "url": "resource",
+          "valueUri": "Encounter"
+        },
+        {
+          "url": "filterParameter",
+          "valueString": "_in"
+        }
+      ]
+    },
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.notificationShape",
+      "extension": [
+        {
+          "url": "resource",
+          "valueUri": "Encounter"
+        },
+        {
+          "url": "include",
+          "valueString": "Encounter:patient&iterate=Patient.link"
+        },
+        {
+          "url": "include",
+          "valueString": "Encounter:practitioner"
+        },
+        {
+          "url": "include",
+          "valueString": "Encounter:service-provider"
+        },
+        {
+          "url": "include",
+          "valueString": "Encounter:account"
+        },
+        {
+          "url": "include",
+          "valueString": "Encounter:diagnosis"
+        },
+        {
+          "url": "include",
+          "valueString": "Encounter:observation"
+        },
+        {
+          "url": "include",
+          "valueString": "Encounter:location"
+        },
+        {
+          "url": "revInclude",
+          "valueString": "Encounter:subject"
+        }
+      ]
+    }
+  ],
+  "modifierExtension": [
+    {
+      "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-SubscriptionTopic.status",
+      "valueCode": "draft"
+    }
+  ],
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/fhir-types",
+        "code": "SubscriptionTopic"
+      }
+    ]
+  }
+}

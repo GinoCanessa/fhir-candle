@@ -4,6 +4,7 @@
 // </copyright>
 
 using FhirCandle.Models;
+using FhirCandle.Smart;
 using FhirStore.Smart;
 
 namespace fhir.candle.Services;
@@ -57,7 +58,6 @@ public interface ISmartAuthManager : IHostedService
         string error = "",
         string errorDescription = "");
 
-
     /// <summary>Attempts to create smart response.</summary>
     /// <param name="tenant">      The tenant name.</param>
     /// <param name="authCode">    The authentication code.</param>
@@ -73,6 +73,30 @@ public interface ISmartAuthManager : IHostedService
         string clientSecret,
         string codeVerifier,
         out AuthorizationInfo.SmartResponse response);
+
+    /// <summary>Attempts to client assertion exchange.</summary>
+    /// <param name="tenant">             The tenant name.</param>
+    /// <param name="clientAssertionType">Type of the client assertion.</param>
+    /// <param name="clientAssertion">    The client assertion.</param>
+    /// <param name="scopes">             The scopes.</param>
+    /// <param name="response">           [out] The response.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryClientAssertionExchange(
+        string tenant,
+        string clientAssertionType,
+        string clientAssertion,
+        IEnumerable<string> scopes,
+        out AuthorizationInfo.SmartResponse response);
+
+    /// <summary>
+    /// Attempts to register client a string from the given SmartClientRegistration.
+    /// </summary>
+    /// <param name="registration">The registration.</param>
+    /// <param name="clientId">    [out] The client's identifier.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryRegisterClient(
+        SmartClientRegistration registration,
+        out string clientId);
 
     /// <summary>Attempts to exchange a refresh token for a new access token.</summary>
     /// <param name="tenant">      The tenant.</param>

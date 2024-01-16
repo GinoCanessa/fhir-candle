@@ -4,11 +4,18 @@
 // </copyright>
 
 using System.Net;
+using System.Xml.Linq;
 using fhir.candle.Models;
 using fhir.candle.Services;
 using FhirCandle.Models;
+using FhirCandle.Smart;
+using Hl7.Fhir.Rest;
+
+using Microsoft.AspNetCore.Http.Extensions;
+
 //using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Mvc;
+using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
 
@@ -219,6 +226,9 @@ public class SmartController : ControllerBase
             string clientId = string.Empty;
             string clientSecret = string.Empty;
             string codeVerifier = string.Empty;
+            string clientAssertionType = string.Empty;
+            string clientAssertion = string.Empty;
+            IEnumerable<string> scopes = Enumerable.Empty<string>();
 
             foreach ((string key, Microsoft.Extensions.Primitives.StringValues values) in Request.Form)
             {
@@ -244,6 +254,15 @@ public class SmartController : ControllerBase
                         break;
                     case "code_verifier":
                         codeVerifier = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "client_assertion_type":
+                        clientAssertionType = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "client_assertion":
+                        clientAssertion = values.FirstOrDefault() ?? string.Empty;
+                        break;
+                    case "scope":
+                        scopes = values;
                         break;
                 }
             }
@@ -302,6 +321,22 @@ public class SmartController : ControllerBase
                         }
                     }
                     break;
+
+                case "client_credentials":
+                    {
+                        if (!_smartAuthManager.TryClientAssertionExchange(
+                                storeName,
+                                clientAssertionType,
+                                clientAssertion,
+                                scopes,
+                                out smart))
+                        {
+                            _logger.LogWarning($"PostSmartTokenRequest <<< exchange client assertion {clientAssertion} failed!");
+                            Response.StatusCode = 400;
+                            return;
+                        }
+                    }
+                    break;
             }
 
             if (smart == null)
@@ -332,6 +367,95 @@ public class SmartController : ControllerBase
             return;
         }
 
+    }
+
+    /// <summary>
+    /// (An Action that handles HTTP POST requests) posts a smart token request.
+    /// </summary>
+    /// <param name="storeName">     The store.</param>
+    /// <param name="authHeader">(Optional) The authentication header.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpPost, Route("{storeName}/register")]
+    [Consumes("application/json")]
+    [Produces("application/json")]
+    public async Task PostSmartRegistrationRequest(
+        [FromRoute] string storeName,
+        [FromHeader(Name = "Authorization")] string? authHeader = null)
+    {
+        // make sure this store exists and has SMART enabled
+        if (!_smartAuthManager.SmartConfigurationByTenant.TryGetValue(
+                storeName,
+                out FhirStore.Smart.SmartWellKnown? smartConfig))
+        {
+            _logger.LogWarning($"PostSmartRegistrationRequest <<< tenant {storeName} does not exist!");
+            Response.StatusCode = 404;
+            return;
+        }
+
+        // sanity check
+        if (Request == null)
+        {
+            _logger.LogError("PostSmartRegistrationRequest <<< cannot process a POST token call without a Request!");
+            Response.StatusCode = 400;
+            return;
+        }
+
+        try
+        {
+            // read the post body to process
+            using (StreamReader reader = new StreamReader(Request.Body))
+            {
+                string content = await reader.ReadToEndAsync();
+
+                // deserialize the json content into a SmartClientRegistration
+                SmartClientRegistration? smartClientRegistration = System.Text.Json.JsonSerializer.Deserialize<SmartClientRegistration>(content);
+
+                if (smartClientRegistration == null)
+                {
+                    Response.StatusCode = 400;
+                    return;
+                }
+
+                // operation
+                bool success = _smartAuthManager.TryRegisterClient(smartClientRegistration, out string clientId);
+
+                if (!success)
+                {
+                    string msg = "PostSmartRegistrationRequest <<< TryRegisterClient failed.";
+
+                    _logger.LogError(msg);
+                    Response.StatusCode = 500;
+                    return;
+                }
+
+                SmartClientRegistratonResponse resp = new()
+                {
+                    ClientId = clientId,
+                };
+
+                // SMART token exchange response is JSON
+                Response.ContentType = "application/json";
+                Response.StatusCode = (int)HttpStatusCode.OK;
+
+                await Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(resp));
+            }
+        }
+        catch (Exception ex)
+        {
+            string msg;
+            if (ex.InnerException == null)
+            {
+                msg = $"PostSmartRegistrationRequest <<< caught: {ex.Message}";
+            }
+            else
+            {
+                msg = $"PostSmartRegistrationRequest <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
+            }
+
+            _logger.LogError(msg);
+            Response.StatusCode = 500;
+            return;
+        }
     }
 
     /// <summary>

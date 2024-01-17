@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 
 namespace FhirCandle.Storage;
 
+/// <summary>A service for accessing store terminologies information.</summary>
 public class StoreTerminologyService : ITerminologyService
 {
     /// <summary>A value set contents.</summary>

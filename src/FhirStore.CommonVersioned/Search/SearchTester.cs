@@ -61,8 +61,11 @@ public class SearchTester
 
         if (fpContext == null)
         {
-            fpContext = new FhirEvaluationContext(resource.ToScopedNode());
-            fpContext.ElementResolver = FhirStore.Resolve;
+            fpContext = new FhirEvaluationContext(resource.ToScopedNode())
+            {
+                TerminologyService = FhirStore.Terminology,
+                ElementResolver = FhirStore.Resolve,
+            };
         }
 
         foreach (ParsedSearchParameter sp in searchParameters)
@@ -202,8 +205,11 @@ public class SearchTester
                         continue;
                     }
 
-                    FhirEvaluationContext chainedContext = new FhirEvaluationContext(resolved.ToScopedNode());
-                    chainedContext.ElementResolver = FhirStore.Resolve;
+                    FhirEvaluationContext chainedContext = new FhirEvaluationContext(resolved.ToScopedNode())
+                    {
+                        TerminologyService = FhirStore.Terminology,
+                        ElementResolver = FhirStore.Resolve,
+                    };
 
                     string rt = resolved.InstanceType.ToString();
 

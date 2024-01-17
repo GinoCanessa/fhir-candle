@@ -66,10 +66,13 @@ public class ExecutableSubscriptionInfo
     /// <summary>Gets or sets URL of the topic.</summary>
     public string TopicUrl { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the interaction triggers.</summary>
     public IEnumerable<InteractionOnlyTrigger> InteractionTriggers { get; set; } = Array.Empty<InteractionOnlyTrigger>();
 
+    /// <summary>Gets or sets the FHIR path triggers.</summary>
     public IEnumerable<CompiledFhirPathTrigger> FhirPathTriggers { get; set; } = Array.Empty<CompiledFhirPathTrigger>();
 
+    /// <summary>Gets or sets the query triggers.</summary>
     public IEnumerable<CompiledQueryTrigger> QueryTriggers { get; set; } = Array.Empty<CompiledQueryTrigger>();
 
     /// <summary>Gets or sets the subscription filters, by subscription id.</summary>

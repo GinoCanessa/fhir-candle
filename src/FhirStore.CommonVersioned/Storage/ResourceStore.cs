@@ -557,13 +557,13 @@ public class ResourceStore<T> : IVersionedResourceStore
             }
             else if (int.TryParse(_resourceStore[source.Id].Meta?.VersionId ?? string.Empty, out int version))
             {
-                source.Meta.VersionId = (version + 1).ToString();
                 previous = (T)_resourceStore[source.Id].DeepCopy();
+                source.Meta.VersionId = (version + 1).ToString();
             }
             else
             {
-                source.Meta.VersionId = "1";
                 previous = (T)_resourceStore[source.Id].DeepCopy();
+                source.Meta.VersionId = "1";
             }
 
             // check preconditions
@@ -939,28 +939,34 @@ public class ResourceStore<T> : IVersionedResourceStore
                 {
                     try
                     {
-                        ITypedElement? result;
+                        bool result;
 
                         if (currentTE != null)
                         {
-                            result = cfp.FhirPathTrigger.Invoke(currentTE, fpContext).First() ?? null;
+                            result = cfp.FhirPathTrigger.IsTrue(currentTE, fpContext);
                         }
                         else if (previousTE != null)
                         {
-                            result = cfp.FhirPathTrigger.Invoke(previousTE, fpContext).First() ?? null;
+                            //result = cfp.FhirPathTrigger.IsTrue(previousTE, fpContext).First() ?? null;
+                            result = cfp.FhirPathTrigger.IsTrue(previousTE, fpContext);
                         }
                         else
                         {
                             continue;
                         }
 
-                        if ((result == null) ||
-                            (result.Value == null) ||
-                            (!(result.Value is bool val)) ||
-                            (val == false))
+                        if (!result)
                         {
                             continue;
                         }
+
+                        //if ((result == null) ||
+                        //    (result.Value == null) ||
+                        //    (!(result.Value is bool val)) ||
+                        //    (val == false))
+                        //{
+                        //    continue;
+                        //}
 
                         matched = true;
                         matchedTopics.Add(topicUrl);
@@ -1192,11 +1198,6 @@ public class ResourceStore<T> : IVersionedResourceStore
         {
             ITypedElement currentTE = current.ToTypedElement();
 
-            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
-            {
-                TerminologyService = _store.Terminology,
-            };
-
             FhirPathVariableResolver resolver = new FhirPathVariableResolver()
             {
                 NextResolver = _store.Resolve,
@@ -1207,7 +1208,11 @@ public class ResourceStore<T> : IVersionedResourceStore
                 },
             };
 
-            fpContext.ElementResolver = resolver.Resolve;
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+            {
+                TerminologyService = _store.Terminology,
+                ElementResolver = resolver.Resolve,
+            };
 
             PerformSubscriptionTest(
                 current,
@@ -1244,11 +1249,6 @@ public class ResourceStore<T> : IVersionedResourceStore
             ITypedElement currentTE = current.ToTypedElement();
             ITypedElement previousTE = previous.ToTypedElement();
 
-            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
-            {
-                TerminologyService = _store.Terminology,
-            };
-
             FhirPathVariableResolver resolver = new FhirPathVariableResolver()
             {
                 NextResolver = _store.Resolve,
@@ -1259,7 +1259,14 @@ public class ResourceStore<T> : IVersionedResourceStore
                 },
             };
 
-            fpContext.ElementResolver = resolver.Resolve;
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(currentTE.ToScopedNode())
+            {
+                TerminologyService = _store.Terminology,
+                ElementResolver = resolver.Resolve,
+            };
+
+            //string test = "meta.tag.memberOf('http://hl7.org/fhir/us/davinci-cdex/ValueSet/cdex-work-queue')";
+            //bool evalRes = current.IsTrue(test, fpContext);
 
             PerformSubscriptionTest(
                 current,
@@ -1293,11 +1300,6 @@ public class ResourceStore<T> : IVersionedResourceStore
         {
             ITypedElement previousTE = previous.ToTypedElement();
 
-            FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
-            {
-                TerminologyService = _store.Terminology,
-            };
-
             FhirPathVariableResolver resolver = new FhirPathVariableResolver()
             {
                 NextResolver = _store.Resolve,
@@ -1308,7 +1310,11 @@ public class ResourceStore<T> : IVersionedResourceStore
                 },
             };
 
-            fpContext.ElementResolver = resolver.Resolve;
+            FhirEvaluationContext fpContext = new FhirEvaluationContext(previousTE.ToScopedNode())
+            {
+                TerminologyService = _store.Terminology,
+                ElementResolver = resolver.Resolve,
+            };
 
             PerformSubscriptionTest(
                 null,

@@ -1479,6 +1479,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)stored?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -1487,7 +1489,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[resourceType],
-                            stored,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -1500,7 +1502,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        stored = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        stored = sForHook;
                     }
                 }
             }
@@ -1753,6 +1756,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)resource?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -1761,7 +1766,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[ctx.ResourceType],
-                            resource,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -1774,7 +1779,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        resource = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        resource = sForHook;
                     }
                 }
             }
@@ -1923,6 +1929,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)r?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -1931,7 +1939,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[ctx.ResourceType],
-                            r,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     if (hr.StatusCode != null)
@@ -1942,7 +1950,8 @@ public partial class VersionedFhirStore : IFhirStore
 
                     if (hr.Resource != null)
                     {
-                        r = (Resource?)hr.Resource;
+                        sForHook = (Resource?)hr.Resource;
+                        r = sForHook;
                     }
                 }
             }
@@ -2363,6 +2372,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)resource?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -2371,7 +2382,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[ctx.ResourceType],
-                            resource,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -2384,7 +2395,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        content = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        resource = sForHook;
                     }
                 }
             }
@@ -3324,6 +3336,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)r?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -3332,7 +3346,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             null,
-                            r,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -3345,7 +3359,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        r = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        r = sForHook;
                     }
                 }
             }
@@ -3537,6 +3552,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)r?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -3545,7 +3562,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[ctx.ResourceType],
-                            r,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -3558,7 +3575,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        r = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        r = sForHook;
                     }
                 }
             }
@@ -3765,6 +3783,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)r?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -3773,7 +3793,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[ctx.ResourceType],
-                            r,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -3786,7 +3806,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        r = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        r = sForHook;
                     }
                 }
             }
@@ -3936,6 +3957,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)resource?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -3944,7 +3967,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[ctx.ResourceType],
-                            resource,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -3957,7 +3980,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        resource = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        resource = sForHook;
                     }
                 }
             }
@@ -4149,6 +4173,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)resource?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -4157,7 +4183,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store[ctx.ResourceType],
-                            resource,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -4170,7 +4196,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        resource = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        resource = sForHook;
                     }
                 }
             }
@@ -4757,8 +4784,11 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (fpContext == null)
         {
-            fpContext = new FhirEvaluationContext(focusTE.ToScopedNode());
-            fpContext.ElementResolver = Resolve;
+            fpContext = new FhirEvaluationContext(focusTE.ToScopedNode())
+            {
+                TerminologyService = _terminology,
+                ElementResolver = Resolve,
+            };
         }
 
         List<Resource> inclusions = new();
@@ -4899,8 +4929,11 @@ public partial class VersionedFhirStore : IFhirStore
 
         ITypedElement resourceTE = resource.ToTypedElement();
 
-        FhirEvaluationContext fpContext = new FhirEvaluationContext(resourceTE.ToScopedNode());
-        fpContext.ElementResolver = Resolve;
+        FhirEvaluationContext fpContext = new FhirEvaluationContext(resourceTE.ToScopedNode())
+        { 
+            TerminologyService = _terminology,
+            ElementResolver = Resolve,
+        };
 
         IEnumerable<Resource> inclusions = ResolveInclusions(resource, resourceTE, resultParameters, addedIds, fpContext);
 
@@ -4980,6 +5013,8 @@ public partial class VersionedFhirStore : IFhirStore
 
         if (hooks?.Any() ?? false)
         {
+            Resource? sForHook = (Resource?)r?.DeepCopy();
+
             foreach (IFhirInteractionHook hook in hooks)
             {
                 if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
@@ -4988,7 +5023,7 @@ public partial class VersionedFhirStore : IFhirStore
                             ctx,
                             this,
                             _store["CapabilityStatement"],
-                            r,
+                            sForHook,
                             out FhirResponseContext hr);
 
                     // check for the hook indicating processing is complete
@@ -5001,7 +5036,8 @@ public partial class VersionedFhirStore : IFhirStore
                     // if the hook modified the resource, use that moving forward
                     if (hr.Resource != null)
                     {
-                        r = (Resource)hr.Resource;
+                        sForHook = (Resource)hr.Resource;
+                        r = sForHook;
                     }
                 }
             }

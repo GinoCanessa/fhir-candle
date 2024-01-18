@@ -1734,7 +1734,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                         //"code token id_token",    // Hybrid Flow
                         "refresh_token",
                 },
-                //ManagementEndpoint = $"{config.BaseUrl}/auth/manage",
+                ManagementEndpoint = $"{config.BaseUrl}/smart/clients",
                 IntrospectionEndpoint = $"{_serverConfig.PublicUrl}/_smart/{name}/introspect",
                 //RecovationEndpoint = $"{config.BaseUrl}/auth/revoke",
                 Capabilities = new string[]

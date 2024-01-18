@@ -5148,13 +5148,20 @@ public partial class VersionedFhirStore : IFhirStore
             //Compartment = new(),
         };
 
+        string securityCodeSystemUrl = _config.FhirVersion switch
+        {
+            TenantConfiguration.SupportedFhirVersions.R4 => "http://terminology.hl7.org/CodeSystem/restful-security-service",
+            TenantConfiguration.SupportedFhirVersions.R4B => "http://terminology.hl7.org/CodeSystem/restful-security-service",
+            TenantConfiguration.SupportedFhirVersions.R5 => "http://hl7.org/fhir/restful-security-service",
+            _ => "http://hl7.org/fhir/restful-security-service",
+        };
+
         if (_config.SmartRequired || _config.SmartAllowed)
         {
             restComponent.Security = new()
             {
                 Cors = true,
-                //Service = new() { new CodeableConcept("http://hl7.org/fhir/restful-security-service", "SMART-on-FHIR") },
-                Service = new() { new CodeableConcept("http://terminology.hl7.org/CodeSystem/restful-security-service", "SMART-on-FHIR") },
+                Service = new() { new CodeableConcept(securityCodeSystemUrl, "SMART-on-FHIR") },
             };
 
             Extension ext = new()

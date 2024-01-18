@@ -6,8 +6,11 @@
 using FhirCandle.Models;
 using FhirCandle.Smart;
 using FhirStore.Smart;
+using Microsoft.IdentityModel.Tokens;
 
 namespace fhir.candle.Services;
+
+/// <summary>Interface for smart authentication manager.</summary>
 public interface ISmartAuthManager : IHostedService
 {
     /// <summary>Initializes the FHIR Store Manager and tenants.</summary>
@@ -20,6 +23,12 @@ public interface ISmartAuthManager : IHostedService
 
     /// <summary>Gets the smart configuration by tenant.</summary>
     Dictionary<string, SmartWellKnown> SmartConfigurationByTenant { get; }
+
+    /// <summary>Gets the authorizations.</summary>
+    Dictionary<string, AuthorizationInfo> SmartAuthorizations { get; }
+
+    /// <summary>Gets the clients.</summary>
+    Dictionary<string, ClientInfo> SmartClients { get; }
 
     /// <summary>Attempts to get authorization.</summary>
     /// <param name="tenant">The tenant name.</param>
@@ -75,28 +84,51 @@ public interface ISmartAuthManager : IHostedService
         out AuthorizationInfo.SmartResponse response);
 
     /// <summary>Attempts to client assertion exchange.</summary>
-    /// <param name="tenant">             The tenant name.</param>
+    /// <param name="tenantName">         The tenant name.</param>
+    /// <param name="remoteIpAddress">    The remote IP address.</param>
     /// <param name="clientAssertionType">Type of the client assertion.</param>
     /// <param name="clientAssertion">    The client assertion.</param>
     /// <param name="scopes">             The scopes.</param>
     /// <param name="response">           [out] The response.</param>
+    /// <param name="messages">           [out] The messages.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryClientAssertionExchange(
-        string tenant,
+        string tenantName,
+        string remoteIpAddress,
         string clientAssertionType,
         string clientAssertion,
         IEnumerable<string> scopes,
-        out AuthorizationInfo.SmartResponse response);
+        out AuthorizationInfo.SmartResponse response,
+        out List<string> messages);
+
+    /// <summary>Generates a signed jwt.</summary>
+    /// <param name="issuer">    The issuer.</param>
+    /// <param name="subject">   The subject.</param>
+    /// <param name="audience">  URL of the EHR resource server from which the app wishes to retrieve
+    ///  FHIR data.</param>
+    /// <param name="jti">       The jti.</param>
+    /// <param name="expiration">The expiration Date/Time.</param>
+    /// <param name="webKey">    The web key.</param>
+    /// <returns>The signed jwt.</returns>
+    string GenerateSignedJwt(
+        string issuer,
+        string subject,
+        string audience,
+        string jti,
+        DateTime expiration,
+        JsonWebKey webKey);
 
     /// <summary>
     /// Attempts to register client a string from the given SmartClientRegistration.
     /// </summary>
     /// <param name="registration">The registration.</param>
     /// <param name="clientId">    [out] The client's identifier.</param>
+    /// <param name="messages">    [out] The messages.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryRegisterClient(
         SmartClientRegistration registration,
-        out string clientId);
+        out string clientId,
+        out List<string> messages);
 
     /// <summary>Attempts to exchange a refresh token for a new access token.</summary>
     /// <param name="tenant">      The tenant.</param>
@@ -119,7 +151,6 @@ public interface ISmartAuthManager : IHostedService
         string tenant,
         string token,
         out AuthorizationInfo.IntrospectionResponse? response);
-
 
     /// <summary>Request authentication.</summary>
     /// <param name="tenant">             The tenant.</param>

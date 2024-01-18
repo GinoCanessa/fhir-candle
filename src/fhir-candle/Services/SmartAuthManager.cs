@@ -4,17 +4,21 @@
 // </copyright>
 
 using fhir.candle.Models;
+using fhir.candle.Pages.Smart;
 using fhir.candle.Pages.Subscriptions;
 using FhirCandle.Models;
 using FhirCandle.Smart;
 using FhirCandle.Storage;
 using FhirStore.Smart;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Utility;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
+using zulip_cs_lib.Resources;
 
 namespace fhir.candle.Services;
 
@@ -26,7 +30,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
     /// <summary>(Immutable) The token expiration in minutes.</summary>
     private const int _tokenExpirationMinutes = 30;
-    
+
     /// <summary>(Immutable) The jwt signing value in bytes.</summary>
     private static readonly byte[] _jwtBytes = System.Text.Encoding.UTF8.GetBytes(_jwtSign);
 
@@ -49,13 +53,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     private Dictionary<string, SmartWellKnown> _smartConfigs = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The smart clients.</summary>
-    private Dictionary<string, SmartClientRegistration> _smartClientsById = new(StringComparer.Ordinal);
-
-    /// <summary>Name of the smart identifiers by.</summary>
-    private Dictionary<string, string> _smartIdsByName = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Identifier for the keys by issuer.</summary>
-    private Dictionary<string, SecurityKey> _keysByIssuerId = new(StringComparer.Ordinal);
+    private Dictionary<string, ClientInfo> _clients = new(StringComparer.Ordinal);
 
     /// <summary>The authorizations.</summary>
     private Dictionary<string, AuthorizationInfo> _authorizations = new();
@@ -81,6 +79,9 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
     /// <summary>Gets the smart authorizations.</summary>
     public Dictionary<string, AuthorizationInfo> SmartAuthorizations { get => _authorizations; }
+
+    /// <summary>Gets the clients.</summary>
+    public Dictionary<string, ClientInfo> SmartClients { get => _clients; }
 
     /// <summary>Query if 'tenant' has tenant.</summary>
     /// <param name="tenant">The tenant.</param>
@@ -186,8 +187,8 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     /// <param name="errorDescription">(Optional) Information describing the error.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryGetClientRedirect(
-        string tenant, 
-        string code, 
+        string tenant,
+        string code,
         out string redirect,
         string error = "",
         string errorDescription = "")
@@ -468,117 +469,321 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     /// </summary>
     /// <param name="registration">The registration.</param>
     /// <param name="clientId">    [out] The client's identifier.</param>
+    /// <param name="messages">    [out] The messages.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryRegisterClient(
         SmartClientRegistration registration,
-        out string clientId)
+        out string clientId,
+        out List<string> messages)
     {
-        // check for this client already existing
+        messages = new List<string>();
 
+        // check for this client already existing
         if (string.IsNullOrEmpty(registration.ClientName))
         {
-            _logger.LogWarning($"TryRegisterClient <<< request is missing client name.");
+            string msg = $"TryRegisterClient <<< request is missing client name.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
             clientId = string.Empty;
             return false;
         }
 
+        // grab the client name for simplicity
         string clientName = registration.ClientName;
 
-        if (_smartIdsByName.ContainsKey(clientName))
+        // assign a new client id if this client already exists
+        clientId = clientName.Replace(" ", string.Empty); 
+        if (_clients.ContainsKey(clientId))
         {
-            _logger.LogWarning($"TryRegisterClient <<< request {clientName} already exists.");
-            clientId = string.Empty;
+            clientId = Guid.NewGuid().ToString();
+        }
+
+        //if (!registration.Keys.Any())
+        //{
+        //    _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing keys.");
+        //    clientId = string.Empty;
+        //    return false;
+        //}
+
+        // create our base client info
+        ClientInfo smartClient = new()
+        {
+            ClientId = clientId,
+            ClientName = clientName,
+            Registration = registration,
+        };
+
+        ProcessKeys(clientName, smartClient, registration.KeySet, messages);
+
+        if (!smartClient.Keys.Any())
+        {
+            string msg = $"TryRegisterClient <<< request {clientName} has no keys.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+        }
+
+        smartClient.Activity.Add(new()
+        {
+            RequestType = "registration",
+            Success = true,
+        });
+
+        _clients.Add(clientId, smartClient);
+
+        return true;
+    }
+
+    /// <summary>Process the keys.</summary>
+    /// <param name="clientName">  Name of the client.</param>
+    /// <param name="smartClient"> The smart client.</param>
+    /// <param name="keySet">The JSON Web Key Set.</param>
+    /// <param name="messages">    [out] The messages.</param>
+    /// <param name="jwksUrl">     (Optional) URL of the jwks.</param>
+    private void ProcessKeys(
+        string clientName,
+        ClientInfo smartClient,
+        JsonWebKeySet keySet,
+        List<string> messages,
+        string? jwksUrl = null)
+    {
+        foreach (JsonWebKey jwksKey in keySet.Keys)
+        {
+            if (string.IsNullOrEmpty(jwksKey.Alg))
+            {
+                string msg = $"TryRegisterClient <<< request {clientName} has a key missing the algorithm.";
+                messages.Add(msg);
+                _logger.LogWarning(msg);
+                continue;
+            }
+
+            if (!TryProcessKey(clientName, jwksKey, out SecurityKey resolvedKey, out List<string> subMessages))
+            {
+                if (subMessages.Any())
+                {
+                    messages.AddRange(subMessages);
+                }
+                string msg = $"TryRegisterClient <<< request {clientName}:{jwksKey.Alg} could not be processed and will not be available.";
+                messages.Add(msg);
+                _logger.LogWarning(msg);
+                continue;
+            }
+
+            string keyId = jwksKey.KeyId ?? jwksUrl ?? string.Empty;
+
+            // add or update this key
+            smartClient.Keys[keyId] = resolvedKey;
+        }
+    }
+
+    /// <summary>Attempts to process key.</summary>
+    /// <param name="clientName"> Name of the client.</param>
+    /// <param name="webKey">     The web key.</param>
+    /// <param name="securityKey">[out] The security key.</param>
+    /// <param name="messages">   [out] The messages.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    private bool TryProcessKey(
+        string clientName, 
+        JsonWebKey webKey, 
+        out SecurityKey securityKey,
+        out List<string> messages)
+    {
+        messages = new();
+
+        if (string.IsNullOrEmpty(webKey.Alg))
+        {
+            string msg = $"TryRegisterClient <<< request {clientName} has a key missing the algorithm (alg).";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+            securityKey = null!;
             return false;
         }
 
-        if (!registration.Keys.Any())
-        {
-            _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing keys.");
-            clientId = string.Empty;
-            return false;
-        }
+        SecurityKey? resolvedKey = null;
 
-        SmartClientRegistration.SmartJwksKey key = registration.Keys.First();
-
-        clientId = Guid.NewGuid().ToString();
-        
-        switch (key.Algorithm)
+        switch (webKey.Alg)
         {
             case "RS384":
                 {
-                    if (string.IsNullOrEmpty(key.RsaModulus))
+                    bool valid = true;
+
+                    if (string.IsNullOrEmpty(webKey.N))
                     {
-                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the RSA Modulus (n).");
-                        clientId = string.Empty;
-                        return false;
+                        string msg = $"TryRegisterClient <<< request {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA Modulus (n).";
+                        messages.Add(msg);
+                        _logger.LogWarning(msg);
+                        valid = false;
                     }
 
-                    if (string.IsNullOrEmpty(key.RsaExponent))
+                    if (string.IsNullOrEmpty(webKey.E))
                     {
-                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the RSA Exponent (e).");
-                        clientId = string.Empty;
-                        return false;
+                        string msg = $"TryRegisterClient <<< request {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA Exponent (e).";
+                        messages.Add(msg);
+                        _logger.LogWarning(msg);
+                        valid = false;
                     }
 
-                    using (System.Security.Cryptography.RSACryptoServiceProvider rsa = new())
+                    if (webKey.KeyOps.Contains("sign"))
                     {
-                        rsa.ImportParameters(new System.Security.Cryptography.RSAParameters()
+                        if (string.IsNullOrEmpty(webKey.D))
                         {
-                            Modulus = System.Text.Encoding.UTF8.GetBytes(key.RsaModulus),
-                            Exponent = System.Text.Encoding.UTF8.GetBytes(key.RsaExponent),
-                        });
+                            string msg = $"TryRegisterClient <<< signing key {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA Private Exponent (d).";
+                            messages.Add(msg);
+                            _logger.LogWarning(msg);
+                            valid = false;
+                        }
 
-                        _keysByIssuerId.Add(clientId, new RsaSecurityKey(rsa));
+                        if (string.IsNullOrEmpty(webKey.P))
+                        {
+                            string msg = $"TryRegisterClient <<< signing key {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA First Prime Factor (p).";
+                            messages.Add(msg);
+                            _logger.LogWarning(msg);
+                            valid = false;
+                        }
+
+                        if (string.IsNullOrEmpty(webKey.Q))
+                        {
+                            string msg = $"TryRegisterClient <<< signing key {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA Second Prime Factor (q).";
+                            messages.Add(msg);
+                            _logger.LogWarning(msg);
+                            valid = false;
+                        }
+
+                        if (string.IsNullOrEmpty(webKey.DP))
+                        {
+                            string msg = $"TryRegisterClient <<< signing key {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA FirstFactorCrtExponent (dp).";
+                            messages.Add(msg);
+                            _logger.LogWarning(msg);
+                            valid = false;
+                        }
+
+                        if (string.IsNullOrEmpty(webKey.DQ))
+                        {
+                            string msg = $"TryRegisterClient <<< signing key {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA SecondFactorCrtExponent (dq).";
+                            messages.Add(msg);
+                            _logger.LogWarning(msg);
+                            valid = false;
+                        }
+
+                        if (string.IsNullOrEmpty(webKey.QI))
+                        {
+                            string msg = $"TryRegisterClient <<< signing key {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the RSA FirstCrtCoefficient (qi).";
+                            messages.Add(msg);
+                            _logger.LogWarning(msg);
+                            valid = false;
+                        }
                     }
+
+                    if (!valid)
+                    {
+                        securityKey = null!;
+                        return false;
+                    }
+
+                    System.Security.Cryptography.RSACryptoServiceProvider rsa = new();
+
+                    rsa.ImportParameters(new System.Security.Cryptography.RSAParameters()
+                    {
+                        Modulus = Base64UrlEncoder.DecodeBytes(webKey.N),
+                        Exponent = Base64UrlEncoder.DecodeBytes(webKey.E),
+                        D = string.IsNullOrEmpty(webKey.D) ? null : Base64UrlEncoder.DecodeBytes(webKey.D),
+                        P = string.IsNullOrEmpty(webKey.P) ? null : Base64UrlEncoder.DecodeBytes(webKey.P),
+                        Q = string.IsNullOrEmpty(webKey.Q) ? null : Base64UrlEncoder.DecodeBytes(webKey.Q),
+                        DP = string.IsNullOrEmpty(webKey.DP) ? null : Base64UrlEncoder.DecodeBytes(webKey.DP),
+                        DQ = string.IsNullOrEmpty(webKey.DQ) ? null : Base64UrlEncoder.DecodeBytes(webKey.DQ),
+                        InverseQ = string.IsNullOrEmpty(webKey.QI) ? null : Base64UrlEncoder.DecodeBytes(webKey.QI),
+                    });
+
+                    resolvedKey = new RsaSecurityKey(rsa);
                 }
                 break;
 
             case "ES384":
                 {
-                    if (string.IsNullOrEmpty(key.EcdsaCurve))
+                    bool valid = true;
+
+                    if (string.IsNullOrEmpty(webKey.Crv))
                     {
-                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the ECDSA Curve (crv).");
-                        clientId = string.Empty;
+                        string msg = $"TryRegisterClient <<< request {clientName}:{webKey.Alg} is missing the ECDSA Curve (crv).";
+                        messages.Add(msg);
+                        _logger.LogWarning(msg);
+                        valid = false;
+                    }
+
+                    if (string.IsNullOrEmpty(webKey.X))
+                    {
+                        string msg = $"TryRegisterClient <<< request {clientName}:{webKey.Alg} is missing the ECDSA X coordinate (x).";
+                        messages.Add(msg);
+                        _logger.LogWarning(msg);
+                        valid = false;
+                    }
+
+                    if (string.IsNullOrEmpty(webKey.Y))
+                    {
+                        string msg = $"TryRegisterClient <<< request {clientName}:{webKey.Alg} is missing the ECDSA Y coordinate (y).";
+                        messages.Add(msg);
+                        _logger.LogWarning(msg);
+                        valid = false;
+                    }
+
+                    if (webKey.KeyOps.Contains("sign"))
+                    {
+                        if (string.IsNullOrEmpty(webKey.D))
+                        {
+                            string msg = $"TryRegisterClient <<< signing key {clientName}:{webKey.Alg}:{webKey.KeyId} is missing the ECC Private Key (d).";
+                            messages.Add(msg);
+                            _logger.LogWarning(msg);
+                            valid = false;
+                        }
+                    }
+
+                    if (!valid)
+                    {
+                        securityKey = null!;
                         return false;
                     }
 
-                    if (string.IsNullOrEmpty(key.EcdsaX))
-                    {
-                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the ECDSA X coordinate (x).");
-                        clientId = string.Empty;
-                        return false;
-                    }
+                    ECCurve curve;
 
-                    if (string.IsNullOrEmpty(key.EcdsaY))
+                    try
                     {
-                        _logger.LogWarning($"TryRegisterClient <<< request {clientName} is missing the ECDSA Y coordinate (y).");
-                        clientId = string.Empty;
-                        return false;
+                        // try to use the named curve
+                        curve = ECCurve.CreateFromFriendlyName(webKey.Crv);
                     }
-
-                    ECCurve curve = ECCurve.NamedCurves.nistP384;
+                    catch (Exception)
+                    {
+                        // assume it is the default curve
+                        curve = ECCurve.NamedCurves.nistP384;
+                    }
 
                     ECParameters parameters = new()
                     {
                         Curve = curve,
                         Q = new()
                         {
-                            X = System.Text.Encoding.UTF8.GetBytes(key.EcdsaX),
-                            Y = System.Text.Encoding.UTF8.GetBytes(key.EcdsaY),
+                            X = Base64UrlEncoder.DecodeBytes(webKey.X),
+                            Y = Base64UrlEncoder.DecodeBytes(webKey.Y),
                         },
+                        D = string.IsNullOrEmpty(webKey.D) ? null : Base64UrlEncoder.DecodeBytes(webKey.D),
                     };
 
-                    using (System.Security.Cryptography.ECDsa ecdsa = System.Security.Cryptography.ECDsaCng.Create(parameters))
-                    {
-                        _keysByIssuerId.Add(clientId, new ECDsaSecurityKey(ecdsa));
-                    }
+                    System.Security.Cryptography.ECDsa ecdsa = System.Security.Cryptography.ECDsaCng.Create(parameters);
+                    resolvedKey = new ECDsaSecurityKey(ecdsa);
                 }
                 break;
         }
 
-        _smartClientsById.Add(clientId, registration);
-        _smartIdsByName.Add(clientName, clientId);
+        if (resolvedKey == null)
+        {
+            string msg = $"TryRegisterClient <<< request {clientName}:{webKey.Alg} could not be resolved and will not be available.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+            securityKey = null!;
+            return false;
+        }
 
+        resolvedKey.KeyId = webKey.KeyId;
+
+        securityKey = resolvedKey;
         return true;
     }
 
@@ -773,29 +978,58 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     }
 
     /// <summary>Attempts to client assertion exchange.</summary>
-    /// <param name="tenant">             The tenant.</param>
+    /// <param name="tenantName">         The tenant.</param>
+    /// <param name="remoteIpAddress">    The remote IP address.</param>
     /// <param name="clientAssertionType">Type of the client assertion.</param>
     /// <param name="clientAssertion">    The client assertion.</param>
-    /// <param name="scope">              The scope.</param>
+    /// <param name="scopes">             The scopes.</param>
     /// <param name="response">           [out] The response.</param>
+    /// <param name="messages">           [out] The messages.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryClientAssertionExchange(
-        string tenant,
+        string tenantName,
+        string remoteIpAddress,
         string clientAssertionType,
         string clientAssertion,
         IEnumerable<string> scopes,
-        out AuthorizationInfo.SmartResponse response)
+        out AuthorizationInfo.SmartResponse response,
+        out List<string> messages)
     {
+        messages = new();
+
+        if (string.IsNullOrEmpty(tenantName))
+        {
+            string msg = $"TryClientAssertionExchange <<< request {clientAssertion} is missing the tenant.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+            response = null!;
+            return false;
+        }
+
+        if (!_tenants.TryGetValue(tenantName, out TenantConfiguration? tenant) ||
+            (tenant == null))
+        {
+            string msg = $"TryClientAssertionExchange <<< request {clientAssertion} has an unknown tenant {tenantName}.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+            response = null!;
+            return false;
+        }
+
         if (!clientAssertionType.Equals("urn:ietf:params:oauth:client-assertion-type:jwt-bearer"))
         {
-            _logger.LogWarning($"TryClientAssertionExchange <<< invalid client assertion type: {clientAssertionType}.");
+            string msg = $"TryClientAssertionExchange <<< invalid client assertion type: {clientAssertionType}.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
 
         if (string.IsNullOrEmpty(clientAssertion))
         {
-            _logger.LogWarning($"TryClientAssertionExchange <<< missing client assertion.");
+            string msg = $"TryClientAssertionExchange <<< missing client assertion.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
@@ -804,7 +1038,9 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
 
         if (!tokenHandler.CanReadToken(clientAssertion))
         {
-            _logger.LogWarning($"TryClientAssertionExchange <<< invalid client assertion.");
+            string msg = $"TryClientAssertionExchange <<< invalid client assertion.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
             response = null!;
             return false;
         }
@@ -812,164 +1048,279 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         // read the token so we can get the claims
         JwtSecurityToken jwtToken = tokenHandler.ReadJwtToken(clientAssertion);
 
-        string iss = jwtToken.Issuer;
-        string sub = jwtToken.Subject;
-        string aud = jwtToken.Audiences.Any() ? jwtToken.Audiences.First() : string.Empty;
+        //// check to see if we are an audience on the key
+        //if (!jwtToken.Audiences.Any(a => a.Equals(tenant.BaseUrl, StringComparison.OrdinalIgnoreCase)))
+        //{
+        //    string msg = $"TryClientAssertionExchange <<< client assertion audience is not valid against tenant {tenantName} ({tenant.BaseUrl}).";
+        //    messages.Add(msg);
+        //    _logger.LogWarning(msg);
+        //    response = null!;
+        //    return false;
+        //}
 
-        SmartClientRegistration? clientRegistration;
-        bool found;
+        string clientId = jwtToken.Issuer;
 
-        string? clientId;
-
-        // check to see if this token was issued by client name
-        if (_smartIdsByName.TryGetValue(iss, out clientId) && (!string.IsNullOrEmpty(clientId)))
+        if (!_clients.TryGetValue(clientId, out ClientInfo? smartClient))
         {
-            found = _smartClientsById.TryGetValue(clientId, out clientRegistration);
+            string msg = $"TryClientAssertionExchange <<< client assertion issuer {jwtToken.Issuer} is not a registered client.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+            response = null!;
+            return false;
+        }
+
+        // check to see if there is a keyset url
+        if (jwtToken.Header.TryGetValue("jku", out object? jku) &&
+            (jku != null) &&
+            (jku is string keySetUrl))
+        {
+            try
+            {
+                // use the keyset url to get the keys via http
+                using (HttpClient client = new())
+                {
+                    string keySetJson = client.GetStringAsync(keySetUrl).Result;
+                    JsonWebKeySet clientKeys = new(keySetJson);
+
+                    if (clientKeys == null)
+                    {
+                        string msg = $"TryClientAssertionExchange <<< failed to parse key set from: {keySetUrl}: retrieved {keySetJson}";
+                        messages.Add(msg);
+                        _logger.LogWarning(msg);
+                        response = null!;
+                        return false;
+                    }
+
+                    ProcessKeys(smartClient.ClientName, smartClient, clientKeys, messages, keySetUrl);
+                }
+            }
+            catch (Exception ex)
+            {
+                string msg = $"TryClientAssertionExchange <<< failed to retrieve key set (jku) from: {keySetUrl}: {ex.Message}";
+                messages.Add(msg);
+                _logger.LogWarning(msg);
+                response = null!;
+                return false;
+            }
         }
         else
         {
-            clientId = iss;
-            found = _smartClientsById.TryGetValue(iss, out clientRegistration);
+            keySetUrl = string.Empty;
         }
 
-        //if ((!found) || (clientAssertion == null))
-        //{
-        //    _logger.LogWarning($"TryClientAssertionExchange <<< client assertion issuer {iss} is not registered.");
-        //    response = null!;
-        //    return false;
-        //}
+        if (!jwtToken.Header.TryGetValue("kid", out object? kid) ||
+            (kid == null) ||
+            (kid is not string signingKeyId))
+        {
+            if (!string.IsNullOrEmpty(keySetUrl))
+            {
+                signingKeyId = keySetUrl;
+            }
+            else
+            {
+                string msg = $"TryClientAssertionExchange <<< client assertion does not have a key id (kid).";
+                messages.Add(msg);
+                _logger.LogWarning(msg);
+                response = null!;
 
-        //if (!_keysByIssuerId.TryGetValue(resolvedId, out SecurityKey? key) || (key == null))
-        //{
-        //    _logger.LogWarning($"TryClientAssertionExchange <<< client assertion issuer {iss} does not have any security keys.");
-        //    response = null!;
-        //    return false;
-        //}
+                smartClient.Activity.Add(new()
+                {
+                    RequestType = "client_assertion",
+                    Success = false,
+                    Message = msg
+                });
 
-        //TokenValidationParameters tokenValidationParameters = new()
-        //{
-        //    ValidateIssuer = true,
-        //    //ValidateAudience = true,
-        //    ValidateLifetime = true,
-        //    ValidateIssuerSigningKey = true,
-        //    ValidIssuer = iss,
-        //    //ValidAudience = _serverConfig.BaseUrl,
-        //    IssuerSigningKey = key,
-        //};
+                return false;
+            }
+        }
 
-        //System.Security.Claims.ClaimsPrincipal claims = tokenHandler.ValidateToken(clientAssertion, tokenValidationParameters, out SecurityToken validatedToken);
+        if (!smartClient.Keys.Any())
+        {
+            string msg = $"TryClientAssertionExchange <<< client has NO keys.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+            response = null!;
 
-        //response = null!;
-        //return false;
+            smartClient.Activity.Add(new()
+            {
+                RequestType = "client_assertion",
+                Success = false,
+                Message = msg
+            });
+
+            return false;
+        }
+
+        if (!smartClient.Keys.TryGetValue(signingKeyId, out SecurityKey? signingKey) ||
+            (signingKey == null))
+        {
+            string msg = $"TryClientAssertionExchange <<< client assertion signing key id (kid) {signingKeyId} was not found in client {clientId}.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+            response = null!;
+
+            smartClient.Activity.Add(new()
+            {
+                RequestType = "client_assertion",
+                Success = false,
+                Message = msg
+            });
+
+            return false;
+        }
+
+        TokenValidationParameters tokenValidationParameters;
+
+        // for debugging, we want to test each component alone
+        bool tokenIsValid = true;
+
+        try
+        {
+            tokenValidationParameters = new()
+            {
+                ValidateLifetime = false,
+                ValidateAudience = false,
+                ValidateIssuer = false,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKeys = smartClient.Keys.Values,
+            };
+
+            tokenHandler.ValidateToken(clientAssertion, tokenValidationParameters, out SecurityToken validatedToken);
+        }
+        catch (Exception ex)
+        {
+            tokenIsValid = false;
+            string msg = ex.InnerException == null
+                ? $"TryClientAssertionExchange <<< token validation failed: {ex.Message}."
+                : $"TryClientAssertionExchange <<< token validation failed: {ex.Message}:{ex.InnerException.Message}.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+        }
+
+        try
+        {
+            tokenValidationParameters = new()
+            {
+                ValidateLifetime = false,
+                ValidateAudience = false,
+                ValidateIssuerSigningKey = false,
+                ValidateIssuer = true,
+                ValidIssuer = clientId,
+                IssuerSigningKeys = smartClient.Keys.Values,
+            };
+
+            tokenHandler.ValidateToken(clientAssertion, tokenValidationParameters, out SecurityToken validatedToken);
+        }
+        catch (Exception ex)
+        {
+            tokenIsValid = false;
+            string msg = ex.InnerException == null
+                ? $"TryClientAssertionExchange <<< token validation failed: {ex.Message}."
+                : $"TryClientAssertionExchange <<< token validation failed: {ex.Message}:{ex.InnerException.Message}.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+        }
+
+        try
+        {
+            tokenValidationParameters = new()
+            {
+                ValidateLifetime = false,
+                ValidateIssuer = false,
+                ValidateIssuerSigningKey = false,
+                ValidateAudience = true,
+                ValidAudience = tenant.BaseUrl,
+                IssuerSigningKeys = smartClient.Keys.Values,
+            };
+
+            tokenHandler.ValidateToken(clientAssertion, tokenValidationParameters, out SecurityToken validatedToken);
+        }
+        catch (Exception ex)
+        {
+            tokenIsValid = false;
+            string msg = ex.InnerException == null
+                ? $"TryClientAssertionExchange <<< token validation failed: {ex.Message}."
+                : $"TryClientAssertionExchange <<< token validation failed: {ex.Message}:{ex.InnerException.Message}.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+        }
+
+        try
+        {
+            tokenValidationParameters = new()
+            {
+                ValidateAudience = false,
+                ValidateIssuer = false,
+                ValidateIssuerSigningKey = false,
+                ValidateLifetime = true,
+                RequireExpirationTime = true,
+                IssuerSigningKeys = smartClient.Keys.Values,
+            };
+
+            tokenHandler.ValidateToken(clientAssertion, tokenValidationParameters, out SecurityToken validatedToken);
+        }
+        catch (Exception ex)
+        {
+            tokenIsValid = false;
+            string msg = ex.InnerException == null
+                ? $"TryClientAssertionExchange <<< token validation failed: {ex.Message}."
+                : $"TryClientAssertionExchange <<< token validation failed: {ex.Message}:{ex.InnerException.Message}.";
+            messages.Add(msg);
+            _logger.LogWarning(msg);
+        }
+
+        if (!tokenIsValid)
+        {
+            response = null!;
+
+            smartClient.Activity.Add(new()
+            {
+                RequestType = "client_assertion",
+                Success = false,
+                Message = $"Failed to validate client assertion: {clientAssertion}\n" + string.Join("\n", messages),
+            });
+
+            return false;
+        }
 
         string code = Guid.NewGuid().ToString();
-        string key = tenant + ":" + code;
-
-        if (string.IsNullOrEmpty(tenant))
-        {
-            string msg = $"TryClientAssertionExchange <<< request {clientAssertion} is missing the tenant.";
-            _logger.LogWarning(msg);
-            response = null!;
-            return false;
-        }
-
-        if (string.IsNullOrEmpty(clientId))
-        {
-            string msg = $"TryCreateSmartResponse <<< request {clientAssertion} is missing the client id.";
-            _logger.LogWarning(msg);
-            response = null!;
-            return false;
-        }
-
-        //if (!local.Tenant.Equals(tenant, StringComparison.OrdinalIgnoreCase))
-        //{
-        //    string msg = $"TryCreateSmartResponse <<< {key} tenant ({local.Tenant}) does not match request: {tenant}.";
-        //    local.Activity.Add(new()
-        //    {
-        //        RequestType = "authorization_code",
-        //        Success = false,
-        //        Message = msg,
-        //    });
-        //    _logger.LogWarning(msg);
-        //    response = null!;
-        //    return false;
-        //}
-
-        //if (!clientId.Equals(local.RequestParameters.ClientId, StringComparison.Ordinal))
-        //{
-        //    string msg = $"TryCreateSmartResponse <<< {key} client ({local.RequestParameters.ClientId}) does not match request: {clientId}.";
-        //    local.Activity.Add(new()
-        //    {
-        //        RequestType = "authorization_code",
-        //        Success = false,
-        //        Message = msg,
-        //    });
-        //    _logger.LogWarning(msg);
-        //    response = null!;
-        //    return false;
-        //}
 
         ExtractScopes(scopes, out HashSet<string> userScopes, out HashSet<string> patientScopes);
-        //local.UserScopes = userScopes;
-        //local.PatientScopes = patientScopes;
 
-        //// check for 'special' code
-        //if (code.Equals(Guid.Empty.ToString()))
-        //{
-        //    // update our last access
-        //    local.LastAccessed = DateTimeOffset.UtcNow;
-
-        //    // create our response
-        //    local.Response = new()
-        //    {
-        //        PatientId = local.LaunchPatient,
-        //        TokenType = "bearer",
-        //        Scopes = string.Join(" ", permittedScopes),
-        //        ClientId = local.RequestParameters.ClientId,
-        //        IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
-        //        AccessToken = code + "_" + code,
-        //        RefreshToken = code + "_" + code,
-        //    };
-        //}
-        //else
-        //{
-        //    // update our last access and expiration
-        //    local.LastAccessed = DateTimeOffset.UtcNow;
-        //    local.Expires = DateTimeOffset.UtcNow.AddMinutes(_tokenExpirationMinutes);
-
-        //    // create our response
-        //    local.Response = new()
-        //    {
-        //        PatientId = local.LaunchPatient,
-        //        TokenType = "bearer",
-        //        Scopes = string.Join(" ", permittedScopes),
-        //        ClientId = local.RequestParameters.ClientId,
-        //        IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, local),
-        //        AccessToken = code + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
-        //        RefreshToken = code + "_" + Guid.NewGuid().ToString()
-        //    };
-        //}
-
-        //local.Activity.Add(new()
-        //{
-        //    RequestType = "authorization_code",
-        //    Success = true,
-        //    Message = $"Granted access token: {local.Response.AccessToken}, refresh token: {local.Response.RefreshToken}"
-        //});
-
-        //response = local.Response!;
-        //return true;
-
+        DateTime expiration = DateTime.UtcNow.AddHours(24);
 
         response = new()
         {
             TokenType = "bearer",
             Scopes = string.Join(" ", scopes),
             ClientId = clientId,
-            IdToken = GenerateIdJwt(_tenants[tenant].BaseUrl, clientId, clientId, DateTime.UtcNow.AddHours(24), _tenants[tenant].BaseUrl),
+            IdToken = GenerateIdJwt(_tenants[tenantName].BaseUrl, clientId, clientId, expiration, _tenants[tenantName].BaseUrl),
             AccessToken = code + "_" + Guid.NewGuid().ToString(),    // GenerateAccessJwt(_tenants[tenant].BaseUrl, local),
             RefreshToken = code + "_" + Guid.NewGuid().ToString()
         };
+
+        AuthorizationInfo auth = new()
+        {
+            Key = code,
+            Tenant = tenantName,
+            RemoteIpAddress = remoteIpAddress,
+            RequestParameters = new()
+            {
+                ClientId = clientId,
+                Scope = string.Join(" ", scopes),
+                Audience = tenant.BaseUrl,
+            },
+            Expires = new DateTimeOffset(expiration).ToUniversalTime(),
+        };
+
+        _authorizations.Add(tenantName + ":" + code, auth);
+
+        smartClient.Activity.Add(new()
+        {
+            RequestType = "client_assertion",
+            Success = true,
+            Message = $"Granted access token: {response.AccessToken}, refresh token: {response.RefreshToken}"
+        });
 
         return true;
     }
@@ -1208,6 +1559,48 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         return true;
     }
 
+    /// <summary>Generates a signed jwt.</summary>
+    /// <param name="issuer">    The issuer.</param>
+    /// <param name="subject">   The subject.</param>
+    /// <param name="audience">  URL of the EHR resource server from which the app wishes to retrieve
+    ///  FHIR data.</param>
+    /// <param name="expiration">The expiration Date/Time.</param>
+    /// <param name="webKey">    The web key.</param>
+    /// <param name="jti">       (Optional) The jti.</param>
+    /// <returns>The signed jwt.</returns>
+    public string GenerateSignedJwt(
+        string issuer,
+        string subject,
+        string audience,
+        string jti,
+        DateTime expiration,
+        JsonWebKey webKey)
+    {
+        JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
+        SecurityTokenDescriptor tokenDescriptor = new()
+        {
+            Subject = new System.Security.Claims.ClaimsIdentity(new System.Security.Claims.Claim[]
+            {
+                //new("iss", issuer),
+                new("sub", subject),
+                //new("aud", audience),
+                new("jti", jti),
+            }),
+            Expires = expiration,
+            Audience = audience,
+            Issuer = issuer,
+            IssuedAt = DateTime.UtcNow,
+        };
+
+        if (TryProcessKey(issuer, webKey, out SecurityKey securityKey, out _))
+        {
+            tokenDescriptor.SigningCredentials = new SigningCredentials(securityKey, webKey.Alg);
+        }
+
+        SecurityToken token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+
     /// <summary>Generates an id-token jwt.</summary>
     /// <param name="rootUrl">URL of the root.</param>
     /// <param name="auth">   [out] The authentication.</param>
@@ -1235,6 +1628,14 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         return tokenHandler.WriteToken(token);
     }
 
+    /// <summary>Generates an id-token jwt.</summary>
+    /// <param name="rootUrl"> URL of the root.</param>
+    /// <param name="subRoot"> The sub root.</param>
+    /// <param name="userId">  Identifier for the user.</param>
+    /// <param name="expires"> The expires Date/Time.</param>
+    /// <param name="audience">URL of the EHR resource server from which the app wishes to retrieve
+    ///  FHIR data.</param>
+    /// <returns>The identifier jwt.</returns>
     internal string GenerateIdJwt(
         string rootUrl, 
         string subRoot, 
@@ -1289,7 +1690,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             {
                 GrantTypes = new string[]
                 {
-                        "authorization_code",
+                    "authorization_code",
                 },
                 AuthorizationEndpoint = $"{_serverConfig.PublicUrl}/_smart/{name}/authorize",
                 TokenEndpoint = $"{_serverConfig.PublicUrl}/_smart/{name}/token",

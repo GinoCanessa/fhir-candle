@@ -1,0 +1,98 @@
+﻿@page "/smart/clients"
+@using FhirCandle.Smart
+@using Microsoft.IdentityModel.Tokens
+
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
+
+@implements IDisposable
+
+<PageTitle>SMART Clients</PageTitle>
+
+<MudStack Row="true" Spacing="3" Class="ma-2">
+    <MudButton Href="/smart/client_register" Variant="Variant.Filled" Color="Color.Primary">Register New Client</MudButton>
+</MudStack>
+
+@if (!AuthManager.SmartClients.Any())
+{
+    <MudText>No SMART clients have been registered.</MudText>
+}
+else
+{
+    <MudGrid>
+        @foreach (ClientInfo smartClient in AuthManager.SmartClients.Values.OrderBy(sc => sc.ClientName))
+        {
+            <MudItem>
+                <MudCard Outlined="true" Class="mx-6 my-4">
+                    <MudCardContent>
+                        <MudField Label="Client Name">@smartClient.ClientName</MudField>
+                        <MudField Label="Client ID">@smartClient.ClientId</MudField>
+
+                        @if (smartClient.Registration != null)
+                        {
+                            @if (!string.IsNullOrEmpty(smartClient.Registration.JwksUri))
+                            {
+                                <MudField Label="JWKS URI">@smartClient.Registration.JwksUri</MudField>
+                            }
+
+                            @foreach (JsonWebKey key in (smartClient.Registration.KeySet.Keys ?? Enumerable.Empty<JsonWebKey>()))
+                            {
+                                <MudField Label="Key Info">@(key.Alg + ": " + key.KeyId)</MudField>
+                            }
+                        }
+
+                        @if (smartClient.Activity.Any())
+                        {
+                            @foreach (ClientInfo.ClientActivityRecord activity in smartClient.Activity.OrderByDescending(a => a.Timestamp).Take(3))
+                            {
+                                <MudField Label="Activity">@(activity.RequestType + " " + activity.Timestamp.ToString("o") + " " + activity.Success)</MudField>
+                                @if (!string.IsNullOrEmpty(activity.Message))
+                                {
+                                    <MudField Label="Message">@activity.Message</MudField>
+                                }
+                            }
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        NavTracker?.NotifyNav("SMART Clients", $"/smart/clients", 1);
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/smart/clients", StringComparison.Ordinal))
+        {
+            NavTracker?.NotifyNav("SMART Clients", $"/smart/clients", 1);
+        }
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        // if (_store != null)
+        // {
+        // }
+    }
+}

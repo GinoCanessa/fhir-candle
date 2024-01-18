@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Http.Extensions;
 
 //using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using static Org.BouncyCastle.Bcpg.Attr.ImageAttrib;
 
 namespace fhir.candle.Controllers;
@@ -326,13 +327,18 @@ public class SmartController : ControllerBase
                     {
                         if (!_smartAuthManager.TryClientAssertionExchange(
                                 storeName,
+                                Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
                                 clientAssertionType,
                                 clientAssertion,
                                 scopes,
-                                out smart))
+                                out smart,
+                                out List<string> messages))
                         {
                             _logger.LogWarning($"PostSmartTokenRequest <<< exchange client assertion {clientAssertion} failed!");
-                            Response.StatusCode = 400;
+                            
+                            Response.ContentType = "text/plain";
+                            Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                            await Response.WriteAsync(string.Join("\n", messages));
                             return;
                         }
                     }
@@ -407,24 +413,35 @@ public class SmartController : ControllerBase
             {
                 string content = await reader.ReadToEndAsync();
 
-                // deserialize the json content into a SmartClientRegistration
-                SmartClientRegistration? smartClientRegistration = System.Text.Json.JsonSerializer.Deserialize<SmartClientRegistration>(content);
+                // pull the key set
+                JsonWebKeySet clientKeySet = new(content);
 
+                // pull any other elements
+                SmartClientRegistration? smartClientRegistration = System.Text.Json.JsonSerializer.Deserialize<SmartClientRegistration>(content);
                 if (smartClientRegistration == null)
                 {
-                    Response.StatusCode = 400;
+                    Response.ContentType = "text/plain";
+                    Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    await Response.WriteAsync($"Parsing of content failed!\nInvalid content:\n----\n{content}\n----");
                     return;
                 }
 
+                smartClientRegistration.KeySet = clientKeySet;
+
                 // operation
-                bool success = _smartAuthManager.TryRegisterClient(smartClientRegistration, out string clientId);
+                bool success = _smartAuthManager.TryRegisterClient(
+                    smartClientRegistration, 
+                    out string clientId,
+                    out List<string> messages);
 
                 if (!success)
                 {
-                    string msg = "PostSmartRegistrationRequest <<< TryRegisterClient failed.";
+                    _logger.LogError("PostSmartRegistrationRequest <<< TryRegisterClient failed.");
 
-                    _logger.LogError(msg);
-                    Response.StatusCode = 500;
+                    Response.ContentType = "text/plain";
+                    Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    await Response.WriteAsync(string.Join("\n", messages));
+
                     return;
                 }
 

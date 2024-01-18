@@ -5165,7 +5165,7 @@ public partial class VersionedFhirStore : IFhirStore
                     new Extension("token", new FhirUri($"{_config.BaseUrl.Replace("/fhir/", "/_smart/")}/token")),
                     new Extension("authorize", new FhirUri($"{_config.BaseUrl.Replace("/fhir/", "/_smart/")}/authorize")),
                     new Extension("register", new FhirUri($"{_config.BaseUrl.Replace("/fhir/", "/_smart/")}/register")),
-                    new Extension("manage", new FhirUri($"{_config.BaseUrl.Replace("/fhir/", "/smart/")}/clients")),
+                    new Extension("manage", new FhirUri($"{_config.BaseUrl.Replace("/fhir/", "/")}/clients")),
                 }
             };
 

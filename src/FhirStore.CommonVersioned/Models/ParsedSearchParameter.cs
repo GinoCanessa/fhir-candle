@@ -154,6 +154,7 @@ public class ParsedSearchParameter
     /// <param name="modifierCode">   The search modifier code.</param>
     /// <param name="value">          The http-paramter value string.</param>
     /// <param name="spd">            The search parameter definition.</param>
+    /// <param name="component">      (Optional) The component.</param>
     [SetsRequiredMembers]
     public ParsedSearchParameter(
         VersionedFhirStore store,
@@ -163,15 +164,15 @@ public class ParsedSearchParameter
         string modifierLiteral,
         SearchModifierCodes modifierCode,
         string value,
-        ModelInfo.SearchParamDefinition? spd)
+        ModelInfo.SearchParamDefinition? spd,
+        ModelInfo.SearchParamComponent? component = null)
     {
         Name = name;
         ResourceType = resourceType;
         Modifier = modifierCode;
         ModifierLiteral = modifierLiteral;
 
-        if ((spd == null) ||
-            string.IsNullOrEmpty(spd.Expression))
+        if ((spd == null) || string.IsNullOrEmpty(spd.Expression))
         {
             ParamType = spd?.Type ?? SearchParamType.Special;
             SelectExpression = string.Empty;
@@ -181,21 +182,78 @@ public class ParsedSearchParameter
             return;
         }
 
-        ParamType = spd.Type;
-        SelectExpression = spd.Expression;
-        CompiledExpression = store.GetCompiledSearchParameter(spd.Resource ?? string.Empty, name, SelectExpression);
+        ModelInfo.SearchParamDefinition definition = spd;
 
-        if (spd.Type == SearchParamType.Composite)
+        // use the component first
+        if (component != null)
         {
-            ExtractCompositeParams(store, resourceStore, value, out List<ParsedSearchParameter> cpValues);
+            // need to resolve component URL
+            if (!resourceStore.TryGetSearchParamDefinition(component.Value.Definition, out ModelInfo.SearchParamDefinition? componentDefinition))
+            {
+                // ignore this parameter
+                ParamType = SearchParamType.Special;
+                SelectExpression = string.Empty;
+                CompiledExpression = null;
+                Values = Array.Empty<string>();
+                IgnoredParameter = true;
+                return;
+            }
 
-            CompositeComponents = cpValues.ToArray();
+            definition = componentDefinition;
+            Name = componentDefinition.Name ?? Name;
+            ParamType = componentDefinition.Type;
+            SelectExpression = string.IsNullOrEmpty(component.Value.Expression) ? componentDefinition.Expression ?? string.Empty : component.Value.Expression;
 
-            // we do not want to run composite parameters through the normal parsing logic
-            Prefixes = Array.Empty<SearchPrefixCodes?>();
-            Values = Array.Empty<string>();
+            if (string.IsNullOrEmpty(SelectExpression))
+            {
+                // ignore this parameter
+                ParamType = SearchParamType.Special;
+                SelectExpression = string.Empty;
+                CompiledExpression = null;
+                Values = Array.Empty<string>();
+                IgnoredParameter = true;
+                return;
+            }
 
-            return;
+            CompiledExpression = store.GetCompiledSearchParameter(spd.Resource ?? string.Empty, $"{spd.Name}${componentDefinition.Name}", SelectExpression);
+        }
+        else
+        {
+            ParamType = spd.Type;
+            SelectExpression = spd.Expression ?? string.Empty;
+            CompiledExpression = store.GetCompiledSearchParameter(spd.Resource ?? string.Empty, name, SelectExpression);
+
+            if (spd.Type == SearchParamType.Composite)
+            {
+                if (!(spd.Component?.Any() ?? false))
+                {
+                    // ignore this parameter
+                    ParamType = SearchParamType.Special;
+                    SelectExpression = string.Empty;
+                    CompiledExpression = null;
+                    Values = Array.Empty<string>();
+                    IgnoredParameter = true;
+                    return;
+                }
+
+                ExtractCompositeParams(
+                    store, 
+                    resourceStore, 
+                    resourceType, 
+                    spd, 
+                    modifierLiteral,
+                    modifierCode,
+                    value, 
+                    out List<ParsedSearchParameter> cpValues);
+
+                CompositeComponents = cpValues.ToArray();
+
+                // we do not want to run composite parameters through the normal parsing logic
+                Prefixes = Array.Empty<SearchPrefixCodes?>();
+                Values = Array.Empty<string>();
+
+                return;
+            }
         }
 
         if (string.IsNullOrEmpty(value))
@@ -206,7 +264,7 @@ public class ParsedSearchParameter
         }
 
         // parse the value string into prefixes and values
-        ExtractValues(value, spd);
+        ExtractValues(value, definition);
 
         if (Values == null)
         {
@@ -216,7 +274,7 @@ public class ParsedSearchParameter
         // by default, assume all values are applied (will be updated during typed parsing)
         IgnoredValueFlags = Enumerable.Repeat(false, Values.Length).ToArray<bool>();
 
-        ProcessTypedValues(value, spd);
+        ProcessTypedValues(value, definition);
 
         // check for no valid values to apply
         if (IgnoredValueFlags.Any() && IgnoredValueFlags.All(x => x))
@@ -289,7 +347,26 @@ public class ParsedSearchParameter
 
         if (parseResult.SearchParameterDefinition.Type == SearchParamType.Composite)
         {
-            ExtractCompositeParams(store, resourceStore, value, out List<ParsedSearchParameter> cpValues);
+            if (!(parseResult.SearchParameterDefinition.Component?.Any() ?? false))
+            {
+                // ignore this parameter
+                ParamType = SearchParamType.Special;
+                SelectExpression = string.Empty;
+                CompiledExpression = null;
+                Values = Array.Empty<string>();
+                IgnoredParameter = true;
+                return;
+            }
+
+            ExtractCompositeParams(
+                store, 
+                resourceStore, 
+                ResourceType, 
+                parseResult.SearchParameterDefinition, 
+                parseResult.ModifierLiteral,
+                parseResult.ModifierCode,
+                value,
+                out List<ParsedSearchParameter> cpValues);
 
             CompositeComponents = cpValues.ToArray();
 
@@ -348,8 +425,9 @@ public class ParsedSearchParameter
     }
 
     /// <summary>Gets applied query string.</summary>
+    /// <param name="includeName">(Optional) True to include, false to exclude the name.</param>
     /// <returns>The applied query string.</returns>
-    public string GetAppliedQueryString()
+    public string GetAppliedQueryString(bool includeName = true)
     {
         if (IgnoredParameter)
         {
@@ -361,29 +439,28 @@ public class ParsedSearchParameter
         // nest into chained parameters
         if (ChainedParameters?.Any() ?? false)
         {
-            sb.Append(Name);
-
-            if (Modifier != SearchModifierCodes.None)
+            if (includeName)
             {
-                sb.Append(':');
-                sb.Append(ModifierLiteral);
+                sb.Append(Name);
+
+                if (Modifier != SearchModifierCodes.None)
+                {
+                    sb.Append(':');
+                    sb.Append(ModifierLiteral);
+                }
+
+                sb.Append('.');
             }
 
-            sb.Append('.');
-            sb.Append(ChainedParameters.First().Value.GetAppliedQueryString());
+            sb.Append(ChainedParameters.First().Value.GetAppliedQueryString(includeName));
 
             return sb.ToString();
         }
 
-        // iterate across values 
-        for (int i = 0; i < Values.Length; i++)
+        // nest into composite parameters
+        if (CompositeComponents?.Any() ?? false)
         {
-            if (IgnoredValueFlags[i])
-            {
-                continue;
-            }
-
-            if (sb.Length == 0)
+            if (includeName)
             {
                 sb.Append(Name);
 
@@ -395,7 +472,41 @@ public class ParsedSearchParameter
 
                 sb.Append("=");
             }
-            else
+
+            sb.Append(string.Join('$', CompositeComponents.Select(c => c.GetAppliedQueryString(false))));
+
+            return sb.ToString();
+            //sb.Append(string.Join('$', CompositeComponents.SelectMany(c => c.Values)));
+        }
+
+        // iterate across values 
+        for (int i = 0; i < Values.Length; i++)
+        {
+            if (IgnoredValueFlags[i])
+            {
+                continue;
+            }
+
+            if (includeName)
+            {
+                if (sb.Length == 0)
+                {
+                    sb.Append(Name);
+
+                    if (Modifier != SearchModifierCodes.None)
+                    {
+                        sb.Append(':');
+                        sb.Append(ModifierLiteral);
+                    }
+
+                    sb.Append("=");
+                }
+                else
+                {
+                    sb.Append(',');
+                }
+            }
+            else if (sb.Length != 0)
             {
                 sb.Append(',');
             }
@@ -419,19 +530,45 @@ public class ParsedSearchParameter
     private static void ExtractCompositeParams(
         VersionedFhirStore store,
         IVersionedResourceStore resourceStore,
+        string resourceType,
+        ModelInfo.SearchParamDefinition spd,
+        string modifierLiteral,
+        SearchModifierCodes modifierCode,
         string value,
         out List<ParsedSearchParameter> cpValues)
     {
         cpValues = new();
-        List<string> compositeValues = new();
 
-        // TODO: no point finishing this until it is in the SDK
-        //string[] split = value.Split('$');
+        if (!(spd.Component?.Any() ?? false))
+        {
+            // ignore this parameter
+            return;
+        }
 
-        //foreach (string cv in split)
-        //{
+        string[] split = value.Split('$');
 
-        //}
+        if (split.Length != spd.Component.Length)
+        {
+            // ignore this parameter
+            return;
+        }
+
+        for (int i = 0; i < split.Length; i++)
+        {
+            // create new search parameters for each component
+
+            // create the composite parameter
+            cpValues.Add(new ParsedSearchParameter(
+                store,
+                resourceStore,
+                resourceType,
+                spd.Name ?? spd.Code ?? string.Empty,
+                modifierLiteral,
+                modifierCode,
+                split[i],
+                spd,
+                spd.Component[i]));
+        }
 
         // note this is wrong - composite parameters do not contain the name of the parameter
         //// work backwards through the composite values so we can understand multi-valued components

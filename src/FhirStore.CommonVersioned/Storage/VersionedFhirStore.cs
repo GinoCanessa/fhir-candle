@@ -27,6 +27,8 @@ using System.Security.AccessControl;
 using System.Reflection.Metadata;
 using static Hl7.Fhir.Model.VerificationResult;
 using System.Linq;
+using Hl7.Fhir.Utility;
+using System.Diagnostics.CodeAnalysis;
 
 namespace FhirCandle.Storage;
 
@@ -2486,25 +2488,24 @@ public partial class VersionedFhirStore : IFhirStore
     /// Attempts to get search parameter definition a ModelInfo.SearchParamDefinition from the given
     /// string.
     /// </summary>
-    /// <param name="resource">    [out] The resource.</param>
-    /// <param name="name">        The name.</param>
+    /// <param name="resourceName">    [out] The resource.</param>
+    /// <param name="spName">        The name.</param>
     /// <param name="spDefinition">[out] The sp definition.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryGetSearchParamDefinition(string resource, string name, out ModelInfo.SearchParamDefinition? spDefinition)
+    public bool TryGetSearchParamDefinition(string resourceName, string spName, out ModelInfo.SearchParamDefinition? spDefinition)
     {
-        if (!_store.ContainsKey(resource))
+        if (!_store.TryGetValue(resourceName, out IVersionedResourceStore? resourceStore))
         {
             spDefinition = null;
             return false;
         }
 
-        if (ParsedSearchParameter._allResourceParameters.ContainsKey(name))
+        if (ParsedSearchParameter._allResourceParameters.TryGetValue(spName, out spDefinition))
         {
-            spDefinition = ParsedSearchParameter._allResourceParameters[name];
             return true;
         }
 
-        return _store[resource].TryGetSearchParamDefinition(name, out spDefinition);
+        return resourceStore.TryGetSearchParamDefinition(spName, out spDefinition);
     }
 
     /// <summary>Compile FHIR path criteria.</summary>

@@ -1,39 +1,34 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-	<VersionPrefix>$([System.DateTime]::Now.ToString("yyyy.MMdd.HHmm"))</VersionPrefix>
-	<Version>$(VersionPrefix)</Version>
-	<AssemblyVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</AssemblyVersion>
-	<FileVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</FileVersion>
-	<RootNamespace>fhir.candle.Tests</RootNamespace>
+    <VersionPrefix>$([System.DateTime]::Now.ToString("yyyy.MMdd.HHmm"))</VersionPrefix>
+    <Version>$(VersionPrefix)</Version>
+    <AssemblyVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</AssemblyVersion>
+    <FileVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</FileVersion>
+    <RootNamespace>fhir.candle.Tests</RootNamespace>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="xunit" Version="2.6.5" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="xunit" Version="2.7.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="coverlet.collector" Version="6.0.0">
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-
-	<PackageReference Include="Hl7.Fhir.R4" Version="5.5.0" Aliases="coreR4" />
-	<PackageReference Include="Hl7.Fhir.R4B" Version="5.5.0" Aliases="coreR4B" />
-	<PackageReference Include="Hl7.Fhir.R5" Version="5.5.0" Aliases="coreR5" />
+    <PackageReference Include="Hl7.Fhir.R4" Version="5.7.0" Aliases="coreR4" />
+    <PackageReference Include="Hl7.Fhir.R4B" Version="5.7.0" Aliases="coreR4B" />
+    <PackageReference Include="Hl7.Fhir.R5" Version="5.7.0" Aliases="coreR5" />
   </ItemGroup>
-
   <ItemGroup>
     <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\FhirCandle.Ui.R4\FhirCandle.Ui.R4.csproj" />
     <ProjectReference Include="..\FhirStore.Common\FhirCandle.Common.csproj" />
@@ -42,19 +37,18 @@
     <ProjectReference Include="..\FhirStore.R4B\FhirCandle.R4B.csproj" />
     <ProjectReference Include="..\FhirStore.R5\FhirCandle.R5.csproj" />
   </ItemGroup>
-
   <Target Name="AddPackageAliases" BeforeTargets="ResolveReferences" Outputs="%(PackageReference.Identity)">
     <ItemGroup>
-        <ReferencePath Condition="'%(FileName)'=='FhirCandle.R4'">
-            <Aliases>candleR4</Aliases>
-        </ReferencePath>
-        <ReferencePath Condition="'%(FileName)'=='FhirCandle.R4B'">
-            <Aliases>candleR4B</Aliases>
-        </ReferencePath>
-        <ReferencePath Condition="'%(FileName)'=='FhirCandle.R5'">
-            <Aliases>candleR5</Aliases>
-        </ReferencePath>
-        <!--<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4.Core'">
+      <ReferencePath Condition="'%(FileName)'=='FhirCandle.R4'">
+        <Aliases>candleR4</Aliases>
+      </ReferencePath>
+      <ReferencePath Condition="'%(FileName)'=='FhirCandle.R4B'">
+        <Aliases>candleR4B</Aliases>
+      </ReferencePath>
+      <ReferencePath Condition="'%(FileName)'=='FhirCandle.R5'">
+        <Aliases>candleR5</Aliases>
+      </ReferencePath>
+      <!--<ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4.Core'">
             <Aliases>coreR4</Aliases>
         </ReferencePath>
         <ReferencePath Condition="'%(FileName)'=='Hl7.Fhir.R4B.Core'">
@@ -65,7 +59,6 @@
         </ReferencePath>-->
     </ItemGroup>
   </Target>
-	
   <ItemGroup>
     <None Remove="data\common\" />
   </ItemGroup>
@@ -92,7 +85,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
   <ItemGroup>
     <Folder Include="data\common\" />
   </ItemGroup>

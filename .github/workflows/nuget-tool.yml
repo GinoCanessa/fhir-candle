@@ -13,7 +13,7 @@ jobs:
 
     - uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '7'
+        dotnet-version: '8'
 
         # Note that we need to pack twice because of an issue with staticwebassets.
     - name: Build and Publish

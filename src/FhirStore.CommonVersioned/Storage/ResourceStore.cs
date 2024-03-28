@@ -17,6 +17,7 @@ using System.Net;
 using FhirCandle.Serialization;
 using Hl7.Fhir.Language.Debugging;
 using FhirCandle.Interactions;
+using System.Diagnostics.CodeAnalysis;
 
 namespace FhirCandle.Storage;
 
@@ -60,6 +61,9 @@ public class ResourceStore<T> : IVersionedResourceStore
 
     /// <summary>The search parameters for this resource, by Name.</summary>
     private Dictionary<string, ModelInfo.SearchParamDefinition> _searchParameters = new();
+
+    /// <summary>List of names of the search parameter urls toes.</summary>
+    private Dictionary<string, string> _searchParamUrlsToNames = new();
 
     /// <summary>The executable subscriptions, by subscription topic url.</summary>
     private Dictionary<string, ExecutableSubscriptionInfo> _executableSubscriptions = new();
@@ -190,6 +194,51 @@ public class ResourceStore<T> : IVersionedResourceStore
         _subscriptionConverter = subscriptionConverter;
     }
 
+    public Resource? GetByCanonical(string url)
+    {
+        if (string.IsNullOrEmpty(url))
+        {
+            return null;
+        }
+
+        if (!_conformanceUrlToId.TryGetValue(url, out string? id))
+        {
+            return null;
+        }
+
+        if (!_resourceStore.TryGetValue(id, out T? resource))
+        {
+            return null;
+        }
+
+        return resource;
+    }
+
+    public bool TryGetByCanonical(string url, out Resource? resource)
+    {
+        if (string.IsNullOrEmpty(url))
+        {
+            resource = null;
+            return false;
+        }
+
+        if (!_conformanceUrlToId.TryGetValue(url, out string? id))
+        {
+            resource = null;
+            return false;
+        }
+
+        if (!_resourceStore.TryGetValue(id, out T? r))
+        {
+            resource = null;
+            return false;
+        }
+
+        resource = r;
+        return true;
+    }
+
+
     /// <summary>Reads a specific instance of a resource.</summary>
     /// <param name="id">[out] The identifier.</param>
     /// <returns>The requested resource or null.</returns>
@@ -200,12 +249,12 @@ public class ResourceStore<T> : IVersionedResourceStore
             return null;
         }
 
-        if (!_resourceStore.ContainsKey(id))
+        if (!_resourceStore.TryGetValue(id, out T? resource))
         {
             return null;
         }
 
-        return _resourceStore[id];
+        return resource;
     }
 
     /// <summary>Interface for has identifier.</summary>
@@ -1399,8 +1448,14 @@ public class ResourceStore<T> : IVersionedResourceStore
             return;
         }
 
-        if (_searchParameters.ContainsKey(name))
+        if (_searchParameters.TryGetValue(name, out ModelInfo.SearchParamDefinition? spd))
         {
+            if ((!string.IsNullOrEmpty(spd.Url)) && 
+                _searchParamUrlsToNames.ContainsKey(spd.Url))
+            {
+                _ = _searchParamUrlsToNames.Remove(spd.Url);
+            }
+
             _searchParameters.Remove(name);
         }
     }
@@ -1426,6 +1481,11 @@ public class ResourceStore<T> : IVersionedResourceStore
         else
         {
             _searchParameters.Add(spDefinition.Name, spDefinition);
+        }
+
+        if (!string.IsNullOrEmpty(spDefinition.Url))
+        {
+            _ = _searchParamUrlsToNames.TryAdd(spDefinition.Url, spDefinition.Name);
         }
 
         //// check for not having a matching search parameter resource
@@ -1466,7 +1526,7 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <param name="name">        The name.</param>
     /// <param name="spDefinition">[out] The sp definition.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
-    public bool TryGetSearchParamDefinition(string name, out ModelInfo.SearchParamDefinition? spDefinition)
+    public bool TryGetSearchParamDefinition(string name, [NotNullWhen(true)] out ModelInfo.SearchParamDefinition? spDefinition)
     {
         if (ParsedSearchParameter._allResourceParameters.ContainsKey(name))
         {
@@ -1474,7 +1534,17 @@ public class ResourceStore<T> : IVersionedResourceStore
             return true;
         }
 
-        return _searchParameters.TryGetValue(name, out spDefinition);
+        if (_searchParameters.TryGetValue(name, out spDefinition))
+        {
+            return true;
+        }
+
+        if (_searchParamUrlsToNames.TryGetValue(name, out string? spName))
+        {
+            return _searchParameters.TryGetValue(spName, out spDefinition);
+        }
+
+        return false;
     }
 
     /// <summary>Gets the search parameter definitions known by this store.</summary>

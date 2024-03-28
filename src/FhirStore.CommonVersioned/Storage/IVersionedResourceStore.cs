@@ -8,6 +8,7 @@ using FhirCandle.Models;
 using FhirCandle.Storage;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 namespace FhirCandle.Storage;
@@ -20,6 +21,20 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <param name="id">[out] The identifier.</param>
     /// <returns>The requested resource or null.</returns>
     Hl7.Fhir.Model.Resource? InstanceRead(string id);
+
+    /// <summary>Gets by canonical.</summary>
+    /// <param name="url">URL of the resource.</param>
+    /// <returns>The by canonical.</returns>
+    Hl7.Fhir.Model.Resource? GetByCanonical(string url);
+
+    /// <summary>
+    /// Attempts to get by canonical a Hl7.Fhir.Model.Resource from the given string.
+    /// </summary>
+    /// <param name="url">     URL of the resource.</param>
+    /// <param name="resource">[out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
+    bool TryGetByCanonical(string url, out Hl7.Fhir.Model.Resource? resource);
+
 
     /// <summary>Create an instance of a resource.</summary>
     /// <param name="ctx">            The context.</param>
@@ -81,7 +96,7 @@ public interface IVersionedResourceStore : IResourceStore, IDisposable, IReadOnl
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryGetSearchParamDefinition(
         string name, 
-        out Hl7.Fhir.Model.ModelInfo.SearchParamDefinition? spDefinition);
+        [NotNullWhen(true)] out Hl7.Fhir.Model.ModelInfo.SearchParamDefinition? spDefinition);
 
     /// <summary>Gets the search parameter definitions known by this store</summary>
     /// <returns>

@@ -8,6 +8,8 @@ using FhirCandle.Storage;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
+using System;
+using System.ComponentModel;
 using static FhirCandle.Search.SearchDefinitions;
 
 namespace FhirCandle.Search;
@@ -38,20 +40,20 @@ public class SearchTester
 
     /// <summary>Tests a resource against parsed search parameters for matching.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
-    /// <param name="resource">         The resource.</param>
+    /// <param name="rootNode">         The resource.</param>
     /// <param name="searchParameters"> Options for controlling the search.</param>
     /// <param name="appliedParameters">[out] Options for controlling the applied.</param>
     /// <param name="ignoredParameters">[out] Options for controlling the ignored.</param>
     /// <param name="fpContext">        (Optional) The context.</param>
     /// <returns>True if the test passes, false if the test fails.</returns>
     public bool TestForMatch(
-        ITypedElement resource,
+        ITypedElement rootNode,
         IEnumerable<ParsedSearchParameter> searchParameters,
         FhirEvaluationContext? fpContext = null)
     {
-        if (resource == null)
+        if (rootNode == null)
         {
-            throw new ArgumentNullException(nameof(resource));
+            throw new ArgumentNullException(nameof(rootNode));
         }
 
         if (!searchParameters.Any())
@@ -61,7 +63,7 @@ public class SearchTester
 
         if (fpContext == null)
         {
-            fpContext = new FhirEvaluationContext(resource.ToScopedNode())
+            fpContext = new FhirEvaluationContext(rootNode.ToScopedNode())
             {
                 TerminologyService = FhirStore.Terminology,
                 ElementResolver = FhirStore.Resolve,
@@ -131,35 +133,36 @@ public class SearchTester
             //        //continue;
             //    }
 
-            if (sp.ParamType == SearchParamType.Composite)
-            {
-                // TODO: Firely added composite definitions, need to finish implementation
-                continue;
-
-#pragma warning disable CS0162 // Unreachable code detected
-                if (sp.CompositeComponents == null)
-                {
-                    continue;
-                }
-
-                // component matching is all or nothing
-                if (TestForMatch(
-                        resource,
-                        searchParameters,
-                        fpContext))
-                {
-                    continue;
-                }
-
-                return false;
-#pragma warning restore CS0162 // Unreachable code detected
-            }
-
             if (sp.CompiledExpression == null)
             {
                 // TODO: Handle non-trivial search parameters
                 continue;
             }
+
+            // nest into composite search parameters
+            if (sp.ParamType == SearchParamType.Composite)
+            {
+                if (sp.CompositeComponents == null)
+                {
+                    continue;
+                }
+
+                IEnumerable<ITypedElement> compositeRoots = sp.CompiledExpression.Invoke(rootNode, fpContext);
+
+                // test for matches against all composite components
+                foreach (ITypedElement compositeRoot in compositeRoots)
+                {
+                    // test the composite component against the composite root
+                    if (TestForMatch(compositeRoot, sp.CompositeComponents, fpContext))
+                    {
+                        return true;
+                    }
+                }
+
+                // if we did not find a tree that matches all components, this is not a match
+                return false;
+            }
+
 
             // check for unsupported modifiers
             if ((!string.IsNullOrEmpty(sp.ModifierLiteral)) &&
@@ -168,7 +171,7 @@ public class SearchTester
                 continue;
             }
 
-            IEnumerable<ITypedElement> extracted = sp.CompiledExpression.Invoke(resource, fpContext);
+            IEnumerable<ITypedElement> extracted = sp.CompiledExpression.Invoke(rootNode, fpContext);
 
             if (!extracted.Any())
             {
@@ -190,6 +193,7 @@ public class SearchTester
                 // loop over any extracted values and test them against the chained parameters
                 foreach (ITypedElement node in extracted)
                 {
+                    // TODO(ginoc): add support for chaining into canonical references (QuestionnareResponse.questionnaire case)
                     if ((node == null) ||
                         (node.InstanceType != "Reference"))
                     {
@@ -236,531 +240,13 @@ public class SearchTester
                 continue;
             }
 
+            // loop over all extracted nodes until we find a match
             foreach (ITypedElement resultNode in extracted)
             {
-                // all types evaluate missing the same way
-                if (sp.Modifier == SearchModifierCodes.Missing)
+                if (TestNode(sp, resultNode))
                 {
-                    if (SearchTestMissing(resultNode, sp))
-                    {
-                        found = true;
-                        break;
-                    }
-
-                    continue;
-                }
-
-                // build a routing tuple: {search type}<-{modifier}>-{value type}
-                string combined = sp.Modifier == SearchModifierCodes.None 
-                    ? $"{sp.ParamType}-{resultNode.InstanceType}".ToLowerInvariant()
-                    : $"{sp.ParamType}-{sp.Modifier}-{resultNode.InstanceType}".ToLowerInvariant();
-
-                // this switch is intentionally 'unrolled' for performance (instead of nesting by type)
-                // the 'missing' modifier is handled earlier so never appears in this switch
-                switch (combined)
-                {
-                    case "date-date":
-                    case "date-datetime":
-                    case "date-instant":
-                    case "date-period":
-                    case "date-timing":
-                        if (EvalDateSearch.TestDate(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-
-                    // note that the SDK keeps all ITypedElement 'integer' values in 64-bit format
-                    case "number-integer":
-                    case "number-unsignedint":
-                    case "number-positiveint":
-                    case "number-integer64":
-                        if (EvalNumberSearch.TestNumberAgainstLong(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "number-decimal":
-                        if (EvalNumberSearch.TestNumberAgainstDecimal(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "quantity-quantity":
-                        if (EvalQuantitySearch.TestQuantity(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "reference-canonical":
-                    case "reference-uri":
-                    case "reference-url":
-                        if (EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "reference-reference":
-                        if (EvalReferenceSearch.TestReference(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "reference-oid":
-                        if (EvalReferenceSearch.TestReferenceAgainstOid(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "reference-uuid":
-                        if (EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    // note that mapping identifier to canonical is specifically disallowed
-                    // (see https://hl7.org/fhir/search.html#modifieridentifier)
-                    //case "reference-identifier-canonical":
-                    case "reference-identifier-reference":
-                    case "reference-identifier-oid":
-                    case "reference-identifier-uri":
-                    case "reference-identifier-url":
-                    case "reference-identifier-uuid":
-                        if (EvalReferenceSearch.TestReferenceIdentifier(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    // note: the literals used are 'actual' resource types (e.g., patient)
-                    case "reference-resourcetype-canonical":
-                    case "reference-resourcetype-uri":
-                    case "reference-resourcetype-url":
-                        if (EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp, sp.ModifierLiteral!))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    // note: the literals used are 'actual' resource types (e.g., patient)
-                    case "reference-resourcetype-reference":
-                        if (EvalReferenceSearch.TestReference(resultNode, sp, sp.ModifierLiteral!))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    // note: the literals used are 'actual' resource types (e.g., patient)
-                    case "reference-resourcetype-oid":
-                        if (EvalReferenceSearch.TestReferenceAgainstOid(resultNode, sp, sp.ModifierLiteral!))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    // note: the literals used are 'actual' resource types (e.g., patient)
-                    case "reference-resourcetype-uuid":
-                        if (EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp, sp.ModifierLiteral!))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-id":
-                    case "string-string":
-                    case "string-markdown":
-                    case "string-xhtml":
-                        if (EvalStringSearch.TestStringStartsWith(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-contains-id":
-                    case "string-contains-string":
-                    case "string-contains-markdown":
-                    case "string-contains-xhtml":
-                        if (EvalStringSearch.TestStringContains(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-exact-id":
-                    case "string-exact-string":
-                    case "string-exact-markdown":
-                    case "string-exact-xhtml":
-                        if (EvalStringSearch.TestStringExact(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-humanname":
-                        if (EvalStringSearch.TestStringStartsWithAgainstHumanName(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-contains-humanname":
-                        if (EvalStringSearch.TestStringContainsAgainstHumanName(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-exact-humanname":
-                        if (EvalStringSearch.TestStringExactAgainstHumanName(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-address":
-                        if (EvalStringSearch.TestStringStartsWithAgainstAddress(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-contains-address":
-                        if (EvalStringSearch.TestStringContainsAgainstAddress(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "string-exact-address":
-                        if (EvalStringSearch.TestStringExactAgainstAddress(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-canonical":
-                    case "token-id":
-                    case "token-oid":
-                    case "token-uri":
-                    case "token-url":
-                    case "token-uuid":
-                    case "token-string":
-                        if (EvalTokenSearch.TestTokenAgainstStringValue(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-not-canonical":
-                    case "token-not-id":
-                    case "token-not-oid":
-                    case "token-not-uri":
-                    case "token-not-url":
-                    case "token-not-uuid":
-                    case "token-not-string":
-                        if (EvalTokenSearch.TestTokenNotAgainstStringValue(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-boolean":
-                        if (EvalTokenSearch.TestTokenAgainstBool(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-not-boolean":
-                        if (EvalTokenSearch.TestTokenNotAgainstBool(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-code":
-                    case "token-coding":
-                    case "token-contactpoint":
-                    case "token-identifier":
-                        if (EvalTokenSearch.TestTokenAgainstCoding(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-not-code":
-                    case "token-not-coding":
-                    case "token-not-contactpoint":
-                    case "token-not-identifier":
-                        if (EvalTokenSearch.TestTokenNotAgainstCoding(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-codeableconcept":
-                        if (EvalTokenSearch.TestTokenAgainstCodeableConcept(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-in-codeableconcept":
-                        if (EvalTokenSearch.TestTokenInCodeableConcept(resultNode, sp, FhirStore))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-in-code":
-                    case "token-in-coding":
-                    case "token-in-contactpoint":
-                    case "token-in-identifier":
-                        if (EvalTokenSearch.TestTokenInCoding(resultNode, sp, FhirStore))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "uri-canonical":
-                    case "uri-uri":
-                    case "uri-url":
-                        if (EvalUriSearch.TestUriAgainstStringValue(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "uri-oid":
-                        if (EvalUriSearch.TestUriAgainstOid(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "uri-uuid":
-                        if (EvalUriSearch.TestUriAgainstUuid(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "token-oftype-identifier":
-                        if (EvalTokenSearch.TestTokenOfType(resultNode, sp))
-                        {
-                            found = true;
-                            break;
-                        }
-                        break;
-
-                    case "reference-above-canonical":
-                    case "reference-above-reference":
-                    case "reference-above-oid":
-                    case "reference-above-uri":
-                    case "reference-above-url":
-                    case "reference-above-uuid":
-                    case "reference-below-canonical":
-                    case "reference-below-reference":
-                    case "reference-below-oid":
-                    case "reference-below-uri":
-                    case "reference-below-url":
-                    case "reference-below-uuid":
-                    case "reference-codetext-canonical":
-                    case "reference-codetext-reference":
-                    case "reference-codetext-oid":
-                    case "reference-codetext-uri":
-                    case "reference-codetext-url":
-                    case "reference-codetext-uuid":
-                    case "reference-in-canonical":
-                    case "reference-in-reference":
-                    case "reference-in-oid":
-                    case "reference-in-uri":
-                    case "reference-in-url":
-                    case "reference-in-uuid":
-                    case "reference-notin-canonical":
-                    case "reference-notin-reference":
-                    case "reference-notin-oid":
-                    case "reference-notin-uri":
-                    case "reference-notin-url":
-                    case "reference-notin-uuid":
-                    case "reference-text-canonical":
-                    case "reference-text-reference":
-                    case "reference-text-oid":
-                    case "reference-text-uri":
-                    case "reference-text-url":
-                    case "reference-text-uuid":
-                    case "reference-textadvanced-canonical":
-                    case "reference-textadvanced-reference":
-                    case "reference-textadvanced-oid":
-                    case "reference-textadvanced-uri":
-                    case "reference-textadvanced-url":
-                    case "reference-textadvanced-uuid":
-                    case "token-above-code":
-                    case "token-above-coding":
-                    case "token-below-code":
-                    case "token-below-coding":
-                    case "token-codetext-code":
-                    case "token-codetext-coding":
-                    case "token-notin-code":
-                    case "token-notin-coding":
-                    case "token-text-code":
-                    case "token-text-coding":
-                    case "token-textadvanced-code":
-                    case "token-textadvanced-coding":
-                    case "token-above-codeableconcept":
-                    case "token-above-identifier":
-                    case "token-above-contactpoint":
-                    case "token-above-canonical":
-                    case "token-above-oid":
-                    case "token-above-uri":
-                    case "token-above-url":
-                    case "token-above-uuid":
-                    case "token-above-string":
-                    case "token-below-codeableconcept":
-                    case "token-below-identifier":
-                    case "token-below-contactpoint":
-                    case "token-below-canonical":
-                    case "token-below-oid":
-                    case "token-below-uri":
-                    case "token-below-url":
-                    case "token-below-uuid":
-                    case "token-below-string":
-                    case "token-codetext-codeableconcept":
-                    case "token-codetext-identifier":
-                    case "token-codetext-contactpoint":
-                    case "token-codetext-canonical":
-                    case "token-codetext-oid":
-                    case "token-codetext-uri":
-                    case "token-codetext-url":
-                    case "token-codetext-uuid":
-                    case "token-codetext-string":
-                    case "token-in-canonical":
-                    case "token-in-oid":
-                    case "token-in-uri":
-                    case "token-in-url":
-                    case "token-in-uuid":
-                    case "token-in-string":
-                    case "token-not-codeableconcept":
-                    case "token-notin-codeableconcept":
-                    case "token-notin-identifier":
-                    case "token-notin-contactpoint":
-                    case "token-notin-canonical":
-                    case "token-notin-oid":
-                    case "token-notin-uri":
-                    case "token-notin-url":
-                    case "token-notin-uuid":
-                    case "token-notin-string":
-                    case "token-text-codeableconcept":
-                    case "token-text-identifier":
-                    case "token-text-contactpoint":
-                    case "token-text-canonical":
-                    case "token-text-oid":
-                    case "token-text-uri":
-                    case "token-text-url":
-                    case "token-text-uuid":
-                    case "token-text-string":
-                    case "token-textadvanced-codeableconcept":
-                    case "token-textadvanced-identifier":
-                    case "token-textadvanced-contactpoint":
-                    case "token-textadvanced-canonical":
-                    case "token-textadvanced-oid":
-                    case "token-textadvanced-uri":
-                    case "token-textadvanced-url":
-                    case "token-textadvanced-uuid":
-                    case "token-textadvanced-string":
-                    case "uri-above-canonical":
-                    case "uri-above-oid":
-                    case "uri-above-uri":
-                    case "uri-above-url":
-                    case "uri-above-uuid":
-                    case "uri-below-canonical":
-                    case "uri-below-oid":
-                    case "uri-below-uri":
-                    case "uri-below-url":
-                    case "uri-below-uuid":
-                    case "uri-contains-canonical":
-                    case "uri-contains-oid":
-                    case "uri-contains-uri":
-                    case "uri-contains-url":
-                    case "uri-contains-uuid":
-                    case "uri-in-canonical":
-                    case "uri-in-oid":
-                    case "uri-in-uri":
-                    case "uri-in-url":
-                    case "uri-in-uuid":
-                    case "uri-not-canonical":
-                    case "uri-not-oid":
-                    case "uri-not-uri":
-                    case "uri-not-url":
-                    case "uri-not-uuid":
-                    case "uri-notin-canonical":
-                    case "uri-notin-oid":
-                    case "uri-notin-uri":
-                    case "uri-notin-url":
-                    case "uri-notin-uuid":
-                    case "uri-oftype-canonical":
-                    case "uri-oftype-oid":
-                    case "uri-oftype-uri":
-                    case "uri-oftype-url":
-                    case "uri-oftype-uuid":
-                    case "uri-text-canonical":
-                    case "uri-text-oid":
-                    case "uri-text-uri":
-                    case "uri-text-url":
-                    case "uri-text-uuid":
-                    case "uri-textadvanced-canonical":
-                    case "uri-textadvanced-oid":
-                    case "uri-textadvanced-uri":
-                    case "uri-textadvanced-url":
-                    case "uri-textadvanced-uuid":
-                        break;
-
-                    // Note that there is no defined way to search for a time
-                    //case "date-time":
-                    default:
-                        break;
+                    found = true;
+                    break;
                 }
             }
             
@@ -775,6 +261,356 @@ public class SearchTester
         return true;
     }
 
+    private bool TestNode(ParsedSearchParameter sp, ITypedElement resultNode)
+    {
+        // all types evaluate missing the same way
+        if (sp.Modifier == SearchModifierCodes.Missing)
+        {
+            if (SearchTestMissing(resultNode, sp))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        // build a routing tuple: {search type}<-{modifier}>-{value type}
+        string combined = sp.Modifier == SearchModifierCodes.None
+            ? $"{sp.ParamType}-{resultNode.InstanceType}".ToLowerInvariant()
+            : $"{sp.ParamType}-{sp.Modifier}-{resultNode.InstanceType}".ToLowerInvariant();
+
+        // this switch is intentionally 'unrolled' for performance (instead of nesting by type)
+        // the 'missing' modifier is handled earlier so never appears in this switch
+        switch (combined)
+        {
+            case "date-date":
+            case "date-datetime":
+            case "date-instant":
+            case "date-period":
+            case "date-timing":
+                return EvalDateSearch.TestDate(resultNode, sp);
+
+
+            // note that the SDK keeps all ITypedElement 'integer' values in 64-bit format
+            case "number-integer":
+            case "number-unsignedint":
+            case "number-positiveint":
+            case "number-integer64":
+                return EvalNumberSearch.TestNumberAgainstLong(resultNode, sp);
+
+            case "number-decimal":
+                return EvalNumberSearch.TestNumberAgainstDecimal(resultNode, sp);
+
+            case "quantity-quantity":
+                return EvalQuantitySearch.TestQuantity(resultNode, sp);
+
+            case "reference-canonical":
+            case "reference-uri":
+            case "reference-url":
+                return EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp);
+
+            case "reference-reference":
+                return EvalReferenceSearch.TestReference(resultNode, sp);
+
+            case "reference-oid":
+                return EvalReferenceSearch.TestReferenceAgainstOid(resultNode, sp);
+
+            case "reference-uuid":
+                return EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp);
+
+            // note that mapping identifier to canonical is specifically disallowed
+            // (see https://hl7.org/fhir/search.html#modifieridentifier)
+            //case "reference-identifier-canonical":
+            case "reference-identifier-reference":
+            case "reference-identifier-oid":
+            case "reference-identifier-uri":
+            case "reference-identifier-url":
+            case "reference-identifier-uuid":
+                return EvalReferenceSearch.TestReferenceIdentifier(resultNode, sp);
+
+            // note: the literals used are 'actual' resource types (e.g., patient)
+            case "reference-resourcetype-canonical":
+            case "reference-resourcetype-uri":
+            case "reference-resourcetype-url":
+                return EvalReferenceSearch.TestReferenceAgainstPrimitive(resultNode, sp, sp.ModifierLiteral!);
+
+            // note: the literals used are 'actual' resource types (e.g., patient)
+            case "reference-resourcetype-reference":
+                return EvalReferenceSearch.TestReference(resultNode, sp, sp.ModifierLiteral!);
+
+            // note: the literals used are 'actual' resource types (e.g., patient)
+            case "reference-resourcetype-oid":
+                return EvalReferenceSearch.TestReferenceAgainstOid(resultNode, sp, sp.ModifierLiteral!);
+
+            // note: the literals used are 'actual' resource types (e.g., patient)
+            case "reference-resourcetype-uuid":
+                return EvalReferenceSearch.TestReferenceAgainstUuid(resultNode, sp, sp.ModifierLiteral!);
+
+            case "string-id":
+            case "string-string":
+            case "string-markdown":
+            case "string-xhtml":
+                return EvalStringSearch.TestStringStartsWith(resultNode, sp);
+
+            case "string-contains-id":
+            case "string-contains-string":
+            case "string-contains-markdown":
+            case "string-contains-xhtml":
+                return EvalStringSearch.TestStringContains(resultNode, sp);
+
+            case "string-exact-id":
+            case "string-exact-string":
+            case "string-exact-markdown":
+            case "string-exact-xhtml":
+                return EvalStringSearch.TestStringExact(resultNode, sp);
+
+            case "string-humanname":
+                return EvalStringSearch.TestStringStartsWithAgainstHumanName(resultNode, sp);
+
+            case "string-contains-humanname":
+                return EvalStringSearch.TestStringContainsAgainstHumanName(resultNode, sp);
+
+            case "string-exact-humanname":
+                return EvalStringSearch.TestStringExactAgainstHumanName(resultNode, sp);
+
+            case "string-address":
+                return EvalStringSearch.TestStringStartsWithAgainstAddress(resultNode, sp);
+
+            case "string-contains-address":
+                return EvalStringSearch.TestStringContainsAgainstAddress(resultNode, sp);
+
+            case "string-exact-address":
+                return EvalStringSearch.TestStringExactAgainstAddress(resultNode, sp);
+
+            case "token-canonical":
+            case "token-id":
+            case "token-oid":
+            case "token-uri":
+            case "token-url":
+            case "token-uuid":
+            case "token-string":
+                return EvalTokenSearch.TestTokenAgainstStringValue(resultNode, sp);
+
+            case "token-not-canonical":
+            case "token-not-id":
+            case "token-not-oid":
+            case "token-not-uri":
+            case "token-not-url":
+            case "token-not-uuid":
+            case "token-not-string":
+                return EvalTokenSearch.TestTokenNotAgainstStringValue(resultNode, sp);
+
+            case "token-boolean":
+                return EvalTokenSearch.TestTokenAgainstBool(resultNode, sp);
+
+            case "token-not-boolean":
+                return EvalTokenSearch.TestTokenNotAgainstBool(resultNode, sp);
+
+            case "token-code":
+            case "token-coding":
+            case "token-contactpoint":
+            case "token-identifier":
+                return EvalTokenSearch.TestTokenAgainstCoding(resultNode, sp);
+
+            case "token-not-code":
+            case "token-not-coding":
+            case "token-not-contactpoint":
+            case "token-not-identifier":
+                return EvalTokenSearch.TestTokenNotAgainstCoding(resultNode, sp);
+
+            case "token-codeableconcept":
+                return EvalTokenSearch.TestTokenAgainstCodeableConcept(resultNode, sp);
+
+            case "token-in-codeableconcept":
+                return EvalTokenSearch.TestTokenInCodeableConcept(resultNode, sp, FhirStore);
+
+            case "token-in-code":
+            case "token-in-coding":
+            case "token-in-contactpoint":
+            case "token-in-identifier":
+                return EvalTokenSearch.TestTokenInCoding(resultNode, sp, FhirStore);
+
+            case "uri-canonical":
+            case "uri-uri":
+            case "uri-url":
+                return EvalUriSearch.TestUriAgainstStringValue(resultNode, sp);
+
+            case "uri-oid":
+                return EvalUriSearch.TestUriAgainstOid(resultNode, sp);
+
+            case "uri-uuid":
+                return EvalUriSearch.TestUriAgainstUuid(resultNode, sp);
+
+            case "token-oftype-identifier":
+                return EvalTokenSearch.TestTokenOfType(resultNode, sp);
+
+            // TODO(ginoc): not yet implemented
+            case "reference-above-canonical":
+            case "reference-above-reference":
+            case "reference-above-oid":
+            case "reference-above-uri":
+            case "reference-above-url":
+            case "reference-above-uuid":
+            case "reference-below-canonical":
+            case "reference-below-reference":
+            case "reference-below-oid":
+            case "reference-below-uri":
+            case "reference-below-url":
+            case "reference-below-uuid":
+            case "reference-codetext-canonical":
+            case "reference-codetext-reference":
+            case "reference-codetext-oid":
+            case "reference-codetext-uri":
+            case "reference-codetext-url":
+            case "reference-codetext-uuid":
+            case "reference-in-canonical":
+            case "reference-in-reference":
+            case "reference-in-oid":
+            case "reference-in-uri":
+            case "reference-in-url":
+            case "reference-in-uuid":
+            case "reference-notin-canonical":
+            case "reference-notin-reference":
+            case "reference-notin-oid":
+            case "reference-notin-uri":
+            case "reference-notin-url":
+            case "reference-notin-uuid":
+            case "reference-text-canonical":
+            case "reference-text-reference":
+            case "reference-text-oid":
+            case "reference-text-uri":
+            case "reference-text-url":
+            case "reference-text-uuid":
+            case "reference-textadvanced-canonical":
+            case "reference-textadvanced-reference":
+            case "reference-textadvanced-oid":
+            case "reference-textadvanced-uri":
+            case "reference-textadvanced-url":
+            case "reference-textadvanced-uuid":
+            case "token-above-code":
+            case "token-above-coding":
+            case "token-below-code":
+            case "token-below-coding":
+            case "token-codetext-code":
+            case "token-codetext-coding":
+            case "token-notin-code":
+            case "token-notin-coding":
+            case "token-text-code":
+            case "token-text-coding":
+            case "token-textadvanced-code":
+            case "token-textadvanced-coding":
+            case "token-above-codeableconcept":
+            case "token-above-identifier":
+            case "token-above-contactpoint":
+            case "token-above-canonical":
+            case "token-above-oid":
+            case "token-above-uri":
+            case "token-above-url":
+            case "token-above-uuid":
+            case "token-above-string":
+            case "token-below-codeableconcept":
+            case "token-below-identifier":
+            case "token-below-contactpoint":
+            case "token-below-canonical":
+            case "token-below-oid":
+            case "token-below-uri":
+            case "token-below-url":
+            case "token-below-uuid":
+            case "token-below-string":
+            case "token-codetext-codeableconcept":
+            case "token-codetext-identifier":
+            case "token-codetext-contactpoint":
+            case "token-codetext-canonical":
+            case "token-codetext-oid":
+            case "token-codetext-uri":
+            case "token-codetext-url":
+            case "token-codetext-uuid":
+            case "token-codetext-string":
+            case "token-in-canonical":
+            case "token-in-oid":
+            case "token-in-uri":
+            case "token-in-url":
+            case "token-in-uuid":
+            case "token-in-string":
+            case "token-not-codeableconcept":
+            case "token-notin-codeableconcept":
+            case "token-notin-identifier":
+            case "token-notin-contactpoint":
+            case "token-notin-canonical":
+            case "token-notin-oid":
+            case "token-notin-uri":
+            case "token-notin-url":
+            case "token-notin-uuid":
+            case "token-notin-string":
+            case "token-text-codeableconcept":
+            case "token-text-identifier":
+            case "token-text-contactpoint":
+            case "token-text-canonical":
+            case "token-text-oid":
+            case "token-text-uri":
+            case "token-text-url":
+            case "token-text-uuid":
+            case "token-text-string":
+            case "token-textadvanced-codeableconcept":
+            case "token-textadvanced-identifier":
+            case "token-textadvanced-contactpoint":
+            case "token-textadvanced-canonical":
+            case "token-textadvanced-oid":
+            case "token-textadvanced-uri":
+            case "token-textadvanced-url":
+            case "token-textadvanced-uuid":
+            case "token-textadvanced-string":
+            case "uri-above-canonical":
+            case "uri-above-oid":
+            case "uri-above-uri":
+            case "uri-above-url":
+            case "uri-above-uuid":
+            case "uri-below-canonical":
+            case "uri-below-oid":
+            case "uri-below-uri":
+            case "uri-below-url":
+            case "uri-below-uuid":
+            case "uri-contains-canonical":
+            case "uri-contains-oid":
+            case "uri-contains-uri":
+            case "uri-contains-url":
+            case "uri-contains-uuid":
+            case "uri-in-canonical":
+            case "uri-in-oid":
+            case "uri-in-uri":
+            case "uri-in-url":
+            case "uri-in-uuid":
+            case "uri-not-canonical":
+            case "uri-not-oid":
+            case "uri-not-uri":
+            case "uri-not-url":
+            case "uri-not-uuid":
+            case "uri-notin-canonical":
+            case "uri-notin-oid":
+            case "uri-notin-uri":
+            case "uri-notin-url":
+            case "uri-notin-uuid":
+            case "uri-oftype-canonical":
+            case "uri-oftype-oid":
+            case "uri-oftype-uri":
+            case "uri-oftype-url":
+            case "uri-oftype-uuid":
+            case "uri-text-canonical":
+            case "uri-text-oid":
+            case "uri-text-uri":
+            case "uri-text-url":
+            case "uri-text-uuid":
+            case "uri-textadvanced-canonical":
+            case "uri-textadvanced-oid":
+            case "uri-textadvanced-uri":
+            case "uri-textadvanced-url":
+            case "uri-textadvanced-uuid":
+            // Note that there is no defined way to search for a time
+            //case "date-time":
+            default:
+                return false;
+        }
+    }
 
     /// <summary>Searches for the first test missing.</summary>
     /// <param name="valueNode">The value node.</param>

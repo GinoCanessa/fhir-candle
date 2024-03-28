@@ -11,7 +11,7 @@
 <PageTitle>SMART Clients</PageTitle>
 
 <MudStack Row="true" Spacing="3" Class="ma-2">
-    <MudButton Href="/smart/client_register" Variant="Variant.Filled" Color="Color.Primary">Register New Client</MudButton>
+    <MudButton Href="/smart/client_details" Variant="Variant.Filled" Color="Color.Primary">Register New Client</MudButton>
 </MudStack>
 
 @if (!AuthManager.SmartClients.Any())
@@ -26,6 +26,7 @@ else
             <MudItem>
                 <MudCard Outlined="true" Class="mx-6 my-4">
                     <MudCardContent>
+
                         <MudField Label="Client Name">@smartClient.ClientName</MudField>
                         <MudField Label="Client ID">@smartClient.ClientId</MudField>
 
@@ -46,13 +47,15 @@ else
                         {
                             @foreach (ClientInfo.ClientActivityRecord activity in smartClient.Activity.OrderByDescending(a => a.Timestamp).Take(3))
                             {
-                                <MudField Label="Activity">@(activity.RequestType + " " + activity.Timestamp.ToString("o") + " " + activity.Success)</MudField>
+                                <MudField Label="Activity">@(activity.RequestType + " " + activity.Timestamp.ToString("o") + " " + (activity.Success ? "success" : "fail"))</MudField>
                                 @if (!string.IsNullOrEmpty(activity.Message))
                                 {
                                     <MudField Label="Message">@activity.Message</MudField>
                                 }
                             }
                         }
+
+                        <MudButton Href="@($"/smart/client_details?smartClientId={smartClient.ClientId}")" Variant="Variant.Filled" Color="Color.Primary">Edit</MudButton>
                     </MudCardContent>
                 </MudCard>
             </MudItem>

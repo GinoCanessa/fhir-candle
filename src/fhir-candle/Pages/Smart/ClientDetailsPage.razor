@@ -1,0 +1,378 @@
+﻿@page "/smart/client_details"
+@using FhirCandle.Smart
+@using Microsoft.IdentityModel.Tokens
+
+@inject NavigationManager NavigationManager
+@inject IFhirStoreManager StoreManager
+@inject ISmartAuthManager AuthManager
+
+@implements IDisposable
+
+<PageTitle>SMART Clients</PageTitle>
+
+@if ((SmartClient == null) || (SmartClient.ClientId == null))
+{
+    <MudStack Row="true" Spacing="3" Class="ma-2">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    </MudStack>
+}
+else
+{
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h4">SMART Client Details</MudText>
+                @if (!string.IsNullOrEmpty(Message))
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Error">@Message</MudText>
+                }
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudTextField @bind-Value="SmartClient.ClientName" Label="Client Name" Error="@(string.IsNullOrEmpty(SmartClient.ClientName))"></MudTextField>
+            <MudField Label="Client ID" HelperText="Managed by system">@SmartClient.ClientId</MudField>
+
+            <br/>
+            <MudRadioGroup @bind-Value="KeyEntryMode">
+                <MudRadio Value="@("jwks")">JWKS JSON</MudRadio>
+                <MudRadio Value="@("uri")">Use JWKS URI</MudRadio>
+                <MudRadio Value="@("manual")">JWKS Fields</MudRadio>
+            </MudRadioGroup>
+
+            @switch (KeyEntryMode)
+            {
+                case "jwks":
+                    <MudTextField @bind-Value="JsonJwks" Label="JSON Web Key Set (JWKS)" Lines="20" ></MudTextField>
+                    break;
+
+                case "uri":
+                    <MudTextField @bind-Value="SmartClient.Registration!.JwksUri" Label="JSON Web Key Set (JWKS) URI"></MudTextField>
+                    break;
+
+                case "manual":
+                    <MudTextField @bind-Value="ClientKey.KeyId" Label="Key ID (kid)" Error="@(string.IsNullOrEmpty(ClientKey!.KeyId))"></MudTextField>
+
+                    <MudSelect @bind-Value="ClientKey.Use" Label="Key Use (use)">
+                        <MudSelectItem T="string" Value="@("sig")">Signature</MudSelectItem>
+                        @* <MudSelectItem T="string" Value="@("enc")">Encryption</MudSelectItem> *@
+                    </MudSelect>
+
+                    <MudText>Key Operations (key_ops)</MudText>
+                    <MudCheckBox Value="@true" Label="verify" Color="Color.Primary" Class="ma-2"></MudCheckBox>
+
+                    @*
+                    <MudText>Key Operations</MudText>
+                    <MudToggleGroup T="string" SelectionMode="SelectionMode.MultiSelection" @bind-Values="ClientKey.KeyOperaions" Color="Color.Primary" CheckMark Class="ma-2">
+                        <MudToggleItem Value="@("sign")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                        <MudToggleItem Value="@("verify")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                        <MudToggleItem Value="@("encrypt")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                        <MudToggleItem Value="@("decrypt")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                        <MudToggleItem Value="@("wrapKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                        <MudToggleItem Value="@("unwrapKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                        <MudToggleItem Value="@("deriveKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                        <MudToggleItem Value="@("deriveBits")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    </MudToggleGroup>
+                    *@
+
+                    <MudSelect @bind-Value="ClientKey.Kty" Label="Key Cryptographic Family (kty)" @onchange="@((e) => ClientKey.Alg = ((e.Value?.ToString() ?? string.Empty).Equals("RSA", StringComparison.Ordinal)) ? "RS384" : "ES384")">
+                        <MudSelectItem T="string" Value="@("RSA")">RSA</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("EC")">Elliptic Curve (EC)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSelect @bind-Value="ClientKey.Alg" Label="Key Algorithm (alg)">
+                        <MudSelectItem Disabled="@(!ClientKey.Kty!.Equals("RSA"))" T="string" Value="@("RS384")">RS384</MudSelectItem>
+                        <MudSelectItem Disabled="@(!ClientKey.Kty!.Equals("EC"))" T="string" Value="@("ES384")">ES384</MudSelectItem>
+                    </MudSelect>
+
+                    @if (ClientKey.Alg?.Equals("RS384", StringComparison.Ordinal) ?? false)
+                    {
+                        <MudTextField @bind-Value="ClientKey.N" Label="RSA Modulus (n) " Error="@(string.IsNullOrEmpty(ClientKey.N))" HelperText="Base64 Url Encoded"></MudTextField>
+                        <MudTextField @bind-Value="ClientKey.E" Label="RSA Exponent (e)" Error="@(string.IsNullOrEmpty(ClientKey.E))" HelperText="Base64 Url Encoded"></MudTextField>
+                    }
+
+                    @if (ClientKey.Alg?.Equals("ES384", StringComparison.Ordinal) ?? false)
+                    {
+                        <MudField @bind-Value="ClientKey.Crv" Label="ECDSA Curve (crv)"></MudField>
+                        <MudTextField @bind-Value="ClientKey.X" Label="ECDSA X-Coordinate (x)" Error="@(string.IsNullOrEmpty(ClientKey.X))" HelperText="Base64 Url Encoded"></MudTextField>
+                        <MudTextField @bind-Value="ClientKey.Y" Label="ECDSA Y-Coordinate (y)" Error="@(string.IsNullOrEmpty(ClientKey.Y))" HelperText="Base64 Url Encoded"></MudTextField>
+                    }
+                    break;
+            }
+
+            <MudStack Row="true" Spacing="3" Class="ma-2">
+                <MudButton @onclick="HandleSaveClick" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
+                <MudButton Href="/smart/clients" Variant="Variant.Filled" Color="Color.Primary">Cancel</MudButton>
+                @*
+                @if (!string.IsNullOrEmpty(ClientId))
+                {
+                    <MudButton @onclick="HandleDeleteClick" Variant="Variant.Filled" Color="Color.Error">Delete</MudButton>
+                }
+                *@
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
+
+    /// <summary>Gets or sets the identifier of the client.</summary>
+    [SupplyParameterFromQuery(Name = "smartClientId")]
+    public string ClientId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the client.</summary>
+    public ClientInfo? SmartClient { get; set; } = null;
+
+    /// <summary>Gets or sets the client key.</summary>
+    public JsonWebKey? ClientKey { get; set; } = null;
+
+    /// <summary>Gets or sets the message.</summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a value indicating whether this object use jwks URI.</summary>
+    public string KeyEntryMode { get; set; } = "jwks";
+
+    /// <summary>Gets or sets the JSON jwks.</summary>
+    public string JsonJwks { get; set; } = string.Empty;
+
+    /// <summary>Executes the initialized asynchronous action.</summary>
+    /// <returns>An asynchronous result.</returns>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        DoInitialization();
+    }
+
+    /// <summary>Executes the initialization operation.</summary>
+    private void DoInitialization()
+    {
+        // if we have a client ID, load the client info
+        if (!string.IsNullOrEmpty(ClientId))
+        {
+            if (AuthManager.SmartClients.TryGetValue(ClientId, out ClientInfo? client))
+            {
+                SmartClient = client;
+                ClientKey = client.Registration?.KeySet?.Keys?.FirstOrDefault();
+
+                if (ClientKey != null)
+                {
+                    JsonJwks = System.Text.Json.JsonSerializer.Serialize(ClientKey, new System.Text.Json.JsonSerializerOptions()
+                    {
+                        WriteIndented = true,
+                    });
+                }
+            }
+        }
+
+        if (SmartClient == null)
+        {
+            SmartClient = new()
+            {
+                ClientId = string.Empty,
+                ClientName = string.Empty,
+                Registration = new SmartClientRegistration(),
+            };
+        }
+
+        if (ClientKey == null)
+        {
+            ClientKey = new()
+            {
+                Use = "sig",
+                Kty = "RSA",
+                Alg = "RS384",
+                Crv = "P-384",
+            };
+
+            ClientKey.KeyOps.Add("verify");
+        }
+
+        if (string.IsNullOrEmpty(ClientId))
+        {
+            NavTracker?.NotifyNav("SMART Client Details", "/smart/client_details", 1);
+        }
+        else
+        {
+            NavTracker?.NotifyNav("SMART Client Details", $"/smart/client_details?smartClientId={ClientId}", 1);
+        }
+    }
+
+    /// <summary>Handles the save click described by e.</summary>
+    /// <param name="e">Mouse event information.</param>
+    private void HandleSaveClick(MouseEventArgs e)
+    {
+        if (string.IsNullOrEmpty(SmartClient?.ClientName))
+        {
+            Message = "Client Name is required.";
+            return;
+        }
+
+        if (string.IsNullOrEmpty(ClientKey?.Use) ||
+            (!ClientKey.Use.Equals("sig", StringComparison.Ordinal)))
+        {
+            Message = "Key Use must be 'sig' (use).";
+            return;
+        }
+
+        if (!(ClientKey.KeyOps ?? Enumerable.Empty<string>()).Any())
+        {
+            Message = "The 'verify' key operation is required (key_ops).";
+            return;
+        }
+
+        switch (KeyEntryMode)
+        {
+            case "jwks":
+                {
+                    if (string.IsNullOrEmpty(JsonJwks))
+                    {
+                        Message = "When using JWKS, you must provide a JSON Web Key Set (JWKS).";
+                        return;
+                    }
+
+                    SmartClient.Registration!.KeySet = JsonWebKeySet.Create(JsonJwks);
+                }
+                break;
+
+            case "uri":
+                {
+                    if (string.IsNullOrEmpty(SmartClient.Registration?.JwksUri))
+                    {
+                        Message = "When using JWKS URI, you must provide a URI (jwks_uri).";
+                        return;
+                    }
+                }
+                break;
+
+            case "manual":
+                {
+                    // clear the URI in the structure
+                    SmartClient.Registration!.JwksUri = null;
+
+                    if ((ClientKey.Kty ?? string.Empty).Equals("RSA", StringComparison.Ordinal))
+                    {
+                        if (!(ClientKey.Alg ?? string.Empty).Equals("RS384", StringComparison.Ordinal))
+                        {
+                            Message = "When using RSA, the only supported algorithm is RS384 (alg).";
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(ClientKey.N))
+                        {
+                            Message = "When using RSA, you must provide a modulus (n).";
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(ClientKey.E))
+                        {
+                            Message = "When using RSA, you must provide an exponent (e).";
+                            return;
+                        }
+
+                        // copy just the values we want
+                        JsonWebKey key = new()
+                        {
+                            Kty = ClientKey.Kty,
+                            Use = ClientKey.Use,
+                            Alg = ClientKey.Alg,
+                            KeyId = ClientKey.KeyId,
+                            E = ClientKey.E,
+                            N = ClientKey.N,
+                        };
+                        key.KeyOps.Add(ClientKey.KeyOps!.First());
+
+                        SmartClient.Registration!.KeySet = new();
+                        SmartClient.Registration!.KeySet.Keys.Add(key);
+                    }
+                    else if ((ClientKey.Kty ?? string.Empty).Equals("EC", StringComparison.Ordinal))
+                    {
+                        if (!(ClientKey.Alg ?? string.Empty).Equals("ES384", StringComparison.Ordinal))
+                        {
+                            Message = "When using EC, the only supported algorithm is ES384 (alg).";
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(ClientKey.Crv))
+                        {
+                            Message = "When using EC, you must provide a curve (crv).";
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(ClientKey.X))
+                        {
+                            Message = "When using EC, you must provide an X-coordinate (x).";
+                            return;
+                        }
+
+                        if (string.IsNullOrEmpty(ClientKey.Y))
+                        {
+                            Message = "When using EC, you must provide a Y-coordinate (y).";
+                            return;
+                        }
+
+                        // copy just the values we want
+                        JsonWebKey key = new()
+                        {
+                            Kty = ClientKey.Kty,
+                            Use = ClientKey.Use,
+                            Alg = ClientKey.Alg,
+                            KeyId = ClientKey.KeyId,
+                            Crv = ClientKey.Crv,
+                            X = ClientKey.X,
+                            Y = ClientKey.Y,
+                        };
+                        key.KeyOps.Add(ClientKey.KeyOps!.First());
+
+                        SmartClient.Registration!.KeySet.Keys.Add(key);
+                    }
+                    else
+                    {
+                        Message = "Key Type must be either RSA or EC (kty).";
+                        return;
+                    }
+                }
+                break;
+
+            default:
+                Message = $"Invalid Key Entry Mode: {KeyEntryMode}.";
+                return;
+        }
+
+        SmartClient.Registration!.ClientName = SmartClient.ClientName;
+
+        if (!AuthManager.TryRegisterClient(SmartClient.Registration, out string clientId, out List<string> messages))
+        {
+            Message = "Client Registration failed!\n" + string.Join("\n", messages);
+            return;
+        }
+
+        SmartClient.ClientId = clientId;
+
+        NavigationManager.NavigateTo("/smart/clients");
+    }
+
+    /// <summary>Handles the location changed.</summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">     Location changed event information.</param>
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (e.Location.ToLowerInvariant().Contains("/smart/client_details", StringComparison.Ordinal))
+        {
+            DoInitialization();
+        }
+    }
+
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged
+    /// resources.
+    /// </summary>
+    public void Dispose()
+    {
+        // if (_store != null)
+        // {
+        // }
+    }
+}

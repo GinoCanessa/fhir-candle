@@ -121,10 +121,11 @@
     {
         base.OnInitialized();
 
-        if (NavTracker != null)
-        {
-            NavTracker.OnThemeChanged += NavTracker_OnThemeChanged;
-        }
+        // Use OnLuminanceChanged to update the theme
+        // if (NavTracker != null)
+        // {
+        //     NavTracker.OnThemeChanged += NavTracker_OnThemeChanged;
+        // }
     }
 
     private void NavTracker_OnThemeChanged(object? sender, EventArgs e)
@@ -138,9 +139,9 @@
     /// </summary>
     public void Dispose()
     {
-        if (NavTracker != null)
-        {
-            NavTracker.OnThemeChanged -= NavTracker_OnThemeChanged;
-        }
+        // if (NavTracker != null)
+        // {
+        //     NavTracker.OnThemeChanged -= NavTracker_OnThemeChanged;
+        // }
     }
 }

@@ -1,32 +1,37 @@
-﻿@implements IIndexContent
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
-<MudText Typo="Typo.body1">
-    As a reference implementation for @ContentFor, this endpoint contains some immutable records for testing:
-</MudText>
+@implements IIndexContent
 
-<MudList>
-    <MudListItem Typo="Typo.body1">
-        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Patient&id=example")"
-                    Underline="Underline.Always">Patient/example</MudLink>:
-        An example patient, loaded from the FHIR examples.
-    </MudListItem>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
 
-    <MudListItem>
-        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=SubscriptionTopic&id=encounter-complete")"
-                    Underline="Underline.Always">SubscriptionTopic/encounter-complete</MudLink>:
-        An example <code>SubscriptionTopic</code>.
-        The topic triggers when an encounter is either created with a <code>status</code> of <code>complete</code>
-        or updated from any other status to <code>complete</code>.
-    </MudListItem>
-</MudList>
-<br />
-<MudText Typo="Typo.body1">
-    If you are getting started with topic-based subscriptions, there is a deatiled tour available
-    <MudLink Href="@($"/subscriptions/tour?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
-</MudText>
-<br />
+    <FluentLabel Typo="Typography.Body">
+        As a reference implementation for @ContentFor, this endpoint contains some immutable records for testing:
+    </FluentLabel>
+
+    <ul>
+        <li>
+            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Patient&id=example")">
+                Patient/example
+            </FluentAnchor>:
+            An example patient, loaded from the FHIR examples.
+        </li>
+
+        <li>
+            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=SubscriptionTopic&id=encounter-complete")">
+                SubscriptionTopic/encounter-complete
+            </FluentAnchor>:
+            An example <code>SubscriptionTopic</code>.
+            The topic triggers when an encounter is either created with a <code>status</code> of <code>complete</code>
+            or updated from any other status to <code>complete</code>.
+        </li>
+    </ul>
+
+    <FluentLabel Typo="Typography.Body">
+        If you are getting started with topic-based subscriptions, there is a deatiled tour available
+        <FluentAnchor Appearance="Appearance.Hypertext"  Href="@($"/subscriptions/tour?store={StoreName}")">here</FluentAnchor>.
+    </FluentLabel>
+</FluentStack>
+
 @* <MudText Typo="Typo.body1">
     If you are building or testing a topic-based subscription server implementation, there is a client available
     <MudLink Href="@($"/subscriptions/client?store={StoreName}")" Underline="Underline.Always">here</MudLink>.

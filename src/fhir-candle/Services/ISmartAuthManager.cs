@@ -21,6 +21,9 @@ public interface ISmartAuthManager : IHostedService
     /// <returns>True if the tenant exists, false if not.</returns>
     bool HasTenant(string tenant);
 
+    /// <summary>Gets a value indicating whether this object is enabled.</summary>
+    bool IsEnabled { get; }
+
     /// <summary>Gets the smart configuration by tenant.</summary>
     Dictionary<string, SmartWellKnown> SmartConfigurationByTenant { get; }
 

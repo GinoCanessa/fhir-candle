@@ -1,4 +1,7 @@
-﻿@page "/"
+﻿@* @using MudBlazor; *@
+@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/"
 
 @using fhir.candle.Components;
 @using fhir.candle.Models;
@@ -10,21 +13,211 @@
 
 @implements IDisposable
 
-<MudAlert Severity="Severity.Warning">
-    This is an open FHIR endpoint for development, testing, and educational purposes only.
-    Uploading real patient data is strictly prohibited.
-</MudAlert>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+        <FluentIcon Value="@(new Icons.Regular.Size24.Warning())" Color="@Color.Warning" />
+        <FluentLabel Color="@Color.Warning">
+            This is an open FHIR endpoint for development, testing, and educational purposes only.
+            Uploading real patient data is strictly prohibited.
+        </FluentLabel>
+    </FluentStack>
 
-<MudPaper Class="pa-4 ma-2" Square="true">
     @if (!string.IsNullOrEmpty(ServerConfig.ReferenceImplementation))
     {
-        <MudText Typo="Typo.h6">Reference Implementation</MudText>
-        <br />
-        <MudText Typo="Typo.body1">
+        <FluentLabel Typo="Typography.H6">Reference Implementation</FluentLabel>
+        <FluentLabel Typo="Typography.Body">
             Note that this server is configured to be a reference implementation (RI) for @ServerConfig.ReferenceImplementation .
-        </MudText>
-        <br />
+        </FluentLabel>
     }
+
+    @if (StoreManager.Count() == 1)
+    {
+        <FluentLabel Typo="Typography.H6">FHIR Endpoint Information</FluentLabel>
+
+        @switch (StoreManager.First().Value.Config.FhirVersion)
+        {
+            case TenantConfiguration.SupportedFhirVersions.R4:
+                <fhir.candle.Components.FhirStoreTileR4 
+                    StoreName="@StoreManager.First().Key" 
+                    Store="@StoreManager.First().Value"
+                    RiName="@ServerConfig.ReferenceImplementation"
+                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
+                    AdditionalContent="@_contentR4"
+                    />
+                break;
+
+            case TenantConfiguration.SupportedFhirVersions.R4B:
+                <fhir.candle.Components.FhirStoreTileR4B
+                    StoreName="@StoreManager.First().Key" 
+                    Store="@StoreManager.First().Value"
+                    RiName="@ServerConfig.ReferenceImplementation"
+                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
+                    AdditionalContent="@_contentR4B"
+                    />
+                break;
+
+            case TenantConfiguration.SupportedFhirVersions.R5:
+                <fhir.candle.Components.FhirStoreTileR5
+                    StoreName="@StoreManager.First().Key" 
+                    Store="@StoreManager.First().Value"
+                    RiName="@ServerConfig.ReferenceImplementation"
+                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
+                    AdditionalContent="@_contentR5"
+                    />
+                break;
+        }
+    }
+        else
+    {
+        <FluentLabel Typo="Typography.H6">FHIR Endpoints</FluentLabel>
+
+        <FluentTabs Orientation="Orientation.Horizontal">
+            @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
+            {
+                <FluentTab Label="@kvp.Key" Id="@kvp.Key">
+                    <FluentCard>
+                        @switch (kvp.Value.Config.FhirVersion)
+                        {
+                            case TenantConfiguration.SupportedFhirVersions.R4:
+                                <fhir.candle.Components.FhirStoreTileR4 
+                                    StoreName="@kvp.Key" 
+                                    Store="@kvp.Value"
+                                    RiName="@ServerConfig.ReferenceImplementation"
+                                    RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
+                                    AdditionalContent="@_contentR4"
+                                    />
+                                break;
+
+                            case TenantConfiguration.SupportedFhirVersions.R4B:
+                                <fhir.candle.Components.FhirStoreTileR4B
+                                    StoreName="@kvp.Key" 
+                                    Store="@kvp.Value"
+                                    RiName="@ServerConfig.ReferenceImplementation"
+                                    RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
+                                    AdditionalContent="@_contentR4B"
+                                    />
+                                break;
+
+                            case TenantConfiguration.SupportedFhirVersions.R5:
+                                <fhir.candle.Components.FhirStoreTileR5
+                                    StoreName="@kvp.Key" 
+                                    Store="@kvp.Value"
+                                    RiName="@ServerConfig.ReferenceImplementation"
+                                    RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
+                                    AdditionalContent="@_contentR5"
+                                    />
+                                break;
+                        }
+
+                        @if (kvp.Value.Config.SmartRequired)
+                        {
+                            <FluentLabel Typo="Typography.Body">
+                                SMART authorization has been set to <code>required</code> for this FHIR endpoint:
+                            </FluentLabel>
+                            <ul>
+                                <li>
+                                    The SMART well-known configuration is available at: 
+                                    <code class="copy-click">@kvp.Value.Config.BaseUrl/.well-known/smart-configuration</code>.
+                                </li>
+                                <li>
+                                    The metadata endpoint (<code>@kvp.Value.Config.BaseUrl/metadata</code>) is openly accessible.
+                                </li>
+                                <li>
+                                    All other FHIR API calls require an access token with appropriate scopes.
+                                </li>
+
+                                <li>
+                                    For testing convenience, there are headers and query parameters that can be used to 'streamline' login and authorization.
+                                    <ul>
+                                        <li>
+                                            Query Parameter <code>candle_auth_bypass</code> or Header <code>candle-auth-bypass</code>, can have values:
+                                            <code>administrator</code>, <code>patient</code>, or <code>practitioner</code>.  Using this value will 'fast-forward'
+                                            through the SMART authorization process and return an access token with the appropriate scopes and launch parameters,
+                                            as specified by the following options.
+                                        </li>
+                                        <li>
+                                            Query Parameter <code>candle_patient</code> or Header <code>candle-patient</code> is used to set the <code>launch/patient</code>.
+                                            Values MUST be formatted as <code>Patient/[id]</code> and MUST exist on the system.
+                                        </li>
+                                        <li>
+                                            Query Parameter <code>candle_practitioner</code> or Header <code>candle-practitioner</code> is used to set the <code>launch/practitioner</code>.
+                                            Values MUST be formatted as <code>Practitioner/[id]</code> and MUST exist on the system.
+                                        </li>
+                                    </ul>
+                                </li>
+
+                                <li>
+                                    For testing convenience, there is an immutable access grant for the <code>administrator</code> user.
+                                    <ul>
+                                        <li>
+                                            The <code>code</code> is <code class="copy-click">00000000-0000-0000-0000-000000000000</code>.
+                                        </li>
+                                        <li>
+                                            The <code>access_token</code> is 
+                                            <code class="copy-click">00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>.
+                                        </li>
+                                        <li>
+                                            The <code>refresh_token</code> is 
+                                            <code class="copy-click">00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>.
+                                        </li>
+                                        <li>
+                                            All requests using this <code>access_token</code> are considered authorized
+                                            (e.g., <code>Authorization: Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>).
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        }
+
+                        @if (kvp.Value.Config.SmartAllowed)
+                        {
+                            <FluentLabel Typo="Typography.Body">
+                                SMART authorization has been set to <code>optional</code> for this FHIR endpoint:
+                            </FluentLabel>
+                            <ul>
+                                <li>
+                                    The SMART well-known configuration is available at:
+                                    <code class="copy-click">@kvp.Value.Config.BaseUrl/.well-known/smart-configuration</code>.
+                                </li>
+                                <li>
+                                    The metadata endpoint (<code>@kvp.Value.Config.BaseUrl/metadata</code>) is openly accessible.
+                                </li>
+                                <li>
+                                    For all other calls, if an authorization header is provided, it will be validated.  If
+                                    no authorization header is provided, the call will be allowed.
+                                </li>
+                                <li>
+                                    For testing convenience, there is an immutable access grant for the <code>administrator</code> user.
+                                    <ul>
+                                        <li>
+                                            The <code>code</code> is <code class="copy-click">00000000-0000-0000-0000-000000000000</code>.
+                                        </li>
+                                        <li>
+                                            The <code>access_token</code> is 
+                                            <code class="copy-click">00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>.
+                                        </li>
+                                        <li>
+                                            The <code>refresh_token</code> is 
+                                            <code class="copy-click">00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>.
+                                        </li>
+                                        <li>
+                                            All requests using this <code>access_token</code> are considered authorized
+                                            (e.g., <code class="copy-click">Authorization: Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>).
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        }
+                    </FluentCard>
+                </FluentTab>
+            }
+        </FluentTabs>
+    }
+
+</FluentStack>
+
+@* 
+<MudPaper Class="pa-4 ma-2" Square="true">
 
     @if (StoreManager.Count() == 1)
     {
@@ -309,7 +502,17 @@
             </tr>
         </tbody>
     </MudSimpleTable>
-</MudPaper>
+</MudPaper> *@
+
+
+@*     <FluentStack Style="margin: 30px 0px; padding: 30px; border: 1px solid var(--accent-fill-rest);">
+        <FluentIcon Value="@(new Icons.Regular.Size24.Airplane())" />
+        <FluentLabel>Example of content</FluentLabel>
+        <FluentButton Appearance="Appearance.Outline">Outline button</FluentButton>
+        <FluentButton Appearance="Appearance.Accent">Accent button</FluentButton>
+    </FluentStack>
+ *@
+
 
 @code {
 
@@ -345,4 +548,5 @@
     public void Dispose()
     {
     }
+
 }

@@ -1,33 +1,37 @@
-﻿@implements IIndexContent
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
-<MudText Typo="Typo.body1">
-    As a reference implementation for @ContentFor, this endpoint contains some immutable records for testing:
-</MudText>
+@implements IIndexContent
 
-<MudList>
-    <MudListItem Typo="Typo.body1">
-        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Patient&id=example")"
-                    Underline="Underline.Always">Patient/example</MudLink>:
-        An example patient, loaded from the FHIR examples.
-    </MudListItem>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.Body">
+        As a reference implementation for @ContentFor, this endpoint contains some immutable records for testing:
+    </FluentLabel>
 
-    <MudListItem>
-        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Basic&id=encounter-complete")"
-                    Underline="Underline.Always">Basic/encounter-complete</MudLink>:
-        An example topic as a <code>Basic</code> resource, using cross-version extensions (equivalent
-        to the R4B and R5 <code>encounter-complete</code> topics).
-        The topic triggers when an encounter is either created with a <code>status</code> of <code>finished</code>
-        or updated from any other status to <code>finished</code>.
-    </MudListItem>
-</MudList>
-<br />
-<MudText Typo="Typo.body1">
-    If you are getting started with topic-based subscriptions, there is a deatiled tour available
-    <MudLink Href="@($"/subscriptions/tour?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
-</MudText>
-<br />
+    <ul>
+        <li>
+            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Patient&id=example")">
+                Patient/example
+            </FluentAnchor>:
+            An example patient, loaded from the FHIR examples.
+        </li>
+
+        <li>
+            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Basic&id=encounter-complete")">
+                Basic/encounter-complete
+            </FluentAnchor>:
+            An example topic as a <code>Basic</code> resource, using cross-version extensions (equivalent
+            to the R4B and R5 <code>encounter-complete</code> topics).
+            The topic triggers when an encounter is either created with a <code>status</code> of <code>finished</code>
+            or updated from any other status to <code>finished</code>.
+        </li>
+    </ul>
+
+    <FluentLabel Typo="Typography.Body">
+        If you are getting started with topic-based subscriptions, there is a deatiled tour available
+        <MudLink Href="@($"/subscriptions/tour?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
+    </FluentLabel>
+</FluentStack>
+
 @* <MudText Typo="Typo.body1">
     If you are building or testing a topic-based subscription server implementation, there is a client available
     <MudLink Href="@($"/subscriptions/client?store={StoreName}")" Underline="Underline.Always">here</MudLink>.

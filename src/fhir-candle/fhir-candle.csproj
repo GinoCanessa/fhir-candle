@@ -7,7 +7,8 @@
     <StartupObject>fhir.candle.Program</StartupObject>
     <VersionPrefix>$([System.DateTime]::Now.ToString("yyyy.MMdd.HHmm"))</VersionPrefix>
     <Version>$(VersionPrefix)</Version>
-    <AssemblyVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</AssemblyVersion>
+	<AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
+	<AssemblyVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</AssemblyVersion>
     <FileVersion>$([System.DateTime]::Now.ToString("0.yyyy.MMdd.HHmm"))</FileVersion>
     <IsPackable>true</IsPackable>
     <PackAsTool>true</PackAsTool>
@@ -72,6 +73,9 @@
   <ItemGroup>
     <PackageReference Include="ini-parser-netcore" Version="3.0.0" />
     <PackageReference Include="MailKit" Version="4.4.0" />
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.6.0" />
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components.Emoji" Version="4.6.0" />
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components.Icons" Version="4.6.0" />
     <PackageReference Include="MudBlazor" Version="6.19.1" IncludeAssets="all" />
     <PackageReference Include="BlazorMonaco" Version="3.2.0" IncludeAssets="all" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />

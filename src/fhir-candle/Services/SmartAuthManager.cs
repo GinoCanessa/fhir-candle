@@ -74,6 +74,9 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<SmartAuthManager>();
     }
 
+    /// <summary>Gets a value indicating whether this object is enabled.</summary>
+    public bool IsEnabled => _smartConfigs.Any();
+
     /// <summary>Gets the smart configuration by tenant.</summary>
     public Dictionary<string, SmartWellKnown> SmartConfigurationByTenant { get => _smartConfigs; }
 

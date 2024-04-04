@@ -1,4 +1,4 @@
-@using MudBlazor;
+@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/davinci-cdex/tasks"
 
@@ -11,34 +11,23 @@
 
 <PageTitle>CDex Tasks</PageTitle>
 
-<MudPaper Class="pa-4 ma-2" Square="true">
-    <MudText Typo="Typo.h6">CDex Tasks</MudText>
-    <MudText Typo="Typo.body1">
-        This page has interactions for DaVinci CDex Tasks, in FHIR @_store.Config.FhirVersion .
-    </MudText>
-    <br />
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.H6">CDex Tasks</FluentLabel>
 
-    <MudText Typo="Typo.body1">
+    <FluentLabel Typo="Typography.Body">
+        This page has interactions for DaVinci CDex Tasks, in FHIR @(_store.Config.FhirVersion).
+    </FluentLabel>
+
+    <FluentLabel Typo="Typography.Body">
         Following is a list of properly-tagged Tasks and actions that can be taken with them.
-    </MudText>
-    <MudSimpleTable>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Code</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <FhirCandle.Ui.R4.davinci_cdex.TaskListRows
-                Store="@_store"
-                StoreName="@StoreName"
-                />
-        </tbody>
-    </MudSimpleTable>
-    <br />
-</MudPaper>
+    </FluentLabel>
+
+    <FhirCandle.Ui.R4.davinci_cdex.TaskTable
+        Store="@_store"
+        StoreName="@StoreName"
+        />
+
+</FluentStack>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
@@ -83,7 +72,9 @@
         if ((!string.IsNullOrEmpty(StoreName)) &&
             (StoreManager.TryGetValue(StoreName, out _store!)))
         {
-            _store!.OnChanged += Store_OnChanged;
+            _store.OnInstanceCreated += Store_OnChanged;
+            _store.OnInstanceUpdated += Store_OnChanged;
+            _store.OnInstanceDeleted += Store_OnChanged;
         }
 
         // notify of store root in case user clicked here directly
@@ -100,13 +91,17 @@
         {
             if (_store != null)
             {
-                _store.OnChanged -= Store_OnChanged;
+                _store.OnInstanceCreated -= Store_OnChanged;
+                _store.OnInstanceUpdated -= Store_OnChanged;
+                _store.OnInstanceDeleted -= Store_OnChanged;
             }
 
             if ((!string.IsNullOrEmpty(StoreName)) &&
                 (StoreManager.TryGetValue(StoreName, out _store!)))
             {
-                _store.OnChanged += Store_OnChanged;
+                _store.OnInstanceCreated += Store_OnChanged;
+                _store.OnInstanceUpdated += Store_OnChanged;
+                _store.OnInstanceDeleted += Store_OnChanged;
             }
 
             // notify of store root in case user clicked here directly
@@ -131,7 +126,9 @@
     {
         if (_store != null)
         {
-            _store.OnChanged -= Store_OnChanged;
+            _store.OnInstanceCreated -= Store_OnChanged;
+            _store.OnInstanceUpdated -= Store_OnChanged;
+            _store.OnInstanceDeleted -= Store_OnChanged;
         }
     }
 }

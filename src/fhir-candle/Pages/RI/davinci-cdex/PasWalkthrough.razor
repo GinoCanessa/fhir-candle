@@ -1,4 +1,4 @@
-@using MudBlazor;
+@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/davinci-pas/walkthrough"
 
@@ -11,26 +11,25 @@
 
 <PageTitle>CDex Tasks</PageTitle>
 
-<MudPaper Class="pa-4 ma-2" Square="true">
-    <MudText Typo="Typo.h6">PAS using CDex Tasks</MudText>
-    <MudText Typo="Typo.body1">
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.H6">PAS using CDex Tasks</FluentLabel>
+
+    <FluentLabel Typo="Typography.Body">
         This page provides a walkthrough of DaVinci Prior Authorization Support (PAS), in FHIR R4.
         The CI build of the IG can be found on
-        <MudLink Href="https://build.fhir.org/ig/HL7/davinci-pas/"
-                 Underline="Underline.Always">build.fhir.org</MudLink>,
+        <FluentAnchor Appearance="Appearance.Hypertext" Href="https://build.fhir.org/ig/HL7/davinci-pas/">build.fhir.org</FluentAnchor>,
         and the most recent published version can be found on
-        <MudLink Href="http://hl7.org/fhir/us/davinci-pas/"
-                 Underline="Underline.Always">hl7.org</MudLink>.
+        <FluentAnchor Appearance="Appearance.Hypertext" Href="http://hl7.org/fhir/us/davinci-pas/">hl7.org</FluentAnchor>.
         <br />
         Note that this walkthrough uses two internal FHIR endpoints, one for a Provider and one for a Payer or Intermediary.
-    </MudText>
-    <br />
+    </FluentLabel>
 
     <FhirCandle.Ui.R4.davinci_pas.PasWalkthroughR4
         ProviderStore="@_provider"
         PayerStore="@_payer"
         />
-</MudPaper>
+
+</FluentStack>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
@@ -72,17 +71,23 @@
             if (name.Contains("provider", StringComparison.OrdinalIgnoreCase))
             {
                 _provider = store;
-                _provider.OnChanged += Store_OnChanged;
+                _provider.OnInstanceCreated += Store_OnChanged;
+                _provider.OnInstanceUpdated += Store_OnChanged;
+                _provider.OnInstanceDeleted += Store_OnChanged;
             }
             else if (name.Contains("payer", StringComparison.OrdinalIgnoreCase))
             {
                 _payer = store;
-                _payer.OnChanged += Store_OnChanged;
+                _payer.OnInstanceCreated += Store_OnChanged;
+                _payer.OnInstanceUpdated += Store_OnChanged;
+                _payer.OnInstanceDeleted += Store_OnChanged;
             }
             else if (name.Contains("intermediary", StringComparison.OrdinalIgnoreCase))
             {
                 _payer = store;
-                _payer.OnChanged += Store_OnChanged;
+                _payer.OnInstanceCreated += Store_OnChanged;
+                _payer.OnInstanceUpdated += Store_OnChanged;
+                _payer.OnInstanceDeleted += Store_OnChanged;
             }
         }
 
@@ -99,12 +104,16 @@
         {
             if (_provider != null)
             {
-                _provider.OnChanged -= Store_OnChanged;
+                _provider.OnInstanceCreated -= Store_OnChanged;
+                _provider.OnInstanceUpdated -= Store_OnChanged;
+                _provider.OnInstanceDeleted -= Store_OnChanged;
             }
 
             if (_payer != null)
             {
-                _payer.OnChanged -= Store_OnChanged;
+                _payer.OnInstanceCreated -= Store_OnChanged;
+                _payer.OnInstanceUpdated -= Store_OnChanged;
+                _payer.OnInstanceDeleted -= Store_OnChanged;
             }
 
             foreach ((string name, IFhirStore store) in StoreManager)
@@ -112,17 +121,23 @@
                 if (name.Contains("provider", StringComparison.OrdinalIgnoreCase))
                 {
                     _provider = store;
-                    _provider.OnChanged += Store_OnChanged;
+                    _provider.OnInstanceCreated += Store_OnChanged;
+                    _provider.OnInstanceUpdated += Store_OnChanged;
+                    _provider.OnInstanceDeleted += Store_OnChanged;
                 }
                 else if (name.Contains("payer", StringComparison.OrdinalIgnoreCase))
                 {
                     _payer = store;
-                    _payer.OnChanged += Store_OnChanged;
+                    _payer.OnInstanceCreated += Store_OnChanged;
+                    _payer.OnInstanceUpdated += Store_OnChanged;
+                    _payer.OnInstanceDeleted += Store_OnChanged;
                 }
                 else if (name.Contains("intermediary", StringComparison.OrdinalIgnoreCase))
                 {
                     _payer = store;
-                    _payer.OnChanged += Store_OnChanged;
+                    _payer.OnInstanceCreated += Store_OnChanged;
+                    _payer.OnInstanceUpdated += Store_OnChanged;
+                    _payer.OnInstanceDeleted += Store_OnChanged;
                 }
             }
 
@@ -147,12 +162,16 @@
     {
         if (_provider != null)
         {
-            _provider.OnChanged -= Store_OnChanged;
+            _provider.OnInstanceCreated -= Store_OnChanged;
+            _provider.OnInstanceUpdated -= Store_OnChanged;
+            _provider.OnInstanceDeleted -= Store_OnChanged;
         }
 
         if (_payer != null)
         {
-            _payer.OnChanged -= Store_OnChanged;
+            _payer.OnInstanceCreated -= Store_OnChanged;
+            _payer.OnInstanceUpdated -= Store_OnChanged;
+            _payer.OnInstanceDeleted -= Store_OnChanged;
         }
     }
 }

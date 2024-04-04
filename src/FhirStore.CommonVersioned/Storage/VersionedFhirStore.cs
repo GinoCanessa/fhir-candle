@@ -38,8 +38,14 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
 
-    /// <summary>Occurs when On Changed.</summary>
-    public event EventHandler<EventArgs>? OnChanged;
+    /// <summary>Occurs when On Instance Created.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceCreated;
+
+    /// <summary>Occurs when On Instance Updated.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceUpdated;
+
+    /// <summary>Occurs when On Instance Deleted.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceDeleted;
 
     /// <summary>Occurs when a Subscription or SubscriptionTopic resource has changed.</summary>
     public event EventHandler<SubscriptionChangedEventArgs>? OnSubscriptionsChanged;
@@ -226,7 +232,6 @@ public partial class VersionedFhirStore : IFhirStore
             if (irs != null)
             {
                 _store.Add(tn, irs);
-                irs.OnChanged += ResourceStore_OnChanged;
             }
         }
 
@@ -5550,23 +5555,53 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
-    /// <summary>State has changed.</summary>
-    public void StateHasChanged()
+    /// <summary>Registers that an instance has been created.</summary>
+    /// <param name="resourceId">Identifier for the resource.</param>
+    public void RegisterInstanceCreated(string resourceType, string resourceId)
     {
-        EventHandler<EventArgs>? handler = OnChanged;
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceCreated;
 
         if (handler != null)
         {
-            handler(this, new());
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = resourceType,
+            });
         }
     }
 
-    /// <summary>FHIR resource store on changed.</summary>
-    /// <param name="sender">The sender.</param>
-    /// <param name="e">     Event information.</param>
-    private void ResourceStore_OnChanged(object? sender, EventArgs e)
+    /// <summary>Registers that an instance has been updated.</summary>
+    /// <param name="resourceId">Identifier for the resource.</param>
+    public void RegisterInstanceUpdated(string resourceType, string resourceId)
     {
-        StateHasChanged();
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceUpdated;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = resourceType,
+            });
+        }
+    }
+
+    /// <summary>Registers that an instance has been deleted.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="resourceId">  Identifier for the resource.</param>
+    public void RegisterInstanceDeleted(string resourceType, string resourceId)
+    {
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceDeleted;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = resourceType,
+            });
+        }
     }
 
     /// <summary>
@@ -5587,7 +5622,8 @@ public partial class VersionedFhirStore : IFhirStore
 
                 foreach (IResourceStore rs in _store.Values)
                 {
-                    rs.OnChanged -= ResourceStore_OnChanged;
+                    rs.Dispose();
+                    //rs.OnChanged -= ResourceStore_OnChanged;
                 }
             }
 

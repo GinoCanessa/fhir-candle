@@ -1,4 +1,4 @@
-﻿@using MudBlazor;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/subscriptions/local"
 
@@ -9,38 +9,37 @@
 
 <PageTitle>Local Subscriptions</PageTitle>
 
-<MudGrid>
+<FluentGrid Spacing="4">
     @foreach (ParsedSubscription sub in _store?.CurrentSubscriptions ?? Array.Empty<ParsedSubscription>())
     {
-    <MudItem>
-        <MudBadge Content="@sub.GeneratedEvents.Count()" Color="@ColorForStatus(sub.CurrentStatus)" Overlap="true" Class="mx-6 my-4">
-            <MudCard Outlined="true">
-                <MudCardContent>
-                    <MudField Label="Subscription">
-                        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={sub.Id}")" Underline="Underline.Always">Subscription/@sub.Id</MudLink>
-                    </MudField>
-                    <MudField Label="Topic">@sub.TopicUrl</MudField>
-                    <MudField Label="Channel">@sub.ChannelCode</MudField>
-                    <MudField Label="Endpoint">@sub.Endpoint</MudField>
+        <FluentGridItem xs="12">
+            <FluentCounterBadge Count="@sub.GeneratedEvents.Count()" Appearance="Appearance.Accent" BottomPosition="97" HorizontalPosition="97" Max="999">
+                <FluentCard>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                        <FluentLabel Typo="Typography.Body">Subscription</FluentLabel>
+                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={sub.Id}")">Subscription/@sub.Id</FluentAnchor>
 
-                    <MudField Label="Generated Event Details">
-                            <MudLink Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={sub.Id}")" Underline="Underline.Always">Generated Events</MudLink>
-                    </MudField>
+                        <FluentTextField Label="Topic" ReadOnly="true" ValueExpression="@sub.TopicUrl"/>
+                        <FluentTextField Label="Channel" ReadOnly="true" ValueExpression="@sub.ChannelCode"/>
+                        <FluentTextField Label="Endpoint" ReadOnly="true" ValueExpression="@sub.Endpoint"/>
 
-                    @if (sub.GeneratedEvents.Any())
-                    {
-                        <MudField Label="Latest">@HeaderFor(sub.GeneratedEvents.Last().Value)</MudField>
-                    }
-                    @if (sub.NotificationErrors.Any())
-                    {
-                        <MudField Label="Error" Error="true">@sub.NotificationErrors.Last()</MudField>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudBadge>
-    </MudItem>
+                        <FluentLabel Typo="Typography.Body">Generated Event Details</FluentLabel>
+                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={sub.Id}")">Generated Events</FluentAnchor>
+
+                        @if (sub.GeneratedEvents.Any())
+                        {
+                            <FluentTextField Label="Latest" ReadOnly="true" ValueExpression="@HeaderFor(sub.GeneratedEvents.Last().Value)" />
+                        }
+                        @if (sub.NotificationErrors.Any())
+                        {
+                            <FluentTextField Label="Error" Error="true" ReadOnly="true" ValueExpression="@sub.NotificationErrors.Last()" />
+                        }
+                    </FluentStack>
+                </FluentCard>
+            </FluentCounterBadge>
+        </FluentGridItem>
     }
-</MudGrid>
+</FluentGrid>
 
 @code {
         /// <summary>Gets or sets the navigation tracker.</summary>
@@ -63,7 +62,8 @@
         if ((!string.IsNullOrEmpty(StoreName)) &&
             (StoreManager.TryGetValue(StoreName, out _store!)))
         {
-            _store.OnChanged += Store_OnChanged;
+            _store.OnInstanceCreated += Store_OnChanged;
+            _store.OnInstanceDeleted += Store_OnChanged;
             _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
             _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
         }
@@ -82,7 +82,8 @@
         {
             if (_store != null)
             {
-                _store.OnChanged -= Store_OnChanged;
+                _store.OnInstanceCreated -= Store_OnChanged;
+                _store.OnInstanceDeleted -= Store_OnChanged;
                 _store.OnSubscriptionSendEvent -= Store_OnSubscriptionSendEvent;
                 _store.OnSubscriptionsChanged -= Store_OnSubscriptionsChanged;
             }
@@ -90,7 +91,8 @@
             if ((!string.IsNullOrEmpty(StoreName)) &&
                 (StoreManager.TryGetValue(StoreName, out _store!)))
             {
-                _store.OnChanged += Store_OnChanged;
+                _store.OnInstanceCreated += Store_OnChanged;
+                _store.OnInstanceDeleted += Store_OnChanged;
                 _store.OnSubscriptionSendEvent += Store_OnSubscriptionSendEvent;
                 _store.OnSubscriptionsChanged += Store_OnSubscriptionsChanged;
             }
@@ -99,29 +101,6 @@
             NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
             NavTracker?.NotifyNav($"Local Subscriptions", "/subscriptions/local?store=" + StoreName, 2);
         }
-    }
-
-    /// <summary>Color for status.</summary>
-    /// <param name="status">The status.</param>
-    /// <returns>A Color.</returns>
-    private Color ColorForStatus(string status)
-    {
-        switch (status)
-        {
-            case "requested":
-                return Color.Info;
-
-            case "active":
-                return Color.Primary;
-
-            case "error":
-                return Color.Error;
-
-            case "off":
-                return Color.Dark;
-        }
-
-        return Color.Primary;
     }
 
     /// <summary>Header for.</summary>
@@ -164,7 +143,8 @@
     {
         if (_store != null)
         {
-            _store.OnChanged -= Store_OnChanged;
+            _store.OnInstanceCreated -= Store_OnChanged;
+            _store.OnInstanceDeleted -= Store_OnChanged;
             _store.OnSubscriptionSendEvent -= Store_OnSubscriptionSendEvent;
             _store.OnSubscriptionsChanged -= Store_OnSubscriptionsChanged;
         }

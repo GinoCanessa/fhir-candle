@@ -1,6 +1,9 @@
-﻿@using System.Diagnostics.CodeAnalysis;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+@using System.Diagnostics.CodeAnalysis;
+
 @inject IJSRuntime JS
 
+@*
 <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
     <MudTimelineItem Color="@ColorForStep(1)">
         <ItemContent>
@@ -12,13 +15,13 @@
                         </MudAvatar>
                     </CardHeaderAvatar>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Precondition Information</MudText>
+                        <FluentLabel Typo="Typography.H6">Precondition Information</FluentLabel>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudText Typo="Typo.body1">
+                    <FluentLabel Typo="Typography.Body">
                         This step contains links and information regarding this walkthrough.
-                    </MudText>
+                    </FluentLabel>
 
                     <br />
                     <MudDivider />
@@ -26,24 +29,24 @@
                     <MudList>
                         <MudListItem>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                            <MudLink Href="@($"/store?store={ProviderStore.Config.ControllerName}")"
-                                        Underline="Underline.Always">Provider FHIR Contents</MudLink>: FHIR resources in the provider FHIR server
+                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store?store={ProviderStore.Config.ControllerName}")"
+                                        >Provider FHIR Contents</FluentAnchor>: FHIR resources in the provider FHIR server
                         </MudListItem>
                         <MudListItem>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                <MudLink Href="@($"/subscriptions/notifications-received?store={ProviderStore.Config.ControllerName}")"
-                                        Underline="Underline.Always">Provider Received Notifications</MudLink>: incoming notifications received by the provider
+                                <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notifications-received?store={ProviderStore.Config.ControllerName}")"
+                                        >Provider Received Notifications</FluentAnchor>: incoming notifications received by the provider
                         </MudListItem>
 
                         <MudListItem>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                            <MudLink Href="@($"/store?store={PayerStore.Config.ControllerName}")"
-                                        Underline="Underline.Always">Intermediary/Payer FHIR Contents</MudLink>: FHIR resources in the intermediary/payer FHIR server
+                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store?store={PayerStore.Config.ControllerName}")"
+                                        >Intermediary/Payer FHIR Contents</FluentAnchor>: FHIR resources in the intermediary/payer FHIR server
                         </MudListItem>
                         <MudListItem>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                            <MudLink Href="@($"/subscriptions/local?store={PayerStore.Config.ControllerName}")"
-                                        Underline="Underline.Always">Intermediary/Payer Subscriptions</MudLink>: configured Subscriptions in the intermediary/payer FHIR server
+                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/local?store={PayerStore.Config.ControllerName}")"
+                                        >Intermediary/Payer Subscriptions</FluentAnchor>: configured Subscriptions in the intermediary/payer FHIR server
                         </MudListItem>
                     </MudList>
                 </MudCardContent>
@@ -64,13 +67,13 @@
                         </MudAvatar>
                     </CardHeaderAvatar>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Select a patient</MudText>
+                        <FluentLabel Typo="Typography.H6">Select a patient</FluentLabel>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudText Typo="Typo.body1">
+                    <FluentLabel Typo="Typography.Body">
                         As Provider: In this step we select the patient to use for our claim.
-                    </MudText>
+                    </FluentLabel>
                     <br />
                     <MudDivider />
                     <br />
@@ -98,22 +101,22 @@
                         </MudAvatar>
                     </CardHeaderAvatar>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Select claim data</MudText>
+                        <FluentLabel Typo="Typography.H6">Select claim data</FluentLabel>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudText Typo="Typo.body1">
+                    <FluentLabel Typo="Typography.Body">
                         As Provider: In this step select data we are using to construct our our claim.
-                    </MudText>
+                    </FluentLabel>
 
                     <br />
                     <MudDivider />
                     <br />
 
-                    <MudText Typo="Typo.h6">
+                    <FluentLabel Typo="Typography.H6">
                         Focal Encounter (optional)
                         <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _focalEncounter = null)">Clear</MudButton>
-                    </MudText>
+                    </FluentLabel>
                     @if (_encounters.Any())
                     {
                         <MudRadioGroup @bind-SelectedOption="@_focalEncounter">
@@ -125,17 +128,17 @@
                     }
                     else
                     {
-                        <MudText Typo="Typo.body1">No encounters found for patient @_patient?.Id</MudText>
+                        <FluentLabel Typo="Typography.Body">No encounters found for patient @_patient?.Id</FluentLabel>
                     }
 
                     <br />
                     <MudDivider />
                     <br />
 
-                    <MudText Typo="Typo.h6">
+                    <FluentLabel Typo="Typography.H6">
                         Patient Insurance (Coverage) (optional)
                         <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _insurance = null)">Clear</MudButton>
-                    </MudText>
+                    </FluentLabel>
                     @if (_coverages.Any())
                     {
                         <MudRadioGroup @bind-SelectedOption="@_insurance">
@@ -147,14 +150,14 @@
                     }
                     else
                     {
-                        <MudText Typo="Typo.body1">No coverage found for patient @_patient?.Id</MudText>
+                        <FluentLabel Typo="Typography.Body">No coverage found for patient @_patient?.Id</FluentLabel>
                     }
 
                     <br />
                     <MudDivider />
                     <br />
 
-                    <MudText Typo="Typo.h6">Supporting Resources (min one required)</MudText>
+                    <FluentLabel Typo="Typography.H6">Supporting Resources (min one required)</FluentLabel>
                     @foreach (ResourceInfo sd in _claimSupportingData)
                     {
                         <MudCheckBox @bind-Checked="sd.Selected"><code>@sd.Display</code></MudCheckBox>
@@ -164,8 +167,8 @@
                     <MudDivider />
                     <br />
 
-                    <MudText Typo="Typo.h6">Supporting Info Note (optional)</MudText>
-                    <MudTextField T="string" Variant="Variant.Outlined" @bind-Value="@_supportingMessage" Lines="5" />
+                    <FluentLabel Typo="Typography.H6">Supporting Info Note (optional)</FluentLabel>
+                    <FluentTextField T="string" Variant="Variant.Outlined" @bind-Value="@_supportingMessage" Lines="5" />
 
                     <br />
                     <MudDivider />
@@ -173,10 +176,10 @@
 
                     @if (_organizations.Any())
                     {
-                        <MudText Typo="Typo.h6">
+                        <FluentLabel Typo="Typography.H6">
                             Insurer (Required)
                             <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _insurer = null)">Clear</MudButton>
-                        </MudText>
+                        </FluentLabel>
 
                         <MudRadioGroup @bind-SelectedOption="@_insurer">
                             @foreach (ResourceInfo ri in _organizations)
@@ -189,10 +192,10 @@
                         <MudDivider />
                         <br />
 
-                        <MudText Typo="Typo.h6">
+                        <FluentLabel Typo="Typography.H6">
                             Requestor (Required)
                             <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _requestor = null)">Clear</MudButton>
-                        </MudText>
+                        </FluentLabel>
 
                         <MudRadioGroup @bind-SelectedOption="@_requestor">
                             @foreach (ResourceInfo ri in _organizations)
@@ -230,13 +233,13 @@
                         </MudAvatar>
                     </CardHeaderAvatar>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Build the claim</MudText>
+                        <FluentLabel Typo="Typography.H6">Build the claim</FluentLabel>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudText Typo="Typo.body1">
+                    <FluentLabel Typo="Typography.Body">
                         In this step, we build the actual claim.
-                    </MudText>
+                    </FluentLabel>
                     <br />
                     <MudDivider />
 
@@ -259,6 +262,8 @@
 
 
 </MudTimeline>
+
+*@
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
@@ -379,51 +384,51 @@
     private Hl7.Fhir.Model.Claim? _claim = null;
     private Hl7.Fhir.Model.Bundle? _requestBundle = null;
 
-    /// <summary>Color for step.</summary>
-    /// <param name="step">Amount to increment by.</param>
-    /// <returns>A MudBlazor.Color.</returns>
-    private MudBlazor.Color ColorForStep(int step)
-    {
-        if (step == errorAtStep)
-        {
-            return Color.Error;
-        }
+    // /// <summary>Color for step.</summary>
+    // /// <param name="step">Amount to increment by.</param>
+    // /// <returns>A MudBlazor.Color.</returns>
+    // private MudBlazor.Color ColorForStep(int step)
+    // {
+    //     if (step == errorAtStep)
+    //     {
+    //         return Color.Error;
+    //     }
 
-        if (step < onStep)
-        {
-            return Color.Success;
-        }
+    //     if (step < onStep)
+    //     {
+    //         return Color.Success;
+    //     }
 
-        if (step == onStep)
-        {
-            return Color.Primary;
-        }
+    //     if (step == onStep)
+    //     {
+    //         return Color.Primary;
+    //     }
 
-        return Color.Default;
-    }
+    //     return Color.Default;
+    // }
 
-    /// <summary>Icon for step.</summary>
-    /// <param name="step">Amount to increment by.</param>
-    /// <returns>A string.</returns>
-    private string IconForStep(int step)
-    {
-        if (step == errorAtStep)
-        {
-            return Icons.Material.Filled.Error;
-        }
+    // /// <summary>Icon for step.</summary>
+    // /// <param name="step">Amount to increment by.</param>
+    // /// <returns>A string.</returns>
+    // private string IconForStep(int step)
+    // {
+    //     if (step == errorAtStep)
+    //     {
+    //         return Icons.Material.Filled.Error;
+    //     }
 
-        if (step < onStep)
-        {
-            return Icons.Material.Filled.Check;
-        }
+    //     if (step < onStep)
+    //     {
+    //         return Icons.Material.Filled.Check;
+    //     }
 
-        if (step == onStep)
-        {
-            return Icons.Material.Filled.Edit;
-        }
+    //     if (step == onStep)
+    //     {
+    //         return Icons.Material.Filled.Edit;
+    //     }
 
-        return Icons.Material.Filled.LockClock;
-    }
+    //     return Icons.Material.Filled.LockClock;
+    // }
 
     /// <summary>Move to step.</summary>
     /// <param name="toStep">to step.</param>

@@ -10,31 +10,23 @@
         <DynamicComponent Type="@AdditionalContent" Parameters="@_contentParams" />
     }
 
-    @if (RiPages.Any())
+    @if (RiPages?.Any() ?? false)
     {
         <FluentLabel Typo="Typography.Body">
             Based on loaded packages, this server also implements the following pages:
         </FluentLabel>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Directive</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach(PackagePageInfo info in RiPages.OrderBy(i => i.ContentFor))
-                {
-                    <tr>
-                        <td>@info.ContentFor</td>
-                        <td><FluentAnchor Href="@($"{info.RoutePath}?store={StoreName}")" Appearance="Appearance.Hypertext">@info.PageName</FluentAnchor></td>
-                        <td>@info.Description</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <FluentDataGrid Items="@RiPages">
+            <PropertyColumn Title="Directive" Property="@(p => p.ContentFor)" Sortable="true" Tooltip="true" IsDefaultSortColumn="true">
+            </PropertyColumn>
+
+            <TemplateColumn Title="Name">
+                <FluentAnchor Href="@($"{context.RoutePath}?store={StoreName}")" Appearance="Appearance.Hypertext">@context.PageName</FluentAnchor>
+            </TemplateColumn>
+
+            <PropertyColumn Title="Description" Property="@(p => p.Description)" Sortable="true" Tooltip="true">
+            </PropertyColumn>
+        </FluentDataGrid>
     }
 
     <FluentLabel Typo="Typography.Body">
@@ -99,7 +91,7 @@
 
     /// <summary>Gets or sets the ri pages.</summary>
     [Parameter]
-    public IEnumerable<PackagePageInfo> RiPages { get; set; } = Enumerable.Empty<PackagePageInfo>();
+    public IQueryable<PackagePageInfo>? RiPages { get; set; } = null;
 
     /// <summary>Gets or sets the additional content.</summary>
     [Parameter]

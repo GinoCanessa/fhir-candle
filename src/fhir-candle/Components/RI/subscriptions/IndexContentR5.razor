@@ -3,7 +3,6 @@
 @implements IIndexContent
 
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-
     <FluentLabel Typo="Typography.Body">
         As a reference implementation for @ContentFor, this endpoint contains some immutable records for testing:
     </FluentLabel>
@@ -32,10 +31,10 @@
     </FluentLabel>
 </FluentStack>
 
-@* <MudText Typo="Typo.body1">
+@* <FluentLabel Typo="Typography.Body">
     If you are building or testing a topic-based subscription server implementation, there is a client available
-    <MudLink Href="@($"/subscriptions/client?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
-</MudText>
+    <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/client?store={StoreName}")" >here</FluentAnchor>.
+</FluentLabel>
 <br />
  *@
 @code {

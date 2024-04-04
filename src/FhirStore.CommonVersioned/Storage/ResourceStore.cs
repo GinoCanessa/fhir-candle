@@ -18,6 +18,7 @@ using FhirCandle.Serialization;
 using Hl7.Fhir.Language.Debugging;
 using FhirCandle.Interactions;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 
 namespace FhirCandle.Storage;
 
@@ -31,6 +32,15 @@ public class ResourceStore<T> : IVersionedResourceStore
 
     /// <summary>Name of the resource.</summary>
     private string _resourceName = typeof(T).Name;
+
+    /// <summary>True if this resource type implements IConformanceResource.</summary>
+    private bool _tIsConformanceResource;
+
+    /// <summary>True if this resource type has an 'identifier' element, false if not.</summary>
+    private bool _tIsIdentifiable;
+
+    /// <summary>True if this resource type has a 'name' element, false if not.</summary>
+    private bool _tHasName;
 
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed = false;
@@ -47,8 +57,14 @@ public class ResourceStore<T> : IVersionedResourceStore
     /// <summary>The lock object.</summary>
     private object _lockObject = new();
 
-    /// <summary>Occurs when On Changed.</summary>
-    public event EventHandler<EventArgs>? OnChanged;
+    /// <summary>Occurs when On Instance Created.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceCreated;
+
+    /// <summary>Occurs when On Instance Updated.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceUpdated;
+
+    /// <summary>Occurs when On Instance Deleted.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceDeleted;
 
     /// <summary>The search tester.</summary>
     public required SearchTester _searchTester;
@@ -177,11 +193,12 @@ public class ResourceStore<T> : IVersionedResourceStore
     IEnumerator<KeyValuePair<string, object>> IEnumerable<KeyValuePair<string, object>>.GetEnumerator() =>
         _resourceStore.Select(kvp => new KeyValuePair<string, object>(kvp.Key, kvp.Value)).GetEnumerator();
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ResourceStore{T}"/> class.
-    /// </summary>
-    /// <param name="fhirStore">   The FHIR store.</param>
-    /// <param name="searchTester">The search tester.</param>
+    /// <summary>Initializes a new instance of the <see cref="ResourceStore{T}"/> class.</summary>
+    /// <param name="fhirStore">            The FHIR store.</param>
+    /// <param name="searchTester">         The search tester.</param>
+    /// <param name="topicConverter">       The topic converter.</param>
+    /// <param name="subscriptionConverter">The subscription converter.</param>
+    [SetsRequiredMembers]
     public ResourceStore(
         VersionedFhirStore fhirStore,
         SearchTester searchTester,
@@ -192,8 +209,175 @@ public class ResourceStore<T> : IVersionedResourceStore
         _searchTester = searchTester;
         _topicConverter = topicConverter;
         _subscriptionConverter = subscriptionConverter;
+
+        _tIsConformanceResource = typeof(T).GetInterface("IConformanceResource") != null;
+        _tIsIdentifiable = typeof(T).GetInterface("IIdentifiable") != null;
+        _tHasName = typeof(T).GetProperties().Any(p => p.Name == "Name");
     }
 
+    /// <summary>Gets a name.</summary>
+    /// <param name="resource">The resource.</param>
+    /// <returns>The name.</returns>
+    private string GetName(T resource)
+    {
+        if (!_tHasName)
+        {
+            return string.Empty;
+        }
+
+        switch (resource)
+        {
+            case IConformanceResource icr:
+                return DisplayFor(icr.Name);
+
+            case Account account:
+                return DisplayFor(account.Name);
+
+            case Patient patient:
+                return DisplayFor(patient.Name);
+
+            case Practitioner practitioner:
+                return DisplayFor(practitioner.Name);
+
+            case Organization organization:
+                return DisplayFor(organization.Name);
+
+            default:
+                return string.Empty;
+        }
+    }
+
+    /// <summary>Gets an identifier.</summary>
+    /// <param name="resource">The resource.</param>
+    /// <returns>The identifier.</returns>
+    private string GetIdentifier(T resource)
+    {
+        if (!_tIsIdentifiable)
+        {
+            return string.Empty;
+        }
+
+        switch (resource)
+        {
+            case IIdentifiable<List<Identifier>> array:
+                return DisplayFor(array.Identifier);
+
+            case IIdentifiable<Identifier> scalar:
+                return DisplayFor(scalar.Identifier);
+
+            default:
+                return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether this resource store contains conformance resources.
+    /// </summary>
+    public bool ResourcesAreConformance => _tIsConformanceResource;
+
+    /// <summary>Gets a value indicating whether the resources have identifier.</summary>
+    public bool ResourcesAreIdentifiable => _tIsIdentifiable;
+
+    /// <summary>Gets a value indicating whether the resources have name.</summary>
+    public bool ResourcesHaveName => _tHasName;
+
+    /// <summary>Gets instance table view.</summary>
+    /// <returns>The instance table view.</returns>
+    public IQueryable<InstanceTableRec> GetInstanceTableView()
+    {
+        return _resourceStore.Select(kvp => new InstanceTableRec()
+        {
+            Id = kvp.Key,
+            Name = GetName(kvp.Value),
+            Url = _tIsConformanceResource ? (kvp.Value as IConformanceResource)!.Url : string.Empty,
+            Description = _tIsConformanceResource ? (kvp.Value as IConformanceResource)!.Description : string.Empty,
+            Identifiers = GetIdentifier(kvp.Value),
+        }).AsQueryable();
+    }
+
+    private string DisplayFor(object o)
+    {
+        if (o == null)
+        {
+            return string.Empty;
+        }
+
+        switch (o)
+        {
+            case Hl7.Fhir.Model.Patient p:
+                return $"{p.Id}: {string.Join(", ", p.Name.Select(n => $"{n.Family}, {string.Join(' ', n.Given)}"))}";
+
+            case IEnumerable<Hl7.Fhir.Model.HumanName> hns:
+                return string.Join(", ", hns.Select(hn => $"{hn.Family}, {string.Join(' ', hn.Given)}"));
+
+            case Hl7.Fhir.Model.HumanName hn:
+                return $"{hn.Family}, {string.Join(' ', hn.Given)}";
+
+            case Hl7.Fhir.Model.FhirString s:
+                return s.Value;
+
+            case Hl7.Fhir.Model.Code c:
+                return c.Value;
+
+            case Hl7.Fhir.Model.Coding coding:
+                return string.IsNullOrEmpty(coding.Display) ? $"{coding.System}|{coding.Code}" : coding.Display;
+
+            case IEnumerable<Hl7.Fhir.Model.Identifier> ids:
+                return string.Join(", ", ids.Select(id => DisplayFor(id)));
+
+            case Hl7.Fhir.Model.Identifier i:
+                {
+                    if (!string.IsNullOrEmpty(i.System) || !string.IsNullOrEmpty(i.Value))
+                    {
+                        return $"{i.System}|{i.Value}";
+                    }
+
+                    if (i.Type != null)
+                    {
+                        return DisplayFor(i.Type);
+                    }
+                }
+                break;
+
+            case Hl7.Fhir.Model.ResourceReference rr:
+                {
+                    if (!string.IsNullOrEmpty(rr.Display))
+                    {
+                        return rr.Display;
+                    }
+
+                    if (!string.IsNullOrEmpty(rr.Reference))
+                    {
+                        return rr.Reference;
+                    }
+
+                    if (rr.Identifier != null)
+                    {
+                        DisplayFor(rr.Identifier);
+                    }
+                }
+                break;
+
+            case Hl7.Fhir.Model.CodeableConcept cc:
+                {
+                    if (!string.IsNullOrEmpty(cc.Text))
+                    {
+                        return cc.Text;
+                    }
+
+                    return string.Join(", ", cc.Coding.Select(c => string.IsNullOrEmpty(c.Display) ? $"{c.System}|{c.Code}" : c.Display));
+                }
+
+            case Hl7.Fhir.Model.Resource r:
+                return r.TypeName + "/" + r.Id;
+        }
+
+        return o.ToString() ?? string.Empty;
+    }
+
+    /// <summary>Gets by canonical.</summary>
+    /// <param name="url">URL of the resource.</param>
+    /// <returns>The by canonical.</returns>
     public Resource? GetByCanonical(string url)
     {
         if (string.IsNullOrEmpty(url))
@@ -214,6 +398,12 @@ public class ResourceStore<T> : IVersionedResourceStore
         return resource;
     }
 
+    /// <summary>
+    /// Attempts to get by canonical a Hl7.Fhir.Model.Resource from the given string.
+    /// </summary>
+    /// <param name="url">     URL of the resource.</param>
+    /// <param name="resource">[out] The resource.</param>
+    /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryGetByCanonical(string url, out Resource? resource)
     {
         if (string.IsNullOrEmpty(url))
@@ -237,7 +427,6 @@ public class ResourceStore<T> : IVersionedResourceStore
         resource = r;
         return true;
     }
-
 
     /// <summary>Reads a specific instance of a resource.</summary>
     /// <param name="id">[out] The identifier.</param>
@@ -444,6 +633,9 @@ public class ResourceStore<T> : IVersionedResourceStore
                 return null;
             }
         }
+
+        RegisterInstanceCreated(source.Id);
+        _store.RegisterInstanceCreated(_resourceName, source.Id);
 
         if (source is IConformanceResource cr)
         {
@@ -656,6 +848,9 @@ public class ResourceStore<T> : IVersionedResourceStore
             _resourceStore[source.Id] = (T)source;
         }
 
+        RegisterInstanceUpdated(source.Id);
+        _store.RegisterInstanceUpdated(_resourceName, source.Id);
+
         if (source is IConformanceResource cr)
         {
             if (previous is IConformanceResource pcr)
@@ -755,6 +950,9 @@ public class ResourceStore<T> : IVersionedResourceStore
         {
             return null;
         }
+
+        RegisterInstanceDeleted(id);
+        _store.RegisterInstanceDeleted(_resourceName, id);
 
         if (previous is IConformanceResource pcr)
         {
@@ -1589,14 +1787,52 @@ public class ResourceStore<T> : IVersionedResourceStore
         }
     }
 
-    /// <summary>State has changed.</summary>
-    public void StateHasChanged()
+    /// <summary>Registers that an instance has been created.</summary>
+    /// <param name="resourceId">Identifier for the resource.</param>
+    public void RegisterInstanceCreated(string resourceId)
     {
-        EventHandler<EventArgs>? handler = OnChanged;
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceCreated;
 
         if (handler != null)
         {
-            handler(this, new());
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = _resourceName,
+            });
+        }
+    }
+
+    /// <summary>Registers that an instance has been updated.</summary>
+    /// <param name="resourceId">Identifier for the resource.</param>
+    public void RegisterInstanceUpdated(string resourceId)
+    {
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceUpdated;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = _resourceName,
+            });
+        }
+    }
+
+    /// <summary>Registers that an instance has been deleted.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="resourceId">  Identifier for the resource.</param>
+    public void RegisterInstanceDeleted(string resourceId)
+    {
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceDeleted;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = _resourceName,
+            });
         }
     }
 

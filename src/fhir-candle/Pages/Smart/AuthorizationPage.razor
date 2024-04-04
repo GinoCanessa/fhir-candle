@@ -1,4 +1,4 @@
-﻿@using MudBlazor;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/smart/auth"
 
@@ -10,65 +10,39 @@
 
 <PageTitle>SMART Authorization</PageTitle>
 
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+
 @if (string.IsNullOrEmpty(ErrorMessage))
 {
+    <FluentLabel Typo="Typography.H4">SMART Authorization</FluentLabel>
+    <FluentLabel Typo="Typography.Body">Please select allowed scopes:</FluentLabel>
 
-    <MudCard>
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h4">SMART Authorization</MudText>
-                <MudText Typo="Typo.body1">Please select allowed scopes:</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            <MudStack Row="false" Spacing="3">
+    <FluentStack Orientation="Orientation.Horizontal" Spacing="4">
+        <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ApproveAuth())">Approve Selected Scopes</FluentButton>
+        <FluentButton BackgroundColor="var(--error)" OnClick="@(() => DenyAuth())">Cancel</FluentButton>
+    </FluentStack>
 
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ApproveScopes())">Approve Selected Scopes</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => DenyScopes())">Cancel</MudButton>
-                </MudStack>
+    <FluentCheckbox Label="@($"All")"
+                ThreeState="true"
+                ShowIndeterminate="false"
+                @bind-CheckState="AllScopesSelected" />
 
-                <MudTable 
-                    @ref="_displayTable"
-                    T="string"
-                    Dense="true"
-                    Striped="true"
-                    MultiSelection="true"
-                    @bind-SelectedItems="_selected"
-                    Hover="true"
-                    SelectOnRowClick="true"
-                    Items="_auth.Scopes.Keys">
-                    <ColGroup>
-                        <col style="width: 5vw!important;" />
-                        <col style="width: 90vw!important;" />
-                    </ColGroup>
-                    <HeaderContent>
-                        <MudTh>Scope</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Scope">@context</MudTd>
-                    </RowTemplate>
-                </MudTable>
-            </MudStack>
-        </MudCardContent>
-    </MudCard>
+    @foreach (string scope in _auth.Scopes.Keys)
+    {
+        bool isChecked = _selected.Contains(scope);
+        <FluentCheckbox Label="@($"{scope}")"
+                        @bind-Value:get="isChecked"
+                        @bind-Value:set="c => OnScopeApprovalChanged(scope, c)" />
+    }
 }
 else
 {
-    <MudCard>
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h4">SMART Authorization</MudText>
-                <MudText Typo="Typo.body1">Error</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            <MudStack Row="false" Spacing="3">
-                <MudText Typo="Typo.body1">@ErrorMessage</MudText>
-            </MudStack>
-        </MudCardContent>
-    </MudCard>
+    <FluentLabel Typo="Typography.H4">SMART Authorization</FluentLabel>
+    <FluentLabel Typo="Typography.Body">Error</FluentLabel>
+    <FluentLabel Typo="Typography.Body">@ErrorMessage</FluentLabel>
 }
+
+</FluentStack>
 
 
 @code {
@@ -76,11 +50,32 @@ else
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
-    /// <summary>The display table.</summary>
-    private MudTable<string>? _displayTable = null;
+    /// <summary>The selected scopes.</summary>
+    private readonly HashSet<string> _selected = new();
 
-    /// <summary>The selected.</summary>
-    private HashSet<string> _selected = new();
+    /// <summary>Gets or sets all scopes selected.</summary>
+    private bool? AllScopesSelected
+    {
+        get
+        {
+            return _selected.SetEquals(_auth.Scopes.Keys)
+                ? true
+                : _selected.Count == 0
+                    ? false
+                    : null;
+        }
+        set
+        {
+            if (value is true)
+            {
+                _selected.UnionWith(_auth.Scopes.Keys);
+            }
+            else if (value is false)
+            {
+                _selected.Clear();
+            }
+        }
+    }
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
@@ -107,13 +102,29 @@ else
 
         if (_auth != null)
         {
-            _selected = new HashSet<string>(_auth.Scopes.Keys);
+            _selected.Clear();
+            AllScopesSelected = true;
         }
 
         NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
     }
 
-    private void DenyScopes()
+    /// <summary>Executes the scope approval changed action.</summary>
+    /// <param name="scope">    The scope.</param>
+    /// <param name="isVisible">True if is visible, false if not.</param>
+    protected void OnScopeApprovalChanged(string scope, bool isVisible)
+    {
+        if (isVisible)
+        {
+            _selected.Add(scope);
+        }
+        else
+        {
+            _selected.Remove(scope);
+        }
+    }
+
+    private void DenyAuth()
     {
         if (AuthManager.TryGetClientRedirect(StoreName, Key, out string url, "denied", "authorization request was denied"))
         {
@@ -123,7 +134,7 @@ else
         // TODO: show an error on the screen
     }
 
-    private void ApproveScopes()
+    private void ApproveAuth()
     {
         foreach (string scope in _auth.Scopes.Keys)
         {

@@ -1,11 +1,13 @@
-﻿@inject NavigationManager NavigationManager
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IFhirStoreManager StoreManager
 
 @implements IDisposable
 
-@* <MudText Inline="true">Item: @_selectedItemText</MudText> *@
-
+@* <FluentLabel Inline="true">Item: @_selectedItemText</FluentLabel> *@
+@* 
 <style>
     .selected {
         background-color: #1E88E5 !important;
@@ -17,58 +19,51 @@
         color: white !important;
     }
 </style>
+ *@
 
-<MudTable 
-        @ref="_displayTable"
-        T="Hl7.Fhir.Model.Patient"
-        Filter="new Func<Hl7.Fhir.Model.Patient, bool>(FilterFuncInstance)"
-        Dense="true"
-        MultiSelection="false"
-        RowClass="cursor-pointer" 
-        RowClassFunc="@SelectedRowClassFunc"
-        Hover="true"
-        SelectOnRowClick="true"
-        OnRowClick="OnRowClick"
-        Items="_resources">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">Patients</MudText>
-        <MudSpacer />
-        <MudTooltip Text="Refresh Contents">
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Info" OnClick="HandleRefresh" />
-        </MudTooltip>
-        <MudTooltip Text="Toggle auto-refresh (10 seconds)">
-            <MudSwitch Color="Color.Info" @bind-Checked="autoRefresh" Label="Auto-refresh" />
-        </MudTooltip>
-        <MudSpacer />
-        <MudTextField @bind-Value="_resourceFilter"
-                      Placeholder="Search"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      IconSize="Size.Medium"
-                      Class="mt-0"
-                      DebounceInterval="500"
-                      OnDebounceIntervalElapsed="HandleFilterChange" />
-    </ToolBarContent>
-     <ColGroup>
-        <col style="width: 30vw!important;" />
-        <col style="width: 30vw!important;" />
-        <col style="width: 30vw!important;" />
-    </ColGroup>
+<FluentLabel Typo="Typography.H6">Patients:</FluentLabel>
+<FluentDataGrid Items="@FilteredItems" GridTemplateColumns="0.5fr 0.5fr 1fr" RowClass="@rowClass">
+    <PropertyColumn Title="Id" Property="@(t => t.Id)" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(IdFilter)" Tooltip="true">
+        <ColumnOptions>
+            <div class="search-box">
+                <FluentSearch 
+                    Autofocus="true"
+                    @bind-Value="IdFilter"
+                    @bind-Value:after="HandleFilterClear"
+                    @oninput="@(e => IdFilter = e.Value?.ToString() ?? string.Empty)"
+                    Placeholder="Resource ID..." />
+            </div>
+        </ColumnOptions>
+    </PropertyColumn>
 
-    <HeaderContent>
-        <MudTh>Id</MudTh>
-        <MudTh>Name</MudTh>
-        <MudTh>Identifier</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="Id">@context.Id</MudTd>
-        <MudTd DataLabel="Name">@DisplayFor(context.Name)</MudTd>
-        <MudTd DataLabel="Identifier">@DisplayFor(context.Identifier)</MudTd>
-    </RowTemplate>
-</MudTable>
+    <PropertyColumn Title="Name" Property="@(t => DisplayFor(t.Name))" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(NameFilter)" Tooltip="true" IsDefaultSortColumn="true">
+        <ColumnOptions>
+            <div class="search-box">
+                <FluentSearch 
+                    Autofocus="true"
+                    @bind-Value="NameFilter"
+                    @bind-Value:after="HandleFilterClear"
+                    @oninput="@(e => NameFilter = e.Value?.ToString() ?? string.Empty)"
+                    Placeholder="Name..." />
+            </div>
+        </ColumnOptions>
+    </PropertyColumn>
+
+    <PropertyColumn Title="Identifier" Property="@(t => DisplayFor(t.Identifier))" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(IdentifierFilter)" Tooltip="true">
+        <ColumnOptions>
+            <div class="search-box">
+                <FluentSearch 
+                    Autofocus="true"
+                    @bind-Value="IdentifierFilter"
+                    @bind-Value:after="HandleFilterClear"
+                    @oninput="@(e => IdentifierFilter = e.Value?.ToString() ?? string.Empty)"
+                    Placeholder="Identifier..." />
+            </div>
+        </ColumnOptions>
+    </PropertyColumn>
+</FluentDataGrid>
 
 @code {
-
     /// <summary>The FHIR store.</summary>
     [Parameter]
     public IFhirStore Store { get; set; } = null!;
@@ -83,82 +78,207 @@
     [Parameter]
     public EventCallback<string> SelectedIdChanged { get; set; }
 
-    /// <summary>The display table.</summary>
-    private MudTable<Hl7.Fhir.Model.Patient>? _displayTable = null;
+    private System.Timers.Timer? debounceTimer = null;
 
-    /// <summary>The elements.</summary>
-    private IEnumerable<Hl7.Fhir.Model.Patient> _resources = Array.Empty<Hl7.Fhir.Model.Patient>();
+    private IQueryable<Hl7.Fhir.Model.Patient>? _filteredItems = null;
 
-    /// <summary>True to automatically refresh.</summary>
-    private bool autoRefresh = true;
+    private IQueryable<Hl7.Fhir.Model.Patient>? FilteredItems => _filteredItems;
 
-    /// <summary>The refresh timer.</summary>
-    private System.Threading.Timer? _refreshTimer = null;
+    private readonly HashSet<string> _selectedIds = new();
 
-    /// <summary>Gets or sets the resource filter.</summary>
-    private string _resourceFilter { get; set; } = string.Empty;
+    private string? rowClass(Hl7.Fhir.Model.Patient p) => _selectedIds.Contains(p.Id) ? "highlighted-row" : null;
+    // Func<Hl7.Fhir.Model.Patient, string?> rowClass = p => _selectedIds.Contains(p.Id) ? "highlighted-row" : null;
+    // Func<Hl7.Fhir.Model.Patient, string?> rowStyle = p => _selectedIds.Contains(p.Id) ? "background-color: var(--highlight-bg);" : null;
 
-    private HashSet<Hl7.Fhir.Model.Patient> _selected = new();
+    private string _idFilter = string.Empty;
+
+    private string IdFilter
+    {
+        get => _idFilter;
+        set
+        {
+            if (value != _idFilter)
+            {
+                _idFilter = value;
+                ResetDebounce();
+            }
+        }
+    }
+
+    private string _nameFilter = string.Empty;
+
+    private string NameFilter
+    {
+        get => _nameFilter;
+        set
+        {
+            if (value != _nameFilter)
+            {
+                _nameFilter = value;
+                ResetDebounce();
+            }
+        }
+    }
+
+    private string _identifierFilter = string.Empty;
+
+    private string IdentifierFilter
+    {
+        get => _identifierFilter;
+        set
+        {
+            if (value != _identifierFilter)
+            {
+                _identifierFilter = value;
+                ResetDebounce();
+            }
+        }
+    }
 
     private string _selectedItemText = "Nothing selected";
-
-    /// <summary>Filter function instance.</summary>
-    /// <param name="patient">The patient.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool FilterFuncInstance(Hl7.Fhir.Model.Patient patient) => FilterFuncDefinition(patient, _resourceFilter);
-
-    /// <summary>Filter function definition.</summary>
-    /// <param name="id">          The identifier.</param>
-    /// <param name="searchString">The search string.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool FilterFuncDefinition(Hl7.Fhir.Model.Patient p, string searchString)
+    
+    /// <summary>Gets filtered items.</summary>
+    /// <returns>The filtered items.</returns>
+    private IQueryable<Hl7.Fhir.Model.Patient>? GetFilteredItems()
     {
-        if (string.IsNullOrWhiteSpace(searchString) ||
-            p.Id.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        if ((ResourceStore == null) ||
+            (!ResourceStore.Any()))
+        {
+            return null;
+        }
+
+        // check for no filters
+        if (string.IsNullOrWhiteSpace(_idFilter) &&
+            string.IsNullOrWhiteSpace(_nameFilter) &&
+            string.IsNullOrWhiteSpace(_identifierFilter))
+        {
+            return ResourceStore
+                .Values
+                .Select(o => (Hl7.Fhir.Model.Patient)o)
+                .AsQueryable<Hl7.Fhir.Model.Patient>();
+        }
+
+        // apply filters
+        return ResourceStore
+            .Values
+            .Select(o => (Hl7.Fhir.Model.Patient)o)
+            .Where(r => string.IsNullOrWhiteSpace(_idFilter) ? true : r.Id.Contains(_idFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.IsNullOrWhiteSpace(_nameFilter) ? true : TestNameFilter(r))
+            .Where(r => string.IsNullOrWhiteSpace(_identifierFilter) ? true : TestIdentifierFilter(r))
+            .AsQueryable<Hl7.Fhir.Model.Patient>();
+    }
+
+    private bool TestNameFilter(Hl7.Fhir.Model.Patient r)
+    {
+        if (string.IsNullOrWhiteSpace(_nameFilter))
         {
             return true;
         }
 
-        return false;
+        return r.Name.Any(n => n.Family.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase) || n.Given.Any(g => g.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase)));
     }
 
-    /// <summary>Selected row class function.</summary>
-    /// <param name="item">     The item.</param>
-    /// <param name="rowNumber">The row number.</param>
-    /// <returns>A string.</returns>
-    private string SelectedRowClassFunc(Hl7.Fhir.Model.Patient item, int rowNumber)
+    private bool TestIdentifierFilter(Hl7.Fhir.Model.Patient r)
     {
-        if (string.IsNullOrEmpty(SelectedId))
+        if (string.IsNullOrWhiteSpace(_identifierFilter))
         {
-            return string.Empty;
+            return true;
         }
 
-        if (SelectedId.Equals(item?.Id ?? string.Empty))
+        return r.Identifier.Any(i => i.Value.Contains(_identifierFilter, StringComparison.OrdinalIgnoreCase) || i.System.Contains(_identifierFilter, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Executes the search action.</summary>
+    private void OnSearchChanged()
+    {
+        _filteredItems = GetFilteredItems();
+        StateHasChanged();
+    }
+
+    private async void TimerElapsed_TickAsync(object? sender, EventArgs e)
+    {
+        CancelDebounce();
+        await InvokeAsync(OnSearchChanged);
+    }
+
+    private void ResetDebounce()
+    {
+        if (debounceTimer != null)
         {
-            return "selected";
+            debounceTimer.Enabled = false;
+            debounceTimer.Elapsed -= TimerElapsed_TickAsync;
+            debounceTimer.Dispose();
+            debounceTimer = null;
         }
+
+        debounceTimer = new(400);
+        debounceTimer.Elapsed += TimerElapsed_TickAsync;
+        debounceTimer.Enabled = true;
+        debounceTimer.Start();
+    }
+
+    private void CancelDebounce()
+    {
+        if (debounceTimer != null)
+        {
+            debounceTimer.Enabled = false;
+            debounceTimer.Elapsed -= TimerElapsed_TickAsync;
+            debounceTimer.Dispose();
+            debounceTimer = null;
+        }
+    }
+
+    private void HandleFilterClear()
+    {
+        CancelDebounce();
+        _ = InvokeAsync(OnSearchChanged);
+    }
+
+    private void OnRowFocus(FluentDataGridRow<Hl7.Fhir.Model.Patient> row)
+    {
+        if (row?.Item != null)
+        {
+            _selectedIds.Add(row.Item.Id);
+        }
+    }
+
+    // /// <summary>Selected row class function.</summary>
+    // /// <param name="item">     The item.</param>
+    // /// <param name="rowNumber">The row number.</param>
+    // /// <returns>A string.</returns>
+    // private string SelectedRowClassFunc(Hl7.Fhir.Model.Patient item, int rowNumber)
+    // {
+    //     if (string.IsNullOrEmpty(SelectedId))
+    //     {
+    //         return string.Empty;
+    //     }
+
+    //     if (SelectedId.Equals(item?.Id ?? string.Empty))
+    //     {
+    //         return "selected";
+    //     }
     
-        return string.Empty;
-    }
+    //     return string.Empty;
+    // }
 
-    /// <summary>Executes the row click action.</summary>
-    /// <param name="args">The arguments.</param>
-    async void OnRowClick(TableRowClickEventArgs<Hl7.Fhir.Model.Patient> args)
-    {
-        if (args.Item.Id.Equals(SelectedId))
-        {
-            _displayTable?.SetSelectedItem(null);
-            _selectedItemText = "Nothing selected";
-            SelectedId = string.Empty;
-            await SelectedIdChanged.InvokeAsync(string.Empty);
-            return;
-        }
+    // /// <summary>Executes the row click action.</summary>
+    // /// <param name="args">The arguments.</param>
+    // async void OnRowClick(TableRowClickEventArgs<Hl7.Fhir.Model.Patient> args)
+    // {
+    //     if (args.Item.Id.Equals(SelectedId))
+    //     {
+    //         _displayTable?.SetSelectedItem(null);
+    //         _selectedItemText = "Nothing selected";
+    //         SelectedId = string.Empty;
+    //         await SelectedIdChanged.InvokeAsync(string.Empty);
+    //         return;
+    //     }
 
-        _displayTable?.SetSelectedItem(args.Item);
-        _selectedItemText = DisplayFor(args.Item);
-        SelectedId = args.Item.Id;
-        await SelectedIdChanged.InvokeAsync(SelectedId);
-    }
+    //     _displayTable?.SetSelectedItem(args.Item);
+    //     _selectedItemText = DisplayFor(args.Item);
+    //     SelectedId = args.Item.Id;
+    //     await SelectedIdChanged.InvokeAsync(SelectedId);
+    // }
 
     /// <summary>Displays for described by o.</summary>
     /// <param name="o">An object to process.</param>
@@ -249,58 +369,20 @@
     {
         base.OnInitialized();
 
-        ResourceStore.OnChanged += ResourceStore_OnChanged;
+        ResourceStore.OnInstanceCreated += ResourceStore_OnChanged;
+        ResourceStore.OnInstanceDeleted += ResourceStore_OnChanged;
 
-        _resources = ResourceStore.Values.OrderBy(p => DisplayFor(((Hl7.Fhir.Model.Patient)p).Name)).Select(r => (Hl7.Fhir.Model.Patient)r);
-
-        _refreshTimer = new Timer(
-            TimerRefresh,
-            null,
-            TimeSpan.Zero,
-            TimeSpan.FromSeconds(10));
+        _filteredItems = GetFilteredItems();
     }
 
-    /// <summary>Timer refresh.</summary>
-    /// <param name="state">The state.</param>
-    private void TimerRefresh(object? state)
-    {
-        if (autoRefresh)
-        {
-            HandleRefresh();
-        }
-    }
-
-    /// <summary>Handles a user refresh request.</summary>
-    private void HandleRefresh()
-    {
-        _resources = ResourceStore.Values.OrderBy(p => DisplayFor(((Hl7.Fhir.Model.Patient)p).Name)).Select(r => (Hl7.Fhir.Model.Patient)r);
-        InvokeAsync(() => _displayTable?.UpdateSelection());
-        InvokeAsync(() => StateHasChanged());
-    }
 
     /// <summary>FHIR store on changed.</summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">     Event information.</param>
     private void ResourceStore_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
-    }
-
-    /// <summary>Handles the filter change described by value.</summary>
-    /// <param name="value">The value.</param>
-    private void HandleFilterChange(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            _resourceFilter = string.Empty;
-            InvokeAsync(() => _displayTable?.UpdateSelection());
-            InvokeAsync(() => StateHasChanged());
-            return;
-        }
-
-        _resourceFilter = value;
-        InvokeAsync(() => _displayTable?.UpdateSelection());
-        InvokeAsync(() => StateHasChanged());
+        // reset our filtered items
+        _filteredItems = GetFilteredItems();
     }
 
     /// <summary>
@@ -309,8 +391,7 @@
     /// </summary>
     public void Dispose()
     {
-        _refreshTimer?.Change(Timeout.Infinite, 0);
-        _refreshTimer?.Dispose();
+        debounceTimer?.Dispose();
 
         // if (_store != null)
         // {
@@ -318,7 +399,8 @@
 
         if (ResourceStore != null)
         {
-            ResourceStore.OnChanged -= ResourceStore_OnChanged;
+            ResourceStore.OnInstanceCreated -= ResourceStore_OnChanged;
+            ResourceStore.OnInstanceDeleted -= ResourceStore_OnChanged;
         }
     }
 }

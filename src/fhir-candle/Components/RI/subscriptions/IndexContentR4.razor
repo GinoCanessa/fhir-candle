@@ -28,14 +28,14 @@
 
     <FluentLabel Typo="Typography.Body">
         If you are getting started with topic-based subscriptions, there is a deatiled tour available
-        <MudLink Href="@($"/subscriptions/tour?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
+        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/tour?store={StoreName}")">here</FluentAnchor>.
     </FluentLabel>
 </FluentStack>
 
-@* <MudText Typo="Typo.body1">
+@* <FluentLabel Typo="Typography.Body">
     If you are building or testing a topic-based subscription server implementation, there is a client available
-    <MudLink Href="@($"/subscriptions/client?store={StoreName}")" Underline="Underline.Always">here</MudLink>.
-</MudText>
+    <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/client?store={StoreName}")" >here</FluentAnchor>.
+</FluentLabel>
 <br />
  *@
 @code {

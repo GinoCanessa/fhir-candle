@@ -1,4 +1,4 @@
-﻿@using MudBlazor;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/subscriptions/notification-local-viewer"
 
@@ -9,24 +9,23 @@
 
 <PageTitle>Generated Subscription Events</PageTitle>
 
-<MudGrid>
+<FluentGrid Spacing="4">
     @foreach (SubscriptionEvent subEvent in _subscription?.GeneratedEvents.Values.AsEnumerable() ?? Array.Empty<SubscriptionEvent>())
     {
-        <MudItem>
-            <MudCard Outlined="true" Class="mx-6 my-4">
-                <MudCardContent>
-                    <MudField Label="Subscription">Subscription/@subEvent.SubscriptionId</MudField>
-                    <MudField Label="Topic">@subEvent.TopicUrl</MudField>
-                    <MudField Label="Event Number">@subEvent.EventNumber</MudField>
-                    <MudField Label="Received">@subEvent.Timestamp.ToLocalTime().ToString("o")</MudField>
-                    <MudField Label="Status At Generation">@subEvent.StatusAtGeneration</MudField>
+        <FluentGridItem xs="12">
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                    <FluentTextField Label="Subscription" ReadOnly="true">Subscription/@subEvent.SubscriptionId</FluentTextField>
+                    <FluentTextField Label="Topic" ReadOnly="true">@subEvent.TopicUrl</FluentTextField>
+                    <FluentTextField Label="Event Number" ReadOnly="true">@subEvent.EventNumber</FluentTextField>
+                    <FluentTextField Label="Received" ReadOnly="true">@subEvent.Timestamp.ToLocalTime().ToString("o")</FluentTextField>
+                    <FluentTextField Label="Status At Generation" ReadOnly="true">@subEvent.StatusAtGeneration</FluentTextField>
 
                     @if ((subEvent.Focus != null) && 
                          (_store.TryGetResourceInfo(subEvent.Focus, out string rn, out string id)))
                     {
-                        <MudField Label="Focus">
-                            <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type={rn}&id={id}")" Underline="Underline.Always">@rn/@id</MudLink>
-                        </MudField>
+                        <FluentLabel Typo="Typography.Body">Focus</FluentLabel>
+                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type={rn}&id={id}")">@rn/@id</FluentAnchor>
                     }
 
                     @if (subEvent.AdditionalContext?.Any() ?? false)
@@ -35,25 +34,24 @@
                         {
                             @if (_store.TryGetResourceInfo(ac, out string acN, out string acId))
                             {
-                                <MudField Label="Additional Context">
-                                    <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type={acN}&id={acId}")" Underline="Underline.Always">@acN/@acId</MudLink>
-                                </MudField>
+                                <FluentLabel Typo="Typography.Body">Additional Context</FluentLabel>
+                                <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type={acN}&id={acId}")" >@acN/@acId</FluentAnchor>
                             }
                         }
                     }
 
 @*                     @if (_subscription?.SerializedEvents.TryGetValue(subEvent.EventNumber, out string? content) == true)
                     {
-                        <MudField Label="Content">
-                            <MudText Typo="Typo.body2">@content</MudText>
-                        </MudField>
+                        <FluentTextField Label="Content">
+                            <FluentLabel Typo="Typography.Body2">@content</FluentLabel>
+                        </FluentTextField>
                     }
  *@
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
+                </FluentStack>
+            </FluentCard >
+        </FluentGridItem>
     }
-</MudGrid>
+</FluentGrid>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>

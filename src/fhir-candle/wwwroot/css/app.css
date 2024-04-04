@@ -138,9 +138,23 @@ ul {
     inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
 }
 
-    .loading-progress-text:after {
-        content: var(--blazor-load-percentage-text, "Loading");
-    }
+.loading-progress-text:after {
+    content: var(--blazor-load-percentage-text, "Loading");
+}
+
+fluent-data-grid {
+    width: 100%;
+}
+
+fluent-data-grid fluent-data-grid-row:not(:first-child):nth-child(2n+1) {
+    background-color: var(--neutral-fill-secondary-rest);
+}
+
+fluent-data-grid fluent-data-grid-row:not(:first-child):hover {
+    background-color: var(--accent-base-color) !important;
+    /*background-color: var(--neutral-fill-hover) !important;*/
+}
+
 
 @media (max-width: 600px) {
     .main {

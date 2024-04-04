@@ -1,4 +1,4 @@
-﻿@using MudBlazor;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/smart/clients"
 @using FhirCandle.Smart
@@ -12,58 +12,58 @@
 
 <PageTitle>SMART Clients</PageTitle>
 
-<MudStack Row="true" Spacing="3" Class="ma-2">
-    <MudButton Href="/smart/client_details" Variant="Variant.Filled" Color="Color.Primary">Register New Client</MudButton>
-</MudStack>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentAnchor Appearance="Appearance.Accent" Href="/smart/client_details">Register New Client</FluentAnchor>
 
-@if (!AuthManager.SmartClients.Any())
-{
-    <MudText>No SMART clients have been registered.</MudText>
-}
-else
-{
-    <MudGrid>
-        @foreach (ClientInfo smartClient in AuthManager.SmartClients.Values.OrderBy(sc => sc.ClientName))
-        {
-            <MudItem>
-                <MudCard Outlined="true" Class="mx-6 my-4">
-                    <MudCardContent>
+    @if (!AuthManager.SmartClients.Any())
+    {
+        <FluentLabel>No SMART clients have been registered.</FluentLabel>
+    }
+    else
+    {
+        <FluentGrid Spacing="8" style="background-color: var(--neutral-layer-3)">
+            @foreach (ClientInfo smartClient in AuthManager.SmartClients.Values.OrderBy(sc => sc.ClientName))
+            {
+                <FluentGridItem>
+                    <FluentCard>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                            <FluentTextField ReadOnly="true" Label="Client Name">@smartClient.ClientName</FluentTextField>
+                            <FluentTextField ReadOnly="true" Label="Client ID">@smartClient.ClientId</FluentTextField>
 
-                        <MudField Label="Client Name">@smartClient.ClientName</MudField>
-                        <MudField Label="Client ID">@smartClient.ClientId</MudField>
-
-                        @if (smartClient.Registration != null)
-                        {
-                            @if (!string.IsNullOrEmpty(smartClient.Registration.JwksUri))
+                            @if (smartClient.Registration != null)
                             {
-                                <MudField Label="JWKS URI">@smartClient.Registration.JwksUri</MudField>
-                            }
-
-                            @foreach (JsonWebKey key in (smartClient.Registration.KeySet.Keys ?? Enumerable.Empty<JsonWebKey>()))
-                            {
-                                <MudField Label="Key Info">@(key.Alg + ": " + key.KeyId)</MudField>
-                            }
-                        }
-
-                        @if (smartClient.Activity.Any())
-                        {
-                            @foreach (ClientInfo.ClientActivityRecord activity in smartClient.Activity.OrderByDescending(a => a.Timestamp).Take(3))
-                            {
-                                <MudField Label="Activity">@(activity.RequestType + " " + activity.Timestamp.ToString("o") + " " + (activity.Success ? "success" : "fail"))</MudField>
-                                @if (!string.IsNullOrEmpty(activity.Message))
+                                @if (!string.IsNullOrEmpty(smartClient.Registration.JwksUri))
                                 {
-                                    <MudField Label="Message">@activity.Message</MudField>
+                                    <FluentTextField Label="JWKS URI" ReadOnly="true">@smartClient.Registration.JwksUri</FluentTextField>
+                                }
+
+                                @foreach (JsonWebKey key in (smartClient.Registration.KeySet.Keys ?? Enumerable.Empty<JsonWebKey>()))
+                                {
+                                    <FluentTextField Label="Key Info" ReadOnly="true">@(key.Alg + ": " + key.KeyId)</FluentTextField>
                                 }
                             }
-                        }
 
-                        <MudButton Href="@($"/smart/client_details?smartClientId={smartClient.ClientId}")" Variant="Variant.Filled" Color="Color.Primary">Edit</MudButton>
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-        }
-    </MudGrid>
-}
+                            @if (smartClient.Activity.Any())
+                            {
+                                @foreach (ClientInfo.ClientActivityRecord activity in smartClient.Activity.OrderByDescending(a => a.Timestamp).Take(3))
+                                {
+                                    <FluentTextField Label="Activity" ReadOnly="true">@(activity.RequestType + " " + activity.Timestamp.ToString("o") + " " + (activity.Success ? "success" : "fail"))</FluentTextField>
+                                    @if (!string.IsNullOrEmpty(activity.Message))
+                                    {
+                                        <FluentTextField Label="Message" ReadOnly="true">@activity.Message</FluentTextField>
+                                    }
+                                }
+                            }
+
+                            <FluentAnchor Appearance="Appearance.Accent" Href="@($"/smart/client_details?smartClientId={smartClient.ClientId}")">Edit</FluentAnchor>
+                        </FluentStack>
+                    </FluentCard>
+                </FluentGridItem>
+            }
+        </FluentGrid>
+    }
+
+</FluentStack>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>

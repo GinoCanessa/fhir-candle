@@ -1,6 +1,10 @@
+@using Microsoft.FluentUI.AspNetCore.Components;
+
 @if (!string.IsNullOrEmpty(FhirPathLabUrl))
 {
-    <MudItem xs="2">
+    <FluentGridItem xs="2">
+
+        @* Size="Size.Small" *@
 
     @switch (ResourceType)
     {
@@ -10,18 +14,14 @@
         case "StructureDefinition":
         case "Questionnaire":
         case "Library":
-            <MudButton
-                Size="Size.Small"
-                Variant="Variant.Filled"
-                Color="Color.Primary"
+            <FluentAnchor
+                Appearance="Appearance.Accent"
                 Href="@($"{FhirPathLabUrl}/SubscriptionTopic?id={BaseUrl}/{ResourceType}/{Id}")" 
-                Target="_blank"
-            >Edit in FHIRPath Lab</MudButton>
-
+                Target="_blank">Edit in FHIRPath Lab</FluentAnchor>
             break;
     }
 
-    </MudItem>
+    </FluentGridItem>
 }
 
 @code {

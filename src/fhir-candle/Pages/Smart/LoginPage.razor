@@ -1,4 +1,4 @@
-﻿@using MudBlazor;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/smart/login"
 @inject NavigationManager NavigationManager
@@ -9,16 +9,13 @@
 
 <PageTitle>SMART Login</PageTitle>
 
-<MudCard>
-    <MudCardHeader>
-        <CardHeaderContent>
-            <MudText Typo="Typo.h4">SMART Login</MudText>
-            <MudText Typo="Typo.body1">Please login to the FHIR store: @StoreName.</MudText>
-        </CardHeaderContent>
-    </MudCardHeader>
-    <MudCardContent>
-        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
-            <MudTabPanel Text="Patient Login">
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.H4">SMART Login</FluentLabel>
+    <FluentLabel Typo="Typography.Body">Please login to the FHIR store: @StoreName.</FluentLabel>
+
+    <FluentTabs Orientation="Orientation.Horizontal">
+        <FluentTab Label="Patient Login">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                 @switch (_store.Config.FhirVersion)
                 {
                     case TenantConfiguration.SupportedFhirVersions.R4:
@@ -49,18 +46,18 @@
                         break;
                 }
 
-                <br />
+                <FluentTextField Label="User (Patient)" @bind-Value="SelectedPatientId" ReadOnly="true" />
+                <FluentTextField Label="Patient" @bind-Value="SelectedPatientId" ReadOnly="true" />
 
-                <MudTextField Label="User (Patient)" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+                    <FluentButton Appearance="Appearance.Accent" Disabled="@(string.IsNullOrEmpty(SelectedPatientId))" OnClick="@(() => ProcessLoginPatient())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentTab>
 
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Disabled="@(string.IsNullOrEmpty(SelectedPatientId))" Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginPatient())">Login</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
-                </MudStack>
-            </MudTabPanel>
-
-            <MudTabPanel Text="Practitioner Login">
+        <FluentTab Label="Practitioner Login">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                 @switch (_store.Config.FhirVersion)
                 {
                     case TenantConfiguration.SupportedFhirVersions.R4:
@@ -91,9 +88,7 @@
                         break;
                 }
 
-                <br />
-
-                <MudText Typo="Typo.body1" Class="ma-2">If you want a patient context, please select a patient below:</MudText>
+                <FluentLabel Typo="Typography.Body">If you want a patient context, please select a patient below:</FluentLabel>
 
                 @switch (_store.Config.FhirVersion)
                 {
@@ -125,20 +120,20 @@
                         break;
                     }
 
-                <br />
+                <FluentTextField Label="User (Practitioner)" @bind-Value="SelectedPractitionerId" ReadOnly="true" />
+                <FluentTextField Label="Patient" @bind-Value="SelectedPatientId" ReadOnly="true" />
+                <FluentTextField Label="Practitioner" @bind-Value="SelectedPractitionerId" ReadOnly="true" />
 
-                <MudTextField Label="User (Practitioner)" @bind-Value="SelectedPractitionerId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Practitioner" @bind-Value="SelectedPractitionerId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+                    <FluentButton Appearance="Appearance.Accent" Disabled="@(string.IsNullOrEmpty(SelectedPractitionerId))" OnClick="@(() => ProcessLoginPractitioner())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentTab>
 
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Disabled="@(string.IsNullOrEmpty(SelectedPractitionerId))" Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginPractitioner())">Login</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
-                </MudStack>
-            </MudTabPanel>
-
-            <MudTabPanel Text="Administrator Login">
-                <MudText Typo="Typo.body1" Class="ma-2">If you want a patient context, please select a patient below:</MudText>
+        <FluentTab Label="Administrator Login">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                <FluentLabel Typo="Typography.Body">If you want a patient context, please select a patient below:</FluentLabel>
 
                 @switch (_store.Config.FhirVersion)
                 {
@@ -170,18 +165,17 @@
                         break;
                 }
 
-                <MudTextField Label="User (Admin)" Value="@("administrator")" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+                <FluentTextField Label="User (Admin)" Value="@("administrator")" ReadOnly="true" />
+                <FluentTextField Label="Patient" @bind-Value="SelectedPatientId" ReadOnly="true" />
 
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginAdministrator())">Login</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
-                </MudStack>
-
-            </MudTabPanel>
-        </MudTabs>
-    </MudCardContent>
-</MudCard>
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ProcessLoginAdministrator())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentTab>
+    </FluentTabs>
+</FluentStack>
 
 
 @code {

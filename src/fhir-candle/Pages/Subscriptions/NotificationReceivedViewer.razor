@@ -1,4 +1,4 @@
-﻿@using MudBlazor;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/subscriptions/notification-received-viewer"
 
@@ -9,42 +9,41 @@
 
 <PageTitle>Received Subscription Events</PageTitle>
 
-<MudGrid>
+<FluentGrid Spacing="4">
     @foreach (ParsedSubscriptionStatus status in _notifications ?? Array.Empty<ParsedSubscriptionStatus>().ToList())
     {
-        <MudItem>
-            <MudCard Outlined="true" Class="mx-6 my-4">
-                <MudCardContent>
-                    <MudField Label="Subscription">@status.SubscriptionReference</MudField>
-                    <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
-                    <MudField Label="Local Bundle">Bundle/@status.BundleId</MudField>
-                    <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
-                    <MudField Label="Type">@status.NotificationType</MudField>
-                    <MudField Label="Bundle">
-                        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={status.BundleId}")" Underline="Underline.Always">Bundle/@status.BundleId</MudLink>
+        <FluentGridItem xs="12">
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                    <FluentTextField Label="Subscription" ReadOnly="true">@status.SubscriptionReference</FluentTextField>
+                    <FluentTextField Label="Topic" ReadOnly="true">@status.SubscriptionTopicCanonical</FluentTextField>
+                    <FluentTextField Label="Local Bundle" ReadOnly="true">Bundle/@status.BundleId</FluentTextField>
+                    <FluentTextField Label="Received" ReadOnly="true">@status.ProcessedDateTime.ToString("o")</FluentTextField>
+                    <FluentTextField Label="Type" ReadOnly="true">@status.NotificationType</FluentTextField>
 
-                    </MudField>
+                    <FluentLabel Typo="Typography.Body">Bundle</FluentLabel>
+                    <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={status.BundleId}")">Bundle/@status.BundleId</FluentAnchor>
 
                     @if (status.NotificationEvents.Any())
                     {
                         @foreach (ParsedSubscriptionStatus.ParsedNotificationEvent ne in status.NotificationEvents)
                         {
-                            <MudField Label="Event Number">@ne.EventNumber</MudField>
-                            <MudField Label="Timestamp">@ne.Timestamp?.ToLocalTime().ToString("O")</MudField>
-                            <MudField Label="Focus Reference">@ne.FocusReference</MudField>
-                            <MudField Label="Additional Context">@string.Join(", ", ne.AdditionalContextReferences ?? Array.Empty<string>())</MudField>
+                            <FluentTextField Label="Event Number" ReadOnly="true">@ne.EventNumber</FluentTextField>
+                            <FluentTextField Label="Timestamp" ReadOnly="true">@ne.Timestamp?.ToLocalTime().ToString("O")</FluentTextField>
+                            <FluentTextField Label="Focus Reference" ReadOnly="true">@ne.FocusReference</FluentTextField>
+                            <FluentTextField Label="Additional Context" ReadOnly="true">@string.Join(", ", ne.AdditionalContextReferences ?? Array.Empty<string>())</FluentTextField>
                         }
                     }
 
                     @if (status.Errors.Any())
                     {
-                        <MudField Label="Error">@status.Errors.First()</MudField>
+                        <FluentTextField Label="Error" ReadOnly="true">@status.Errors.First()</FluentTextField>
                     }
-                    </MudCardContent>
-            </MudCard>
-        </MudItem>
+                </FluentStack>
+            </FluentCard>
+        </FluentGridItem>
     }
-</MudGrid>
+</FluentGrid>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>

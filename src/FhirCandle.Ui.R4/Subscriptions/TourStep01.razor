@@ -1,47 +1,45 @@
-﻿<MudText Typo="Typo.body1">
-    In FHIR @Store.Config.FhirVersion, topics are discovered by looking at the server
-    <code>CapabilityStatement</code> for the
-    <MudLink Href="http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition-capabilitystatement-subscriptiontopic-canonical.html"
-             Underline="Underline.Always">SubscriptionTopic Canonical Extension</MudLink>.
-</MudText>
-<br />
-<MudText Typo="Typo.body1">
-    For this walkthrough, we will be using the included <code>encounter-complete</code>
-    topic that has a canonical URL of <code>http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>.
-    The current metadata for this server can be viewed
-    <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=CapabilityStatement&id=metadata")"
-             Underline="Underline.Always">here</MudLink>,
-    or requested (in FHIR) at
-    <code>@Store.Config.BaseUrl/metadata</code>
-    <sup>
-        <button onclick="@($"navigator.clipboard.writeText('{@Store.Config.BaseUrl}/metadata')")">
-            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
-        </button>
-    </sup>.
-</MudText>
-<br />
-<MudText Typo="Typo.body1">
-    Note that in FHIR R4, there is not an official required format for representing <code>SubscriptionTopic</code>
-    resources.  Since topics are canonical resources, the expectation is that they will be defined
-    by authors (e.g., in Implementation Guides) and communicated out-of-band.  For example, for
-    an "encounter-start" topic, both the server and client can function with <i>only</i> the
-    canonical URL and the understanding of what that topic represents.
-</MudText>
-<br />
-<MudText Typo="Typo.body1">
-    With that said, one possible way of representing topics in FHIR R4 is to use the model provided
-    in FHIR R5, ported using FHIR cross-version support.  This implementation supports topics defined via
-    that mechanism.  Our included <code>encounter-complete</code> topic is thus available on this server
-    at <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Basic&id=encounter-complete")"
-                Underline="Underline.Always">Basic/encounter-complete</MudLink>
-    or in FHIR at
-    <code>@Store.Config.BaseUrl/Basic/encounter-complete</code>
-    <sup>
-        <button onclick="@($"navigator.clipboard.writeText('{@Store.Config.BaseUrl}/Basic/encounter-complete')")">
-            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
-        </button>
-    </sup>.
-</MudText>
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.Body">
+        In FHIR @Store.Config.FhirVersion, topics are discovered by looking at the server
+        <code>CapabilityStatement</code> for the
+        <FluentAnchor Appearance="Appearance.Hypertext" Href="http://hl7.org/fhir/uv/subscriptions-backport/StructureDefinition-capabilitystatement-subscriptiontopic-canonical.html"
+                 >SubscriptionTopic Canonical Extension</FluentAnchor>.
+    </FluentLabel>
+
+    <FluentLabel Typo="Typography.Body">
+        For this walkthrough, we will be using the included <code>encounter-complete</code>
+        topic that has a canonical URL of <code class="copy-click">http://example.org/FHIR/SubscriptionTopic/encounter-complete</code>.
+        The current metadata for this server can be viewed
+        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=CapabilityStatement&id=metadata")"
+                 >here</FluentAnchor>,
+        or requested (in FHIR) at
+        <code class="copy-click">@Store.Config.BaseUrl/metadata</code>.
+    </FluentLabel>
+
+    <FluentLabel Typo="Typography.Body">
+        Note that in FHIR R4, there is not an official required format for representing <code>SubscriptionTopic</code>
+        resources.  Since topics are canonical resources, the expectation is that they will be defined
+        by authors (e.g., in Implementation Guides) and communicated out-of-band.  For example, for
+        an "encounter-start" topic, both the server and client can function with <i>only</i> the
+        canonical URL and the understanding of what that topic represents.
+    </FluentLabel>
+
+    <FluentLabel Typo="Typography.Body">
+        With that said, one possible way of representing topics in FHIR R4 is to use the model provided
+        in FHIR R5, ported using FHIR cross-version support.  This implementation supports topics defined via
+        that mechanism.  Our included <code>encounter-complete</code> topic is thus available on this server
+        at <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Basic&id=encounter-complete")"
+                    >Basic/encounter-complete</FluentAnchor>
+        or in FHIR at
+        <code class="copy-click">@Store.Config.BaseUrl/Basic/encounter-complete</code>.
+    </FluentLabel>
+
+    <FluentLabel Typo="Typography.Body">
+        Click next to select the <code>encounter-complete</code> topic.
+    </FluentLabel>
+</FluentStack>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>

@@ -1,5 +1,4 @@
-﻿@* @using MudBlazor; *@
-@using Microsoft.FluentUI.AspNetCore.Components;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/"
 
@@ -14,13 +13,18 @@
 @implements IDisposable
 
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+@*     <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
         <FluentIcon Value="@(new Icons.Regular.Size24.Warning())" Color="@Color.Warning" />
         <FluentLabel Color="@Color.Warning">
             This is an open FHIR endpoint for development, testing, and educational purposes only.
             Uploading real patient data is strictly prohibited.
         </FluentLabel>
     </FluentStack>
+ *@
+    <FluentMessageBar Title="Development Server" Intent="@MessageIntent.Warning" AllowDismiss="false">
+        This is an open FHIR endpoint for development, testing, and educational purposes only.
+        Uploading real patient data is strictly prohibited.
+    </FluentMessageBar>   
 
     @if (!string.IsNullOrEmpty(ServerConfig.ReferenceImplementation))
     {
@@ -214,315 +218,56 @@
         </FluentTabs>
     }
 
+    <FluentDataGrid GenerateHeader="GenerateHeaderOption.None" TGridItem="string" role="grid">
+        <FluentDataGridRow RowType="DataGridRowType.Header">
+            <FluentDataGridCell GridColumn=1 CellType="DataGridCellType.ColumnHeader">Description</FluentDataGridCell>
+            <FluentDataGridCell GridColumn=2 CellType="DataGridCellType.ColumnHeader">Link</FluentDataGridCell>
+        </FluentDataGridRow>
+
+        <FluentDataGridRow>
+            <FluentDataGridCell GridColumn=1>GitHub Repository for this software</FluentDataGridCell>
+            <FluentDataGridCell GridColumn=2>
+                <FluentAnchor Appearance="Appearance.Hypertext" Href="https://github.com/GinoCanessa/fhir-candle" Target="_blank">github.com</FluentAnchor>
+            </FluentDataGridCell>
+        </FluentDataGridRow>
+
+        <FluentDataGridRow>
+            <FluentDataGridCell GridColumn=1>FHIR R5 Subscriptions Framework</FluentDataGridCell>
+            <FluentDataGridCell GridColumn=2>
+                <FluentAnchor Appearance="Appearance.Hypertext" Href="https://hl7.org/fhir/R5/subscriptions.html" Target="_blank">hl7.org</FluentAnchor>
+            </FluentDataGridCell>
+        </FluentDataGridRow>
+
+        <FluentDataGridRow>
+            <FluentDataGridCell GridColumn=1>FHIR R4/R4B Subscriptions Backport IG</FluentDataGridCell>
+            <FluentDataGridCell GridColumn=2>
+                <FluentAnchor Appearance="Appearance.Hypertext" Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.htm" Target="_blank">hl7.org</FluentAnchor>
+            </FluentDataGridCell>
+        </FluentDataGridRow>
+
+        <FluentDataGridRow>
+            <FluentDataGridCell GridColumn=1>FHIR R4 Specification</FluentDataGridCell>
+            <FluentDataGridCell GridColumn=2>
+                <FluentAnchor Appearance="Appearance.Hypertext" Href="https://www.hl7.org/fhir/R4/" Target="_blank">hl7.org</FluentAnchor>
+            </FluentDataGridCell>
+        </FluentDataGridRow>
+
+        <FluentDataGridRow>
+            <FluentDataGridCell GridColumn=1>FHIR R4B Specification</FluentDataGridCell>
+            <FluentDataGridCell GridColumn=2>
+                <FluentAnchor Appearance="Appearance.Hypertext" Href="https://www.hl7.org/fhir/R4B/" Target="_blank">hl7.org</FluentAnchor>
+            </FluentDataGridCell>
+        </FluentDataGridRow>
+
+    </FluentDataGrid>
+
 </FluentStack>
-
-@* 
-<MudPaper Class="pa-4 ma-2" Square="true">
-
-    @if (StoreManager.Count() == 1)
-    {
-        <MudText Typo="Typo.h6">FHIR Endpoint Information</MudText>
-        <br />
-
-        @switch (StoreManager.First().Value.Config.FhirVersion)
-        {
-            case TenantConfiguration.SupportedFhirVersions.R4:
-                <fhir.candle.Components.FhirStoreTileR4 
-                    StoreName="@StoreManager.First().Key" 
-                    Store="@StoreManager.First().Value"
-                    RiName="@ServerConfig.ReferenceImplementation"
-                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
-                    AdditionalContent="@_contentR4"
-                    />
-                break;
-
-            case TenantConfiguration.SupportedFhirVersions.R4B:
-                <fhir.candle.Components.FhirStoreTileR4B
-                    StoreName="@StoreManager.First().Key" 
-                    Store="@StoreManager.First().Value"
-                    RiName="@ServerConfig.ReferenceImplementation"
-                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
-                    AdditionalContent="@_contentR4B"
-                    />
-                break;
-
-            case TenantConfiguration.SupportedFhirVersions.R5:
-                <fhir.candle.Components.FhirStoreTileR5
-                    StoreName="@StoreManager.First().Key" 
-                    Store="@StoreManager.First().Value"
-                    RiName="@ServerConfig.ReferenceImplementation"
-                    RiPages="@StoreManager.AdditionalPagesByTenant[StoreManager.First().Key]"
-                    AdditionalContent="@_contentR5"
-                    />
-                break;
-        }
-    }
-    else
-    {
-        <MudText Typo="Typo.h6">FHIR Endpoints</MudText>
-
-        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
-            @foreach (KeyValuePair<string, IFhirStore> kvp in @StoreManager.OrderBy(kvp => kvp.Key))
-            {
-                <MudTabPanel Text="@kvp.Key">
-                    @switch (kvp.Value.Config.FhirVersion)
-                    {
-                        case TenantConfiguration.SupportedFhirVersions.R4:
-                            <fhir.candle.Components.FhirStoreTileR4 
-                                StoreName="@kvp.Key" 
-                                Store="@kvp.Value"
-                                RiName="@ServerConfig.ReferenceImplementation"
-                                RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
-                                AdditionalContent="@_contentR4"
-                                />
-                            break;
-
-                        case TenantConfiguration.SupportedFhirVersions.R4B:
-                            <fhir.candle.Components.FhirStoreTileR4B
-                                StoreName="@kvp.Key" 
-                                Store="@kvp.Value"
-                                RiName="@ServerConfig.ReferenceImplementation"
-                                RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
-                                AdditionalContent="@_contentR4B"
-                                />
-                            break;
-
-                        case TenantConfiguration.SupportedFhirVersions.R5:
-                            <fhir.candle.Components.FhirStoreTileR5
-                                StoreName="@kvp.Key" 
-                                Store="@kvp.Value"
-                                RiName="@ServerConfig.ReferenceImplementation"
-                                RiPages="@StoreManager.AdditionalPagesByTenant[kvp.Key]"
-                                AdditionalContent="@_contentR5"
-                                />
-                            break;
-                    }
-
-                    @if (kvp.Value.Config.SmartRequired)
-                    {
-                        <br />
-
-                        <MudText Typo="Typo.body1">
-                            SMART authorization has been set to <code>required</code> for this FHIR endpoint:
-                        </MudText>
-                        <MudList>
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                The SMART well-known configuration is available at: 
-                                <code>@kvp.Value.Config.BaseUrl/.well-known/smart-configuration</code>
-                                <sup>
-                                    <button onclick="@($"navigator.clipboard.writeText('{@kvp.Value.Config.BaseUrl}/.well-known/smart-configuration')")">
-                                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                    </button>
-                                </sup>
-                                .
-                            </MudListItem>
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                The metadata endpoint (<code>@kvp.Value.Config.BaseUrl/metadata</code>) is openly accessible.
-                            </MudListItem>
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                All other FHIR API calls require an access token with appropriate scopes.
-                            </MudListItem>
-
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                For testing convenience, there are headers and query parameters that can be used to 'streamline' login and authorization.
-                                <MudList>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        Query Parameter <code>candle_auth_bypass</code> or Header <code>candle-auth-bypass</code>, can have values:
-                                        <code>administrator</code>, <code>patient</code>, or <code>practitioner</code>.  Using this value will 'fast-forward'
-                                        through the SMART authorization process and return an access token with the appropriate scopes and launch parameters,
-                                        as specified by the following options.
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        Query Parameter <code>candle_patient</code> or Header <code>candle-patient</code> is used to set the <code>launch/patient</code>.
-                                        Values MUST be formatted as <code>Patient/[id]</code> and MUST exist on the system.
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        Query Parameter <code>candle_practitioner</code> or Header <code>candle-practitioner</code> is used to set the <code>launch/practitioner</code>.
-                                        Values MUST be formatted as <code>Practitioner/[id]</code> and MUST exist on the system.
-                                    </MudListItem>
-                                </MudList>
-                            </MudListItem>
-
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                For testing convenience, there is an immutable access grant for the <code>administrator</code> user.
-                                <MudList>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        The <code>code</code> is <code>00000000-0000-0000-0000-000000000000</code>
-                                        <sup>
-                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000')")">
-                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                            </button>
-                                        </sup>
-                                        .
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        The <code>access_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
-                                        <sup>
-                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
-                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                            </button>
-                                        </sup>
-                                        .
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        The <code>refresh_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
-                                        <sup>
-                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
-                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                            </button>
-                                        </sup>
-                                        .
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        All requests using this <code>access_token</code> are considered authorized
-                                        (e.g., <code>Authorization: Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>).
-                                    </MudListItem>
-                                </MudList>
-                            </MudListItem>
-                        </MudList>
-                    }
-
-                    @if (kvp.Value.Config.SmartAllowed)
-                    {
-                        <br />
-
-                        <MudText Typo="Typo.body1">
-                            SMART authorization has been set to <code>optional</code> for this FHIR endpoint:
-                        </MudText>
-                        <MudList>
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                The SMART well-known configuration is available at:
-                                <code>@kvp.Value.Config.BaseUrl/.well-known/smart-configuration</code>
-                                <sup>
-                                    <button onclick="@($"navigator.clipboard.writeText('{@kvp.Value.Config.BaseUrl}/.well-known/smart-configuration')")">
-                                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                    </button>
-                                </sup>
-                                .
-                            </MudListItem>
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                The metadata endpoint (<code>@kvp.Value.Config.BaseUrl/metadata</code>) is openly accessible.
-                            </MudListItem>
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                For all other calls, if an authorization header is provided, it will be validated.  If
-                                no authorization header is provided, the call will be allowed.
-                            </MudListItem>
-                            <MudListItem>
-                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                For testing convenience, there is an immutable access grant for the <code>administrator</code> user.
-                                <MudList>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        The <code>code</code> is <code>00000000-0000-0000-0000-000000000000</code>
-                                        <sup>
-                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000')")">
-                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                            </button>
-                                        </sup>
-                                        .
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        The <code>access_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
-                                        <sup>
-                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
-                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                            </button>
-                                        </sup>
-                                        .
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        The <code>refresh_token</code> is <code>00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>
-                                        <sup>
-                                            <button onclick="@($"navigator.clipboard.writeText('00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000')")">
-                                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-                                            </button>
-                                        </sup>
-                                        .
-                                    </MudListItem>
-                                    <MudListItem>
-                                        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-                                        All requests using this <code>access_token</code> are considered authorized
-                                        (e.g., <code>Authorization: Bearer 00000000-0000-0000-0000-000000000000_00000000-0000-0000-0000-000000000000</code>).
-                                    </MudListItem>
-                                </MudList>
-                            </MudListItem>
-                        </MudList>
-                    }
-                </MudTabPanel>
-            }
-        </MudTabs>
-    }
-</MudPaper>
-<MudPaper Class="pa-16 ma-2" Square="true">
-    <MudText Typo="Typo.h6">Useful Links</MudText>
-    <MudSimpleTable>
-        <thead>
-            <tr>
-                <th>Description</th>
-                <th>Link</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>GitHub Repository for this software</td>
-                <td><MudLink Href="https://github.com/GinoCanessa/fhir-candle" Target="_" Underline="Underline.Always">github.com</MudLink></td>
-            </tr>
-            <tr>
-                <td>FHIR R5 Subscriptions Framework</td>
-                <td><MudLink Href="https://hl7.org/fhir/R5/subscriptions.html" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
-            </tr>
-            <tr>
-                <td>FHIR R4/R4B Subscriptions Backport IG</td>
-                <td><MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
-            </tr>
-            <tr>
-                <td>FHIR R4B Specification</td>
-                <td><MudLink Href="https://hl7.org/fhir/R4B/" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
-            </tr>
-            <tr>
-                <td>FHIR R4 Specification</td>
-                <td><MudLink Href="https://hl7.org/fhir/R4/" Target="_" Underline="Underline.Always">hl7.org</MudLink></td>
-            </tr>
-        </tbody>
-    </MudSimpleTable>
-</MudPaper> *@
-
-
-@*     <FluentStack Style="margin: 30px 0px; padding: 30px; border: 1px solid var(--accent-fill-rest);">
-        <FluentIcon Value="@(new Icons.Regular.Size24.Airplane())" />
-        <FluentLabel>Example of content</FluentLabel>
-        <FluentButton Appearance="Appearance.Outline">Outline button</FluentButton>
-        <FluentButton Appearance="Appearance.Accent">Accent button</FluentButton>
-    </FluentStack>
- *@
-
 
 @code {
 
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
-
-    // private IEnumerable<PackagePageInfo> _riPagesR4 = Enumerable.Empty<PackagePageInfo>();
-    // private IEnumerable<PackagePageInfo> _riPagesR4B = Enumerable.Empty<PackagePageInfo>();
-    // private IEnumerable<PackagePageInfo> _riPagesR5 = Enumerable.Empty<PackagePageInfo>();
 
     private Type? _contentR4 = null;
     private Type? _contentR4B = null;
@@ -534,9 +279,7 @@
     {
         base.OnInitialized();
 
-        NavTracker?.NotifyNav("FHIR Candle", "", 0);
-
-        // Utils.GetRiPages(ServerConfig.ReferenceImplementation ?? string.Empty, out _riPagesR4, out _riPagesR4B, out _riPagesR5);
+        NavTracker?.NotifyNav(string.Empty, string.Empty, 0);
 
         Utils.GetAdditionalIndexContent(ServerConfig.ReferenceImplementation ?? string.Empty, out _contentR4, out _contentR4B, out _contentR5);
     }

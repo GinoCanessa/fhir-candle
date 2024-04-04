@@ -14,7 +14,6 @@ using FhirCandle.Extensions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using FhirStore.Smart;
-using MudBlazor;
 using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace fhir.candle.Services;
@@ -50,7 +49,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     private Dictionary<string, IFhirStore> _storesByController = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The additional pages by controller.</summary>
-    private Dictionary<string, IEnumerable<PackagePageInfo>> _additionalPagesByController = new();
+    private Dictionary<string, List<PackagePageInfo>> _additionalPagesByController = new();
 
     /// <summary>
     /// Gets an enumerable collection that contains the keys in the read-only dictionary.
@@ -134,7 +133,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     }
 
     /// <summary>Gets the additional pages by tenant.</summary>
-    public Dictionary<string, IEnumerable<PackagePageInfo>> AdditionalPagesByTenant { get => _additionalPagesByController; }
+    public IReadOnlyDictionary<string, IQueryable<PackagePageInfo>> AdditionalPagesByTenant => _additionalPagesByController.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.AsQueryable());
 
     /// <summary>State has changed.</summary>
     public void StateHasChanged()
@@ -330,7 +329,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
                         if (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase))
                         {
-                            ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                            _additionalPagesByController[name].Add(page);
                         }
                         else
                         {
@@ -361,7 +360,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
                     if (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase))
                     {
-                        ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                        _additionalPagesByController[name].Add(page);
                     }
                     else
                     {

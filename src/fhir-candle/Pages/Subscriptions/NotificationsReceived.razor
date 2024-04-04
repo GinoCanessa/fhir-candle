@@ -1,4 +1,4 @@
-﻿@using MudBlazor;
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
 @page "/subscriptions/notifications-received"
 
@@ -9,41 +9,40 @@
 
 <PageTitle>Received Notifications</PageTitle>
 
-<MudGrid>
+<FluentGrid Spacing="4">
     @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store?.ReceivedNotifications.AsEnumerable() ?? Array.Empty<KeyValuePair<string, List<ParsedSubscriptionStatus>>>())
     {
-    <MudItem>
-        <MudBadge Content="@kvp.Value.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
-            <MudCard Outlined="true">
-                <MudCardContent>
-                    <MudField Label="Subscription">@kvp.Key</MudField>
-                    @if (kvp.Value.Any() && (kvp.Value.Last() is ParsedSubscriptionStatus status))
-                    {
-                        <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
-                        <MudField Label="Local Bundle">Bundle/@status.BundleId</MudField>
-                        <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
-                        <MudField Label="Type">@status.NotificationType</MudField>
+        <FluentGridItem xs="12">
+            <FluentCounterBadge Count="@kvp.Value.Count()" Appearance="Appearance.Accent">
+                <FluentCard>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                        <FluentTextField Label="Subscription" ReadOnly="true">@kvp.Key</FluentTextField>
+                        @if (kvp.Value.Any() && (kvp.Value.Last() is ParsedSubscriptionStatus status))
+                        {
+                            <FluentTextField Label="Topic" ReadOnly="true">@status.SubscriptionTopicCanonical</FluentTextField>
+                            <FluentTextField Label="Local Bundle" ReadOnly="true">Bundle/@status.BundleId</FluentTextField>
+                            <FluentTextField Label="Received" ReadOnly="true">@status.ProcessedDateTime.ToString("o")</FluentTextField>
+                            <FluentTextField Label="Type" ReadOnly="true">@status.NotificationType</FluentTextField>
 
-                        <MudField Label="Recevied Event Details">
-                            <MudLink Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" Underline="Underline.Always">Received Events</MudLink>
-                        </MudField>
+                            <FluentLabel Typo="Typography.Body">Recevied Event Details</FluentLabel>
+                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" >Received Events</FluentAnchor>
     
-                        @if (status.NotificationEvents.Any())
-                        {
-                            <MudField Label="Focus">@status.NotificationEvents.First().FocusReference</MudField>
-                        }
+                            @if (status.NotificationEvents.Any())
+                            {
+                                <FluentTextField Label="Focus" ReadOnly="true">@status.NotificationEvents.First().FocusReference</FluentTextField>
+                            }
 
-                        @if (status.Errors.Any())
-                        {
-                            <MudField Label="Error">@status.Errors.First()</MudField>
+                            @if (status.Errors.Any())
+                            {
+                                <FluentTextField Label="Error" ReadOnly="true">@status.Errors.First()</FluentTextField>
+                            }
                         }
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudBadge>
-    </MudItem>
+                    </FluentStack>
+                </FluentCard>
+            </FluentCounterBadge>
+        </FluentGridItem>
     }
-</MudGrid>
+</FluentGrid>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
@@ -84,7 +83,8 @@
         {
             if (_store != null)
             {
-                _store.OnChanged -= Store_OnChanged;
+                _store.OnInstanceCreated -= Store_OnChanged;
+                _store.OnInstanceDeleted -= Store_OnChanged;
                 _store.OnReceivedSubscriptionChanged -= Store_OnReceivedSubscriptionChanged;
                 _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
             }
@@ -92,7 +92,8 @@
             if ((!string.IsNullOrEmpty(StoreName)) &&
                 (StoreManager.TryGetValue(StoreName, out _store!)))
             {
-                _store.OnChanged += Store_OnChanged;
+                _store.OnInstanceCreated += Store_OnChanged;
+                _store.OnInstanceDeleted += Store_OnChanged;
                 _store.OnReceivedSubscriptionChanged += Store_OnReceivedSubscriptionChanged;
                 _store.OnReceivedSubscriptionEvent += Store_OnReceivedSubscriptionEvent;
             }
@@ -145,7 +146,8 @@
     {
         if (_store != null)
         {
-            _store.OnChanged -= Store_OnChanged;
+            _store.OnInstanceCreated -= Store_OnChanged;
+            _store.OnInstanceDeleted -= Store_OnChanged;
             _store.OnReceivedSubscriptionChanged -= Store_OnReceivedSubscriptionChanged;
             _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
         }

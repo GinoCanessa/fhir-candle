@@ -18,6 +18,7 @@
                 DisplayStepNumber="@(WizardStepStatus.Current | WizardStepStatus.Next)"
                 Border="WizardBorder.Outside"
                 StepTitleHiddenWhen="@GridItemHidden.XsAndDown"
+                style="height: 100%"
                 OnFinish="@(() => CleanUp())">
     <Steps>
         <FluentWizardStep Label="Intro" OnChange="@OnStepChange">
@@ -59,56 +60,48 @@
                         In this step, we are configuration the subscription options.
                     </FluentLabel>
 
-                    <FluentCard>
-                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                            <FluentLabel Typo="Typography.H6">
-                                The following options are fixed for this walkthrough and are displayed only for reference:
-                            </FluentLabel>
+                    <FluentLabel Typo="Typography.H6">
+                        The following options are fixed for this walkthrough and are displayed only for reference:
+                    </FluentLabel>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8" class="indented">
+                        <FluentSelect Label="Channel Type" @bind-Value="subscription.ChannelCode" TOption="string" >
+                            <FluentOption Disabled="true" Value="@("email")">Email</FluentOption>
+                            <FluentOption Disabled="true" Value="@("message")">FHIR Message</FluentOption>
+                            <FluentOption Value="@("rest-hook")">REST Hook (http/s POST)</FluentOption>
+                            <FluentOption Disabled="true" Value="@("websocket")">Websocket</FluentOption>
+                            <FluentOption Disabled="true" Value="@("zulip")">Zulip</FluentOption>
+                        </FluentSelect>
 
-                            <FluentLabel Typo="Typography.Body">
-                                Walkthrough is restricted to REST-Hook so that notifications can be viewed:
-                            </FluentLabel>
+                        <FluentTextField Value="subscription.Endpoint" Label="Endpoint" ReadOnly="true"/>
+                        <FluentNumberField @bind-Value="subscription.HeartbeatSeconds" Label="Heartbeat frequency (seconds)" ReadOnly="true"/>
+                        <FluentTextField @bind-Value="Expiration" Label="End (expiration)" ReadOnly="true"/>
+                    </FluentStack>
 
-                            <FluentSelect Label="Channel Type" @bind-Value="subscription.ChannelCode" TOption="string">
-                                <FluentOption Disabled="true" Value="@("email")">Email</FluentOption>
-                                <FluentOption Disabled="true" Value="@("message")">FHIR Message</FluentOption>
-                                <FluentOption Value="@("rest-hook")">REST Hook (http/s POST)</FluentOption>
-                                <FluentOption Disabled="true" Value="@("websocket")">Websocket</FluentOption>
-                                <FluentOption Disabled="true" Value="@("zulip")">Zulip</FluentOption>
-                            </FluentSelect>
+                    <br/>
 
-                            <FluentTextField @bind-Value="subscription.Endpoint" Label="Endpoint" ReadOnly="true" />
-                            <FluentNumberField @bind-Value="subscription.HeartbeatSeconds" Label="Heartbeat frequency (seconds)" ReadOnly="true" />
-                            <FluentTextField @bind-Value="Expiration" Label="End (expiration)" ReadOnly="true" />
-                        </FluentStack>
-                    </FluentCard>
+                    <FluentLabel Typo="Typography.H6">
+                        The following options are configurable in this walkthrough:
+                    </FluentLabel>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8" class="indented">
+                        <FluentLabel Typo="Typography.Body">
+                            MIME Type to use for notifications:
+                        </FluentLabel>
 
-                    <FluentCard>
-                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                            <FluentLabel Typo="Typography.Body">
-                                The following options are selected in this walkthrough:
-                            </FluentLabel>
+                        <FluentSelect Label="Content Type" @bind-Value="subscription.ContentType" TOption="string">
+                            <FluentOption Value="@("application/fhir+json")">FHIR JSON</FluentOption>
+                            <FluentOption Value="@("application/fhir+xml")">FHIR XML</FluentOption>
+                        </FluentSelect>
 
-                            <FluentLabel Typo="Typography.Body">
-                                MIME Type to use for notifications:
-                            </FluentLabel>
+                        <FluentLabel Typo="Typography.Body">
+                            Amount of data to include in notifications:
+                        </FluentLabel>
 
-                            <FluentSelect Label="Content Type" @bind-Value="subscription.ContentType" TOption="string">
-                                <FluentOption Value="@("application/fhir+json")">FHIR JSON</FluentOption>
-                                <FluentOption Value="@("application/fhir+xml")">FHIR XML</FluentOption>
-                            </FluentSelect>
-
-                            <FluentLabel Typo="Typography.Body">
-                                Amount of data to include in notifications:
-                            </FluentLabel>
-
-                            <FluentSelect Label="Content Level" @bind-Value="subscription.ContentLevel" TOption="string">
-                                <FluentOption Value="@("empty")">Empty</FluentOption>
-                                <FluentOption Value="@("id-only")">IDs Only</FluentOption>
-                                <FluentOption Value="@("full-resource")">Full Resources</FluentOption>
-                            </FluentSelect>
-                        </FluentStack>
-                    </FluentCard>
+                        <FluentSelect Label="Content Level" @bind-Value="subscription.ContentLevel" TOption="string">
+                            <FluentOption Value="@("empty")">Empty</FluentOption>
+                            <FluentOption Value="@("id-only")">IDs Only</FluentOption>
+                            <FluentOption Value="@("full-resource")">Full Resources</FluentOption>
+                        </FluentSelect>
+                    </FluentStack>
 
                 </FluentStack>
             </ChildContent>
@@ -275,6 +268,12 @@
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
+
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = PageName, Link = RoutePath + "store=" + StoreName },
+    };
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
@@ -491,8 +490,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Subscriptions Tour", "/subscriptions/tour?store=" + StoreName, 2);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -520,8 +518,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Subscriptions Tour", "/subscriptions/tour?store=" + StoreName, 2);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

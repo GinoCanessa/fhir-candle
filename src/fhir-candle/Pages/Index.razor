@@ -264,7 +264,6 @@
 </FluentStack>
 
 @code {
-
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
@@ -279,7 +278,7 @@
     {
         base.OnInitialized();
 
-        NavTracker?.NotifyNav(string.Empty, string.Empty, 0);
+        NavTracker?.NotifyNav(Array.Empty<NavPageInfoRec>());
 
         Utils.GetAdditionalIndexContent(ServerConfig.ReferenceImplementation ?? string.Empty, out _contentR4, out _contentR4B, out _contentR5);
     }

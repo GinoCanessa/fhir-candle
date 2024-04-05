@@ -9,45 +9,61 @@
 
 <PageTitle>Received Notifications</PageTitle>
 
-<FluentGrid Spacing="4">
-    @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store?.ReceivedNotifications.AsEnumerable() ?? Array.Empty<KeyValuePair<string, List<ParsedSubscriptionStatus>>>())
-    {
-        <FluentGridItem xs="12">
-            <FluentCounterBadge Count="@kvp.Value.Count()" Appearance="Appearance.Accent">
-                <FluentCard>
-                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                        <FluentTextField Label="Subscription" ReadOnly="true">@kvp.Key</FluentTextField>
-                        @if (kvp.Value.Any() && (kvp.Value.Last() is ParsedSubscriptionStatus status))
-                        {
-                            <FluentTextField Label="Topic" ReadOnly="true">@status.SubscriptionTopicCanonical</FluentTextField>
-                            <FluentTextField Label="Local Bundle" ReadOnly="true">Bundle/@status.BundleId</FluentTextField>
-                            <FluentTextField Label="Received" ReadOnly="true">@status.ProcessedDateTime.ToString("o")</FluentTextField>
-                            <FluentTextField Label="Type" ReadOnly="true">@status.NotificationType</FluentTextField>
+@if (!_store?.ReceivedNotifications.Any() ?? false)
+{
+    <FluentLabel Typo="Typography.Body">No events received for this endpoint.</FluentLabel>
+}
+else
+{
+    <FluentGrid Spacing="4">
+        @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store!.ReceivedNotifications.AsEnumerable())
+        {
+            <FluentGridItem Style="min-width: var(--field-container-min-width);">
+                <FluentCounterBadge Count="@kvp.Value.Count()" Appearance="Appearance.Accent" BottomPosition="97" HorizontalPosition="97" Max="999">
+                    <FluentCard>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                            <FluentTextField Label="Subscription" ReadOnly="true" Value="@kvp.Key"/>
+                            @if (kvp.Value.Any() && (kvp.Value.Last() is ParsedSubscriptionStatus status))
+                            {
+                                <FluentTextField Label="Topic" ReadOnly="true" Value="@status.SubscriptionTopicCanonical"/>
 
-                            <FluentLabel Typo="Typography.Body">Recevied Event Details</FluentLabel>
-                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" >Received Events</FluentAnchor>
+                                <FluentLabel Typo="Typography.Body">Local Bundle</FluentLabel>
+                                <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={status.BundleId}")">@("Bundle/" + status.BundleId)</FluentAnchor>
+
+                                <FluentTextField Label="Received" ReadOnly="true" Value="@status.ProcessedDateTime.ToString("o")"/>
+                                <FluentTextField Label="Type" ReadOnly="true" Value="@status.NotificationType?.ToString()"/>
+
+                                <FluentLabel Typo="Typography.Body">Recevied Event Details</FluentLabel>
+                                <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" >Received Events</FluentAnchor>
     
-                            @if (status.NotificationEvents.Any())
-                            {
-                                <FluentTextField Label="Focus" ReadOnly="true">@status.NotificationEvents.First().FocusReference</FluentTextField>
-                            }
+                                @if (status.NotificationEvents.Any())
+                                {
+                                    <FluentTextField Label="Focus" ReadOnly="true" Value="@status.NotificationEvents.First().FocusReference"/>
+                                }
 
-                            @if (status.Errors.Any())
-                            {
-                                <FluentTextField Label="Error" ReadOnly="true">@status.Errors.First()</FluentTextField>
+                                @if (status.Errors.Any())
+                                {
+                                    <FluentTextField Label="Error" ReadOnly="true" Value="@status.Errors.First()"/>
+                                }
                             }
-                        }
-                    </FluentStack>
-                </FluentCard>
-            </FluentCounterBadge>
-        </FluentGridItem>
-    }
-</FluentGrid>
+                        </FluentStack>
+                    </FluentCard>
+                </FluentCounterBadge>
+            </FluentGridItem>
+        }
+    </FluentGrid>
+}
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
+
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = "Received Subscription Events", Link = $"/subscriptions/notifications-received?store={StoreName}" },
+    };
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
@@ -70,8 +86,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav(StoreName, "/store?storeName=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Received Notifications", "/subscriptions/notifications-received?store=" + StoreName, 2);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -99,8 +114,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Received Notifications", "/subscriptions/notifications-received?store=" + StoreName, 2);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

@@ -1,11 +1,52 @@
 ﻿@import '/_content/Microsoft.FluentUI.AspNetCore.Components/css/reboot.css';
 
+/*:root {
+    --type-ramp-base-font-size: 1rem;
+    --type-ramp-base-line-height: 1.2rem;
+    --type-ramp-minus-1-font-size: 0.8rem;
+    --type-ramp-minus-1-line-height: 1rem;
+    --type-ramp-minus-2-font-size: 0.6rem;
+    --type-ramp-minus-2-line-height: 0.8rem;
+    --type-ramp-plus-1-font-size: 1.2rem;
+    --type-ramp-plus-1-line-height: 1.4rem;
+    --type-ramp-plus-2-font-size: 1.4rem;
+    --type-ramp-plus-2-line-height: 1.6rem;
+    --type-ramp-plus-3-font-size: 1.6rem;
+    --type-ramp-plus-3-line-height: 1.8rem;
+    --type-ramp-plus-4-font-size: 1.8rem;
+    --type-ramp-plus-4-line-height: 2.0rem;
+    --type-ramp-plus-5-font-size: 2.0rem;
+    --type-ramp-plus-5-line-height: 2.2rem;
+    --type-ramp-plus-6-font-size: 2.2rem;
+    --type-ramp-plus-6-line-height: 2.4rem;
+}
+*/
 body {
+    --type-ramp-base-font-size: 1rem;
+    --type-ramp-base-line-height: 1.4rem;
+    --type-ramp-minus-1-font-size: 0.8rem;
+    --type-ramp-minus-1-line-height: 1.2rem;
+    --type-ramp-minus-2-font-size: 0.6rem;
+    --type-ramp-minus-2-line-height: 1.0rem;
+    --type-ramp-plus-1-font-size: 1.2rem;
+    --type-ramp-plus-1-line-height: 1.6rem;
+    --type-ramp-plus-2-font-size: 1.4rem;
+    --type-ramp-plus-2-line-height: 1.8rem;
+    --type-ramp-plus-3-font-size: 1.6rem;
+    --type-ramp-plus-3-line-height: 2.0rem;
+    --type-ramp-plus-4-font-size: 1.8rem;
+    --type-ramp-plus-4-line-height: 2.2rem;
+    --type-ramp-plus-5-font-size: 2.0rem;
+    --type-ramp-plus-5-line-height: 2.4rem;
+    --type-ramp-plus-6-font-size: 2.2rem;
+    --type-ramp-plus-6-line-height: 2.6rem;
     --body-font: "Segoe UI Variable", "Segoe UI", sans-serif;
     font-family: var(--body-font);
     font-size: var(--type-ramp-base-font-size);
     line-height: var(--type-ramp-base-line-height);
     margin: 0;
+    --field-min-width: 400px;
+    --field-container-min-width: 420px;
 }
 
 .navmenu-icon {
@@ -142,6 +183,10 @@ ul {
     content: var(--blazor-load-percentage-text, "Loading");
 }
 
+.indented {
+    margin-left: 32px;
+}
+
 fluent-data-grid {
     width: 100%;
 }
@@ -155,6 +200,13 @@ fluent-data-grid fluent-data-grid-row:not(:first-child):hover {
     /*background-color: var(--neutral-fill-hover) !important;*/
 }
 
+fluent-text-field {
+    min-width: var(--field-min-width);
+}
+
+fluent-number-field {
+    min-width: var(--field-min-width);
+}
 
 @media (max-width: 600px) {
     .main {

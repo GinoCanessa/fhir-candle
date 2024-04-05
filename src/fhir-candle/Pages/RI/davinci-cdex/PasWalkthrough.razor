@@ -36,6 +36,11 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = "PAS Walkthrough", Link = "/davinci-pas/walkthrough" },
+    };
+
     private IFhirStore _provider = null!;
     private IFhirStore _payer = null!;
 
@@ -92,7 +97,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"PAS Walkthrough", "/davinci-pas/walkthrough", 1);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -142,7 +147,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"PAS Walkthrough", "/davinci-pas/walkthrough", 1);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

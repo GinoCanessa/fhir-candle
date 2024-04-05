@@ -183,6 +183,11 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = "SMART Login: " + StoreName, Link = $"/smart/login?store={StoreName}&key={Key}" },
+    };
+
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "store")]
@@ -222,7 +227,7 @@
         //     //
         // }
 
-        NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Cancel login.</summary>
@@ -298,7 +303,7 @@
             // {
             // }
 
-            NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

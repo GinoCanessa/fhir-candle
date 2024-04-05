@@ -85,6 +85,11 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+    };
+
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "store")]
@@ -120,8 +125,21 @@
 
     private IFhirStore _store = null!;
 
+    private bool _hideEmptyResources = true;
+
     /// <summary>True to hide or false to show empty resources.</summary>
-    private bool hideEmptyResources = true;
+    private bool hideEmptyResources
+    {
+        get => _hideEmptyResources;
+        set
+        {
+            if (value != _hideEmptyResources)
+            {
+                _hideEmptyResources = value;
+                _filteredItems = GetFilteredItems();
+            }
+        }
+    }
     
     /// <summary>Gets filtered items.</summary>
     /// <returns>The filtered items.</returns>
@@ -226,7 +244,7 @@
 
         _filteredItems = GetFilteredItems();
 
-        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -251,7 +269,7 @@
 
             _filteredItems = GetFilteredItems();
 
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 
@@ -261,6 +279,7 @@
     private void Store_OnChanged(object? sender, EventArgs e)
     {
         _filteredItems = GetFilteredItems();
+        _ = InvokeAsync(() => StateHasChanged());
     }
 
     /// <summary>

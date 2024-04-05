@@ -30,9 +30,11 @@
         <FluentButton Title="Navigation" IconEnd="@(new Icons.Regular.Size24.Navigation())" OnClick="@OpenNavPanel" Appearance="@(IsDarkMode ? Appearance.Outline : Appearance.Accent)" />
         <FluentSpacer Width="8"/>
         <FluentBreadcrumb>
-            @foreach (NavBreadcrumb item in _crumbs)
+            <FluentBreadcrumbItem Appearance="Appearance.Accent" Href="/">@homeTitle</FluentBreadcrumbItem>
+
+            @foreach (NavPageInfoRec item in _crumbs)
             {
-                <FluentBreadcrumbItem Appearance="Appearance.Accent" Href="@item.Link">@item.Text</FluentBreadcrumbItem>
+                <FluentBreadcrumbItem Appearance="Appearance.Accent" Href="@item.Link">@item.Display</FluentBreadcrumbItem>
             }
         </FluentBreadcrumb>
         <FluentSpacer />
@@ -62,10 +64,11 @@
 </div>
 
 @code {
-
+    /// <summary>The home title.</summary>
     private string homeTitle = "FHIR Candle";
 
-    private record struct NavBreadcrumb(string Text, string Link);
+    /// <summary>Occurs when On Theme Changed.</summary>
+    public event EventHandler<EventArgs>? OnThemeChanged;
 
     /// <summary>Gets or sets the mode.</summary>
     public DesignThemeModes Mode { get; set; }
@@ -77,10 +80,7 @@
     private IDialogReference? _navDialog;
 
     /// <summary>The crumbs.</summary>
-    private List<NavBreadcrumb> _crumbs = new()
-    {
-        new NavBreadcrumb("FHIR Candle", "#"),
-    };
+    private NavPageInfoRec[] _crumbs = Array.Empty<NavPageInfoRec>();
 
     /// <summary>Links for store.</summary>
     /// <param name="storeName">Name of the store.</param>
@@ -130,11 +130,18 @@
         if (Mode == DesignThemeModes.Dark)
         {
             Mode = DesignThemeModes.Light;
+            RegisterThemeChange();
         }
         else
         {
             Mode = DesignThemeModes.Dark;
+            RegisterThemeChange();
         }
+    }
+
+    private void RegisterThemeChange()
+    {
+        OnThemeChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Executes the after render action.</summary>
@@ -152,7 +159,6 @@
                 if (!string.IsNullOrEmpty(ServerConfig.ReferenceImplementation))
                 {
                     homeTitle = $"FHIR Candle ({ServerConfig.ReferenceImplementation})";
-                    NotifyNav(string.Empty, string.Empty, 0);
                     // _crumbs[0] = new NavBreadcrumb($"Candle ({ServerConfig.ReferenceImplementation})", "#");
                 }
 
@@ -171,21 +177,9 @@
     /// <param name="page"> The page.</param>
     /// <param name="link"> The link.</param>
     /// <param name="depth">The depth.</param>
-    public void NotifyNav(string page, string link, int depth)
+    public void NotifyNav(NavPageInfoRec[] navTree)
     {
-        if (_crumbs.Count > depth)
-        {
-            _crumbs.RemoveRange(depth, _crumbs.Count - depth);
-        }
-
-        if (string.IsNullOrEmpty(link))
-        {
-            _crumbs.Add(new NavBreadcrumb(homeTitle, "/"));
-        }
-        else
-        {
-            _crumbs.Add(new NavBreadcrumb(page, link));
-        }
+        _crumbs = navTree;
 
         StateHasChanged();
     }

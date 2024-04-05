@@ -143,6 +143,12 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = ResourceType, Link = $"/store/resource-list?store={StoreName}&type={ResourceType}" },
+    };
+
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "store")]
@@ -340,11 +346,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-        NavTracker?.NotifyNav(
-            ResourceType,
-            $"/store/resource-list?store={StoreName}&type={ResourceType}",
-            2);
+        NavTracker?.NotifyNav(_navPages);
 
         NavigationManager.LocationChanged += HandleLocationChanged;
     }
@@ -380,11 +382,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav(
-                ResourceType,
-                $"/store/resource-list?store={StoreName}&type={ResourceType}",
-                2);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 
@@ -394,6 +392,7 @@
     private void ResourceStore_OnChanged(object? sender, EventArgs e)
     {
         _filteredItems = GetFilteredItems();
+        _ = InvokeAsync(() => StateHasChanged());
     }
 
     /// <summary>

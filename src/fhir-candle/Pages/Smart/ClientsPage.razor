@@ -24,22 +24,22 @@
         <FluentGrid Spacing="8" style="background-color: var(--neutral-layer-3)">
             @foreach (ClientInfo smartClient in AuthManager.SmartClients.Values.OrderBy(sc => sc.ClientName))
             {
-                <FluentGridItem>
+                <FluentGridItem Style="min-width: var(--field-container-min-width);">
                     <FluentCard>
                         <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                            <FluentTextField ReadOnly="true" Label="Client Name">@smartClient.ClientName</FluentTextField>
-                            <FluentTextField ReadOnly="true" Label="Client ID">@smartClient.ClientId</FluentTextField>
+                            <FluentTextField ReadOnly="true" Label="Client Name" Value="@smartClient.ClientName" />
+                            <FluentTextField ReadOnly="true" Label="Client ID" Value="@smartClient.ClientId" />
 
                             @if (smartClient.Registration != null)
                             {
                                 @if (!string.IsNullOrEmpty(smartClient.Registration.JwksUri))
                                 {
-                                    <FluentTextField Label="JWKS URI" ReadOnly="true">@smartClient.Registration.JwksUri</FluentTextField>
+                                    <FluentTextField Label="JWKS URI" ReadOnly="true" Value="@smartClient.Registration.JwksUri" />
                                 }
 
                                 @foreach (JsonWebKey key in (smartClient.Registration.KeySet.Keys ?? Enumerable.Empty<JsonWebKey>()))
                                 {
-                                    <FluentTextField Label="Key Info" ReadOnly="true">@(key.Alg + ": " + key.KeyId)</FluentTextField>
+                                    <FluentTextField Label="Key Info" ReadOnly="true" Value="@(key.Alg + ": " + key.KeyId)" />
                                 }
                             }
 
@@ -47,10 +47,10 @@
                             {
                                 @foreach (ClientInfo.ClientActivityRecord activity in smartClient.Activity.OrderByDescending(a => a.Timestamp).Take(3))
                                 {
-                                    <FluentTextField Label="Activity" ReadOnly="true">@(activity.RequestType + " " + activity.Timestamp.ToString("o") + " " + (activity.Success ? "success" : "fail"))</FluentTextField>
+                                    <FluentTextField Label="Activity" ReadOnly="true" Value="@(activity.RequestType + " " + activity.Timestamp.ToString("o") + " " + (activity.Success ? "success" : "fail"))" />
                                     @if (!string.IsNullOrEmpty(activity.Message))
                                     {
-                                        <FluentTextField Label="Message" ReadOnly="true">@activity.Message</FluentTextField>
+                                        <FluentTextField Label="Message" ReadOnly="true" Value="@activity.Message" />
                                     }
                                 }
                             }
@@ -70,13 +70,18 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = "SMART Clients", Link = "/smart/clients" },
+    };
+
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
     protected override void OnInitialized()
     {
         base.OnInitialized();
 
-        NavTracker?.NotifyNav("SMART Clients", $"/smart/clients", 1);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -86,7 +91,7 @@
     {
         if (e.Location.ToLowerInvariant().Contains("/smart/clients", StringComparison.Ordinal))
         {
-            NavTracker?.NotifyNav("SMART Clients", $"/smart/clients", 1);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

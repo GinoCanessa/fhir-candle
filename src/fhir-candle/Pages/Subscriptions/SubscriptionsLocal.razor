@@ -9,47 +9,60 @@
 
 <PageTitle>Local Subscriptions</PageTitle>
 
-<FluentGrid Spacing="4">
-    @foreach (ParsedSubscription sub in _store?.CurrentSubscriptions ?? Array.Empty<ParsedSubscription>())
-    {
-        <FluentGridItem xs="12">
-            <FluentCounterBadge Count="@sub.GeneratedEvents.Count()" Appearance="Appearance.Accent" BottomPosition="97" HorizontalPosition="97" Max="999">
-                <FluentCard>
-                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                        <FluentLabel Typo="Typography.Body">Subscription</FluentLabel>
-                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={sub.Id}")">Subscription/@sub.Id</FluentAnchor>
+@if (!_store?.CurrentSubscriptions.Any() ?? false)
+{
+    <FluentLabel Typo="Typography.Body">No local subscriptions found for this store.</FluentLabel>
+}
+else
+{
+    <FluentGrid Spacing="4">
+        @foreach (ParsedSubscription sub in _store!.CurrentSubscriptions)
+        {
+            <FluentGridItem Style="min-width: var(--field-container-min-width);">
+                <FluentCounterBadge Count="@sub.GeneratedEvents.Count()" Appearance="Appearance.Accent" BottomPosition="97" HorizontalPosition="97" Max="999">
+                    <FluentCard>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                            <FluentLabel Typo="Typography.Body">Subscription</FluentLabel>
+                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={sub.Id}")">Subscription/@sub.Id</FluentAnchor>
 
-                        <FluentTextField Label="Topic" ReadOnly="true" ValueExpression="@sub.TopicUrl"/>
-                        <FluentTextField Label="Channel" ReadOnly="true" ValueExpression="@sub.ChannelCode"/>
-                        <FluentTextField Label="Endpoint" ReadOnly="true" ValueExpression="@sub.Endpoint"/>
+                            <FluentTextField Label="Topic" ReadOnly="true" Value="@sub.TopicUrl"/>
+                            <FluentTextField Label="Channel" ReadOnly="true" Value="@sub.ChannelCode"/>
+                            <FluentTextField Label="Endpoint" ReadOnly="true" Value="@sub.Endpoint"/>
 
-                        <FluentLabel Typo="Typography.Body">Generated Event Details</FluentLabel>
-                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={sub.Id}")">Generated Events</FluentAnchor>
+                            <FluentLabel Typo="Typography.Body">Generated Event Details</FluentLabel>
+                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={sub.Id}")">Generated Events</FluentAnchor>
 
-                        @if (sub.GeneratedEvents.Any())
-                        {
-                            <FluentTextField Label="Latest" ReadOnly="true" ValueExpression="@HeaderFor(sub.GeneratedEvents.Last().Value)" />
-                        }
-                        @if (sub.NotificationErrors.Any())
-                        {
-                            <FluentTextField Label="Error" Error="true" ReadOnly="true" ValueExpression="@sub.NotificationErrors.Last()" />
-                        }
-                    </FluentStack>
-                </FluentCard>
-            </FluentCounterBadge>
-        </FluentGridItem>
-    }
-</FluentGrid>
+                            @if (sub.GeneratedEvents.Any())
+                            {
+                                <FluentTextField Label="Latest" ReadOnly="true" Value="@HeaderFor(sub.GeneratedEvents.Last().Value)"/>
+                            }
+                            @if (sub.NotificationErrors.Any())
+                            {
+                                <FluentTextField Label="Error" Error="true" ReadOnly="true" Value="@sub.NotificationErrors.Last()" />
+                            }
+                        </FluentStack>
+                    </FluentCard>
+                </FluentCounterBadge>
+            </FluentGridItem>
+        }
+    </FluentGrid>
+}
 
 @code {
-        /// <summary>Gets or sets the navigation tracker.</summary>
-        [CascadingParameter]
-        public INavTracker? NavTracker { get; set; } = null;
+    /// <summary>Gets or sets the navigation tracker.</summary>
+    [CascadingParameter]
+    public INavTracker? NavTracker { get; set; } = null;
 
-        /// <summary>Gets or sets the package name.</summary>
-        [Parameter]
-        [SupplyParameterFromQuery(Name = "store")]
-        public string StoreName { get; set; } = "";
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = "Local Subscriptions", Link = "/subscriptions/local?store=" + StoreName },
+    };
+
+    /// <summary>Gets or sets the package name.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "store")]
+    public string StoreName { get; set; } = "";
 
     private IFhirStore _store = null!;
 
@@ -69,8 +82,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Local Subscriptions", "/subscriptions/local?store=" + StoreName, 2);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -98,8 +110,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Local Subscriptions", "/subscriptions/local?store=" + StoreName, 2);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

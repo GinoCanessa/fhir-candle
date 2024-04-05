@@ -50,6 +50,11 @@ else
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = "Authorization: " + StoreName, Link = $"/smart/auth?store={StoreName}&key={Key}" },
+    };
+
     /// <summary>The selected scopes.</summary>
     private readonly HashSet<string> _selected = new();
 
@@ -106,7 +111,7 @@ else
             AllScopesSelected = true;
         }
 
-        NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Executes the scope approval changed action.</summary>
@@ -161,7 +166,7 @@ else
         {
             _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
 
-            NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

@@ -12,14 +12,14 @@
 <FluentGrid Spacing="4">
     @foreach (SubscriptionEvent subEvent in _subscription?.GeneratedEvents.Values.AsEnumerable() ?? Array.Empty<SubscriptionEvent>())
     {
-        <FluentGridItem xs="12">
+        <FluentGridItem Style="min-width: var(--field-container-min-width);">
             <FluentCard>
                 <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                    <FluentTextField Label="Subscription" ReadOnly="true">Subscription/@subEvent.SubscriptionId</FluentTextField>
-                    <FluentTextField Label="Topic" ReadOnly="true">@subEvent.TopicUrl</FluentTextField>
-                    <FluentTextField Label="Event Number" ReadOnly="true">@subEvent.EventNumber</FluentTextField>
-                    <FluentTextField Label="Received" ReadOnly="true">@subEvent.Timestamp.ToLocalTime().ToString("o")</FluentTextField>
-                    <FluentTextField Label="Status At Generation" ReadOnly="true">@subEvent.StatusAtGeneration</FluentTextField>
+                    <FluentTextField Label="Subscription" ReadOnly="true" Value="@("Subscription/" + subEvent.SubscriptionId)"/>
+                    <FluentTextField Label="Topic" ReadOnly="true" Value="@subEvent.TopicUrl"/>
+                    <FluentNumberField Label="Event Number" ReadOnly="true" Value="@subEvent.EventNumber"/>
+                    <FluentTextField Label="Received" ReadOnly="true" Value="@subEvent.Timestamp.ToLocalTime().ToString("o")"/>
+                    <FluentTextField Label="Status At Generation" ReadOnly="true" Value="@subEvent.StatusAtGeneration"/>
 
                     @if ((subEvent.Focus != null) && 
                          (_store.TryGetResourceInfo(subEvent.Focus, out string rn, out string id)))
@@ -58,6 +58,12 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = "Generated Subscription Events", Link = $"/subscriptions/notification-local-viewer?store={StoreName}&id={SubscriptionId}" },
+    };
+
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "store")]
@@ -90,7 +96,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"Generated Subscription Events", $"/subscriptions/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -118,7 +124,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"Generated Subscription Events", $"/subscriptions/notification-local-viewer?store={StoreName}&id={SubscriptionId}", 3);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

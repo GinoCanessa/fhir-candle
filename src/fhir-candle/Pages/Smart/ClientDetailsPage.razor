@@ -108,6 +108,18 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => string.IsNullOrEmpty(ClientId)
+        ? new NavPageInfoRec[]
+        {
+            new() { Display = "SMART Clients", Link = "/smart/clients" },
+            new() { Display = "New Client", Link = "/smart/client_details" },
+        }
+        : new NavPageInfoRec[]
+        {
+            new() { Display = "SMART Clients", Link = "/smart/clients" },
+            new() { Display = "Edit: " + ClientId, Link = $"/smart/client_details?smartClientId={ClientId}" },
+        };
+
     /// <summary>Gets or sets the identifier of the client.</summary>
     [SupplyParameterFromQuery(Name = "smartClientId")]
     public string ClientId { get; set; } = string.Empty;
@@ -180,16 +192,7 @@
             ClientKey.KeyOps.Add("verify");
         }
 
-        if (string.IsNullOrEmpty(ClientId))
-        {
-            NavTracker?.NotifyNav("SMART Clients", "/smart/clients", 1);
-            NavTracker?.NotifyNav("New Client", "/smart/client_details", 2);
-        }
-        else
-        {
-            NavTracker?.NotifyNav("SMART Clients", "/smart/clients", 1);
-            NavTracker?.NotifyNav(ClientId, $"/smart/client_details?smartClientId={ClientId}", 2);
-        }
+        NavTracker?.NotifyNav(_navPages);
     }
 
     private void ShowError(string message)

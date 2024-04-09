@@ -18,7 +18,7 @@
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                 <FhirCandle.Ui.Common.Components.ResourcePicker
                     Store="@_store"
-                    ResourceStore="@_store["Patient"]"
+                    ResourceStore="@_patientStore"
                     ResourceType="Patient"
                     AllowMultipleSelection="false"
                     @bind-SelectedIds="SelectedPatientIds"
@@ -37,7 +37,7 @@
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                 <FhirCandle.Ui.Common.Components.ResourcePicker
                     Store="@_store"
-                    ResourceStore="@_store["Practitioner"]"
+                    ResourceStore="@_practitionerStore"
                     ResourceType="Practitioner"
                     AllowMultipleSelection="false"
                     @bind-SelectedIds="SelectedPractitionerIds"
@@ -47,7 +47,7 @@
 
                 <FhirCandle.Ui.Common.Components.ResourcePicker
                     Store="@_store"
-                    ResourceStore="@_store["Patient"]"
+                    ResourceStore="@_patientStore"
                     ResourceType="Patient"
                     AllowMultipleSelection="false"
                     @bind-SelectedIds="SelectedPatientIds"
@@ -66,10 +66,9 @@
         <FluentTab Label="Administrator Login">
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                 <FluentLabel Typo="Typography.Body">If you want a patient context, please select a patient below:</FluentLabel>
-
                 <FhirCandle.Ui.Common.Components.ResourcePicker
                     Store="@_store"
-                    ResourceStore="@_store["Patient"]"
+                    ResourceStore="@_patientStore"
                     ResourceType="Patient"
                     AllowMultipleSelection="false"
                     @bind-SelectedIds="SelectedPatientIds"
@@ -105,6 +104,9 @@
 
     private IFhirStore _store = null!;
 
+    private IResourceStore _patientStore = null!;
+    private IResourceStore _practitionerStore = null!;
+
     /// <summary>Gets or sets the authorization key.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "key")]
@@ -128,16 +130,7 @@
     {
         base.OnInitialized();
 
-        _ = StoreManager.TryGetValue(StoreName, out _store!);
-        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
-
-        // if ((!string.IsNullOrEmpty(StoreName)) &&
-        //     (AuthManager.HasTenant(StoreName)))
-        // {
-        //     //
-        // }
-
-        NavTracker?.NotifyNav(_navPages);
+        DoInit();
     }
 
     /// <summary>Cancel login.</summary>
@@ -151,21 +144,11 @@
         // TODO: show an error on the screen
     }
 
-    private void ProcessLogin()
-    {
-        _auth.UserId = SelectedUser;
-        _auth.LaunchPatient = SelectedPatientIds.First();
-        _auth.LaunchPractitioner = SelectedPractitionerIds.First();
-
-        _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
-
-        NavigationManager.NavigateTo($"/smart/auth?store={StoreName}&key={Key}");
-    }
-
     private void ProcessLoginAdministrator()
     {
         _auth.UserId = "administrator";
-        _auth.LaunchPatient = SelectedPatientIds.First();
+        _auth.LaunchPatient = SelectedPatientIds.FirstOrDefault() ?? string.Empty;
+        // _auth.LaunchPractitioner = SelectedPractitionerIds.FirstOrDefault() ?? string.Empty;
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
@@ -174,6 +157,11 @@
 
     private void ProcessLoginPatient()
     {
+        if (!SelectedPatientIds.Any())
+        {
+            return;
+        }
+
         _auth.UserId = "Patient/" + SelectedPatientIds.First();
         _auth.LaunchPatient = SelectedPatientIds.First();
 
@@ -184,13 +172,31 @@
 
     private void ProcessLoginPractitioner()
     {
-        _auth.UserId = "Practitioner/" + SelectedPractitionerIds;
-        _auth.LaunchPatient = SelectedPatientIds.First();
+        if (!SelectedPractitionerIds.Any())
+        {
+            return;
+        }
+
+        _auth.UserId = "Practitioner/" + SelectedPractitionerIds.First();
+        _auth.LaunchPatient = SelectedPatientIds.FirstOrDefault() ?? string.Empty;
         _auth.LaunchPractitioner = SelectedPractitionerIds.First();
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
         NavigationManager.NavigateTo($"/smart/auth?store={StoreName}&key={Key}");
+    }
+
+    private void DoInit()
+    {
+        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
+
+        if (StoreManager.TryGetValue(StoreName, out _store!))
+        {
+            _ = _store.TryGetValue("Patient", out _patientStore!);
+            _ = _store.TryGetValue("Practitioner", out _practitionerStore!);
+        }
+
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -200,20 +206,7 @@
     {
         if (e.Location.ToLowerInvariant().Contains("/smart/login?", StringComparison.Ordinal))
         {
-            // if (_store != null)
-            // {
-            //     _store.OnChanged -= Store_OnChanged;
-            // }
-
-            _ = StoreManager.TryGetValue(StoreName, out _store!);
-            _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
-
-            // if ((!string.IsNullOrEmpty(StoreName)) &&
-            //     (StoreManager.TryGetValue(StoreName, out _store!)))
-            // {
-            // }
-
-            NavTracker?.NotifyNav(_navPages);
+            DoInit();
         }
     }
 

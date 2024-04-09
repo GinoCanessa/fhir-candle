@@ -18,15 +18,16 @@
     <FluentLabel Typo="Typography.Body">Please select allowed scopes:</FluentLabel>
 
     <FluentStack Orientation="Orientation.Horizontal" Spacing="4">
-        <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ApproveAuth())">Approve Selected Scopes</FluentButton>
+        <FluentButton BackgroundColor="var(--success)" OnClick="@(() => ApproveAuth())">Approve Selected Scopes</FluentButton>
         <FluentButton BackgroundColor="var(--error)" OnClick="@(() => DenyAuth())">Cancel</FluentButton>
     </FluentStack>
 
-    <FluentCheckbox Label="@($"All")"
+    <FluentCheckbox Label="@($"All Scopes")"
                 ThreeState="true"
                 ShowIndeterminate="false"
                 @bind-CheckState="AllScopesSelected" />
 
+    @*
     @foreach (string scope in _auth.Scopes.Keys)
     {
         bool isChecked = _selected.Contains(scope);
@@ -34,6 +35,14 @@
                         @bind-Value:get="isChecked"
                         @bind-Value:set="c => OnScopeApprovalChanged(scope, c)" />
     }
+    *@
+
+    <FluentDataGrid Items="@_items" GridTemplateColumns="2fr" RowClass="@(s => _selected.Contains(s) ? "highlighted-row" : null)" OnRowFocus="HandleRowFocus" TGridItem=string>
+
+        <PropertyColumn Title="Scope" Property="@(t => t)" Sortable="true" Tooltip="true">
+        </PropertyColumn>
+
+    </FluentDataGrid>
 }
 else
 {
@@ -54,6 +63,8 @@ else
     {
         new() { Display = "Authorization: " + StoreName, Link = $"/smart/auth?store={StoreName}&key={Key}" },
     };
+
+    private IQueryable<string> _items = Array.Empty<string>().AsQueryable();
 
     /// <summary>The selected scopes.</summary>
     private readonly HashSet<string> _selected = new();
@@ -97,6 +108,25 @@ else
     /// <summary>The authorization information.</summary>
     private AuthorizationInfo _auth = null!;
 
+    private void HandleRowFocus(FluentDataGridRow<string> row)
+    {
+        // _ = JsLogAsync($"Focused row item id: {row.Item?.Id}");
+
+        if (row?.Item != null)
+        {
+            if (_selected.Contains(row.Item))
+            {
+                _selected.Remove(row.Item);
+            }
+            else
+            {
+                _selected.Add(row.Item);
+            }
+        }
+
+        StateHasChanged();
+    }
+
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
     protected override void OnInitialized()
@@ -107,6 +137,7 @@ else
 
         if (_auth != null)
         {
+            _items = _auth.Scopes.Keys.AsQueryable();
             _selected.Clear();
             AllScopesSelected = true;
         }

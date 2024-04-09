@@ -121,6 +121,29 @@ public class AuthorizationInfo
         public string? PkceMethod { get; init; } = string.Empty;
     }
 
+    public record class SmartFhirContext
+    {
+        [JsonPropertyName("type")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? Type { get; init; } = null;
+
+        [JsonPropertyName("reference")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? Reference { get; init; } = null;
+
+        [JsonPropertyName("canonical")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? Canonical { get; init; } = null;
+
+        [JsonPropertyName("identifier")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? Identifier { get; init; } = null;
+
+        [JsonPropertyName("role")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public string? Role { get; init; } = null;
+    }
+
     /// <summary>A smart response.</summary>
     public record class SmartResponse
     {
@@ -132,6 +155,10 @@ public class AuthorizationInfo
 
         [JsonPropertyName("patient")]
         public string PatientId { get; init; } = string.Empty;
+
+        [JsonPropertyName("fhirContext")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public IEnumerable<SmartFhirContext>? FhirContext { get; init; } = null;
 
         [JsonPropertyName("token_type")]
         public string TokenType { get; init; } = string.Empty;

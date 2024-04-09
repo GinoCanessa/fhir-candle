@@ -19,6 +19,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
 using zulip_cs_lib.Resources;
+using static FhirCandle.Models.AuthorizationInfo;
 
 namespace fhir.candle.Services;
 
@@ -932,6 +933,18 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         local.UserScopes = userScopes;
         local.PatientScopes = patientScopes;
 
+        // create our FHIR Context
+        List<SmartFhirContext> fhirContext = new();
+
+        if (!string.IsNullOrEmpty(local.LaunchPractitioner))
+        {
+            fhirContext.Add(new()
+            {
+                Type = "Practitioner",
+                Reference = local.LaunchPractitioner.StartsWith("Practitioner/") ? local.LaunchPractitioner : "Practitioner/" + local.LaunchPractitioner,
+            });
+        }
+
         // check for 'special' code
         if (code.Equals(Guid.Empty.ToString()))
         {
@@ -942,6 +955,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             local.Response = new()
             {
                 PatientId = local.LaunchPatient,
+                FhirContext = fhirContext.Any() ? fhirContext : null,
                 TokenType = "bearer",
                 Scopes = string.Join(" ", permittedScopes),
                 ClientId = local.RequestParameters.ClientId,
@@ -960,6 +974,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             local.Response = new()
             {
                 PatientId = local.LaunchPatient,
+                FhirContext = fhirContext.Any() ? fhirContext : null,
                 TokenType = "bearer",
                 Scopes = string.Join(" ", permittedScopes),
                 ClientId = local.RequestParameters.ClientId,
@@ -1718,7 +1733,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                     "fhirUser",
                     "launch",
                     "launch/patient",
-                    //"launch/practitioner",
+                    "launch/practitioner",
                     //"launch/encounter",
                     //"patient/*.read",
                     //"patient/*.r",

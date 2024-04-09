@@ -27,21 +27,12 @@
                 ShowIndeterminate="false"
                 @bind-CheckState="AllScopesSelected" />
 
-    @*
-    @foreach (string scope in _auth.Scopes.Keys)
-    {
-        bool isChecked = _selected.Contains(scope);
-        <FluentCheckbox Label="@($"{scope}")"
-                        @bind-Value:get="isChecked"
-                        @bind-Value:set="c => OnScopeApprovalChanged(scope, c)" />
-    }
-    *@
-
-    <FluentDataGrid Items="@_items" GridTemplateColumns="2fr" RowClass="@(s => _selected.Contains(s) ? "highlighted-row" : null)" OnRowFocus="HandleRowFocus" TGridItem=string>
-
-        <PropertyColumn Title="Scope" Property="@(t => t)" Sortable="true" Tooltip="true">
+    <FluentDataGrid Items="@_items" GridTemplateColumns="1fr 2fr" RowClass="@(s => _selected.Contains(s.Scope) ? "highlighted-row" : null)" OnRowFocus="HandleRowFocus" TGridItem=ScopeInfo>
+        <PropertyColumn Title="Scope" Property="@(t => t.Scope)" Sortable="true" Tooltip="true">
         </PropertyColumn>
 
+        <PropertyColumn Title="Description" Property="@(t => t.Description)" Sortable="true" Tooltip="true">
+        </PropertyColumn>
     </FluentDataGrid>
 }
 else
@@ -64,7 +55,13 @@ else
         new() { Display = "Authorization: " + StoreName, Link = $"/smart/auth?store={StoreName}&key={Key}" },
     };
 
-    private IQueryable<string> _items = Array.Empty<string>().AsQueryable();
+    private record class ScopeInfo
+    {
+        public required string Scope { get; init; }
+        public string Description { get; init; } = string.Empty;
+    }
+
+    private IQueryable<ScopeInfo> _items = Array.Empty<ScopeInfo>().AsQueryable();
 
     /// <summary>The selected scopes.</summary>
     private readonly HashSet<string> _selected = new();
@@ -108,23 +105,199 @@ else
     /// <summary>The authorization information.</summary>
     private AuthorizationInfo _auth = null!;
 
-    private void HandleRowFocus(FluentDataGridRow<string> row)
+    private void HandleRowFocus(FluentDataGridRow<ScopeInfo> row)
     {
         // _ = JsLogAsync($"Focused row item id: {row.Item?.Id}");
 
         if (row?.Item != null)
         {
-            if (_selected.Contains(row.Item))
+            if (_selected.Contains(row.Item.Scope))
             {
-                _selected.Remove(row.Item);
+                _selected.Remove(row.Item.Scope);
             }
             else
             {
-                _selected.Add(row.Item);
+                _selected.Add(row.Item.Scope);
             }
         }
 
         StateHasChanged();
+    }
+
+    private void UpdateScopeInfo()
+    {
+        List<ScopeInfo> scopeInfo = new();
+
+        foreach (string scope in _auth.Scopes.Keys)
+        {
+            switch (scope)
+            {
+                case "openid":
+                case "fhirUser":
+                case "profile":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Permission to retrieve information about the current logged-in user."
+                    });
+                    break;
+
+                case "launch":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Permission to obtain launch context when app is launched from an EHR."
+                    });
+                    break;
+
+                case "launch/patient":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "When launching outside the EHR, ask for a patient to be selected at launch time."
+                    });
+                    break;
+
+                case "offline_access":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Request a refresh_token that can be used to obtain a new access token to replace an expired one, even after the end-user no longer is online after the access token expires."
+                    });
+                    break;
+
+                case "online_access":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Request a refresh_token that can be used to obtain a new access token to replace an expired one, and that will be usable for as long as the end-user remains online."
+                    });
+                    break;
+
+                default:
+                    {
+                        if (ParseResourceScope(scope, out string context, out string resourceType, out List<string> ops, out List<string> filters))
+                        {
+                            scopeInfo.Add(new()
+                            {
+                                Scope = scope,
+                                Description = $"Permission to {string.Join("&", ops)} all {resourceType} resources the {context} has access to" + 
+                                    (filters.Any()
+                                    ? $", if they match: {string.Join(", ", filters)}"
+                                    : "."),
+                            });
+                        }
+                        else
+                        {
+                            scopeInfo.Add(new()
+                            {
+                                Scope = scope,
+                                Description = ""
+                            });
+                        }
+                    }
+                    break;
+            }
+        }
+
+        _items = scopeInfo.AsQueryable();
+    }
+
+    private bool ParseResourceScope(string scope, out string context, out string resourceType, out List<string> ops, out List<string> filters)
+    {
+        resourceType = string.Empty;
+        context = string.Empty;
+        ops = new();
+        filters = new();
+
+        if (string.IsNullOrEmpty(scope))
+        {
+            return false;
+        }
+
+        string contextRemoved;
+
+        if (scope.StartsWith("patient/", StringComparison.Ordinal))
+        {
+            context = "Patient";
+            contextRemoved = scope.Substring(8);
+        }
+        else if (scope.StartsWith("user/", StringComparison.Ordinal))
+        {
+            context = "User";
+            contextRemoved = scope.Substring(5);
+        }
+        else
+        {
+            return false;
+        }
+
+        int opDelimiterLoc = contextRemoved.IndexOf('.');
+        string opLiterals = opDelimiterLoc > 0 ? contextRemoved.Substring(opDelimiterLoc + 1) : string.Empty;
+        resourceType = opDelimiterLoc > 0 ? contextRemoved.Substring(0, opDelimiterLoc) : contextRemoved;
+
+        if (resourceType == "*")
+        {
+            resourceType = "ALL";
+        }
+
+        int filterDelimiterLoc = opLiterals.IndexOf('?');
+        string filterLiterals = filterDelimiterLoc > 0 ? opLiterals.Substring(filterDelimiterLoc + 1) : string.Empty;
+        opLiterals = filterDelimiterLoc > 0 ? opLiterals.Substring(0, filterDelimiterLoc) : opLiterals;
+
+        if (!string.IsNullOrEmpty(filterLiterals))
+        {
+            filters.AddRange(filterLiterals.Split('&'));
+        }
+
+        if (opLiterals == "read")
+        {
+            ops.Add("Read");
+            ops.Add("Search");
+        }
+        else if (opLiterals == "write")
+        {
+            ops.Add("Create");
+            ops.Add("Update");
+            ops.Add("Delete");
+        }
+        else if (opLiterals == "*")
+        {
+            ops.Add("Create");
+            ops.Add("Read");
+            ops.Add("Update");
+            ops.Add("Delete");
+            ops.Add("Search");
+        }
+        else
+        {
+            if (opLiterals.Contains("c", StringComparison.Ordinal))
+            {
+                ops.Add("Create");
+            }
+
+            if (opLiterals.Contains("r", StringComparison.Ordinal))
+            {
+                ops.Add("Read");
+            }
+
+            if (opLiterals.Contains("u", StringComparison.Ordinal))
+            {
+                ops.Add("Update");
+            }
+
+            if (opLiterals.Contains("d", StringComparison.Ordinal))
+            {
+                ops.Add("Delete");
+            }
+
+            if (opLiterals.Contains("s", StringComparison.Ordinal))
+            {
+                ops.Add("Search");
+            }
+        }
+
+        return true;
     }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
@@ -137,27 +310,13 @@ else
 
         if (_auth != null)
         {
-            _items = _auth.Scopes.Keys.AsQueryable();
+
+            UpdateScopeInfo();
             _selected.Clear();
             AllScopesSelected = true;
         }
 
         NavTracker?.NotifyNav(_navPages);
-    }
-
-    /// <summary>Executes the scope approval changed action.</summary>
-    /// <param name="scope">    The scope.</param>
-    /// <param name="isVisible">True if is visible, false if not.</param>
-    protected void OnScopeApprovalChanged(string scope, bool isVisible)
-    {
-        if (isVisible)
-        {
-            _selected.Add(scope);
-        }
-        else
-        {
-            _selected.Remove(scope);
-        }
     }
 
     private void DenyAuth()

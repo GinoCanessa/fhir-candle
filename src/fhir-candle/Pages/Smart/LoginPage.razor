@@ -16,41 +16,18 @@
     <FluentTabs Orientation="Orientation.Horizontal">
         <FluentTab Label="Patient Login">
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_store["Patient"]"
+                    ResourceType="Patient"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPatientIds"
+                    />
 
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                }
-
-                <FluentTextField Label="User (Patient)" @bind-Value="SelectedPatientId" ReadOnly="true" />
-                <FluentTextField Label="Patient" @bind-Value="SelectedPatientId" ReadOnly="true" />
+                <FluentTextField Label="User (Patient)" Value="@(string.Join(", ", SelectedPatientIds))" ReadOnly="true" />
 
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
-                    <FluentButton Appearance="Appearance.Accent" Disabled="@(string.IsNullOrEmpty(SelectedPatientId))" OnClick="@(() => ProcessLoginPatient())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" Disabled="@(!SelectedPatientIds.Any())" OnClick="@(() => ProcessLoginPatient())">Login</FluentButton>
                     <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
                 </FluentStack>
             </FluentStack>
@@ -58,74 +35,29 @@
 
         <FluentTab Label="Practitioner Login">
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPractitioner
-                            Store="@_store"
-                            ResourceStore="@_store["Practitioner"]"
-                            @bind-SelectedId="SelectedPractitionerId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPractitioner
-                            Store="@_store"
-                            ResourceStore="@_store["Practitioner"]"
-                            @bind-SelectedId="SelectedPractitionerId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPractitioner
-                            Store="@_store"
-                            ResourceStore="@_store["Practitioner"]"
-                            @bind-SelectedId="SelectedPractitionerId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                }
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_store["Practitioner"]"
+                    ResourceType="Practitioner"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPractitionerIds"
+                    />
 
                 <FluentLabel Typo="Typography.Body">If you want a patient context, please select a patient below:</FluentLabel>
 
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_store["Patient"]"
+                    ResourceType="Patient"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPatientIds"
+                    />
 
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                    }
-
-                <FluentTextField Label="User (Practitioner)" @bind-Value="SelectedPractitionerId" ReadOnly="true" />
-                <FluentTextField Label="Patient" @bind-Value="SelectedPatientId" ReadOnly="true" />
-                <FluentTextField Label="Practitioner" @bind-Value="SelectedPractitionerId" ReadOnly="true" />
+                <FluentTextField Label="User (Practitioner)" Value="@(string.Join(", ", SelectedPractitionerIds))" ReadOnly="true" />
+                <FluentTextField Label="Patient" Value="@(string.Join(", ", SelectedPatientIds))" ReadOnly="true" />
 
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
-                    <FluentButton Appearance="Appearance.Accent" Disabled="@(string.IsNullOrEmpty(SelectedPractitionerId))" OnClick="@(() => ProcessLoginPractitioner())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" Disabled="@(!SelectedPractitionerIds.Any())" OnClick="@(() => ProcessLoginPractitioner())">Login</FluentButton>
                     <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
                 </FluentStack>
             </FluentStack>
@@ -135,38 +67,16 @@
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
                 <FluentLabel Typo="Typography.Body">If you want a patient context, please select a patient below:</FluentLabel>
 
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                }
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_store["Patient"]"
+                    ResourceType="Patient"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPatientIds"
+                    />
 
                 <FluentTextField Label="User (Admin)" Value="@("administrator")" ReadOnly="true" />
-                <FluentTextField Label="Patient" @bind-Value="SelectedPatientId" ReadOnly="true" />
+                <FluentTextField Label="Patient" Value="@(string.Join(", ", SelectedPatientIds))" ReadOnly="true" />
 
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
                     <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ProcessLoginAdministrator())">Login</FluentButton>
@@ -207,10 +117,10 @@
     public string SelectedUser { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the selected patient identifier.</summary>
-    public string SelectedPatientId { get; set; } = string.Empty;
+    public HashSet<string> SelectedPatientIds { get; set; } = new();
 
     /// <summary>Gets or sets the selected practitioner identifier.</summary>
-    public string SelectedPractitionerId { get; set; } = string.Empty;
+    public HashSet<string> SelectedPractitionerIds { get; set; } = new();
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
@@ -244,8 +154,8 @@
     private void ProcessLogin()
     {
         _auth.UserId = SelectedUser;
-        _auth.LaunchPatient = SelectedPatientId;
-        _auth.LaunchPractitioner = SelectedPractitionerId;
+        _auth.LaunchPatient = SelectedPatientIds.First();
+        _auth.LaunchPractitioner = SelectedPractitionerIds.First();
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
@@ -255,7 +165,7 @@
     private void ProcessLoginAdministrator()
     {
         _auth.UserId = "administrator";
-        _auth.LaunchPatient = SelectedPatientId;
+        _auth.LaunchPatient = SelectedPatientIds.First();
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
@@ -264,8 +174,8 @@
 
     private void ProcessLoginPatient()
     {
-        _auth.UserId = "Patient/" + SelectedPatientId;
-        _auth.LaunchPatient = SelectedPatientId;
+        _auth.UserId = "Patient/" + SelectedPatientIds.First();
+        _auth.LaunchPatient = SelectedPatientIds.First();
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
@@ -274,9 +184,9 @@
 
     private void ProcessLoginPractitioner()
     {
-        _auth.UserId = "Practitioner/" + SelectedPractitionerId;
-        _auth.LaunchPatient = SelectedPatientId;
-        _auth.LaunchPractitioner = SelectedPractitionerId;
+        _auth.UserId = "Practitioner/" + SelectedPractitionerIds;
+        _auth.LaunchPatient = SelectedPatientIds.First();
+        _auth.LaunchPractitioner = SelectedPractitionerIds.First();
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 

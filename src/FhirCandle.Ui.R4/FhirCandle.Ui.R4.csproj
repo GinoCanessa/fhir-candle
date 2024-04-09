@@ -23,6 +23,7 @@
     <ProjectReference Include="..\FhirStore.R4\FhirCandle.R4.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Components\Pickers\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 </Project>

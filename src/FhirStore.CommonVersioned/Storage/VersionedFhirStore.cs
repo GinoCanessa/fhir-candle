@@ -164,10 +164,10 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Gets a list of names of the loaded packages.</summary>
-    public HashSet<string> LoadedPackages { get => _loadedDirectives; }
+    public HashSet<string> LoadedPackages => _loadedDirectives;
 
     /// <summary>Gets the loaded supplements.</summary>
-    public HashSet<string> LoadedSupplements { get => _loadedSupplements; }
+    public HashSet<string> LoadedSupplements => _loadedSupplements;
 
     /// <summary>Initializes this object.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
@@ -465,7 +465,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="directive">         The directive.</param>
     /// <param name="directory">         Pathname of the directory.</param>
     /// <param name="packageSupplements">The package supplements.</param>
-    /// <param name="includeExample">    True to include, false to exclude the examples.</param>
+    /// <param name="includeExamples">    True to include, false to exclude the examples.</param>
     public void LoadPackage(
         string directive, 
         string directory, 

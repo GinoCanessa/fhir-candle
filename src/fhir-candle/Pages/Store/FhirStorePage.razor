@@ -11,7 +11,7 @@
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
     <FluentLabel Typo="Typography.H4">FHIR Resources: @StoreName</FluentLabel>
 
-    <FluentSwitch Label="Hide Empty Resources" @bind-Value="hideEmptyResources"></FluentSwitch>
+    <FluentSwitch Label="Hide Empty Resources" @bind-Value="HideEmptyResources"></FluentSwitch>
 
     <FluentDataGrid Items="@FilteredItems" GridTemplateColumns="1fr 1fr">
 @*         <PropertyColumn Title="Resource Name" Property="@(ri => ri.ResourceName)" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(ResourceNameFilter)" Tooltip="true"  IsDefaultSortColumn="true">
@@ -128,7 +128,7 @@
     private bool _hideEmptyResources = true;
 
     /// <summary>True to hide or false to show empty resources.</summary>
-    private bool hideEmptyResources
+    private bool HideEmptyResources
     {
         get => _hideEmptyResources;
         set
@@ -154,7 +154,7 @@
         // check for no filters
         if (string.IsNullOrWhiteSpace(_resourceNameFilter))
         {
-            if (hideEmptyResources)
+            if (HideEmptyResources)
             {
                 return _store
                     .Where(kvp => kvp.Value.Count > 0)
@@ -167,7 +167,7 @@
                 .AsQueryable<ResourceStoreInfo>();
         }
 
-        if (hideEmptyResources)
+        if (HideEmptyResources)
         {
             return _store
                 .Where(kvp => kvp.Value.Count > 0)

@@ -127,7 +127,7 @@ else
     /// <param name="e">     Subscription event information.</param>
     private void Store_OnSubscriptionsChanged(object? sender, SubscriptionChangedEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>Event handler. Called by Store for on subscription events.</summary>
@@ -135,7 +135,7 @@ else
     /// <param name="e">     Subscription event information.</param>
     private void Store_OnSubscriptionSendEvent(object? sender, SubscriptionSendEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>FHIR store on changed.</summary>
@@ -143,7 +143,7 @@ else
     /// <param name="e">     Event information.</param>
     private void Store_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

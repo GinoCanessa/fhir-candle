@@ -278,7 +278,7 @@
     {
         base.OnInitialized();
 
-        NavTracker?.NotifyNav(Array.Empty<NavPageInfoRec>());
+        NavTracker?.NotifyNav([]);
 
         Utils.GetAdditionalIndexContent(ServerConfig.ReferenceImplementation ?? string.Empty, out _contentR4, out _contentR4B, out _contentR5);
     }

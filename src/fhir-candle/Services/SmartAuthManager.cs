@@ -79,13 +79,13 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
     public bool IsEnabled => _smartConfigs.Any();
 
     /// <summary>Gets the smart configuration by tenant.</summary>
-    public Dictionary<string, SmartWellKnown> SmartConfigurationByTenant { get => _smartConfigs; }
+    public Dictionary<string, SmartWellKnown> SmartConfigurationByTenant => _smartConfigs;
 
     /// <summary>Gets the smart authorizations.</summary>
-    public Dictionary<string, AuthorizationInfo> SmartAuthorizations { get => _authorizations; }
+    public Dictionary<string, AuthorizationInfo> SmartAuthorizations => _authorizations;
 
     /// <summary>Gets the clients.</summary>
-    public Dictionary<string, ClientInfo> SmartClients { get => _clients; }
+    public Dictionary<string, ClientInfo> SmartClients => _clients;
 
     /// <summary>Query if 'tenant' has tenant.</summary>
     /// <param name="tenant">The tenant.</param>

@@ -232,11 +232,11 @@
         // apply filters
         return _resourceStore
             .GetInstanceTableView()
-            .Where(tr => string.IsNullOrWhiteSpace(_idFilter) ? true : tr.Id.Contains(_idFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_nameFilter) ? true : tr.Name.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_urlFilter) ? true : tr.Url.Contains(_urlFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_descriptionFilter) ? true : tr.Description.Contains(_descriptionFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_identifierFilter) ? true : tr.Identifiers.Contains(_identifierFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_idFilter) || tr.Id.Contains(_idFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_nameFilter) || tr.Name.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_urlFilter) || tr.Url.Contains(_urlFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_descriptionFilter) || tr.Description.Contains(_descriptionFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_identifierFilter) || tr.Identifiers.Contains(_identifierFilter, StringComparison.OrdinalIgnoreCase))
             .AsQueryable<InstanceTableRec>();
     }
     

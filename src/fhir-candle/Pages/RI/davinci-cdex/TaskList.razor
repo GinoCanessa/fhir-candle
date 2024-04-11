@@ -49,25 +49,25 @@
     private IFhirStore _store = null!;
 
     /// <summary>Gets the content for package.</summary>
-    public static string ContentFor { get => "hl7.fhir.us.davinci-cdex"; }
+    public static string ContentFor => "hl7.fhir.us.davinci-cdex";
 
     /// <summary>Gets the name of the page.</summary>
-    public static string PageName { get => "CDex Tasks"; }
+    public static string PageName => "CDex Tasks";
 
     /// <summary>Gets the description.</summary>
-    public static string Description { get => "This page contains interactions with CDex Tasks."; }
+    public static string Description => "This page contains interactions with CDex Tasks.";
 
     /// <summary>Gets the full pathname of the route file.</summary>
-    public static string RoutePath { get => "/davinci-cdex/tasks"; }
+    public static string RoutePath => "/davinci-cdex/tasks";
 
     /// <summary>Gets the FHIR version literal.</summary>
-    public static string FhirVersionLiteral { get => "R4"; }
+    public static string FhirVersionLiteral => "R4";
 
     /// <summary>Gets the FHIR version numeric.</summary>
-    public static string FhirVersionNumeric { get => "4.0"; }
+    public static string FhirVersionNumeric => "4.0";
 
     /// <summary>Gets the only show on endpoint.</summary>
-    public static string OnlyShowOnEndpoint { get => "provider"; }
+    public static string OnlyShowOnEndpoint => "provider";
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
@@ -119,7 +119,7 @@
     /// <param name="e">     Event information.</param>
     private void Store_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

@@ -80,7 +80,7 @@
     private IDialogReference? _navDialog;
 
     /// <summary>The crumbs.</summary>
-    private NavPageInfoRec[] _crumbs = Array.Empty<NavPageInfoRec>();
+    private NavPageInfoRec[] _crumbs = [];
 
     /// <summary>Links for store.</summary>
     /// <param name="storeName">Name of the store.</param>
@@ -90,6 +90,16 @@
         return $"/store?store={storeName}";
     }
 
+    /// <summary>
+    /// Asynchronously opens the navigation panel.
+    /// </summary>
+    /// <remarks>
+    /// This method creates a dialog using the DialogService and shows it.
+    /// The dialog displays the navigation menu of the application.
+    /// The dialog is configured to not have primary and secondary actions, and the dismiss button is hidden.
+    /// The result of the dialog is not used in this method.
+    /// </remarks>
+    /// <returns>A Task representing the asynchronous operation.</returns>
     private async Task OpenNavPanel()
     {
         // create the dialog
@@ -172,15 +182,12 @@
 
         _ = JS.InvokeVoidAsync("processCopyable");
     }
-
-    /// <summary>Notifies a navigation.</summary>
-    /// <param name="page"> The page.</param>
-    /// <param name="link"> The link.</param>
-    /// <param name="depth">The depth.</param>
+    
+    /// <summary>Notifies the navigation manager about the current location.</summary>
+    /// <param name="navTree"></param>
     public void NotifyNav(NavPageInfoRec[] navTree)
     {
         _crumbs = navTree;
-
         StateHasChanged();
     }
 }

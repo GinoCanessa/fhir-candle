@@ -84,10 +84,10 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
     /// <summary>(Immutable) The package registry uris.</summary>
     private static readonly Uri[] PackageRegistryUris =
-    {
+    [
         new("http://packages.fhir.org/"),
-        new("http://packages2.fhir.org/packages/"),
-    };
+        new("http://packages2.fhir.org/packages/")
+    ];
 
     /// <summary>(Immutable) URI of the FHIR published server.</summary>
     private static readonly Uri FhirPublishedUri = new("http://hl7.org/fhir/");
@@ -172,7 +172,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     public bool IsReady => _isInitialized;
 
     /// <summary>The completed requests.</summary>
-    private HashSet<string> _processed = new();
+    private readonly HashSet<string> _processed = new();
 
     /// <summary>Initializes this object.</summary>
     public void Init()
@@ -239,13 +239,15 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         return Task.CompletedTask;
     }
 
-    /// <summary>A package cache entry.</summary>
-    /// <param name="fhirVersion">        The FHIR version.</param>
-    /// <param name="directory">          Pathname of the directory.</param>
-    /// <param name="resolvedDirective">  The resolved directive.</param>
-    /// <param name="resolvedName">       Name of the resolved.</param>
-    /// <param name="resolvedVersion">    The resolved version.</param>
-    /// <param name="umbrellaPackageName">Name of the umbrella package.</param>
+    /// <summary>
+    /// A record struct representing a package cache entry.
+    /// </summary>
+    /// <param name="fhirVersion">The FHIR version of the package.</param>
+    /// <param name="directory">The directory where the package is stored.</param>
+    /// <param name="resolvedDirective">The resolved directive of the package.</param>
+    /// <param name="name">The name of the package.</param>
+    /// <param name="version">The version of the package.</param>
+    /// <param name="umbrellaPackageName">The umbrella package name that this package is part of.</param>
     public record struct PackageCacheEntry(
         FhirSequenceEnum fhirVersion,
         string directory,
@@ -257,9 +259,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <summary>Attempts to find locally or download a given package.</summary>
     /// <param name="directive">        The directive.</param>
     /// <param name="branchName">       Name of the branch.</param>
-    /// <param name="directory">        [out] Pathname of the directory.</param>
-    /// <param name="fhirVersion">      [out] The FHIR version.</param>
-    /// <param name="resolvedDirective">[out] The branch directive.</param>
+    /// <param name="packages"></param>
     /// <param name="offlineMode">      True to enable offline mode, false to disable it.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool FindOrDownload(
@@ -295,10 +295,9 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
         string name;
         string version;
-        bool isLocal = false;
         List<PackageCacheEntry> packageList = new();
 
-        string directory = string.Empty;
+        string directory;
         FhirSequenceEnum fhirVersion;
         string resolvedDirective;
 
@@ -477,7 +476,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             }
 
             version = directiveVersion;
-            isLocal = false;
+            bool isLocal = false;
             directory = string.Empty;
             
             string sequencedName = string.IsNullOrEmpty(trailer) ? name : $"{name}.{trailer}";
@@ -561,6 +560,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <param name="version">    [out] The version string (e.g., 4.0.1).</param>
     /// <param name="directory">  [out] Pathname of the directory.</param>
     /// <param name="fhirVersion">[out] The FHIR version.</param>
+    /// <param name="resolvedDirective"></param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     private bool TryDownloadViaRegistry(
         string name,
@@ -595,19 +595,10 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <returns>The directory size.</returns>
     private static long GetDirectorySize(string directory)
     {
-        long size = 0;
-
         DirectoryInfo dirInfo = new(directory);
-        var fileInfos = dirInfo.EnumerateFiles("*.*", SearchOption.AllDirectories);
+        IEnumerable<FileInfo> fileInfos = dirInfo.EnumerateFiles("*.*", SearchOption.AllDirectories);
 
-        size = 0;
-
-        foreach (FileInfo fileInfo in fileInfos)
-        {
-            size = size + fileInfo.Length;
-        }
-
-        return size;
+        return fileInfos.Select(fi => fi.Length).Sum();
     }
 
     /// <summary>Updates the cache package initialize.</summary>
@@ -924,7 +915,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                     out string ciBuildId,
                     out string ciBuildDate);
 
-                if (cachedNpm.BuildDate.CompareTo(ciBuildDate) > 0)
+                if (String.Compare(cachedNpm.BuildDate, ciBuildDate, StringComparison.Ordinal) > 0)
                 {
                     fhirVersion = SequenceForVersion(ciFhirVersion);
                     resolvedDirective = $"{cachedNpm.Name}#{cachedNpm.Version}";
@@ -974,7 +965,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
             {
                 FhirNpmPackageDetails cachedNpm = FhirNpmPackageDetails.Load(localNpmFilename);
 
-                if (cachedNpm.BuildDate.CompareTo(ciNpm.BuildDate) <= 0)
+                if (String.Compare(cachedNpm.BuildDate, ciNpm.BuildDate, StringComparison.Ordinal) <= 0)
                 {
                     fhirVersion = SequenceForVersion(cachedNpm.FhirVersion);
                     resolvedDirective = $"{cachedNpm.Name}#{cachedNpm.Version}";
@@ -1015,7 +1006,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
             details = FhirNpmPackageDetails.Parse(contents);
 
-            if (details.Url == null)
+            if (string.IsNullOrEmpty(details.Url))
             {
                 details.Url = new Uri(FhirCiUri, $"ig/{branchName}").ToString();
             }
@@ -1200,6 +1191,8 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <param name="name">      The name.</param>
     /// <param name="branchName">Name of the branch.</param>
     /// <param name="directory"> [out] Pathname of the directory.</param>
+    /// <param name="fhirVersion"></param>
+    /// <param name="resolvedDirective"></param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryDownloadGuideViaCI(
         string name,
@@ -1225,7 +1218,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
                 FhirNpmPackageDetails ciNpm = FhirNpmPackageDetails.Parse(contents);
 
-                if (cachedNpm.BuildDate.CompareTo(ciNpm.BuildDate) <= 0)
+                if (String.Compare(cachedNpm.BuildDate, ciNpm.BuildDate, StringComparison.Ordinal) <= 0)
                 {
                     fhirVersion = SequenceForVersion(ciNpm.FhirVersion);
                     resolvedDirective = $"{ciNpm.Name}#{ciNpm.Version}";
@@ -1457,10 +1450,9 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
         out bool isCached,
         out string directory)
     {
-        string highestCached = string.Empty;
         string highestOnline = string.Empty;
 
-        _ = TryGetHighestVersionOffline(name, out highestCached);
+        _ = TryGetHighestVersionOffline(name, out string highestCached);
 
         if (!offlineMode)
         {
@@ -1609,7 +1601,7 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
                     continue;
                 }
 
-                if (info.Versions == null || info.Versions.Count == 0)
+                if (!(info.Versions?.Any() ?? false))
                 {
                     //_logger.LogInformation(
                     //    $"GetPackageVersionsAndUrls <<<" +
@@ -1759,19 +1751,20 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryGetPackageState(string directive, out PackageLoadStateEnum state)
     {
-        if (!_packagesByDirective.ContainsKey(directive))
+        if (!_packagesByDirective.TryGetValue(directive, out PackageCacheRecord cacheRecord))
         {
             state = PackageLoadStateEnum.Unknown;
             return false;
         }
 
-        state = _packagesByDirective[directive].PackageState;
+        state = cacheRecord.PackageState;
         return true;
     }
 
     /// <summary>Process the synchronize.</summary>
     /// <param name="data">        The data.</param>
     /// <param name="directive">   The directive.</param>
+    /// <param name="packageDate"></param>
     /// <param name="shouldRemove">[out] True if should remove.</param>
     private void ProcessSync(
         IniData data,
@@ -1912,13 +1905,9 @@ public partial class FhirPackageService : IFhirPackageService, IDisposable
 
         data.Sections.Add(new IniParser.Model.Section("cache"));
         data["cache"].Add("version", "3");
-
         data.Sections.Add(new IniParser.Model.Section("urls"));
-
         data.Sections.Add(new IniParser.Model.Section("local"));
-
         data.Sections.Add(new IniParser.Model.Section("packages"));
-
         data.Sections.Add(new IniParser.Model.Section("package-sizes"));
 
         SaveIniData(_iniFilePath, data);

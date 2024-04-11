@@ -27,7 +27,7 @@
     </FluentNavMenu>
 </FluentDialogBody>
 <FluentDialogFooter>
-    <FluentLabel>@GetType()?.Assembly?.GetName()?.Version?.ToString()</FluentLabel>
+    <FluentLabel>@GetType().Assembly.GetName().Version?.ToString()</FluentLabel>
 </FluentDialogFooter>
 
 @code {

@@ -26,23 +26,23 @@ public record struct PackagePageInfo(
 public interface IPackagePage
 {
     /// <summary>Gets the package or ri name this page is for.</summary>
-    public virtual static string ContentFor { get => string.Empty; }
+    public virtual static string ContentFor => string.Empty;
 
     /// <summary>Gets the name of the page.</summary>
-    public virtual static string PageName { get => string.Empty; }
+    public virtual static string PageName => string.Empty;
 
     /// <summary>Gets the description.</summary>
-    public virtual static string Description { get => string.Empty; }
+    public virtual static string Description => string.Empty;
 
     /// <summary>Gets the full pathname of the route file.</summary>
-    public virtual static string RoutePath { get => string.Empty; }
+    public virtual static string RoutePath => string.Empty;
 
     /// <summary>Gets the FHIR version literal.</summary>
-    public virtual static string FhirVersionLiteral { get => string.Empty; }
+    public virtual static string FhirVersionLiteral => string.Empty;
 
     /// <summary>Gets the FHIR version numeric.</summary>
-    public virtual static string FhirVersionNumeric { get => string.Empty; }
+    public virtual static string FhirVersionNumeric => string.Empty;
 
     /// <summary>Gets the only show on endpoint.</summary>
-    public virtual static string OnlyShowOnEndpoint { get => string.Empty; }
+    public virtual static string OnlyShowOnEndpoint => string.Empty;
 }

@@ -27,40 +27,30 @@ public class FhirController : ControllerBase
 
     private ILogger<FhirController> _logger;
 
-    private readonly HashSet<string> _acceptMimeTypes = new()
-    {
+    private readonly HashSet<string> _acceptMimeTypes =
+    [
         "application/fhir+json",
         "application/fhir+xml",
         "application/json",
-        "application/xml",
+        "application/xml"
         //"json",
         //"xml",
-    };
+    ];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FhirController"/> class.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
-    /// <param name="fhirStore">The FHIR store.</param>
+    /// <param name="fhirStoreManager"></param>
+    /// <param name="smartAuthManager"></param>
+    /// <param name="logger"></param>
+    /// <exception cref="ArgumentNullException"></exception>
     public FhirController(
         [FromServices] IFhirStoreManager fhirStoreManager,
         [FromServices] ISmartAuthManager smartAuthManager,
         [FromServices] ILogger<FhirController> logger)
     {
-        if (fhirStoreManager == null)
-        {
-            throw new ArgumentNullException(nameof(fhirStoreManager));
-        }
-
-        _fhirStoreManager = fhirStoreManager;
-
-        if (smartAuthManager == null)
-        {
-            throw new ArgumentNullException(nameof(smartAuthManager));
-        }
-
-        _smartAuthManager = smartAuthManager;
-
+        _fhirStoreManager = fhirStoreManager ?? throw new ArgumentNullException(nameof(fhirStoreManager));
+        _smartAuthManager = smartAuthManager ?? throw new ArgumentNullException(nameof(smartAuthManager));
         _logger = logger;
 
         //if (host != null)
@@ -77,6 +67,7 @@ public class FhirController : ControllerBase
     /// <summary>Gets the MIME type.</summary>
     /// <param name="queryParam">The query parameter.</param>
     /// <param name="request">   The request.</param>
+    /// <param name="allowNonFhirReturn"></param>
     /// <returns>The mime type.</returns>
     private string GetMimeType(string? queryParam, HttpRequest request, bool allowNonFhirReturn = false)
     {
@@ -255,6 +246,7 @@ public class FhirController : ControllerBase
     /// <param name="storeName">The store.</param>
     /// <param name="format">   Describes the format to use.</param>
     /// <param name="pretty">   The pretty.</param>
+    /// <param name="authHeader"></param>
     /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{storeName}/metadata")]
     public async Task GetMetadata(
@@ -263,8 +255,7 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_pretty")] string? pretty,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"GetMetadata <<< no tenant at {storeName}!");
             return;
@@ -306,6 +297,7 @@ public class FhirController : ControllerBase
     /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="prefer">      The prefer.</param>
+    /// <param name="authHeader"></param>
     /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{storeName}/{resourceName}/${opName}")]
     public async Task GetTypeOperation(
@@ -318,8 +310,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"GetTypeOperation <<< no tenant at {storeName}!");
             return;
@@ -385,8 +376,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "If-None-Match")] string? ifNoneMatch,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"GetResourceInstance <<< no tenant at {storeName}!");
             return;
@@ -440,6 +430,8 @@ public class FhirController : ControllerBase
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer"></param>
+    /// <param name="authHeader"></param>
     /// <returns>An asynchronous result.</returns>
     [HttpGet, Route("{storeName}/{resourceName}/{id}/${opName}")]
     public async Task GetInstanceOperation(
@@ -453,8 +445,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"GetInstanceOperation <<< no tenant at {storeName}!");
             return;
@@ -502,13 +493,15 @@ public class FhirController : ControllerBase
     /// <summary>
     /// (An Action that handles HTTP POST requests) posts an instance operation.
     /// </summary>
-    /// <param name="store">       The store.</param>
+    /// <param name="storeName"></param>
     /// <param name="resourceName">Name of the resource.</param>
     /// <param name="id">          The identifier.</param>
     /// <param name="opName">      Name of the operation.</param>
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="summary">     The summary.</param>
     /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer"></param>
+    /// <param name="authHeader"></param>
     /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{storeName}/{resourceName}/{id}/${opName}")]
     //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
@@ -523,8 +516,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PostInstanceOperation <<< no tenant at {storeName}!");
             return;
@@ -539,56 +531,45 @@ public class FhirController : ControllerBase
         try
         {
             // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
+            using StreamReader reader = new StreamReader(Request.Body);
+            string content = await reader.ReadToEndAsync();
+
+            FhirRequestContext ctx = new()
             {
-                string content = await reader.ReadToEndAsync();
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = Request.QueryString.ToString(),
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                Interaction = Common.StoreInteractionCodes.InstanceOperation,
+                ResourceType = resourceName,
+                Id = id,
+                OperationName = "$" + opName,
+                SourceFormat = Request.ContentType ?? string.Empty,
+                SourceContent = content,
+            };
 
-                FhirRequestContext ctx = new()
-                {
-                    TenantName = storeName,
-                    Store = store,
-                    HttpMethod = Request.Method.ToUpperInvariant(),
-                    Url = Request.GetDisplayUrl(),
-                    UrlPath = Request.Path,
-                    UrlQuery = Request.QueryString.ToString(),
-                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                    DestinationFormat = GetMimeType(format, Request),
-                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    Interaction = Common.StoreInteractionCodes.InstanceOperation,
-                    ResourceType = resourceName,
-                    Id = id,
-                    OperationName = "$" + opName,
-                    SourceFormat = Request.ContentType ?? string.Empty,
-                    SourceContent = content,
-                };
-
-                if (!_smartAuthManager.IsAuthorized(ctx))
-                {
-                    Response.StatusCode = 401;
-                    return;
-                }
-
-                // operation
-                bool success = store.InstanceOperation(
-                    ctx,
-                    out FhirResponseContext opResponse);
-
-                await AddFhirResponse(Response, prefer, success, opResponse);
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
             }
+
+            // operation
+            bool success = store.InstanceOperation(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            await AddFhirResponse(Response, prefer, success, opResponse);
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PostInstanceOperation <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PostInstanceOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PostInstanceOperation <<< caught: {ex.Message}" : $"PostInstanceOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -603,6 +584,7 @@ public class FhirController : ControllerBase
     /// <param name="format">      Describes the format to use.</param>
     /// <param name="pretty">      The pretty.</param>
     /// <param name="summary">     The summary.</param>
+    /// <param name="authHeader"></param>
     /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{storeName}/{resourceName}/_search")]
     [Consumes("application/x-www-form-urlencoded")]
@@ -614,8 +596,7 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_summary")] string? summary,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PostResourceTypeSearch <<< no tenant at {storeName}!");
             return;
@@ -627,78 +608,60 @@ public class FhirController : ControllerBase
             return;
         }
 
-        // sanity check
-        if (Request == null)
-        {
-            await LogAndReturnError(Response, 500, $"PostResourceTypeSearch <<< cannot process a POST search without a Request");
-            return;
-        }
-
         try
         {
             // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
+            using StreamReader reader = new StreamReader(Request.Body);
+            string content = await reader.ReadToEndAsync();
+            string queryString = Request.QueryString.ToString();
+
+            if (!string.IsNullOrEmpty(queryString))
             {
-                string content = await reader.ReadToEndAsync();
-                string queryString = Request.QueryString.ToString();
-
-                if (!string.IsNullOrEmpty(queryString))
+                if (string.IsNullOrEmpty(content))
                 {
-                    if (string.IsNullOrEmpty(content))
-                    {
-                        content = queryString;
-                    }
-                    else
-                    {
-                        content += $"&{queryString}";
-                    }
+                    content = queryString;
                 }
-
-                FhirRequestContext ctx = new()
+                else
                 {
-                    TenantName = storeName,
-                    Store = store,
-                    HttpMethod = Request.Method.ToUpperInvariant(),
-                    Url = Request.GetDisplayUrl(),
-                    UrlPath = Request.Path,
-                    UrlQuery = queryString,
-                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                    DestinationFormat = GetMimeType(format, Request),
-                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    SerializeSummaryFlag = summary ?? string.Empty,
-                    Interaction = Common.StoreInteractionCodes.TypeSearch,
-                    ResourceType = resourceName,
-                    SourceContent = content,
-                    SourceFormat = Request.ContentType ?? string.Empty,
-                };
-
-                if (!_smartAuthManager.IsAuthorized(ctx))
-                {
-                    Response.StatusCode = 401;
-                    return;
+                    content += $"&{queryString}";
                 }
-
-                bool success = _fhirStoreManager[storeName].TypeSearch(
-                    ctx,
-                    out FhirResponseContext opResponse);
-
-                // cannot prefer outcome on search
-                await AddFhirResponse(Response, null, success, opResponse);
             }
+
+            FhirRequestContext ctx = new()
+            {
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = queryString,
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                SerializeSummaryFlag = summary ?? string.Empty,
+                Interaction = Common.StoreInteractionCodes.TypeSearch,
+                ResourceType = resourceName,
+                SourceContent = content,
+                SourceFormat = Request.ContentType ?? string.Empty,
+            };
+
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
+            }
+
+            bool success = _fhirStoreManager[storeName].TypeSearch(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            // cannot prefer outcome on search
+            await AddFhirResponse(Response, null, success, opResponse);
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PostResourceTypeSearch <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PostResourceTypeSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PostResourceTypeSearch <<< caught: {ex.Message}" : $"PostResourceTypeSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -726,8 +689,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PostTypeOperation <<< no tenant at {storeName}!");
             return;
@@ -742,56 +704,45 @@ public class FhirController : ControllerBase
         try
         {
             // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
+            using StreamReader reader = new StreamReader(Request.Body);
+            string content = await reader.ReadToEndAsync();
+
+            FhirRequestContext ctx = new()
             {
-                string content = await reader.ReadToEndAsync();
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = Request.QueryString.ToString(),
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                SerializeSummaryFlag = summary ?? string.Empty,
+                Interaction = Common.StoreInteractionCodes.TypeOperation,
+                ResourceType = resourceName,
+                OperationName = "$" + opName,
+                SourceFormat = Request.ContentType ?? string.Empty,
+                SourceContent = content,
+            };
 
-                FhirRequestContext ctx = new()
-                {
-                    TenantName = storeName,
-                    Store = store,
-                    HttpMethod = Request.Method.ToUpperInvariant(),
-                    Url = Request.GetDisplayUrl(),
-                    UrlPath = Request.Path,
-                    UrlQuery = Request.QueryString.ToString(),
-                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                    DestinationFormat = GetMimeType(format, Request),
-                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    SerializeSummaryFlag = summary ?? string.Empty,
-                    Interaction = Common.StoreInteractionCodes.TypeOperation,
-                    ResourceType = resourceName,
-                    OperationName = "$" + opName,
-                    SourceFormat = Request.ContentType ?? string.Empty,
-                    SourceContent = content,
-                };
-
-                if (!_smartAuthManager.IsAuthorized(ctx))
-                {
-                    Response.StatusCode = 401;
-                    return;
-                }
-
-                // operation
-                bool success = store.TypeOperation(
-                    ctx,
-                    out FhirResponseContext opResponse);
-
-                await AddFhirResponse(Response, prefer, success, opResponse);
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
             }
+
+            // operation
+            bool success = store.TypeOperation(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            await AddFhirResponse(Response, prefer, success, opResponse);
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PostTypeOperation <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PostTypeOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PostTypeOperation <<< caught: {ex.Message}" : $"PostTypeOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -802,6 +753,7 @@ public class FhirController : ControllerBase
     /// <param name="format"> Describes the format to use.</param>
     /// <param name="pretty"> The pretty.</param>
     /// <param name="summary">The summary.</param>
+    /// <param name="authHeader"></param>
     /// <returns>An asynchronous result.</returns>
     [HttpPost, Route("{storeName}/_search")]
     [Consumes("application/x-www-form-urlencoded")]
@@ -812,85 +764,65 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_summary")] string? summary,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PostSystemSearch <<< no tenant at {storeName}!");
-            return;
-        }
-
-        // sanity check
-        if (Request == null)
-        {
-            _logger.LogWarning("PostSystemSearch <<< cannot process a POST search without a Request!");
-            Response.StatusCode = 400;
             return;
         }
 
         try
         {
             // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
+            using StreamReader reader = new StreamReader(Request.Body);
+            string content = await reader.ReadToEndAsync();
+            string queryString = Request.QueryString.ToString();
+
+            if (!string.IsNullOrEmpty(queryString))
             {
-                string content = await reader.ReadToEndAsync();
-                string queryString = Request.QueryString.ToString();
-
-                if (!string.IsNullOrEmpty(queryString))
+                if (string.IsNullOrEmpty(content))
                 {
-                    if (string.IsNullOrEmpty(content))
-                    {
-                        content = queryString;
-                    }
-                    else
-                    {
-                        content += $"&{queryString}";
-                    }
+                    content = queryString;
                 }
-
-                FhirRequestContext ctx = new()
+                else
                 {
-                    TenantName = storeName,
-                    Store = store,
-                    HttpMethod = Request.Method.ToUpperInvariant(),
-                    Url = Request.GetDisplayUrl(),
-                    UrlPath = Request.Path,
-                    UrlQuery = queryString,
-                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                    DestinationFormat = GetMimeType(format, Request),
-                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    SerializeSummaryFlag = summary ?? string.Empty,
-                    Interaction = Common.StoreInteractionCodes.SystemSearch,
-                    SourceFormat = Request.ContentType ?? string.Empty,
-                    SourceContent = content,
-                };
-
-                if (!_smartAuthManager.IsAuthorized(ctx))
-                {
-                    Response.StatusCode = 401;
-                    return;
+                    content += $"&{queryString}";
                 }
-
-                bool success = store.SystemSearch(
-                    ctx,
-                    out FhirResponseContext opResponse);
-
-                // cannot prefer outcome on search
-                await AddFhirResponse(Response, null, success, opResponse);
             }
+
+            FhirRequestContext ctx = new()
+            {
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = queryString,
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                SerializeSummaryFlag = summary ?? string.Empty,
+                Interaction = Common.StoreInteractionCodes.SystemSearch,
+                SourceFormat = Request.ContentType ?? string.Empty,
+                SourceContent = content,
+            };
+
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
+            }
+
+            bool success = store.SystemSearch(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            // cannot prefer outcome on search
+            await AddFhirResponse(Response, null, success, opResponse);
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PostSystemSearch <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PostSystemSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PostSystemSearch <<< caught: {ex.Message}" : $"PostSystemSearch <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -914,18 +846,9 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PostSystemOperation <<< no tenant at {storeName}!");
-            return;
-        }
-
-        // sanity check
-        if (Request == null)
-        {
-            _logger.LogWarning("PostSystemOperation <<< cannot process an operation POST without a Request!");
-            Response.StatusCode = 400;
             return;
         }
 
@@ -971,16 +894,7 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PostSystemOperation <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PostSystemOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PostSystemOperation <<< caught: {ex.Message}" : $"PostSystemOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -1006,8 +920,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "If-None-Exist")] string? ifNoneExist,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PostResourceType <<< no tenant at {storeName}!");
             return;
@@ -1019,65 +932,46 @@ public class FhirController : ControllerBase
             return;
         }
 
-        // sanity check
-        if ((Request == null) || (Request.Body == null))
-        {
-            _logger.LogWarning("PostResourceType <<< cannot process a POST without data!");
-            Response.StatusCode = 400;
-            return;
-        }
-
         try
         {
             // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
+            using StreamReader reader = new StreamReader(Request.Body);
+            string content = await reader.ReadToEndAsync();
+
+            FhirRequestContext ctx = new()
             {
-                string content = await reader.ReadToEndAsync();
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = Request.QueryString.ToString(),
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                Interaction = Common.StoreInteractionCodes.TypeCreate,
+                ResourceType = resourceName,
+                SourceFormat = Request.ContentType ?? string.Empty,
+                SourceContent = content,
+                IfNoneExist = ifNoneExist ?? string.Empty,
+            };
 
-                FhirRequestContext ctx = new()
-                {
-                    TenantName = storeName,
-                    Store = store,
-                    HttpMethod = Request.Method.ToUpperInvariant(),
-                    Url = Request.GetDisplayUrl(),
-                    UrlPath = Request.Path,
-                    UrlQuery = Request.QueryString.ToString(),
-                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                    DestinationFormat = GetMimeType(format, Request),
-                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    Interaction = Common.StoreInteractionCodes.TypeCreate,
-                    ResourceType = resourceName,
-                    SourceFormat = Request.ContentType ?? string.Empty,
-                    SourceContent = content,
-                    IfNoneExist = ifNoneExist ?? string.Empty,
-                };
-
-                if (!_smartAuthManager.IsAuthorized(ctx))
-                {
-                    Response.StatusCode = 401;
-                    return;
-                }
-
-                bool success = store.InstanceCreate(
-                    ctx,
-                    out FhirResponseContext opResponse);
-
-                await AddFhirResponse(Response, prefer, success, opResponse);
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
             }
+
+            bool success = store.InstanceCreate(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            await AddFhirResponse(Response, prefer, success, opResponse);
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PostResourceType <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PostResourceType <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PostResourceType <<< caught: {ex.Message}" : $"PostResourceType <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -1107,8 +1001,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "If-None-Match")] string? ifNoneMatch,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PutResourceInstance <<< no tenant at {storeName}!");
             return;
@@ -1120,67 +1013,48 @@ public class FhirController : ControllerBase
             return;
         }
 
-        // sanity check
-        if ((Request == null) || (Request.Body == null))
-        {
-            _logger.LogWarning("PutResourceInstance <<< cannot process a PUT without data!");
-            Response.StatusCode = 400;
-            return;
-        }
-
         try
         {
             // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
+            using StreamReader reader = new StreamReader(Request.Body);
+            string content = await reader.ReadToEndAsync();
+
+            FhirRequestContext ctx = new()
             {
-                string content = await reader.ReadToEndAsync();
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = Request.QueryString.ToString(),
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                Interaction = Common.StoreInteractionCodes.InstanceUpdate,
+                ResourceType = resourceName,
+                Id = id,
+                IfMatch = ifMatch ?? string.Empty,
+                IfNoneMatch = ifNoneMatch ?? string.Empty,
+                SourceFormat = Request.ContentType ?? string.Empty,
+                SourceContent = content,
+            };
 
-                FhirRequestContext ctx = new()
-                {
-                    TenantName = storeName,
-                    Store = store,
-                    HttpMethod = Request.Method.ToUpperInvariant(),
-                    Url = Request.GetDisplayUrl(),
-                    UrlPath = Request.Path,
-                    UrlQuery = Request.QueryString.ToString(),
-                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                    DestinationFormat = GetMimeType(format, Request),
-                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    Interaction = Common.StoreInteractionCodes.InstanceUpdate,
-                    ResourceType = resourceName,
-                    Id = id,
-                    IfMatch = ifMatch ?? string.Empty,
-                    IfNoneMatch = ifNoneMatch ?? string.Empty,
-                    SourceFormat = Request.ContentType ?? string.Empty,
-                    SourceContent = content,
-                };
-
-                if (!_smartAuthManager.IsAuthorized(ctx))
-                {
-                    Response.StatusCode = 401;
-                    return;
-                }
-
-                bool success = store.InstanceUpdate(
-                    ctx,
-                    out FhirResponseContext opResponse);
-
-                await AddFhirResponse(Response, prefer, success, opResponse);
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
             }
+
+            bool success = store.InstanceUpdate(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            await AddFhirResponse(Response, prefer, success, opResponse);
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PutResourceInstance <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PutResourceInstance <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PutResourceInstance <<< caught: {ex.Message}" : $"PutResourceInstance <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -1209,8 +1083,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "If-Match")] string? ifMatch,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"DeleteResourceInstance <<< no tenant at {storeName}!");
             return;
@@ -1270,8 +1143,7 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_summary")] string? summary,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"GetResourceTypeSearch <<< no tenant at {storeName}!");
             return;
@@ -1334,8 +1206,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"DeleteResourceConditional <<< no tenant at {storeName}!");
             return;
@@ -1370,18 +1241,8 @@ public class FhirController : ControllerBase
             return;
         }
 
-        // sanity check
-        if (Request == null)
-        {
-            System.Console.WriteLine("DeleteResourceConditional <<< cannot process a conditional delete without a Request!");
-            Response.StatusCode = 400;
-            return;
-        }
-
         try
         {
-            string queryString = Request.QueryString.ToString();
-
             bool success = store.TypeDelete(
                 ctx,
                 out FhirResponseContext opResponse);
@@ -1390,16 +1251,7 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"DeleteResourceConditional <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"DeleteResourceConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"DeleteResourceConditional <<< caught: {ex.Message}" : $"DeleteResourceConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -1421,70 +1273,50 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"PostSystemBundle <<< no tenant at {storeName}!");
             return;
         }
-
-        // sanity check
-        if ((Request == null) || (Request.Body == null))
-        {
-            _logger.LogWarning("PostSystemBundle <<< cannot process a bundle POST without data!");
-            Response.StatusCode = 400;
-            return;
-        }
-
+        
         try
         {
             // read the post body to process
-            using (StreamReader reader = new StreamReader(Request.Body))
+            using StreamReader reader = new StreamReader(Request.Body);
+            string content = await reader.ReadToEndAsync();
+
+            FhirRequestContext ctx = new()
             {
-                string content = await reader.ReadToEndAsync();
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = Request.QueryString.ToString(),
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                Interaction = Common.StoreInteractionCodes.SystemBundle,
+                SourceFormat = Request.ContentType ?? string.Empty,
+                SourceContent = content,
+            };
 
-                FhirRequestContext ctx = new()
-                {
-                    TenantName = storeName,
-                    Store = store,
-                    HttpMethod = Request.Method.ToUpperInvariant(),
-                    Url = Request.GetDisplayUrl(),
-                    UrlPath = Request.Path,
-                    UrlQuery = Request.QueryString.ToString(),
-                    RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                    Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
-                    DestinationFormat = GetMimeType(format, Request),
-                    SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
-                    Interaction = Common.StoreInteractionCodes.SystemBundle,
-                    SourceFormat = Request.ContentType ?? string.Empty,
-                    SourceContent = content,
-                };
-
-                if (!_smartAuthManager.IsAuthorized(ctx))
-                {
-                    Response.StatusCode = 401;
-                    return;
-                }
-
-                bool success = store.ProcessBundle(
-                    ctx,
-                    out FhirResponseContext opResponse);
-
-                await AddFhirResponse(Response, prefer, success, opResponse);
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
             }
+
+            bool success = store.ProcessBundle(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            await AddFhirResponse(Response, prefer, success, opResponse);
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"PostSystemBundle <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"PostSystemBundle <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"PostSystemBundle <<< caught: {ex.Message}" : $"PostSystemBundle <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
@@ -1505,8 +1337,7 @@ public class FhirController : ControllerBase
         [FromQuery(Name = "_summary")] string? summary,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"GetSystemSearch <<< no tenant at {storeName}!");
             return;
@@ -1561,8 +1392,7 @@ public class FhirController : ControllerBase
         [FromHeader(Name = "Prefer")] string? prefer,
         [FromHeader(Name = "Authorization")] string? authHeader)
     {
-        if ((!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store)) ||
-            (store == null))
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
         {
             await LogAndReturnError(Response, 404, $"DeleteSystemConditional <<< no tenant at {storeName}!");
             return;
@@ -1590,18 +1420,8 @@ public class FhirController : ControllerBase
             return;
         }
 
-        // sanity check
-        if (Request == null)
-        {
-            _logger.LogWarning("DeleteSystemConditional <<< cannot process a conditional delete without a Request!");
-            Response.StatusCode = 400;
-            return;
-        }
-
         try
         {
-            string queryString = Request.QueryString.ToString();
-
             bool success = store.SystemDelete(
                 ctx,
                 out FhirResponseContext opResponse);
@@ -1610,16 +1430,7 @@ public class FhirController : ControllerBase
         }
         catch (Exception ex)
         {
-            string msg;
-            if (ex.InnerException == null)
-            {
-                msg = $"DeleteSystemConditional <<< caught: {ex.Message}";
-            }
-            else
-            {
-                msg = $"DeleteSystemConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
-            }
-
+            string msg = ex.InnerException == null ? $"DeleteSystemConditional <<< caught: {ex.Message}" : $"DeleteSystemConditional <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }

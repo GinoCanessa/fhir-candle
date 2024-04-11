@@ -52,13 +52,13 @@ public class VersionController : ControllerBase
     public virtual IActionResult GetVersionInfo()
     {
         // create a basic tuple to return
-        Dictionary<string, string> information = new Dictionary<string, string>();
-
-        information.Add("Application", AppDomain.CurrentDomain.FriendlyName);
-        information.Add("Runtime", Environment.Version.ToString());
-
-        // get the file version of the assembly that launched us
-        information.Add("Version", FileVersionInfo.GetVersionInfo(Assembly.GetEntryAssembly()!.Location).FileVersion?.ToString() ?? string.Empty);
+        Dictionary<string, string> information = new()
+        {
+            { "Application", AppDomain.CurrentDomain.FriendlyName },
+            { "Runtime", Environment.Version.ToString() },
+            // get the file version of the assembly that launched us
+            { "Version", FileVersionInfo.GetVersionInfo(Assembly.GetEntryAssembly()!.Location).FileVersion?.ToString() ?? string.Empty },
+        };
 
         // add the list of configuration keys and values
         IEnumerable<IConfigurationSection> configItems = _config.GetChildren();

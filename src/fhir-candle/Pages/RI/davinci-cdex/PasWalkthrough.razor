@@ -45,25 +45,25 @@
     private IFhirStore _payer = null!;
 
     /// <summary>Gets the content for package.</summary>
-    public static string ContentFor { get => "hl7.fhir.us.davinci-pas"; }
+    public static string ContentFor => "hl7.fhir.us.davinci-pas";
 
     /// <summary>Gets the name of the page.</summary>
-    public static string PageName { get => "PAS Walkthrough (incomplete!)"; }
+    public static string PageName => "PAS Walkthrough (incomplete!)";
 
     /// <summary>Gets the description.</summary>
-    public static string Description { get => "A walkthrough of a FHIR-based PAS workflow (work in progress)."; }
+    public static string Description => "A walkthrough of a FHIR-based PAS workflow (work in progress).";
 
     /// <summary>Gets the full pathname of the route file.</summary>
-    public static string RoutePath { get => "/davinci-pas/walkthrough"; }
+    public static string RoutePath => "/davinci-pas/walkthrough";
 
     /// <summary>Gets the FHIR version literal.</summary>
-    public static string FhirVersionLiteral { get => "R4"; }
+    public static string FhirVersionLiteral => "R4";
 
     /// <summary>Gets the FHIR version numeric.</summary>
-    public static string FhirVersionNumeric { get => "4.0"; }
+    public static string FhirVersionNumeric => "4.0";
 
     /// <summary>Gets the only show on endpoint.</summary>
-    public static string OnlyShowOnEndpoint { get => "provider"; }
+    public static string OnlyShowOnEndpoint => "provider";
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
@@ -156,7 +156,7 @@
     /// <param name="e">     Event information.</param>
     private void Store_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

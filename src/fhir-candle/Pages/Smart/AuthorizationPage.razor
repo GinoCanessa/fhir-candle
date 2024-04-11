@@ -27,7 +27,7 @@
                 ShowIndeterminate="false"
                 @bind-CheckState="AllScopesSelected" />
 
-    <FluentDataGrid Items="@_items" GridTemplateColumns="1fr 2fr" RowClass="@(s => _selected.Contains(s.Scope) ? "highlighted-row" : null)" OnRowFocus="HandleRowFocus" TGridItem=ScopeInfo>
+    <FluentDataGrid Items="@_items" GridTemplateColumns="1fr 2fr" RowClass="@(s => _selected.Contains(s.Scope) ? "highlighted-row" : null!)" OnRowFocus="HandleRowFocus" TGridItem=ScopeInfo>
         <PropertyColumn Title="Scope" Property="@(t => t.Scope)" Sortable="true" Tooltip="true">
         </PropertyColumn>
 
@@ -69,14 +69,12 @@ else
     /// <summary>Gets or sets all scopes selected.</summary>
     private bool? AllScopesSelected
     {
-        get
-        {
-            return _selected.SetEquals(_auth.Scopes.Keys)
+        get =>
+            _selected.SetEquals(_auth.Scopes.Keys)
                 ? true
                 : _selected.Count == 0
                     ? false
                     : null;
-        }
         set
         {
             if (value is true)
@@ -306,11 +304,8 @@ else
     {
         base.OnInitialized();
 
-        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
-
-        if (_auth != null)
+        if (AuthManager.TryGetAuthorization(StoreName, Key, out _auth))
         {
-
             UpdateScopeInfo();
             _selected.Clear();
             AllScopesSelected = true;

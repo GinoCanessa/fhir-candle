@@ -26,7 +26,7 @@
     </ul>
 
     <FluentLabel Typo="Typography.Body">
-        If you are getting started with topic-based subscriptions, there is a deatiled tour available
+        If you are getting started with topic-based subscriptions, there is a detailed tour available
         <FluentAnchor Appearance="Appearance.Hypertext"  Href="@($"/subscriptions/tour?store={StoreName}")">here</FluentAnchor>.
     </FluentLabel>
 </FluentStack>
@@ -50,8 +50,9 @@
     public IFhirStore Store { get; set; } = null!;
 
     /// <summary>Identifies the RI literal this content applies to.</summary>
-    public static string ContentFor { get => "subscriptions"; }
-    
+    public static string ContentFor => "subscriptions";
+
     /// <summary>Gets the FHIR version literal.</summary>
-    public static string FhirVersionLiteral { get => "R5"; }
+    public static string FhirVersionLiteral => "R5";
+
 }

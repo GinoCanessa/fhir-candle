@@ -126,7 +126,7 @@ else
     /// <param name="e">     Subscription event information.</param>
     private void Store_OnReceivedSubscriptionEvent(object? sender, ReceivedSubscriptionEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

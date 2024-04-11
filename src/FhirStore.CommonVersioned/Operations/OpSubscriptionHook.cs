@@ -56,7 +56,7 @@ public class OpSubscriptionHook : IFhirOperation
     /// <summary>
     /// If this operation requires a specific FHIR package to be loaded, the package identifier.
     /// </summary>
-    public string RequiresPackage { get => string.Empty; }
+    public string RequiresPackage => string.Empty;
 
     /// <summary>Gets the supported resources.</summary>
     public HashSet<string> SupportedResources => new();

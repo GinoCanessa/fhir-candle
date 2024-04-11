@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Components;
 namespace fhir.candle.Models;
 
 /// <summary>Information about the index content.</summary>
-/// <param name="ContentForPackage"> The content for package.</param>
+/// <param name="ContentFor"> The content for package.</param>
 /// <param name="FhirVersionLiteral">The FHIR version literal.</param>
 public record struct IndexContentInfo(
     string ContentFor,
@@ -18,8 +18,8 @@ public record struct IndexContentInfo(
 public interface IIndexContent
 {
     /// <summary>Gets the content for package.</summary>
-    public virtual static string ContentFor { get => string.Empty; }
+    public static virtual string ContentFor => string.Empty;
 
     /// <summary>Gets the FHIR version literal.</summary>
-    public virtual static string FhirVersionLiteral { get => string.Empty; }
+    public static virtual string FhirVersionLiteral => string.Empty;
 }

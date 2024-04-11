@@ -317,10 +317,15 @@
         ContentLevel = "id-only",
         Filters = new()
         {
-            { "Encounter", new List<ParsedSubscription.SubscriptionFilter>()
-                {
-                    new ParsedSubscription.SubscriptionFilter("Encounter", "patient", string.Empty, string.Empty, "Patient/example"),
-                }
+            { "Encounter", 
+                [
+                    new ParsedSubscription.SubscriptionFilter(
+                        "Encounter", 
+                        "patient", 
+                        string.Empty, 
+                        string.Empty, 
+                        "Patient/example")
+                ]
             },
         }
     };
@@ -335,16 +340,16 @@
     List<string> postedEncounters = new();
 
     /// <summary>Gets the content for package.</summary>
-    public static string ContentFor { get => "subscriptions"; }
+    public static string ContentFor => "subscriptions";
 
     /// <summary>Gets the name of the page.</summary>
-    public static string PageName { get => "Subscriptions RI Tour"; }
+    public static string PageName => "Subscriptions RI Tour";
 
     /// <summary>Gets the description.</summary>
-    public static string Description { get => "This page contains a tour of topic-based subscriptions."; }
+    public static string Description => "This page contains a tour of topic-based subscriptions.";
 
     /// <summary>Gets the full pathname of the route file.</summary>
-    public static string RoutePath { get => "/subscriptions/tour"; }
+    public static string RoutePath => "/subscriptions/tour";
 
     private string bindFilter = "Patient/example";
 
@@ -364,7 +369,7 @@
             _ = JS.InvokeVoidAsync("scrollElementIntoView", "element-step-" + toStep);
         }
 
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>Posts the subscription.</summary>
@@ -542,8 +547,7 @@
 
             if (e.ChangedSubscription.CurrentStatus == "active")
             {
-                if ((_store.ReceivedNotifications.TryGetValue(subscriptionLocation, out List<ParsedSubscriptionStatus>? notifications)) &&
-                    (notifications != null))
+                if (_store.ReceivedNotifications.TryGetValue(subscriptionLocation, out List<ParsedSubscriptionStatus>? notifications))
                 {
                     ParsedSubscriptionStatus? handshake = notifications.Where(n => n.NotificationType == ParsedSubscription.NotificationTypeCodes.Handshake)?.First() ?? null;
 
@@ -584,7 +588,7 @@
     /// <param name="e">     Subscription event information.</param>
     private void Store_OnSubscriptionSendEvent(object? sender, SubscriptionSendEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>FHIR store on changed.</summary>
@@ -592,7 +596,7 @@
     /// <param name="e">     Event information.</param>
     private void Store_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

@@ -33,7 +33,7 @@ else
                                 <FluentTextField Label="Received" ReadOnly="true" Value="@status.ProcessedDateTime.ToString("o")"/>
                                 <FluentTextField Label="Type" ReadOnly="true" Value="@status.NotificationType?.ToString()"/>
 
-                                <FluentLabel Typo="Typography.Body">Recevied Event Details</FluentLabel>
+                                <FluentLabel Typo="Typography.Body">Received Event Details</FluentLabel>
                                 <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" >Received Events</FluentAnchor>
     
                                 @if (status.NotificationEvents.Any())
@@ -131,7 +131,7 @@ else
     /// <param name="e">     Event information.</param>
     private void Store_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -141,7 +141,7 @@ else
     /// <param name="e">     Received subscription changed event information.</param>
     private void Store_OnReceivedSubscriptionChanged(object? sender, ReceivedSubscriptionChangedEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>Event handler. Called by Store for on received subscription events.</summary>
@@ -149,7 +149,7 @@ else
     /// <param name="e">     Received subscription event information.</param>
     private void Store_OnReceivedSubscriptionEvent(object? sender, ReceivedSubscriptionEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

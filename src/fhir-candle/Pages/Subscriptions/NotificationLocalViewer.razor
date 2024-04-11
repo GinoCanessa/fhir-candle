@@ -21,8 +21,7 @@
                     <FluentTextField Label="Received" ReadOnly="true" Value="@subEvent.Timestamp.ToLocalTime().ToString("o")"/>
                     <FluentTextField Label="Status At Generation" ReadOnly="true" Value="@subEvent.StatusAtGeneration"/>
 
-                    @if ((subEvent.Focus != null) && 
-                         (_store.TryGetResourceInfo(subEvent.Focus, out string rn, out string id)))
+                    @if (_store.TryGetResourceInfo(subEvent.Focus, out string rn, out string id))
                     {
                         <FluentLabel Typo="Typography.Body">Focus</FluentLabel>
                         <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type={rn}&id={id}")">@rn/@id</FluentAnchor>
@@ -91,7 +90,7 @@
             if ((!string.IsNullOrEmpty(SubscriptionId)) &&
                 (_store.CurrentSubscriptions.Any()))
             {
-                _subscription = _store.CurrentSubscriptions.Where(s => s.Id.Equals(SubscriptionId, StringComparison.Ordinal)).First() ?? null!;
+                _subscription = _store.CurrentSubscriptions.FirstOrDefault(s => s.Id.Equals(SubscriptionId, StringComparison.Ordinal));
             }
         }
 
@@ -119,7 +118,7 @@
                 if ((!string.IsNullOrEmpty(SubscriptionId)) &&
                     (_store.CurrentSubscriptions.Any()))
                 {
-                    _subscription = _store.CurrentSubscriptions.Where(s => s.Id.Equals(SubscriptionId, StringComparison.Ordinal)).First() ?? null!;
+                    _subscription = _store.CurrentSubscriptions.FirstOrDefault(s => s.Id.Equals(SubscriptionId, StringComparison.Ordinal));
                 }
             }
 
@@ -133,7 +132,7 @@
     /// <param name="e">     Subscription event information.</param>
     private void Store_OnSubscriptionSendEvent(object? sender, SubscriptionSendEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

@@ -209,6 +209,10 @@ fluent-text-field {
     min-width: var(--field-min-width);
 }
 
+fluent-text-area {
+    min-width: var(--field-min-width);
+}
+
 fluent-number-field {
     min-width: var(--field-min-width);
 }

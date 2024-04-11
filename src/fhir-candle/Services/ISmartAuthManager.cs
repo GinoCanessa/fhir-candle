@@ -62,6 +62,8 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="tenant">  The tenant name.</param>
     /// <param name="key">     The key.</param>
     /// <param name="redirect">[out] The redirect.</param>
+    /// <param name="error"></param>
+    /// <param name="errorDescription"></param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryGetClientRedirect(
         string tenant, 
@@ -173,6 +175,7 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="pkceMethod">         Method used for the code_challenge parameter. (required v2,
     ///  opt v1)</param>
     /// <param name="redirectDestination">[out] The redirect destination.</param>
+    /// <param name="authKey"></param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool RequestAuth(
         string tenant,

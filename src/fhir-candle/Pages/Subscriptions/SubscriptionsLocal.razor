@@ -20,28 +20,28 @@ else
         {
             <FluentGridItem Style="min-width: var(--field-container-min-width);">
                 <FluentCounterBadge Count="@sub.GeneratedEvents.Count()" Appearance="Appearance.Accent" BottomPosition="97" HorizontalPosition="97" Max="999">
-                    <FluentCard>
-                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
-                            <FluentLabel Typo="Typography.Body">Subscription</FluentLabel>
-                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={sub.Id}")">Subscription/@sub.Id</FluentAnchor>
+                <FluentCard>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                        <FluentLabel Typo="Typography.Body">Subscription</FluentLabel>
+                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Subscription&id={sub.Id}")">Subscription/@sub.Id</FluentAnchor>
 
-                            <FluentTextField Label="Topic" ReadOnly="true" Value="@sub.TopicUrl"/>
-                            <FluentTextField Label="Channel" ReadOnly="true" Value="@sub.ChannelCode"/>
-                            <FluentTextField Label="Endpoint" ReadOnly="true" Value="@sub.Endpoint"/>
+                        <FluentTextField Label="Topic" ReadOnly="true" Value="@sub.TopicUrl"/>
+                        <FluentTextField Label="Channel" ReadOnly="true" Value="@sub.ChannelCode"/>
+                        <FluentTextField Label="Endpoint" ReadOnly="true" Value="@sub.Endpoint"/>
 
-                            <FluentLabel Typo="Typography.Body">Generated Event Details</FluentLabel>
-                            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={sub.Id}")">Generated Events</FluentAnchor>
+                        <FluentLabel Typo="Typography.Body">Generated Event Details</FluentLabel>
+                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-local-viewer?store={StoreName}&id={sub.Id}")">Generated Events</FluentAnchor>
 
-                            @if (sub.GeneratedEvents.Any())
-                            {
-                                <FluentTextField Label="Latest" ReadOnly="true" Value="@HeaderFor(sub.GeneratedEvents.Last().Value)"/>
-                            }
-                            @if (sub.NotificationErrors.Any())
-                            {
-                                <FluentTextField Label="Error" Error="true" ReadOnly="true" Value="@sub.NotificationErrors.Last()" />
-                            }
-                        </FluentStack>
-                    </FluentCard>
+                        @if (sub.GeneratedEvents.Any())
+                        {
+                            <FluentTextField Label="Latest" ReadOnly="true" Value="@HeaderFor(sub.GeneratedEvents.Last().Value)"/>
+                        }
+                        @if (sub.NotificationErrors.Any())
+                        {
+                            <FluentTextField Label="Error" Error="true" ReadOnly="true" Value="@sub.NotificationErrors.Last()"/>
+                        }
+                    </FluentStack>
+                </FluentCard>
                 </FluentCounterBadge>
             </FluentGridItem>
         }

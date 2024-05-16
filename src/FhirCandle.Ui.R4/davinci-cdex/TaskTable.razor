@@ -43,13 +43,13 @@
 
     <TemplateColumn Title="Set Status">
         <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="2">
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetStatus(context, "requested"))">Requested</FluentButton>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetStatus(context, "accepted"))">Accepted</FluentButton>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetStatus(context, "rejected"))">Rejected</FluentButton>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetStatus(context, "in-progress"))">In Progress</FluentButton>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetStatus(context, "failed"))">Failed</FluentButton>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetStatus(context, "completed"))">Completed</FluentButton>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetStatus(context, "on-hold"))">On Hold</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetTaskStatus(context, "requested"))">Requested</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetTaskStatus(context, "accepted"))">Accepted</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetTaskStatus(context, "rejected"))">Rejected</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetTaskStatus(context, "in-progress"))">In Progress</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetTaskStatus(context, "failed"))">Failed</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetTaskStatus(context, "completed"))">Completed</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => SetTaskStatus(context, "on-hold"))">On Hold</FluentButton>
         </FluentStack>
     </TemplateColumn>
 
@@ -200,9 +200,9 @@
     }
 
     /// <summary>Sets the status.</summary>
-    /// <param name="id">    The identifier.</param>
+    /// <param name="task">  The task to update.</param>
     /// <param name="status">The status.</param>
-    private void SetStatus(Hl7.Fhir.Model.Task? task, string status)
+    private void SetTaskStatus(Hl7.Fhir.Model.Task? task, string status)
     {
         if ((task == null) ||
             string.IsNullOrEmpty(task.Id) || 
@@ -218,7 +218,7 @@
         {
             return;
         }
-
+        
         // we want to store a new copy of the task so that events and subscriptions trigger (not update inline)
         // this is only an issue because we are pulling our list directly from the store instead of using a query to copy
         Hl7.Fhir.Model.Task t = (Hl7.Fhir.Model.Task)task.DeepCopy();
@@ -231,6 +231,9 @@
         {
             Console.WriteLine($"Error updating Task/{t.Id}!");
         }
+
+        // reload results to see the changed value
+        OnSearchChanged();
     }
 
     protected override void OnInitialized()

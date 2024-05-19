@@ -5148,17 +5148,18 @@ public partial class VersionedFhirStore : IFhirStore
             (inputValue == null) &&
             string.IsNullOrEmpty(inputRawValue))
         {
-            List<DataType> rValues = cs.Rest
-                .SelectMany(r => r.Resource)
-                .Where(r => r.Interaction.Any(i => i.Code == interaction))
-                .Select(r => (DataType)new Code(r.Type))
-                .ToList();
+            // List<DataType> rValues = cs.Rest
+            //     .SelectMany(r => r.Resource)
+            //     .Where(r => r.Interaction.Any(i => i.Code == interaction))
+            //     .Select(r => (DataType)new Code(r.Type))
+            //     .ToList();
             
             response = new()
             {
                 Name = featureName,
                 Context = context,
-                Value = rValues,
+                Value = [ new FhirBoolean(true), new FhirBoolean(false)],
+                // Value = rValues,
                 Matches = null, // cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction))),
                 ProcessingStatus = "all-ok",
             };

@@ -5081,6 +5081,246 @@ public partial class VersionedFhirStore : IFhirStore
         return true;
     }
 
+    public record class FeatureQueryResponse
+    {
+        /// <summary>
+        /// name: name of the feature (uri)
+        /// </summary>
+        public required string Name { get; init; }
+        
+        /// <summary>
+        /// name: present if provided, used to match responses to requests (uri)
+        /// </summary>
+        public required string? Context { get; init; }
+        
+        /// <summary>
+        /// processing-status: code from the server about processing the request (e.g., all-ok, not-supported, etc.)
+        /// </summary>
+        public required string ProcessingStatus { get; init; }
+        
+        /// <summary>
+        ///  value:
+        ///     if provided in input: the value requested (datatype as defined by the feature) (even if processing fails) (if read from HTTP Query Parameter, default to fhir string type)
+        ///     if not provided: the value of the feature (can have multiple repetitions) (uses datatype of feature)
+        /// </summary>
+        public required List<DataType> Value { get; init; }
+        
+        /// <summary>
+        /// answer:
+        ///     only present if processing was successful (all-ok)
+        ///     if a value is provided, does the supplied value match the server feature-supported value
+        ///     if a value is not provided, does not exist
+        /// </summary>
+        public required bool? Answer { get; init; }
+    }
+
+    public bool TryQueryCapabilityFeature(
+        string featureName,
+        string context,
+        DataType? inputValue,
+        string? inputRawValue, 
+        out FeatureQueryResponse response)
+    {
+        CapabilityStatement cs;
+        
+        if (_capabilitiesAreStale)
+        {
+            cs = UpdateCapabilities();
+        }
+        else
+        {
+            // bypass read to avoid instance read hooks (firing meta hooks)
+            cs = (CapabilityStatement)((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store["CapabilityStatement"])[_capabilityStatementId];
+        }
+        
+        switch (featureName)
+        {
+            case "instantiates":
+                return TryTestCapabilityFeatureInstantiates(cs, featureName, context, inputValue, inputRawValue, out response);
+            
+            case "read":
+                return TryTestCapabilityFeatureInteraction(cs, featureName, context, inputValue, inputRawValue, CapabilityStatement.TypeRestfulInteraction.Read, out response);
+
+            case "create":
+                return TryTestCapabilityFeatureInteraction(cs, featureName, context, inputValue, inputRawValue, CapabilityStatement.TypeRestfulInteraction.Create, out response);
+
+            case "update":
+                return TryTestCapabilityFeatureInteraction(cs, featureName, context, inputValue, inputRawValue, CapabilityStatement.TypeRestfulInteraction.Update, out response);
+            
+            default:
+                response = new()
+                {
+                    Name = featureName,
+                    Context = string.IsNullOrEmpty(context) ? null : context,
+                    Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                    Answer = null,
+                    ProcessingStatus = "unknown",
+                };
+                return true;
+        }
+    }
+
+    private bool TryTestCapabilityFeatureInteraction(
+        CapabilityStatement cs,
+        string featureName,
+        string context,
+        DataType? inputValue,
+        string? inputRawValue,
+        CapabilityStatement.TypeRestfulInteraction interaction,
+        out FeatureQueryResponse response)
+    {
+        // check for no or 'all' context and no value
+        if ((string.IsNullOrEmpty(context) || (context == "*")) &&
+            (inputValue == null) &&
+            string.IsNullOrEmpty(inputRawValue))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction))),
+                ProcessingStatus = "all-ok",
+            };
+            return true;
+        }
+        
+        // check for specific context and no value
+        if ((inputValue == null) &&
+            string.IsNullOrEmpty(inputRawValue))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && r.Interaction.Any(i => i.Code == interaction))),
+                ProcessingStatus = "all-ok",
+            };
+            return true;
+        }
+        
+        // check for valid values
+        bool? testValue = inputValue switch
+        {
+            FhirBoolean fb => fb.Value,
+            FhirString fs => bool.TryParse(fs.Value, out bool b) ? b : null,
+            _ => null,
+        };
+
+        testValue ??= string.IsNullOrEmpty(inputRawValue) 
+            ? null 
+            : bool.TryParse(inputRawValue, out bool bv) 
+                ? bv 
+                : null; 
+        
+        // check for invalid values
+        if (testValue == null)
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = null,
+                ProcessingStatus = "invalid-value",
+            };
+            return true;
+        }
+        
+        // check for no or 'all' context and value (tested above)
+        if (string.IsNullOrEmpty(context) || (context == "*"))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = [ new FhirBoolean(testValue) ],
+                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction) == testValue)),
+                ProcessingStatus = "all-ok",
+            };
+            return true;
+        }
+        
+        // have context and value
+        
+        response = new()
+        {
+            Name = featureName,
+            Context = context,
+            Value = [ new FhirBoolean(testValue) ],
+            Answer = cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && (r.Interaction.Any(i => i.Code == interaction) == testValue))),
+            ProcessingStatus = "all-ok",
+        };
+        return true;
+    }
+    
+    private bool TryTestCapabilityFeatureInstantiates(
+        CapabilityStatement cs, 
+        string featureName,
+        string context, 
+        DataType? inputValue, 
+        string? inputRawValue, 
+        out FeatureQueryResponse response)
+    {
+        // check for context and fail it if present
+        if (!string.IsNullOrEmpty(context))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = null,
+                ProcessingStatus = "invalid-context",
+            };
+            return true;
+        }
+        
+        // check for enumeration request
+        if (string.IsNullOrEmpty(inputRawValue) && (inputValue == null))
+        {
+            List<DataType> rValues = cs.Instantiates.Select(i => (DataType)new Canonical(i)).ToList();
+
+            if (rValues.Count == 0)
+            {
+                rValues = inputValue != null ? [inputValue] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [];
+            }
+            
+            response = new()
+            {
+                Name = featureName,
+                Context = null,
+                Value = rValues,
+                Answer = true,
+                ProcessingStatus = "all-ok",
+            };
+
+            return true;
+        }
+        
+        // check for specific value request
+        string testValue = !string.IsNullOrEmpty(inputRawValue) ? inputRawValue : inputValue?.ToString() ?? throw new Exception("No value expected here");
+
+        Canonical testCanonical = new Canonical(testValue);
+        
+        List<DataType> responseValues = cs.Instantiates
+            .Where(i => i.Equals(testValue, StringComparison.Ordinal))
+            .Select(i => (DataType)new Canonical(i))
+            .ToList();
+
+        response = new()
+        {
+            Name = featureName,
+            Context = null,
+            Value = responseValues.Count != 0 ? responseValues : [testCanonical],
+            Answer = responseValues.Count != 0,
+            ProcessingStatus = "all-ok",
+        };
+        
+        return true;
+    }
+
     /// <summary>Common to firely version.</summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when one or more arguments are outside the
     ///  required range.</exception>

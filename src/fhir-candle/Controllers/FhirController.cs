@@ -900,6 +900,71 @@ public class FhirController : ControllerBase
         }
     }
 
+    
+    /// <summary>(An Action that handles HTTP POST requests) posts a system operation.</summary>
+    /// <param name="storeName"> The store.</param>
+    /// <param name="opName">    Name of the operation.</param>
+    /// <param name="format">    Describes the format to use.</param>
+    /// <param name="pretty">    The pretty.</param>
+    /// <param name="prefer">    The prefer.</param>
+    /// <param name="authHeader">The authentication header.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpGet, Route("{storeName}/${opName}")]
+    //[Consumes("application/fhir+json", new[] { "application/fhir+xml", "application/json", "application/xml" })]
+    public async Task GetSystemOperation(
+        [FromRoute] string storeName,
+        [FromRoute] string opName,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "Authorization")] string? authHeader)
+    {
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
+        {
+            await LogAndReturnError(Response, 404, $"GetSystemOperation <<< no tenant at {storeName}!");
+            return;
+        }
+
+        try
+        {
+            FhirRequestContext ctx = new()
+            {
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = Request.Method.ToUpperInvariant(),
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = Request.QueryString.ToString(),
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                Interaction = Common.StoreInteractionCodes.SystemOperation,
+                OperationName = "$" + opName,
+            };
+
+            if (!_smartAuthManager.IsAuthorized(ctx))
+            {
+                Response.StatusCode = 401;
+                return;
+            }
+
+            // re-add the prefix $ character since it was stripped during routing
+
+            bool success= store.SystemOperation(
+                ctx,
+                out FhirResponseContext opResponse);
+
+            await AddFhirResponse(Response, prefer, success, opResponse);
+        }
+        catch (Exception ex)
+        {
+            string msg = ex.InnerException == null ? $"GetSystemOperation <<< caught: {ex.Message}" : $"PostSystemOperation <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
+            await LogAndReturnError(Response, 500, msg);
+            return;
+        }
+    }
+    
     /// <summary>(An Action that handles HTTP POST requests) posts a resource type.</summary>
     /// <param name="storeName">   The store.</param>
     /// <param name="resourceName">Name of the resource.</param>

@@ -17,6 +17,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Models\ParsedSearchParameter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interactions\IFhirInteractionHook.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\IFhirOperation.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Operations\OpFeatureQuery.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpIsFhir.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Operations\OpSubscriptionHook.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Search\EvalDateSearch.cs" />

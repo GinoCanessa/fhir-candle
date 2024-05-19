@@ -106,7 +106,7 @@ public record class SmartWellKnown
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("revocation_endpoint")]
-    public string? RecovationEndpoint { get; set; } = null;
+    public string? RevocationEndpoint { get; set; } = null;
 
     /// <summary>
     /// Gets or sets the array of strings representing SMART capabilities (e.g., sso-openid-connect

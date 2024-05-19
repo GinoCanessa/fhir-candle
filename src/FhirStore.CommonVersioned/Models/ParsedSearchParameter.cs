@@ -152,7 +152,7 @@ public class ParsedSearchParameter
     /// <param name="name">           The search parameter name.</param>
     /// <param name="modifierLiteral">The search modifier literal.</param>
     /// <param name="modifierCode">   The search modifier code.</param>
-    /// <param name="value">          The http-paramter value string.</param>
+    /// <param name="value">          The http-parameter value string.</param>
     /// <param name="spd">            The search parameter definition.</param>
     /// <param name="component">      (Optional) The component.</param>
     [SetsRequiredMembers]

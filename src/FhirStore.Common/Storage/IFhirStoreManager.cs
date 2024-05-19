@@ -19,7 +19,7 @@ public interface IFhirStoreManager : IHostedService, IReadOnlyDictionary<string,
     void Init();
 
     /// <summary>Gets the additional pages by tenant.</summary>
-    Dictionary<string, IEnumerable<PackagePageInfo>> AdditionalPagesByTenant { get; }
+    IReadOnlyDictionary<string, IQueryable<PackagePageInfo>> AdditionalPagesByTenant { get; }
 
     /// <summary>Loads ri contents.</summary>
     /// <param name="dir">The dir.</param>

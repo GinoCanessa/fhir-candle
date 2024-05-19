@@ -19,6 +19,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
 using zulip_cs_lib.Resources;
+using static FhirCandle.Models.AuthorizationInfo;
 
 namespace fhir.candle.Services;
 
@@ -74,14 +75,17 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<SmartAuthManager>();
     }
 
+    /// <summary>Gets a value indicating whether this object is enabled.</summary>
+    public bool IsEnabled => _smartConfigs.Any();
+
     /// <summary>Gets the smart configuration by tenant.</summary>
-    public Dictionary<string, SmartWellKnown> SmartConfigurationByTenant { get => _smartConfigs; }
+    public Dictionary<string, SmartWellKnown> SmartConfigurationByTenant => _smartConfigs;
 
     /// <summary>Gets the smart authorizations.</summary>
-    public Dictionary<string, AuthorizationInfo> SmartAuthorizations { get => _authorizations; }
+    public Dictionary<string, AuthorizationInfo> SmartAuthorizations => _authorizations;
 
     /// <summary>Gets the clients.</summary>
-    public Dictionary<string, ClientInfo> SmartClients { get => _clients; }
+    public Dictionary<string, ClientInfo> SmartClients => _clients;
 
     /// <summary>Query if 'tenant' has tenant.</summary>
     /// <param name="tenant">The tenant.</param>
@@ -929,6 +933,18 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
         local.UserScopes = userScopes;
         local.PatientScopes = patientScopes;
 
+        // create our FHIR Context
+        List<SmartFhirContext> fhirContext = new();
+
+        if (!string.IsNullOrEmpty(local.LaunchPractitioner))
+        {
+            fhirContext.Add(new()
+            {
+                Type = "Practitioner",
+                Reference = local.LaunchPractitioner.StartsWith("Practitioner/") ? local.LaunchPractitioner : "Practitioner/" + local.LaunchPractitioner,
+            });
+        }
+
         // check for 'special' code
         if (code.Equals(Guid.Empty.ToString()))
         {
@@ -939,6 +955,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             local.Response = new()
             {
                 PatientId = local.LaunchPatient,
+                FhirContext = fhirContext.Any() ? fhirContext : null,
                 TokenType = "bearer",
                 Scopes = string.Join(" ", permittedScopes),
                 ClientId = local.RequestParameters.ClientId,
@@ -957,6 +974,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
             local.Response = new()
             {
                 PatientId = local.LaunchPatient,
+                FhirContext = fhirContext.Any() ? fhirContext : null,
                 TokenType = "bearer",
                 Scopes = string.Join(" ", permittedScopes),
                 ClientId = local.RequestParameters.ClientId,
@@ -1715,7 +1733,7 @@ public class SmartAuthManager : ISmartAuthManager, IDisposable
                     "fhirUser",
                     "launch",
                     "launch/patient",
-                    //"launch/practitioner",
+                    "launch/practitioner",
                     //"launch/encounter",
                     //"patient/*.read",
                     //"patient/*.r",

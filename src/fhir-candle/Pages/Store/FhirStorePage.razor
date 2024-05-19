@@ -1,4 +1,6 @@
-﻿@page "/store"
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/store"
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
 
@@ -6,6 +8,37 @@
 
 <PageTitle>FHIR Candle</PageTitle>
 
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.H4">FHIR Resources: @StoreName</FluentLabel>
+
+    <FluentSwitch Label="Hide Empty Resources" @bind-Value="HideEmptyResources"></FluentSwitch>
+
+    <FluentDataGrid Items="@FilteredItems" GridTemplateColumns="1fr 1fr">
+@*         <PropertyColumn Title="Resource Name" Property="@(ri => ri.ResourceName)" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(ResourceNameFilter)" Tooltip="true"  IsDefaultSortColumn="true">
+            <ColumnOptions>
+                <div class="search-box">
+                    <FluentSearch 
+                        Autofocus="true"
+                        @bind-Value="ResourceNameFilter"
+                        @bind-Value:after="HandleFilterClear"
+                        @oninput="@(e => ResourceNameFilter = e.Value?.ToString() ?? string.Empty)"
+                        Placeholder="Resource Name..." />
+                </div>
+            </ColumnOptions>
+        </PropertyColumn>
+ *@
+        <TemplateColumn Title="Resource Name" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(ResourceNameFilter)" Tooltip="true"  IsDefaultSortColumn="true">
+            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-list?store={StoreName}&type={context.ResourceName}")">@context.ResourceName</FluentAnchor>
+        </TemplateColumn>
+
+        <PropertyColumn Title="Instance Count" Property="@(ri => ri.Count)" Sortable="true" Tooltip="true">
+        </PropertyColumn>
+
+    </FluentDataGrid>
+
+</FluentStack>
+
+@*
 <MudTable @ref="_displayTable"
         Items="@_store.OrderBy(kvp => kvp.Key)"
         Filter="new Func<KeyValuePair<string, IResourceStore>, bool>(FilterFuncInstance)"
@@ -14,7 +47,7 @@
         Height="calc(100vh - (var(--mud-appbar-height) * 2))"
         FixedHeader="true">
     <ToolBarContent>
-        <MudText Typo="Typo.h6">FHIR Resources: @StoreName</MudText>
+        <FluentLabel Typo="Typography.H6">FHIR Resources: @StoreName</FluentLabel>
         <MudSpacer />
         <MudSwitch Color="Color.Info" @bind-Checked="hideEmptyResources" Label="Hide empty" />
         <MudSpacer />
@@ -25,7 +58,7 @@
             <MudSwitch Color="Color.Info" @bind-Checked="autoRefresh" Label="Auto-refresh" />
         </MudTooltip>
         <MudSpacer />
-        <MudTextField @bind-Value="@resourceFilter" Label="Filter" DebounceInterval="100" OnDebounceIntervalElapsed="HandleResourceFilterChange" />
+        <FluentTextField @bind-Value="@resourceFilter" Label="Filter" DebounceInterval="100" OnDebounceIntervalElapsed="HandleResourceFilterChange" />
     </ToolBarContent>
     <ColGroup>
         <col style="width: 10vw!important;" />
@@ -40,65 +73,160 @@
     <RowTemplate>
         <MudTd></MudTd>
         <MudTd DataLabel="Resource Type">
-            <MudLink Href="@($"/store/resource-list?store={StoreName}&type={context.Key}")" Underline="Underline.Always">@context.Key</MudLink>
+            <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-list?store={StoreName}&type={context.Key}")" >@context.Key</FluentAnchor>
         </MudTd>
         <MudTd DataLabel="Count">@context.Value.Count</MudTd>
     </RowTemplate>
 </MudTable>
+*@
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+    };
+
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "store")]
     public string StoreName { get; set; } = "";
 
-    private IFhirStore _store = null!;
-
-    /// <summary>The display table.</summary>
-    private MudTable<KeyValuePair<string, IResourceStore>>? _displayTable = null;
-
-    /// <summary>True to hide or false to show empty resources.</summary>
-    private bool hideEmptyResources = true;
-
-    /// <summary>True to automatically refresh.</summary>
-    private bool autoRefresh = true;
-
-    /// <summary>The refresh timer.</summary>
-    private System.Threading.Timer? _refreshTimer = null;
-
-    /// <summary>The resource search string.</summary>
-    private string resourceFilter = string.Empty;
-
-    private bool FilterFuncInstance(KeyValuePair<string, IResourceStore> kvp) => FilterFuncDefinition(kvp, resourceFilter);
-
-    /// <summary>Filter function.</summary>
-    /// <param name="e">A FhirElement to process.</param>
-    /// <returns>True if it succeeds, false if it fails.</returns>
-    private bool FilterFuncDefinition(KeyValuePair<string, IResourceStore> kvp, string searchString)
+    /// <summary>Information about the resource store.</summary>
+    private record class ResourceStoreInfo
     {
-        if (hideEmptyResources && (!kvp.Value.Any()))
-        {
-            return false;
-        }
-
-        if (string.IsNullOrEmpty(searchString))
-        {
-            return true;
-        }
-
-        return kvp.Key.Contains(searchString, StringComparison.OrdinalIgnoreCase);
+        public string ResourceName { get; set; } = string.Empty;
+        public int Count { get; set; }
     }
 
-    /// <summary>Handles the filter change described by value.</summary>
-    /// <param name="value">The value.</param>
-    private void HandleResourceFilterChange(string value)
+    private System.Timers.Timer? debounceTimer = null;
+
+    private string _resourceNameFilter = string.Empty;
+
+    private string ResourceNameFilter
     {
-        _displayTable?.UpdateSelection();
-        InvokeAsync(() => StateHasChanged());
+        get => _resourceNameFilter;
+        set
+        {
+            if (value != _resourceNameFilter)
+            {
+                _resourceNameFilter = value;
+                ResetDebounce();
+            }
+        }
+    }
+
+    IQueryable<ResourceStoreInfo>? _filteredItems = null;
+
+    private IQueryable<ResourceStoreInfo>? FilteredItems => _filteredItems;
+
+    private IFhirStore _store = null!;
+
+    private bool _hideEmptyResources = true;
+
+    /// <summary>True to hide or false to show empty resources.</summary>
+    private bool HideEmptyResources
+    {
+        get => _hideEmptyResources;
+        set
+        {
+            if (value != _hideEmptyResources)
+            {
+                _hideEmptyResources = value;
+                _filteredItems = GetFilteredItems();
+            }
+        }
+    }
+    
+    /// <summary>Gets filtered items.</summary>
+    /// <returns>The filtered items.</returns>
+    private IQueryable<ResourceStoreInfo>? GetFilteredItems()
+    {
+        if ((_store == null) ||
+            (!_store.Any()))
+        {
+            return null;
+        }
+
+        // check for no filters
+        if (string.IsNullOrWhiteSpace(_resourceNameFilter))
+        {
+            if (HideEmptyResources)
+            {
+                return _store
+                    .Where(kvp => kvp.Value.Count > 0)
+                    .Select(kvp => new ResourceStoreInfo(){ ResourceName = kvp.Key, Count = kvp.Value.Count })
+                    .AsQueryable<ResourceStoreInfo>();
+            }
+
+            return _store
+                .Select(kvp => new ResourceStoreInfo(){ ResourceName = kvp.Key, Count = kvp.Value.Count })
+                .AsQueryable<ResourceStoreInfo>();
+        }
+
+        if (HideEmptyResources)
+        {
+            return _store
+                .Where(kvp => kvp.Value.Count > 0)
+                .Where(kvp => kvp.Key.Contains(_resourceNameFilter, StringComparison.OrdinalIgnoreCase))
+                .Select(kvp => new ResourceStoreInfo(){ ResourceName = kvp.Key, Count = kvp.Value.Count })
+                .AsQueryable<ResourceStoreInfo>();
+        }
+
+        // apply filters
+        return _store
+            .Where(kvp => kvp.Key.Contains(_resourceNameFilter, StringComparison.OrdinalIgnoreCase))
+            .Select(kvp => new ResourceStoreInfo(){ ResourceName = kvp.Key, Count = kvp.Value.Count })
+            .AsQueryable<ResourceStoreInfo>();
+    }
+
+    /// <summary>Executes the search action.</summary>
+    private void OnSearchChanged()
+    {
+        _filteredItems = GetFilteredItems();
+        StateHasChanged();
+    }
+
+    private async void TimerElapsed_TickAsync(object? sender, EventArgs e)
+    {
+        CancelDebounce();
+        await InvokeAsync(OnSearchChanged);
+    }
+
+    private void ResetDebounce()
+    {
+        if (debounceTimer != null)
+        {
+            debounceTimer.Enabled = false;
+            debounceTimer.Elapsed -= TimerElapsed_TickAsync;
+            debounceTimer.Dispose();
+            debounceTimer = null;
+        }
+
+        debounceTimer = new(400);
+        debounceTimer.Elapsed += TimerElapsed_TickAsync;
+        debounceTimer.Enabled = true;
+        debounceTimer.Start();
+    }
+
+    private void CancelDebounce()
+    {
+        if (debounceTimer != null)
+        {
+            debounceTimer.Enabled = false;
+            debounceTimer.Elapsed -= TimerElapsed_TickAsync;
+            debounceTimer.Dispose();
+            debounceTimer = null;
+        }
+    }
+
+    private void HandleFilterClear()
+    {
+        CancelDebounce();
+        _ = InvokeAsync(OnSearchChanged);
     }
 
     /// <summary>Executes the initialized asynchronous action.</summary>
@@ -110,40 +238,13 @@
         if ((!string.IsNullOrEmpty(StoreName)) &&
             (StoreManager.TryGetValue(StoreName, out _store!)))
         {
-            _store.OnChanged += Store_OnChanged;
+            _store.OnInstanceCreated += Store_OnChanged;
+            _store.OnInstanceDeleted += Store_OnChanged;
         }
 
-        _refreshTimer = new Timer(
-            TimerRefresh,
-            null,
-            TimeSpan.Zero,
-            TimeSpan.FromSeconds(10));
+        _filteredItems = GetFilteredItems();
 
-        NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-    }
-
-    /// <summary>Timer refresh.</summary>
-    /// <param name="state">The state.</param>
-    private void TimerRefresh(object? state)
-    {
-        if (autoRefresh)
-        {
-            HandleRefresh();
-        }
-    }
-
-    /// <summary>Handles a user refresh request.</summary>
-    private void HandleRefresh()
-    {
-        try
-        {
-            _displayTable?.UpdateSelection();
-            InvokeAsync(() => StateHasChanged());
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.ToString());
-        }
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -155,16 +256,20 @@
         {
             if (_store != null)
             {
-                _store.OnChanged -= Store_OnChanged;
+                _store.OnInstanceCreated -= Store_OnChanged;
+                _store.OnInstanceDeleted -= Store_OnChanged;
             }
 
             if ((!string.IsNullOrEmpty(StoreName)) &&
                 (StoreManager.TryGetValue(StoreName, out _store!)))
             {
-                _store.OnChanged += Store_OnChanged;
+                _store.OnInstanceCreated += Store_OnChanged;
+                _store.OnInstanceDeleted += Store_OnChanged;
             }
 
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
+            _filteredItems = GetFilteredItems();
+
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 
@@ -173,7 +278,8 @@
     /// <param name="e">     Event information.</param>
     private void Store_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        _filteredItems = GetFilteredItems();
+        _ = InvokeAsync(() => StateHasChanged());
     }
 
     /// <summary>
@@ -182,12 +288,12 @@
     /// </summary>
     public void Dispose()
     {
-        _refreshTimer?.Change(Timeout.Infinite, 0);
-        _refreshTimer?.Dispose();
+        debounceTimer?.Dispose();
 
         if (_store != null)
         {
-            _store.OnChanged -= Store_OnChanged;
+            _store.OnInstanceCreated -= Store_OnChanged;
+            _store.OnInstanceDeleted -= Store_OnChanged;
         }
     }
 }

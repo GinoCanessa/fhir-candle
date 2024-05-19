@@ -26,7 +26,8 @@ using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using MudBlazor.Services;
+using Microsoft.FluentUI.AspNetCore.Components;
+using fhir.candle;
 
 namespace fhir.candle;
 
@@ -42,11 +43,6 @@ public static partial class Program
     /// <summary>(Immutable) The default subscription expiration.</summary>
     private static readonly int DefaultSubscriptionExpirationMinutes = 30;
 
-    ///// <summary>Candle server delegate.</summary>
-    ///// <param name="config">The configuration.</param>
-    ///// <returns>An int.</returns>
-    //public delegate int CandleServerDelegate(ServerConfiguration config);
-
     /// <summary>Main entry-point for this application.</summary>
     /// <param name="args">An array of command-line argument strings.</param>
     public static async Task<int> Main(string[] args)
@@ -57,142 +53,142 @@ public static partial class Program
             .AddEnvironmentVariables()
             .Build();
 
-        Option<string> optPublicUrl = new(
+        System.CommandLine.Option<string> optPublicUrl = new(
             aliases: new[] { "--url", "-u" },
             getDefaultValue: () => configuration.GetValue("Public_Url", string.Empty) ?? string.Empty,
             "Public URL for the server");
 
-        Option<int?> optListenPort = new(
+        System.CommandLine.Option<int?> optListenPort = new(
             aliases: new[] { "--port", "-p" },
             getDefaultValue: () => configuration.GetValue<int?>("Listen_Port", _defaultListenPort) ?? _defaultListenPort,
             "Listen port for the server");
 
-        Option<bool?> optOpenBrowser = new(
+        System.CommandLine.Option<bool?> optOpenBrowser = new(
             aliases: new[] { "--open-browser", "-o" },
             getDefaultValue: () => configuration.GetValue<bool>("Open_Browser", false),
             "Open a browser once the server starts.");
 
-        Option<int?> optMaxResourceCount = new(
+        System.CommandLine.Option<int?> optMaxResourceCount = new(
             aliases: new[] { "--max-resources", "-m" },
             getDefaultValue: () => configuration.GetValue<int?>("Max_Resources", null),
             "Maximum number of resources allowed per tenant.");
 
-        Option<bool?> optDisableUi = new(
+        System.CommandLine.Option<bool?> optDisableUi = new(
             name: "--disable-ui",
             getDefaultValue: () => configuration.GetValue<bool?>("Disable_Ui", null),
             "If the server should run headless.");
 
-        Option<string?> optPackageCache = new(
+        System.CommandLine.Option<string?> optPackageCache = new(
             name: "--fhir-package-cache",
             getDefaultValue: () => configuration.GetValue<string?>("Fhir_Cache", null),
             "Location of the FHIR package cache, for use with registries and IG packages.  Use empty quoted string to disable cache.");
 
-        Option<List<string>> optPublishedPackages = new(
+        System.CommandLine.Option<List<string>> optPublishedPackages = new(
             name: "--load-package",
             getDefaultValue: () => configuration.GetValue<List<string>>("Load_Packages", new List<string>())!,
             "Published packages to load. Specifying package name alone loads highest version.");
 
-        Option<List<string>> optCiPackages = new(
+        System.CommandLine.Option<List<string>> optCiPackages = new(
             name: "--ci-package",
             getDefaultValue: () => configuration.GetValue<List<string>>("Ci_Packages", new List<string>())!,
             "Continuous Integration (CI) packages to load. You may specify either just the branch name or a full URL.");
 
-        Option<bool?> optLoadPackageExamples = new(
+        System.CommandLine.Option<bool?> optLoadPackageExamples = new(
             name: "--load-examples",
             getDefaultValue: () => configuration.GetValue<bool?>("Load_Examples", null),
             "If package loading should include example instances.");
 
-        Option<string?> optPackageReferenceImplementation = new(
+        System.CommandLine.Option<string?> optPackageReferenceImplementation = new(
             name: "--reference-implementation",
             getDefaultValue: () => configuration.GetValue<string?>("Reference_Implementation", null),
             "If running as the Reference Implementation, the package directive or literal.");
 
-        Option<string?> optSourceDirectory = new(
+        System.CommandLine.Option<string?> optSourceDirectory = new(
             name: "--fhir-source",
             getDefaultValue: () => null,
             "FHIR Contents to load, either in this directory or by subdirectories named per tenant.");
 
-        Option<bool?> optProtectLoadedContent = new(
+        System.CommandLine.Option<bool?> optProtectLoadedContent = new(
             name: "--protect-source",
             getDefaultValue: () => null,
             "If any loaded FHIR contents cannot be altered.");
 
-        Option<List<string>> optTenantsR4 = new(
+        System.CommandLine.Option<List<string>> optTenantsR4 = new(
             name: "--r4",
             getDefaultValue: () => new(),
             "FHIR R4 Tenants to provide");
 
-        Option<List<string>> optTenantsR4B = new(
+        System.CommandLine.Option<List<string>> optTenantsR4B = new(
             name: "--r4b",
             getDefaultValue: () => new(),
             "FHIR R4B Tenants to provide");
 
-        Option<List<string>> optTenantsR5 = new(
+        System.CommandLine.Option<List<string>> optTenantsR5 = new(
             name: "--r5",
             getDefaultValue: () => new(),
             "FHIR R5 Tenants to provide");
 
-        Option<List<string>> optTenantsSmartRequired = new(
+        System.CommandLine.Option<List<string>> optTenantsSmartRequired = new(
             name: "--smart-required",
             getDefaultValue: () => new(),
             "FHIR Tenants that require SMART auth");
 
-        Option<List<string>> optTenantsSmartOptional = new(
+        System.CommandLine.Option<List<string>> optTenantsSmartOptional = new(
             name: "--smart-optional",
             getDefaultValue: () => new(),
             "FHIR Tenants that allow (but do not require) SMART auth");
 
-        Option<bool?> optCreateExistingId = new(
+        System.CommandLine.Option<bool?> optCreateExistingId = new(
             name: "--create-existing-id",
             getDefaultValue: () => configuration.GetValue<bool>("Create_Existing_Id", true),
             "Allow Create interactions (POST) to specify an ID.");
 
-        Option<bool?> optCreateAsUpdate = new(
+        System.CommandLine.Option<bool?> optCreateAsUpdate = new(
             name: "--create-as-update",
             getDefaultValue: () => configuration.GetValue<bool>("Create_As_Update", true),
             "Allow Update interactions (PUT) to create new resources.");
 
-        Option<int?> optMaxSubscriptionExpirationMinutes = new(
+        System.CommandLine.Option<int?> optMaxSubscriptionExpirationMinutes = new(
             name: "--max-subscription-minutes",
             getDefaultValue: () => configuration.GetValue<int?>("Max_Subscription_Minutes", null),
             "Maximum number of minutes a subscription is allowed to expire in.");
 
-        Option<string> optZulipEmail = new(
+        System.CommandLine.Option<string> optZulipEmail = new(
             name: "--zulip-email",
             getDefaultValue: () => configuration.GetValue("Zulip_Email", string.Empty) ?? string.Empty,
             "Zulip bot email address");
 
-        Option<string> optZulipKey = new(
+        System.CommandLine.Option<string> optZulipKey = new(
             name: "--zulip-key",
             getDefaultValue: () => configuration.GetValue("Zulip_Key", string.Empty) ?? string.Empty,
             "Zulip bot API key");
 
-        Option<string> optZulipUrl = new(
+        System.CommandLine.Option<string> optZulipUrl = new(
             name: "--zulip-url",
             getDefaultValue: () => configuration.GetValue("Zulip_Url", string.Empty) ?? string.Empty,
             "Zulip bot email address");
 
-        Option<string> optSmtpHost = new(
+        System.CommandLine.Option<string> optSmtpHost = new(
             name: "--smtp-host",
             getDefaultValue: () => configuration.GetValue("SMTP_Host", string.Empty) ?? string.Empty,
             "SMTP Host name/address");
 
-        Option<int?> optSmtpPort = new(
+        System.CommandLine.Option<int?> optSmtpPort = new(
             name: "--smtp-port",
             getDefaultValue: () => configuration.GetValue<int?>("SMTP_Port", null),
             "SMTP Port");
 
-        Option<string> optSmtpUser = new(
+        System.CommandLine.Option<string> optSmtpUser = new(
             name: "--smtp-user",
             getDefaultValue: () => configuration.GetValue("SMTP_User", string.Empty) ?? string.Empty,
             "SMTP Username");
 
-        Option<string> optSmtpPassword = new(
+        System.CommandLine.Option<string> optSmtpPassword = new(
             name: "--smtp-password",
             getDefaultValue: () => configuration.GetValue("SMTP_Password", string.Empty) ?? string.Empty,
             "SMTP Password");
 
-        Option<string> optFhirPathLabUrl = new(
+        System.CommandLine.Option<string> optFhirPathLabUrl = new(
             name: "--fhirpath-lab-url",
             getDefaultValue: () => configuration.GetValue("FHIRPath_Lab_Url", string.Empty) ?? string.Empty,
             "FHIRPath Lab URL");
@@ -382,12 +378,15 @@ public static partial class Program
             }
             else
             {
-                builder.Services.AddRazorPages(options =>
-                {
-                    options.Conventions.AddPageRoute("/store", "/store/{storeName}");
-                });
-                builder.Services.AddServerSideBlazor();
-                builder.Services.AddMudServices();
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveServerComponents();
+                //builder.Services.AddRazorPages(options =>
+                //{
+                //    options.Conventions.AddPageRoute("/store", "/store/{storeName}");
+                //});
+                //builder.Services.AddServerSideBlazor();
+                builder.Services.AddHttpClient();
+                builder.Services.AddFluentUIComponents();
 
                 // set our default UI page
                 //Pages.Index.Mode = config.UiMode;
@@ -410,7 +409,7 @@ public static partial class Program
             app.UseStaticFiles();
 
             app.UseRouting();
-
+            app.UseAntiforgery();
             app.MapControllers();
 
             // this is developer tooling - always respond with as much detail as we can
@@ -418,8 +417,11 @@ public static partial class Program
 
             if (config.DisableUi != true)
             {
-                app.MapBlazorHub();
-                app.MapFallbackToPage("/_Host");
+                app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+                //app.MapRazorComponents<Components.App>()
+                //    .AddInteractiveServerRenderMode();
+                //app.MapBlazorHub();
+                //app.MapFallbackToPage("/_Host");
             }
 
             IFhirPackageService ps = app.Services.GetRequiredService<IFhirPackageService>();

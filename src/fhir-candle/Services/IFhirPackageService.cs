@@ -26,9 +26,7 @@ public interface IFhirPackageService : IHostedService
     /// <summary>Attempts to find locally or download a given package.</summary>
     /// <param name="directive">        The directive.</param>
     /// <param name="branchName">       Name of the branch.</param>
-    /// <param name="directory">        [out] Pathname of the directory.</param>
-    /// <param name="fhirVersion">      [out] The FHIR version.</param>
-    /// <param name="resolvedDirective">[out] The resolved directive.</param>
+    /// <param name="packages"></param>
     /// <param name="offlineMode">      True to enable offline mode, false to disable it.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool FindOrDownload(

@@ -12,8 +12,14 @@ namespace FhirCandle.Storage;
 /// <summary>Interface for versioned store.</summary>
 public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResourceStore>
 {
-    /// <summary>Occurs when On Changed.</summary>
-    event EventHandler<EventArgs>? OnChanged;
+    /// <summary>Occurs when On Instance Created.</summary>
+    event EventHandler<StoreInstanceEventArgs>? OnInstanceCreated;
+
+    /// <summary>Occurs when On Instance Updated.</summary>
+    event EventHandler<StoreInstanceEventArgs>? OnInstanceUpdated;
+
+    /// <summary>Occurs when On Instance Deleted.</summary>
+    event EventHandler<StoreInstanceEventArgs>? OnInstanceDeleted;
 
     /// <summary>Occurs when a Subscription or SubscriptionTopic resource has changed.</summary>
     event EventHandler<SubscriptionChangedEventArgs>? OnSubscriptionsChanged;
@@ -27,8 +33,20 @@ public interface IFhirStore : IDisposable, IReadOnlyDictionary<string, IResource
     /// <summary>Occurs when on Subscription.</summary>
     event EventHandler<ReceivedSubscriptionEventArgs>? OnReceivedSubscriptionEvent;
 
-    /// <summary>State has changed.</summary>
-    void StateHasChanged();
+    /// <summary>Registers the instance created.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="resourceId">  Identifier for the resource.</param>
+    void RegisterInstanceCreated(string resourceType, string resourceId);
+
+    /// <summary>Registers the instance updated.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="resourceId">  Identifier for the resource.</param>
+    void RegisterInstanceUpdated(string resourceType, string resourceId);
+
+    /// <summary>Registers the instance deleted.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="resourceId">  Identifier for the resource.</param>
+    void RegisterInstanceDeleted(string resourceType, string resourceId);
 
     /// <summary>Initializes this service.</summary>
     /// <param name="config">The configuration.</param>

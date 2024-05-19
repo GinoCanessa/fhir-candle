@@ -188,6 +188,11 @@ public class R4TestsObservation : IClassFixture<R4Tests>
     {
         //_testOutputHelper.WriteLine($"Running with {jsons.Length} files");
 
+        //coreR4.Hl7.Fhir.Model.Task t;
+        //t.Code.Coding.Any(c => c.System == "http://loinc.org" && c.Code == "29463-7");
+
+        //t.Code.Coding.SelectMany(cc => cc.Co)
+
         FhirRequestContext ctx = new()
         {
             TenantName = _fixture._store.Config.ControllerName,

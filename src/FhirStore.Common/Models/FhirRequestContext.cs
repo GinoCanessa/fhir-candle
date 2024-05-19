@@ -179,7 +179,7 @@ public record class FhirRequestContext
     public string IfNoneExist { get; init; } = string.Empty;
 
     /// <summary>Gets a message describing the error.</summary>
-    public string ErrorMessage { get => _errorMessage; }
+    public string ErrorMessage => _errorMessage;
 
     /// <summary>Gets the full pathname of the URL file.</summary>
     public string UrlPath { get => _urlPath; init => _urlPath = value; }

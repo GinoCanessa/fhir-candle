@@ -1,0 +1,21 @@
+﻿@using fhir.candle
+@using fhir.candle.Layout
+
+@namespace fhir.candle.Components
+
+<Router AppAssembly="@typeof(Program).Assembly"
+        AdditionalAssemblies="new System.Reflection.Assembly[] {
+            (System.Reflection.Assembly)(typeof(FhirCandle.Ui.R4.Subscriptions.TourUtils).Assembly),
+            (System.Reflection.Assembly)(typeof(FhirCandle.Ui.R4B.Subscriptions.TourUtils).Assembly),
+            (System.Reflection.Assembly)(typeof(FhirCandle.Ui.R5.Subscriptions.TourUtils).Assembly)}">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(fhir.candle.Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <p role="alert">Sorry, there's nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
+</Router>

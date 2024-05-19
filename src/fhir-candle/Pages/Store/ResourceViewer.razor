@@ -1,4 +1,6 @@
-﻿@page "/store/resource-viewer"
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/store/resource-viewer"
 
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using BlazorMonaco
@@ -15,6 +17,57 @@
 
 <PageTitle>Resource Editor</PageTitle>
 
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentGrid Spacing="8" Justify="JustifyContent.SpaceEvenly" style="width: 90%;">
+        <FluentGridItem Style="min-width: var(--field-container-min-width);">
+            <FluentSelect @bind-Value="ResourceFormatCode" TOption="string" >
+                <FluentOption Value="@("json")">JSON</FluentOption>
+                <FluentOption Value="@("xml")">XML</FluentOption>
+            </FluentSelect>
+        </FluentGridItem>
+
+        <FluentSpacer />
+
+        @switch (_store.Config.FhirVersion)
+        {
+            case TenantConfiguration.SupportedFhirVersions.R4:
+                <FhirCandle.Ui.R4.Components.FhirEditorLinks
+                    BaseUrl="@_store.Config.BaseUrl"
+                    ResourceType="@ResourceType"
+                    Id="@Id"
+                    FhirPathLabUrl="@ServerConfig.FhirPathLabUrl"
+                    />
+                break;
+
+            case TenantConfiguration.SupportedFhirVersions.R4B:
+                <FhirCandle.Ui.R4B.Components.FhirEditorLinks
+                    BaseUrl="@_store.Config.BaseUrl"
+                    ResourceType="@ResourceType"
+                    Id="@Id"
+                    FhirPathLabUrl="@ServerConfig.FhirPathLabUrl"
+                    />
+                break;
+
+            case TenantConfiguration.SupportedFhirVersions.R5:
+                <FhirCandle.Ui.R5.Components.FhirEditorLinks
+                    BaseUrl="@_store.Config.BaseUrl"
+                    ResourceType="@ResourceType"
+                    Id="@Id"
+                    FhirPathLabUrl="@ServerConfig.FhirPathLabUrl"
+                    />
+                break;
+        }
+    </FluentGrid>
+
+    <FhirCandle.Ui.Common.Components.FhirEditor
+        Language="@ResourceFormatCode"
+        EditorContent="@_resourceContent"
+        DarkMode="@(NavTracker?.IsDarkMode ?? true)"
+        />
+
+</FluentStack>
+
+@*
 <MudStack>
     <MudPaper>
         <MudGrid Spacing="2" Justify="Justify.FlexStart" Style="align-items: center;">
@@ -69,11 +122,19 @@
         />
  
 </MudStack>
+*@
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
+
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = ResourceType, Link = $"/store/resource-list?store={StoreName}&type={ResourceType}" },
+        new() { Display = Id, Link = $"/store/resource-editor?store={StoreName}&type={ResourceType}&id={Id}" },
+    };
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
@@ -93,8 +154,21 @@
     /// <summary>The FHIR store.</summary>
     private IFhirStore _store = null!;
 
+    private string _resourceFormatCode = "json";
+
     /// <summary>The resource format code.</summary>
-    private string _resourceFormatCode { get; set; } = "json";
+    private string ResourceFormatCode 
+    {
+        get => _resourceFormatCode;
+        set
+        {
+            if (value != _resourceFormatCode)
+            {
+                _resourceFormatCode = value;
+                LoadResourceContent();
+            }
+        }
+    }
 
     private string _resourceContent { get; set; } = "";
 
@@ -129,18 +203,6 @@
         _resourceContent = response.SerializedResource;
     }
 
-    private void OnUserFormatChanged(string format)
-    {
-        _resourceFormatCode = format;
-        UpdateContent();
-    }
-
-    /// <summary>Updates this object.</summary>
-    private void UpdateContent()
-    {
-        LoadResourceContent();
-    }
-
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
     protected override void OnInitialized()
@@ -155,15 +217,7 @@
         if (NavTracker != null)
         {
             // notify of store root in case user clicked here directly
-            NavTracker.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker.NotifyNav(
-                ResourceType,
-                $"/store/resource-list?store={StoreName}&type={ResourceType}",
-                2);
-            NavTracker.NotifyNav(
-                Id,
-                $"/store/resource-editor?store={StoreName}&type={ResourceType}&id={Id}",
-                3);
+            NavTracker.NotifyNav(_navPages);
         }
 
         NavigationManager.LocationChanged += HandleLocationChanged;
@@ -190,15 +244,7 @@
             if (NavTracker != null)
             {
                 // notify of store root in case user clicked here directly
-                NavTracker.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-                NavTracker.NotifyNav(
-                    ResourceType,
-                    $"/store/resource-list?store={StoreName}&type={ResourceType}",
-                    2);
-                NavTracker.NotifyNav(
-                    Id,
-                    $"/store/resource-editor?store={StoreName}&type={ResourceType}&id={Id}",
-                    3);
+                NavTracker.NotifyNav(_navPages);
             }
 
             LoadResourceContent();

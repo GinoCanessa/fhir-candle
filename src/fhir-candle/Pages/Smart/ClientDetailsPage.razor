@@ -1,122 +1,124 @@
-﻿@page "/smart/client_details"
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/smart/client_details"
 @using FhirCandle.Smart
 @using Microsoft.IdentityModel.Tokens
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
 @inject ISmartAuthManager AuthManager
+@inject IMessageService MessageService
 
 @implements IDisposable
 
 <PageTitle>SMART Clients</PageTitle>
 
-@if ((SmartClient == null) || (SmartClient.ClientId == null))
-{
-    <MudStack Row="true" Spacing="3" Class="ma-2">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-    </MudStack>
-}
-else
-{
-    <MudCard>
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h4">SMART Client Details</MudText>
-                @if (!string.IsNullOrEmpty(Message))
-                {
-                    <MudText Typo="Typo.body2" Color="Color.Error">@Message</MudText>
-                }
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            <MudTextField @bind-Value="SmartClient.ClientName" Label="Client Name" Error="@(string.IsNullOrEmpty(SmartClient.ClientName))"></MudTextField>
-            <MudField Label="Client ID" HelperText="Managed by system">@SmartClient.ClientId</MudField>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
 
-            <br/>
-            <MudRadioGroup @bind-Value="KeyEntryMode">
-                <MudRadio Value="@("jwks")">JWKS JSON</MudRadio>
-                <MudRadio Value="@("uri")">Use JWKS URI</MudRadio>
-                <MudRadio Value="@("manual")">JWKS Fields</MudRadio>
-            </MudRadioGroup>
+    @if ((SmartClient == null) || (SmartClient.ClientId == null) || (ClientKey == null))
+    {
+        <FluentProgress></FluentProgress>
+    }
+    else
+    {
+        <FluentLabel Typo="Typography.H4">SMART Client Details</FluentLabel>
 
-            @switch (KeyEntryMode)
-            {
-                case "jwks":
-                    <MudTextField @bind-Value="JsonJwks" Label="JSON Web Key Set (JWKS)" Lines="20" ></MudTextField>
-                    break;
+        <FluentTabs Orientation="Orientation.Horizontal" @bind-ActiveTabId="@KeyEntryMode">
+            <FluentTab Label="JWKS JSON" Id="jwks" Icon="@(new Icons.Regular.Size20.Braces())">
+                <FluentTextField @bind-Value="SmartClient.ClientName" Label="Client Name" Required="true"/>
+                <FluentTextField @bind-Value="SmartClient.ClientId" Label="Client ID" ReadOnly="true"/>
+                <FluentTextArea @bind-Value="JsonJwks" Label="JSON Web Key Set (JWKS)" Rows="20"/>
+            </FluentTab>
 
-                case "uri":
-                    <MudTextField @bind-Value="SmartClient.Registration!.JwksUri" Label="JSON Web Key Set (JWKS) URI"></MudTextField>
-                    break;
+            <FluentTab Label="JWKS URI" Id="uri" Icon="@(new Icons.Regular.Size20.ArrowDownload())">
+                <FluentTextField @bind-Value="SmartClient.ClientName" Label="Client Name" Required="true"/>
+                <FluentTextField @bind-Value="SmartClient.ClientId" Label="Client ID" ReadOnly="true"/>
+                <FluentTextField @bind-Value="SmartClient.Registration!.JwksUri" Label="JSON Web Key Set (JWKS) URI"/>
+            </FluentTab>
 
-                case "manual":
-                    <MudTextField @bind-Value="ClientKey.KeyId" Label="Key ID (kid)" Error="@(string.IsNullOrEmpty(ClientKey!.KeyId))"></MudTextField>
+            <FluentTab Label="Manual Entry" Id="manual" Icon="@(new Icons.Regular.Size20.TextField())">
+                <FluentTextField @bind-Value="SmartClient.ClientName" Label="Client Name" Required="true"/>
+                <FluentTextField @bind-Value="SmartClient.ClientId" Label="Client ID" ReadOnly="true"/>
 
-                    <MudSelect @bind-Value="ClientKey.Use" Label="Key Use (use)">
-                        <MudSelectItem T="string" Value="@("sig")">Signature</MudSelectItem>
-                        @* <MudSelectItem T="string" Value="@("enc")">Encryption</MudSelectItem> *@
-                    </MudSelect>
+                <FluentTextField @bind-Value="ClientKey.KeyId" Label="Key ID (kid)" Required="true"/>
 
-                    <MudText>Key Operations (key_ops)</MudText>
-                    <MudCheckBox Value="@true" Label="verify" Color="Color.Primary" Class="ma-2"></MudCheckBox>
+                <FluentSelect @bind-Value="ClientKey.Use" Label="Key Use (use)" TOption="string">
+                    <FluentOption Value="@("sig")">Signature</FluentOption>
+                    <FluentOption Disabled="true" Value="@("enc")">Encryption</FluentOption>
+                </FluentSelect>
 
-                    @*
-                    <MudText>Key Operations</MudText>
-                    <MudToggleGroup T="string" SelectionMode="SelectionMode.MultiSelection" @bind-Values="ClientKey.KeyOperaions" Color="Color.Primary" CheckMark Class="ma-2">
-                        <MudToggleItem Value="@("sign")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                        <MudToggleItem Value="@("verify")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                        <MudToggleItem Value="@("encrypt")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                        <MudToggleItem Value="@("decrypt")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                        <MudToggleItem Value="@("wrapKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                        <MudToggleItem Value="@("unwrapKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                        <MudToggleItem Value="@("deriveKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                        <MudToggleItem Value="@("deriveBits")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
-                    </MudToggleGroup>
-                    *@
+                <FluentLabel>Key Operations (key_ops)</FluentLabel>
+                <FluentCheckbox ReadOnly="true" Value="@true" Label="verify"/>
 
-                    <MudSelect @bind-Value="ClientKey.Kty" Label="Key Cryptographic Family (kty)" @onchange="@((e) => ClientKey.Alg = ((e.Value?.ToString() ?? string.Empty).Equals("RSA", StringComparison.Ordinal)) ? "RS384" : "ES384")">
-                        <MudSelectItem T="string" Value="@("RSA")">RSA</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("EC")">Elliptic Curve (EC)</MudSelectItem>
-                    </MudSelect>
-
-                    <MudSelect @bind-Value="ClientKey.Alg" Label="Key Algorithm (alg)">
-                        <MudSelectItem Disabled="@(!ClientKey.Kty!.Equals("RSA"))" T="string" Value="@("RS384")">RS384</MudSelectItem>
-                        <MudSelectItem Disabled="@(!ClientKey.Kty!.Equals("EC"))" T="string" Value="@("ES384")">ES384</MudSelectItem>
-                    </MudSelect>
-
-                    @if (ClientKey.Alg?.Equals("RS384", StringComparison.Ordinal) ?? false)
-                    {
-                        <MudTextField @bind-Value="ClientKey.N" Label="RSA Modulus (n) " Error="@(string.IsNullOrEmpty(ClientKey.N))" HelperText="Base64 Url Encoded"></MudTextField>
-                        <MudTextField @bind-Value="ClientKey.E" Label="RSA Exponent (e)" Error="@(string.IsNullOrEmpty(ClientKey.E))" HelperText="Base64 Url Encoded"></MudTextField>
-                    }
-
-                    @if (ClientKey.Alg?.Equals("ES384", StringComparison.Ordinal) ?? false)
-                    {
-                        <MudField @bind-Value="ClientKey.Crv" Label="ECDSA Curve (crv)"></MudField>
-                        <MudTextField @bind-Value="ClientKey.X" Label="ECDSA X-Coordinate (x)" Error="@(string.IsNullOrEmpty(ClientKey.X))" HelperText="Base64 Url Encoded"></MudTextField>
-                        <MudTextField @bind-Value="ClientKey.Y" Label="ECDSA Y-Coordinate (y)" Error="@(string.IsNullOrEmpty(ClientKey.Y))" HelperText="Base64 Url Encoded"></MudTextField>
-                    }
-                    break;
-            }
-
-            <MudStack Row="true" Spacing="3" Class="ma-2">
-                <MudButton @onclick="HandleSaveClick" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
-                <MudButton Href="/smart/clients" Variant="Variant.Filled" Color="Color.Primary">Cancel</MudButton>
                 @*
-                @if (!string.IsNullOrEmpty(ClientId))
-                {
-                    <MudButton @onclick="HandleDeleteClick" Variant="Variant.Filled" Color="Color.Error">Delete</MudButton>
-                }
+                <FluentLabel>Key Operations</FluentLabel>
+                <MudToggleGroup T="string" SelectionMode="SelectionMode.MultiSelection" @bind-Values="ClientKey.KeyOperaions" Color="Color.Primary" CheckMark Class="ma-2">
+                    <MudToggleItem Value="@("sign")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    <MudToggleItem Value="@("verify")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    <MudToggleItem Value="@("encrypt")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    <MudToggleItem Value="@("decrypt")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    <MudToggleItem Value="@("wrapKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    <MudToggleItem Value="@("unwrapKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    <MudToggleItem Value="@("deriveKey")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                    <MudToggleItem Value="@("deriveBits")" UnselectedIcon="@Icons.Material.Filled.CheckBoxOutlineBlank" SelectedIcon="@Icons.Material.Filled.CheckBox" />
+                </MudToggleGroup>
                 *@
-            </MudStack>
-        </MudCardContent>
-    </MudCard>
-}
+
+                <FluentSelect @bind-Value="ClientKey.Kty" Label="Key Cryptographic Family (kty)" SelectedOptionChanged="@((e) => ClientKey.Alg = ((e ?? string.Empty).Equals("RSA", StringComparison.Ordinal)) ? "RS384" : "ES384")" TOption="string">
+                    <FluentOption Value="@("RSA")">RSA</FluentOption>
+                    <FluentOption Value="@("EC")">Elliptic Curve (EC)</FluentOption>
+                </FluentSelect>
+
+                <FluentSelect @bind-Value="ClientKey.Alg" Label="Key Algorithm (alg)" TOption="string">
+                    <FluentOption Disabled="@(!ClientKey.Kty!.Equals("RSA"))" Value="@("RS384")">RS384</FluentOption>
+                    <FluentOption Disabled="@(!ClientKey.Kty!.Equals("EC"))" Value="@("ES384")">ES384</FluentOption>
+                </FluentSelect>
+
+                @if (ClientKey.Alg?.Equals("RS384", StringComparison.Ordinal) ?? false)
+                {
+                    <FluentTextField @bind-Value="ClientKey.N" Label="RSA Modulus (n) - Base64 URL Encoded" Required="true"/>
+                    <FluentTextField @bind-Value="ClientKey.E" Label="RSA Exponent (e) - Base64 URL Encoded" Required="true"/>
+                }
+
+                @if (ClientKey.Alg?.Equals("ES384", StringComparison.Ordinal) ?? false)
+                {
+                    <FluentTextField @bind-Value="ClientKey.Crv" Label="ECDSA Curve (crv)" ReadOnly="true"/>
+                    <FluentTextField @bind-Value="ClientKey.X" Label="ECDSA X-Coordinate (x) - Base64 URL Encoded"/>
+                    <FluentTextField @bind-Value="ClientKey.Y" Label="ECDSA Y-Coordinate (y) - Base64 URL Encoded"/>
+                }
+            </FluentTab>
+
+        </FluentTabs>
+
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+            <FluentButton Appearance="Appearance.Accent" OnClick="@HandleSaveClick">Save</FluentButton>
+            <FluentAnchor Appearance="Appearance.Accent" Href="/smart/clients">Cancel</FluentAnchor>
+            @* TODO: Allow deleting a client
+            @if (!string.IsNullOrEmpty(ClientId))
+            {
+                <FluentButton Appearance="Appearance.Accent" OnClick="@HandleDeleteClick">Delete</FluentButton>
+            }
+            *@
+        </FluentStack>
+    }
+</FluentStack>
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
+
+    private NavPageInfoRec[] _navPages => string.IsNullOrEmpty(ClientId)
+        ? new NavPageInfoRec[]
+        {
+            new() { Display = "SMART Clients", Link = "/smart/clients" },
+            new() { Display = "New Client", Link = "/smart/client_details" },
+        }
+        : new NavPageInfoRec[]
+        {
+            new() { Display = "SMART Clients", Link = "/smart/clients" },
+            new() { Display = "Edit: " + ClientId, Link = $"/smart/client_details?smartClientId={ClientId}" },
+        };
 
     /// <summary>Gets or sets the identifier of the client.</summary>
     [SupplyParameterFromQuery(Name = "smartClientId")]
@@ -190,15 +192,20 @@ else
             ClientKey.KeyOps.Add("verify");
         }
 
-        if (string.IsNullOrEmpty(ClientId))
-        {
-            NavTracker?.NotifyNav("SMART Client Details", "/smart/client_details", 1);
-        }
-        else
-        {
-            NavTracker?.NotifyNav("SMART Client Details", $"/smart/client_details?smartClientId={ClientId}", 1);
-        }
+        NavTracker?.NotifyNav(_navPages);
     }
+
+    private void ShowError(string message)
+    {
+        _ = MessageService.ShowMessageBarAsync(
+            message,
+            MessageIntent.Error,
+            "MESSAGES_TOP");
+    }
+
+    /// <summary>Handles the cancel click described by e.</summary>
+    /// <param name="e">Mouse event information.</param>
+    private void HandleCancelClick(MouseEventArgs e) => NavigationManager.NavigateTo("/smart/clients");
 
     /// <summary>Handles the save click described by e.</summary>
     /// <param name="e">Mouse event information.</param>
@@ -206,20 +213,20 @@ else
     {
         if (string.IsNullOrEmpty(SmartClient?.ClientName))
         {
-            Message = "Client Name is required.";
+            ShowError("Client Name is required.");
             return;
         }
 
         if (string.IsNullOrEmpty(ClientKey?.Use) ||
             (!ClientKey.Use.Equals("sig", StringComparison.Ordinal)))
         {
-            Message = "Key Use must be 'sig' (use).";
+            ShowError("Key Use must be 'sig' (use).");
             return;
         }
 
         if (!(ClientKey.KeyOps ?? Enumerable.Empty<string>()).Any())
         {
-            Message = "The 'verify' key operation is required (key_ops).";
+            ShowError("The 'verify' key operation is required (key_ops).");
             return;
         }
 
@@ -229,7 +236,7 @@ else
                 {
                     if (string.IsNullOrEmpty(JsonJwks))
                     {
-                        Message = "When using JWKS, you must provide a JSON Web Key Set (JWKS).";
+                        ShowError("When using JWKS, you must provide a JSON Web Key Set (JWKS).");
                         return;
                     }
 
@@ -241,7 +248,7 @@ else
                 {
                     if (string.IsNullOrEmpty(SmartClient.Registration?.JwksUri))
                     {
-                        Message = "When using JWKS URI, you must provide a URI (jwks_uri).";
+                        ShowError("When using JWKS URI, you must provide a URI (jwks_uri).");
                         return;
                     }
                 }
@@ -256,19 +263,19 @@ else
                     {
                         if (!(ClientKey.Alg ?? string.Empty).Equals("RS384", StringComparison.Ordinal))
                         {
-                            Message = "When using RSA, the only supported algorithm is RS384 (alg).";
+                            ShowError("When using RSA, the only supported algorithm is RS384 (alg).");
                             return;
                         }
 
                         if (string.IsNullOrEmpty(ClientKey.N))
                         {
-                            Message = "When using RSA, you must provide a modulus (n).";
+                            ShowError("When using RSA, you must provide a modulus (n).");
                             return;
                         }
 
                         if (string.IsNullOrEmpty(ClientKey.E))
                         {
-                            Message = "When using RSA, you must provide an exponent (e).";
+                            ShowError("When using RSA, you must provide an exponent (e).");
                             return;
                         }
 
@@ -291,25 +298,25 @@ else
                     {
                         if (!(ClientKey.Alg ?? string.Empty).Equals("ES384", StringComparison.Ordinal))
                         {
-                            Message = "When using EC, the only supported algorithm is ES384 (alg).";
+                            ShowError("When using EC, the only supported algorithm is ES384 (alg).");
                             return;
                         }
 
                         if (string.IsNullOrEmpty(ClientKey.Crv))
                         {
-                            Message = "When using EC, you must provide a curve (crv).";
+                            ShowError("When using EC, you must provide a curve (crv).");
                             return;
                         }
 
                         if (string.IsNullOrEmpty(ClientKey.X))
                         {
-                            Message = "When using EC, you must provide an X-coordinate (x).";
+                            ShowError("When using EC, you must provide an X-coordinate (x).");
                             return;
                         }
 
                         if (string.IsNullOrEmpty(ClientKey.Y))
                         {
-                            Message = "When using EC, you must provide a Y-coordinate (y).";
+                            ShowError("When using EC, you must provide a Y-coordinate (y).");
                             return;
                         }
 
@@ -330,14 +337,14 @@ else
                     }
                     else
                     {
-                        Message = "Key Type must be either RSA or EC (kty).";
+                        ShowError("Key Type must be either RSA or EC (kty).");
                         return;
                     }
                 }
                 break;
 
             default:
-                Message = $"Invalid Key Entry Mode: {KeyEntryMode}.";
+                ShowError($"Invalid Key Entry Mode: {KeyEntryMode}.");
                 return;
         }
 
@@ -345,7 +352,7 @@ else
 
         if (!AuthManager.TryRegisterClient(SmartClient.Registration, out string clientId, out List<string> messages))
         {
-            Message = "Client Registration failed!\n" + string.Join("\n", messages);
+            ShowError("Client Registration failed!\n" + string.Join("\n", messages));
             return;
         }
 

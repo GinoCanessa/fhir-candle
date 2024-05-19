@@ -38,8 +38,14 @@ public partial class VersionedFhirStore : IFhirStore
     /// <summary>True if has disposed, false if not.</summary>
     private bool _hasDisposed;
 
-    /// <summary>Occurs when On Changed.</summary>
-    public event EventHandler<EventArgs>? OnChanged;
+    /// <summary>Occurs when On Instance Created.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceCreated;
+
+    /// <summary>Occurs when On Instance Updated.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceUpdated;
+
+    /// <summary>Occurs when On Instance Deleted.</summary>
+    public event EventHandler<StoreInstanceEventArgs>? OnInstanceDeleted;
 
     /// <summary>Occurs when a Subscription or SubscriptionTopic resource has changed.</summary>
     public event EventHandler<SubscriptionChangedEventArgs>? OnSubscriptionsChanged;
@@ -158,10 +164,10 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Gets a list of names of the loaded packages.</summary>
-    public HashSet<string> LoadedPackages { get => _loadedDirectives; }
+    public HashSet<string> LoadedPackages => _loadedDirectives;
 
     /// <summary>Gets the loaded supplements.</summary>
-    public HashSet<string> LoadedSupplements { get => _loadedSupplements; }
+    public HashSet<string> LoadedSupplements => _loadedSupplements;
 
     /// <summary>Initializes this object.</summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
@@ -226,7 +232,6 @@ public partial class VersionedFhirStore : IFhirStore
             if (irs != null)
             {
                 _store.Add(tn, irs);
-                irs.OnChanged += ResourceStore_OnChanged;
             }
         }
 
@@ -460,7 +465,7 @@ public partial class VersionedFhirStore : IFhirStore
     /// <param name="directive">         The directive.</param>
     /// <param name="directory">         Pathname of the directory.</param>
     /// <param name="packageSupplements">The package supplements.</param>
-    /// <param name="includeExample">    True to include, false to exclude the examples.</param>
+    /// <param name="includeExamples">    True to include, false to exclude the examples.</param>
     public void LoadPackage(
         string directive, 
         string directory, 
@@ -473,7 +478,6 @@ public partial class VersionedFhirStore : IFhirStore
         bool success;
 
         DirectoryInfo di;
-        FileInfo[] files;
 
         if ((!string.IsNullOrEmpty(directive)) &&
             (!string.IsNullOrEmpty(directory)))
@@ -511,6 +515,7 @@ public partial class VersionedFhirStore : IFhirStore
             {
             }
 
+            FileInfo[] files;
             if ((!includeExamples) &&
                 (!string.IsNullOrEmpty(libDir)) &&
                 Directory.Exists(Path.Combine(directory, libDir)))
@@ -663,8 +668,7 @@ public partial class VersionedFhirStore : IFhirStore
 
     public bool TryGetResourceInfo(object resource, out string resourceName, out string id)
     {
-        if ((resource == null) ||
-            (resource is not Resource r))
+        if (resource is not Resource r)
         {
             resourceName = string.Empty;
             id = string.Empty;
@@ -937,8 +941,8 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        string resourceType = components[components.Length - 2];
-        string id = components[components.Length - 1];
+        string resourceType = components[^2];
+        string id = components[^1];
 
         if (!_store.TryGetValue(resourceType, out IVersionedResourceStore? rs))
         {
@@ -979,8 +983,8 @@ public partial class VersionedFhirStore : IFhirStore
             return false;
         }
 
-        string resourceType = components[components.Length - 2];
-        string id = components[components.Length - 1];
+        string resourceType = components[^2];
+        string id = components[^1];
 
         if (!_store.TryGetValue(resourceType, out IVersionedResourceStore? rs))
         {
@@ -1016,8 +1020,8 @@ public partial class VersionedFhirStore : IFhirStore
             //throw new ArgumentException("Invalid URI", nameof(uri));
         }
 
-        string resourceType = components[components.Length - 2];
-        string id = components[components.Length - 1];
+        string resourceType = components[^2];
+        string id = components[^1];
 
         if (!_store.TryGetValue(resourceType, out IVersionedResourceStore? rs))
         {
@@ -1241,13 +1245,12 @@ public partial class VersionedFhirStore : IFhirStore
     {
         if (!_hooksByInteractionByResource.TryGetValue(resourceType, out Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]>? hooksByInteraction))
         {
-            return Enumerable.Empty<IFhirInteractionHook>();
+            return [];
         }
 
-        if ((!hooksByInteraction.TryGetValue(interaction, out IFhirInteractionHook[]? hooks)) ||
-            (hooks == null))
+        if (!hooksByInteraction.TryGetValue(interaction, out IFhirInteractionHook[]? hooks))
         {
-            return Enumerable.Empty<IFhirInteractionHook>();
+            return [];
         }
 
         return hooks;
@@ -1262,15 +1265,14 @@ public partial class VersionedFhirStore : IFhirStore
     {
         if (!_hooksByInteractionByResource.TryGetValue(resourceType, out Dictionary<Common.StoreInteractionCodes, IFhirInteractionHook[]>? hooksByInteraction))
         {
-            return Enumerable.Empty<IFhirInteractionHook>();
+            return [];
         }
 
         List<IFhirInteractionHook[]> collector = new();
 
         foreach (Common.StoreInteractionCodes interaction in interactions)
         {
-            if ((!hooksByInteraction.TryGetValue(interaction, out IFhirInteractionHook[]? hooks)) ||
-                (hooks == null))
+            if (!hooksByInteraction.TryGetValue(interaction, out IFhirInteractionHook[]? hooks))
             {
                 continue;
             }
@@ -1291,10 +1293,9 @@ public partial class VersionedFhirStore : IFhirStore
     {
         Resource? r;
 
-        if ((ctx.SourceObject != null) &&
-            (ctx.SourceObject is Resource))
+        if (ctx.SourceObject is Resource resource)
         {
-            r = ctx.SourceObject as Resource;
+            r = resource;
         }
         else
         {
@@ -1382,31 +1383,28 @@ public partial class VersionedFhirStore : IFhirStore
             resourceType,
             string.IsNullOrEmpty(ctx.IfNoneExist) ? Common.StoreInteractionCodes.TypeCreate : Common.StoreInteractionCodes.TypeCreateConditional);
 
-        if (hooks?.Any() ?? false)
+        foreach (IFhirInteractionHook hook in hooks ?? [])
         {
-            foreach (IFhirInteractionHook hook in hooks)
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[resourceType],
+                        content,
+                        out FhirResponseContext hr);
+
+                // check for the hook indicating processing is complete
+                if (hr.StatusCode != null)
                 {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[resourceType],
-                            content,
-                            out FhirResponseContext hr);
+                    response = hr;
+                    return true;
+                }
 
-                    // check for the hook indicating processing is complete
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
-
-                    // if the hook modified the resource, use that moving forward
-                    if (hr.Resource != null)
-                    {
-                        content = (Resource)hr.Resource;
-                    }
+                // if the hook modified the resource, use that moving forward
+                if (hr.Resource != null)
+                {
+                    content = (Resource)hr.Resource;
                 }
             }
         }
@@ -1479,34 +1477,33 @@ public partial class VersionedFhirStore : IFhirStore
         // create the resource
         Resource? stored = _store[resourceType].InstanceCreate(ctx, content, _config.AllowExistingId);
 
-        if (hooks?.Any() ?? false)
+        Resource? sForHook = null;
+
+        foreach (IFhirInteractionHook hook in hooks ?? [])
         {
-            Resource? sForHook = (Resource?)stored?.DeepCopy();
-
-            foreach (IFhirInteractionHook hook in hooks)
+            sForHook ??= (Resource?)stored?.DeepCopy();
+            
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[resourceType],
+                        sForHook,
+                        out FhirResponseContext hr);
+
+                // check for the hook indicating processing is complete
+                if (hr.StatusCode != null)
                 {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[resourceType],
-                            sForHook,
-                            out FhirResponseContext hr);
+                    response = hr;
+                    return true;
+                }
 
-                    // check for the hook indicating processing is complete
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
-
-                    // if the hook modified the resource, use that moving forward
-                    if (hr.Resource != null)
-                    {
-                        sForHook = (Resource)hr.Resource;
-                        stored = sForHook;
-                    }
+                // if the hook modified the resource, use that moving forward
+                if (hr.Resource != null)
+                {
+                    sForHook = (Resource)hr.Resource;
+                    stored = sForHook;
                 }
             }
         }
@@ -1560,10 +1557,9 @@ public partial class VersionedFhirStore : IFhirStore
 
         Resource? r;
 
-        if ((ctx.SourceObject != null) &&
-            (ctx.SourceObject is Resource))
+        if (ctx.SourceObject is Resource resource)
         {
-            r = ctx.SourceObject as Resource;
+            r = resource;
         }
         else
         {
@@ -1730,25 +1726,22 @@ public partial class VersionedFhirStore : IFhirStore
 
         IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.InstanceDelete);
 
-        if (hooks?.Any() ?? false)
+        foreach (IFhirInteractionHook hook in hooks ?? [])
         {
-            foreach (IFhirInteractionHook hook in hooks)
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
-                {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[ctx.ResourceType],
-                            null,
-                            out FhirResponseContext hr);
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[ctx.ResourceType],
+                        null,
+                        out FhirResponseContext hr);
 
-                    // check for the hook indicating processing is complete
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
+                // check for the hook indicating processing is complete
+                if (hr.StatusCode != null)
+                {
+                    response = hr;
+                    return true;
                 }
             }
         }
@@ -1756,34 +1749,33 @@ public partial class VersionedFhirStore : IFhirStore
         // attempt delete
         Resource? resource = _store[ctx.ResourceType].InstanceDelete(ctx.Id, _protectedResources);
 
-        if (hooks?.Any() ?? false)
+        Resource? sForHook = null;
+
+        foreach (IFhirInteractionHook hook in hooks ?? [])
         {
-            Resource? sForHook = (Resource?)resource?.DeepCopy();
-
-            foreach (IFhirInteractionHook hook in hooks)
+            sForHook ??= (Resource?)resource?.DeepCopy();
+            
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[ctx.ResourceType],
+                        sForHook,
+                        out FhirResponseContext hr);
+
+                // check for the hook indicating processing is complete
+                if (hr.StatusCode != null)
                 {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[ctx.ResourceType],
-                            sForHook,
-                            out FhirResponseContext hr);
+                    response = hr;
+                    return true;
+                }
 
-                    // check for the hook indicating processing is complete
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
-
-                    // if the hook modified the resource, use that moving forward
-                    if (hr.Resource != null)
-                    {
-                        sForHook = (Resource)hr.Resource;
-                        resource = sForHook;
-                    }
+                // if the hook modified the resource, use that moving forward
+                if (hr.Resource != null)
+                {
+                    sForHook = (Resource)hr.Resource;
+                    resource = sForHook;
                 }
             }
         }
@@ -1830,11 +1822,8 @@ public partial class VersionedFhirStore : IFhirStore
     }
 
     /// <summary>Instance read.</summary>
-    /// <param name="ctx">               The request context.</param>
-    /// <param name="serializedResource">[out] The serialized resource.</param>
-    /// <param name="serializedOutcome"> [out] The serialized outcome.</param>
-    /// <param name="eTag">              [out] The tag.</param>
-    /// <param name="lastModified">      [out] The last modified.</param>
+    /// <param name="ctx">     The request context.</param>
+    /// <param name="response">[out] The response and related information</param>
     /// <returns>A HttpStatusCode.</returns>
     public bool InstanceRead(
         FhirRequestContext ctx,
@@ -1904,57 +1893,53 @@ public partial class VersionedFhirStore : IFhirStore
 
         IEnumerable<IFhirInteractionHook> hooks = GetHooks(ctx.ResourceType, Common.StoreInteractionCodes.InstanceRead);
 
-        if (hooks?.Any() ?? false)
+        foreach (IFhirInteractionHook hook in hooks ?? [])
         {
-            foreach (IFhirInteractionHook hook in hooks)
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
-                {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[ctx.ResourceType],
-                            null,
-                            out FhirResponseContext hr);
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[ctx.ResourceType],
+                        null,
+                        out FhirResponseContext hr);
 
-                    // check for the hook indicating processing is complete
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
+                // check for the hook indicating processing is complete
+                if (hr.StatusCode != null)
+                {
+                    response = hr;
+                    return true;
                 }
             }
         }
 
         Resource? r = _store[ctx.ResourceType].InstanceRead(ctx.Id);
 
-        if (hooks?.Any() ?? false)
+        Resource? sForHook = null;
+
+        foreach (IFhirInteractionHook hook in hooks)
         {
-            Resource? sForHook = (Resource?)r?.DeepCopy();
+            sForHook ??= (Resource?)r?.DeepCopy();
 
-            foreach (IFhirInteractionHook hook in hooks)
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[ctx.ResourceType],
+                        sForHook,
+                        out FhirResponseContext hr);
+
+                if (hr.StatusCode != null)
                 {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[ctx.ResourceType],
-                            sForHook,
-                            out FhirResponseContext hr);
+                    response = hr;
+                    return true;
+                }
 
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
-
-                    if (hr.Resource != null)
-                    {
-                        sForHook = (Resource?)hr.Resource;
-                        r = sForHook;
-                    }
+                if (hr.Resource != null)
+                {
+                    sForHook = (Resource?)hr.Resource;
+                    r = sForHook;
                 }
             }
         }
@@ -1993,7 +1978,7 @@ public partial class VersionedFhirStore : IFhirStore
         string lastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r");
 
         if ((!string.IsNullOrEmpty(ctx.IfModifiedSince)) &&
-            (lastModified.CompareTo(ctx.IfModifiedSince) < 0))
+            (String.Compare(lastModified, ctx.IfModifiedSince, StringComparison.Ordinal) < 0))
         {
             response = new()
             {
@@ -2086,17 +2071,15 @@ public partial class VersionedFhirStore : IFhirStore
 
     /// <summary>Attempts to update.</summary>
     /// <param name="resource">    The resource.</param>
-    /// <param name="allowCreate"> True to allow, false to suppress the create.</param>
     /// <param name="resourceType">[out] Type of the resource.</param>
     /// <param name="id">          [out] The identifier.</param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     public bool TryInstanceUpdate(
-        object resource,
+        object? resource,
         out string resourceType,
         out string id)
     {
-        if ((resource == null) ||
-            (resource is not Hl7.Fhir.Model.Resource r))
+        if (resource is not Hl7.Fhir.Model.Resource r)
         {
             resourceType = string.Empty;
             id = string.Empty;
@@ -2270,31 +2253,28 @@ public partial class VersionedFhirStore : IFhirStore
             ctx.ResourceType,
             string.IsNullOrEmpty(ctx.UrlQuery) ? Common.StoreInteractionCodes.InstanceUpdate : Common.StoreInteractionCodes.InstanceUpdateConditional);
 
-        if (hooks?.Any() ?? false)
+        foreach (IFhirInteractionHook hook in hooks ?? [])
         {
-            foreach (IFhirInteractionHook hook in hooks)
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Pre))
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[ctx.ResourceType],
+                        content,
+                        out FhirResponseContext hr);
+
+                // check for the hook indicating processing is complete
+                if (hr.StatusCode != null)
                 {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[ctx.ResourceType],
-                            content,
-                            out FhirResponseContext hr);
+                    response = hr;
+                    return true;
+                }
 
-                    // check for the hook indicating processing is complete
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
-
-                    // if the hook modified the resource, use that moving forward
-                    if (hr.Resource != null)
-                    {
-                        content = (Resource)hr.Resource;
-                    }
+                // if the hook modified the resource, use that moving forward
+                if (hr.Resource != null)
+                {
+                    content = (Resource)hr.Resource;
                 }
             }
         }
@@ -2372,34 +2352,33 @@ public partial class VersionedFhirStore : IFhirStore
             out sc,
             out outcome);
 
-        if (hooks?.Any() ?? false)
+        Resource? sForHook = null;
+
+        foreach (IFhirInteractionHook hook in hooks ?? [])
         {
-            Resource? sForHook = (Resource?)resource?.DeepCopy();
+            sForHook ??= (Resource?)resource?.DeepCopy();
 
-            foreach (IFhirInteractionHook hook in hooks)
+            if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
             {
-                if (hook.HookRequestStates.Contains(Common.HookRequestStateCodes.Post))
+                _ = hook.DoInteractionHook(
+                        ctx,
+                        this,
+                        _store[ctx.ResourceType],
+                        sForHook,
+                        out FhirResponseContext hr);
+
+                // check for the hook indicating processing is complete
+                if (hr.StatusCode != null)
                 {
-                    _ = hook.DoInteractionHook(
-                            ctx,
-                            this,
-                            _store[ctx.ResourceType],
-                            sForHook,
-                            out FhirResponseContext hr);
+                    response = hr;
+                    return true;
+                }
 
-                    // check for the hook indicating processing is complete
-                    if (hr.StatusCode != null)
-                    {
-                        response = hr;
-                        return true;
-                    }
-
-                    // if the hook modified the resource, use that moving forward
-                    if (hr.Resource != null)
-                    {
-                        sForHook = (Resource)hr.Resource;
-                        resource = sForHook;
-                    }
+                // if the hook modified the resource, use that moving forward
+                if (hr.Resource != null)
+                {
+                    sForHook = (Resource)hr.Resource;
+                    resource = sForHook;
                 }
             }
         }
@@ -2599,13 +2578,13 @@ public partial class VersionedFhirStore : IFhirStore
             {
                 // TODO: Make sure to reduce full resource URI down to stub (e.g., not http://hl7.org/fhir/StructureDefinition/Patient)
                 // TODO: Need to check event triggers once they are added
-                if (!topic.ResourceTriggers.ContainsKey(key))
+                if (!topic.ResourceTriggers.TryGetValue(key, out List<ParsedSubscriptionTopic.ResourceTrigger>? rts))
                 {
                     continue;
                 }
 
                 // build our trigger definitions
-                foreach (ParsedSubscriptionTopic.ResourceTrigger rt in topic.ResourceTriggers[key])
+                foreach (ParsedSubscriptionTopic.ResourceTrigger rt in rts)
                 {
                     bool onCreate = rt.OnCreate;
                     bool onUpdate = rt.OnUpdate;
@@ -2676,7 +2655,7 @@ public partial class VersionedFhirStore : IFhirStore
                         continue;
                     }
 
-                    // add triggers that do not have inherint filters beyond interactions
+                    // add triggers that do not have inherent filters beyond interactions
                     if (onCreate || onUpdate || onDelete)
                     {
                         interactionTriggers.Add(new(
@@ -2758,17 +2737,17 @@ public partial class VersionedFhirStore : IFhirStore
     /// <returns>The subscription event count.</returns>
     public long GetSubscriptionEventCount(string subscriptionId, bool increment)
     {
-        if (!_subscriptions.ContainsKey(subscriptionId))
+        if (!_subscriptions.TryGetValue(subscriptionId, out ParsedSubscription? subscription))
         {
             return 0;
         }
 
         if (increment)
         {
-            return _subscriptions[subscriptionId].IncrementEventCount();
+            return subscription.IncrementEventCount();
         }
 
-        return _subscriptions[subscriptionId].CurrentEventCount;
+        return subscription.CurrentEventCount;
     }
 
     /// <summary>Registers the subscriptions changed.</summary>
@@ -5065,7 +5044,7 @@ public partial class VersionedFhirStore : IFhirStore
             Id = _capabilityStatementId,
             Outcome = Utils.BuildOutcomeForRequest(
                 HttpStatusCode.OK,
-                $"Retreived current CapabilityStatement",
+                $"Retrieved current CapabilityStatement",
                 OperationOutcome.IssueType.Success),
             ETag = string.IsNullOrEmpty(r.Meta?.VersionId) ? string.Empty : $"W/\"{r.Meta.VersionId}\"",
             LastModified = r.Meta?.LastUpdated == null ? string.Empty : r.Meta.LastUpdated.Value.UtcDateTime.ToString("r"),
@@ -5076,7 +5055,247 @@ public partial class VersionedFhirStore : IFhirStore
         return true;
     }
 
-    /// <summary>Common to firely version.</summary>
+    public record class FeatureQueryResponse
+    {
+        /// <summary>
+        /// name: name of the feature (uri)
+        /// </summary>
+        public required string Name { get; init; }
+        
+        /// <summary>
+        /// name: present if provided, used to match responses to requests (uri)
+        /// </summary>
+        public required string? Context { get; init; }
+        
+        /// <summary>
+        /// processing-status: code from the server about processing the request (e.g., all-ok, not-supported, etc.)
+        /// </summary>
+        public required string ProcessingStatus { get; init; }
+        
+        /// <summary>
+        ///  value:
+        ///     if provided in input: the value requested (datatype as defined by the feature) (even if processing fails) (if read from HTTP Query Parameter, default to fhir string type)
+        ///     if not provided: the value of the feature (can have multiple repetitions) (uses datatype of feature)
+        /// </summary>
+        public required List<DataType> Value { get; init; }
+        
+        /// <summary>
+        /// answer:
+        ///     only present if processing was successful (all-ok)
+        ///     if a value is provided, does the supplied value match the server feature-supported value
+        ///     if a value is not provided, does not exist
+        /// </summary>
+        public required bool? Answer { get; init; }
+    }
+
+    public bool TryQueryCapabilityFeature(
+        string featureName,
+        string context,
+        DataType? inputValue,
+        string? inputRawValue, 
+        out FeatureQueryResponse response)
+    {
+        CapabilityStatement cs;
+        
+        if (_capabilitiesAreStale)
+        {
+            cs = UpdateCapabilities();
+        }
+        else
+        {
+            // bypass read to avoid instance read hooks (firing meta hooks)
+            cs = (CapabilityStatement)((IReadOnlyDictionary<string, Hl7.Fhir.Model.Resource>)_store["CapabilityStatement"])[_capabilityStatementId];
+        }
+        
+        switch (featureName)
+        {
+            case "instantiates":
+                return TryTestCapabilityFeatureInstantiates(cs, featureName, context, inputValue, inputRawValue, out response);
+            
+            case "read":
+                return TryTestCapabilityFeatureInteraction(cs, featureName, context, inputValue, inputRawValue, CapabilityStatement.TypeRestfulInteraction.Read, out response);
+
+            case "create":
+                return TryTestCapabilityFeatureInteraction(cs, featureName, context, inputValue, inputRawValue, CapabilityStatement.TypeRestfulInteraction.Create, out response);
+
+            case "update":
+                return TryTestCapabilityFeatureInteraction(cs, featureName, context, inputValue, inputRawValue, CapabilityStatement.TypeRestfulInteraction.Update, out response);
+            
+            default:
+                response = new()
+                {
+                    Name = featureName,
+                    Context = string.IsNullOrEmpty(context) ? null : context,
+                    Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                    Answer = null,
+                    ProcessingStatus = "unknown",
+                };
+                return true;
+        }
+    }
+
+    private bool TryTestCapabilityFeatureInteraction(
+        CapabilityStatement cs,
+        string featureName,
+        string context,
+        DataType? inputValue,
+        string? inputRawValue,
+        CapabilityStatement.TypeRestfulInteraction interaction,
+        out FeatureQueryResponse response)
+    {
+        // check for no or 'all' context and no value
+        if ((string.IsNullOrEmpty(context) || (context == "*")) &&
+            (inputValue == null) &&
+            string.IsNullOrEmpty(inputRawValue))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction))),
+                ProcessingStatus = "all-ok",
+            };
+            return true;
+        }
+        
+        // check for specific context and no value
+        if ((inputValue == null) &&
+            string.IsNullOrEmpty(inputRawValue))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && r.Interaction.Any(i => i.Code == interaction))),
+                ProcessingStatus = "all-ok",
+            };
+            return true;
+        }
+        
+        // check for valid values
+        bool? testValue = inputValue switch
+        {
+            FhirBoolean fb => fb.Value,
+            FhirString fs => bool.TryParse(fs.Value, out bool b) ? b : null,
+            _ => null,
+        };
+
+        testValue ??= string.IsNullOrEmpty(inputRawValue) 
+            ? null 
+            : bool.TryParse(inputRawValue, out bool bv) 
+                ? bv 
+                : null; 
+        
+        // check for invalid values
+        if (testValue == null)
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = null,
+                ProcessingStatus = "invalid-value",
+            };
+            return true;
+        }
+        
+        // check for no or 'all' context and value (tested above)
+        if (string.IsNullOrEmpty(context) || (context == "*"))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = [ new FhirBoolean(testValue) ],
+                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction) == testValue)),
+                ProcessingStatus = "all-ok",
+            };
+            return true;
+        }
+        
+        // have context and value
+        
+        response = new()
+        {
+            Name = featureName,
+            Context = context,
+            Value = [ new FhirBoolean(testValue) ],
+            Answer = cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && (r.Interaction.Any(i => i.Code == interaction) == testValue))),
+            ProcessingStatus = "all-ok",
+        };
+        return true;
+    }
+    
+    private bool TryTestCapabilityFeatureInstantiates(
+        CapabilityStatement cs, 
+        string featureName,
+        string context, 
+        DataType? inputValue, 
+        string? inputRawValue, 
+        out FeatureQueryResponse response)
+    {
+        // check for context and fail it if present
+        if (!string.IsNullOrEmpty(context))
+        {
+            response = new()
+            {
+                Name = featureName,
+                Context = context,
+                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
+                Answer = null,
+                ProcessingStatus = "invalid-context",
+            };
+            return true;
+        }
+        
+        // check for enumeration request
+        if (string.IsNullOrEmpty(inputRawValue) && (inputValue == null))
+        {
+            List<DataType> rValues = cs.Instantiates.Select(i => (DataType)new Canonical(i)).ToList();
+
+            if (rValues.Count == 0)
+            {
+                rValues = inputValue != null ? [inputValue] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [];
+            }
+            
+            response = new()
+            {
+                Name = featureName,
+                Context = null,
+                Value = rValues,
+                Answer = true,
+                ProcessingStatus = "all-ok",
+            };
+
+            return true;
+        }
+        
+        // check for specific value request
+        string testValue = !string.IsNullOrEmpty(inputRawValue) ? inputRawValue : inputValue?.ToString() ?? throw new Exception("No value expected here");
+
+        Canonical testCanonical = new Canonical(testValue);
+        
+        List<DataType> responseValues = cs.Instantiates
+            .Where(i => i.Equals(testValue, StringComparison.Ordinal))
+            .Select(i => (DataType)new Canonical(i))
+            .ToList();
+
+        response = new()
+        {
+            Name = featureName,
+            Context = null,
+            Value = responseValues.Count != 0 ? responseValues : [testCanonical],
+            Answer = responseValues.Count != 0,
+            ProcessingStatus = "all-ok",
+        };
+        
+        return true;
+    }
+
+    /// <summary>Common to Firely version.</summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when one or more arguments are outside the
     ///  required range.</exception>
     /// <param name="v">The SupportedFhirVersions to process.</param>
@@ -5133,10 +5352,10 @@ public partial class VersionedFhirStore : IFhirStore
             Resource = new(),
             Interaction = new()
             {
-                //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.Batch },
+                new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.Batch },
                 //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.HistorySystem },
-                //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.SearchSystem },
-                //new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.Transaction },
+                new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.SearchSystem },
+                new() { Code = Hl7.Fhir.Model.CapabilityStatement.SystemRestfulInteraction.Transaction },
             },
             //SearchParam = new(),      // currently, search parameters are expanded out to all-resource
             Operation = _operations.Values
@@ -5550,23 +5769,53 @@ public partial class VersionedFhirStore : IFhirStore
         }
     }
 
-    /// <summary>State has changed.</summary>
-    public void StateHasChanged()
+    /// <summary>Registers that an instance has been created.</summary>
+    /// <param name="resourceId">Identifier for the resource.</param>
+    public void RegisterInstanceCreated(string resourceType, string resourceId)
     {
-        EventHandler<EventArgs>? handler = OnChanged;
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceCreated;
 
         if (handler != null)
         {
-            handler(this, new());
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = resourceType,
+            });
         }
     }
 
-    /// <summary>FHIR resource store on changed.</summary>
-    /// <param name="sender">The sender.</param>
-    /// <param name="e">     Event information.</param>
-    private void ResourceStore_OnChanged(object? sender, EventArgs e)
+    /// <summary>Registers that an instance has been updated.</summary>
+    /// <param name="resourceId">Identifier for the resource.</param>
+    public void RegisterInstanceUpdated(string resourceType, string resourceId)
     {
-        StateHasChanged();
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceUpdated;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = resourceType,
+            });
+        }
+    }
+
+    /// <summary>Registers that an instance has been deleted.</summary>
+    /// <param name="resourceType">Type of the resource.</param>
+    /// <param name="resourceId">  Identifier for the resource.</param>
+    public void RegisterInstanceDeleted(string resourceType, string resourceId)
+    {
+        EventHandler<StoreInstanceEventArgs>? handler = OnInstanceDeleted;
+
+        if (handler != null)
+        {
+            handler(this, new()
+            {
+                ResourceId = resourceId,
+                ResourceType = resourceType,
+            });
+        }
     }
 
     /// <summary>
@@ -5587,7 +5836,8 @@ public partial class VersionedFhirStore : IFhirStore
 
                 foreach (IResourceStore rs in _store.Values)
                 {
-                    rs.OnChanged -= ResourceStore_OnChanged;
+                    rs.Dispose();
+                    //rs.OnChanged -= ResourceStore_OnChanged;
                 }
             }
 

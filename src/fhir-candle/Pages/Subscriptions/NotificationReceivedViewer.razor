@@ -1,4 +1,6 @@
-﻿@page "/subscriptions/notification-received-viewer"
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/subscriptions/notification-received-viewer"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -7,47 +9,60 @@
 
 <PageTitle>Received Subscription Events</PageTitle>
 
-<MudGrid>
-    @foreach (ParsedSubscriptionStatus status in _notifications ?? Array.Empty<ParsedSubscriptionStatus>().ToList())
-    {
-        <MudItem>
-            <MudCard Outlined="true" Class="mx-6 my-4">
-                <MudCardContent>
-                    <MudField Label="Subscription">@status.SubscriptionReference</MudField>
-                    <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
-                    <MudField Label="Local Bundle">Bundle/@status.BundleId</MudField>
-                    <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
-                    <MudField Label="Type">@status.NotificationType</MudField>
-                    <MudField Label="Bundle">
-                        <MudLink Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={status.BundleId}")" Underline="Underline.Always">Bundle/@status.BundleId</MudLink>
+@if (!_notifications?.Any() ?? false)
+{
+    <FluentLabel Typo="Typography.Body">No events received for this Subscription.</FluentLabel>
+}
+else
+{
+    <FluentGrid Spacing="4">
+        @foreach (ParsedSubscriptionStatus status in _notifications!)
+        {
+            <FluentGridItem Style="min-width: var(--field-container-min-width);">
+                <FluentCard>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                        <FluentTextField Label="Subscription" ReadOnly="true" Value="@status.SubscriptionReference"/>
+                        <FluentTextField Label="Topic" ReadOnly="true" Value="@status.SubscriptionTopicCanonical"/>
+                        <FluentTextField Label="Local Bundle" ReadOnly="true" Value="@("Bundle/" + status.BundleId)"/>
+                        <FluentTextField Label="Received" ReadOnly="true" Value="@status.ProcessedDateTime.ToString("o")"/>
+                        <FluentTextField Label="Type" ReadOnly="true" Value="@status.NotificationType?.ToString()"/>
 
-                    </MudField>
+                        <FluentLabel Typo="Typography.Body">Bundle</FluentLabel>
+                        <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={status.BundleId}")">Bundle/@status.BundleId</FluentAnchor>
 
-                    @if (status.NotificationEvents.Any())
-                    {
-                        @foreach (ParsedSubscriptionStatus.ParsedNotificationEvent ne in status.NotificationEvents)
+                        @if (status.NotificationEvents.Any())
                         {
-                            <MudField Label="Event Number">@ne.EventNumber</MudField>
-                            <MudField Label="Timestamp">@ne.Timestamp?.ToLocalTime().ToString("O")</MudField>
-                            <MudField Label="Focus Reference">@ne.FocusReference</MudField>
-                            <MudField Label="Additional Context">@string.Join(", ", ne.AdditionalContextReferences ?? Array.Empty<string>())</MudField>
+                            @foreach (ParsedSubscriptionStatus.ParsedNotificationEvent ne in status.NotificationEvents)
+                            {
+                                <FluentNumberField Label="Event Number" ReadOnly="true" Value="@ne.EventNumber"/>
+                                <FluentTextField Label="Timestamp" ReadOnly="true" Value="@ne.Timestamp?.ToLocalTime().ToString("O")"/>
+                                <FluentTextField Label="Focus Reference" ReadOnly="true" Value="@ne.FocusReference"/>
+                                <FluentTextField Label="Additional Context" ReadOnly="true" Value="@string.Join(", ", ne.AdditionalContextReferences ?? Array.Empty<string>())"/>
+                            }
                         }
-                    }
 
-                    @if (status.Errors.Any())
-                    {
-                        <MudField Label="Error">@status.Errors.First()</MudField>
-                    }
-                    </MudCardContent>
-            </MudCard>
-        </MudItem>
-    }
-</MudGrid>
+                        @if (status.Errors.Any())
+                        {
+                            <FluentTextField Label="Error" ReadOnly="true" Value="@status.Errors.First()"/>
+                        }
+                    </FluentStack>
+                </FluentCard>
+            </FluentGridItem>
+        }
+    </FluentGrid>
+}
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
+
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = "Received Subscription Events", Link = $"/subscriptions/notifications-received?store={StoreName}" },
+        new() { Display = SubscriptionRef, Link = $"/subscriptions/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}" },
+    };
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
@@ -80,7 +95,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav($"Received Subscription Events", $"/subscriptions/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -102,7 +117,7 @@
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav($"Received Subscription Events", $"/subscriptions/notification-received-viewer?store={StoreName}&ref={SubscriptionRef}", 3);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 
@@ -111,7 +126,7 @@
     /// <param name="e">     Subscription event information.</param>
     private void Store_OnReceivedSubscriptionEvent(object? sender, ReceivedSubscriptionEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>

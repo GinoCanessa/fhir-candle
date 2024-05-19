@@ -1,23 +1,17 @@
 ﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
-@page "/store/resource-list"
-
-@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
-
-@inject NavigationManager NavigationManager
 @inject IJSRuntime JS
-@inject IFhirStoreManager StoreManager
-@inject ProtectedLocalStorage BrowserStore
 
 @implements IDisposable
 
-<PageTitle>Resource List</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
     <FluentLabel Typo="Typography.H6">@ResourceType Resources</FluentLabel>
+    
+    @* <FluentLabel>Selected Ids: @(string.Join(", ", SelectedIds))</FluentLabel> *@
 
-    <FluentDataGrid Items="@FilteredItems" GridTemplateColumns="@ColSizes">
-        <TemplateColumn Title="Id" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(IdFilter)" Tooltip="true">
+    <FluentDataGrid Items="@FilteredItems" GridTemplateColumns="@ColSizes" RowClass="@(itr => SelectedIds.Contains(itr.Id) ? "highlighted-row" : null)" ItemKey="@(i => i.Id)" OnRowFocus="HandleRowFocus" TGridItem=InstanceTableRec>
+        <PropertyColumn Title="Id" Property="@(t => t.Id)" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(IdFilter)" Tooltip="true">
             <ColumnOptions>
                 <div class="search-box">
                     <FluentSearch 
@@ -28,12 +22,9 @@
                         Placeholder="Resource ID..." />
                 </div>
             </ColumnOptions>
-            <ChildContent>
-                <FluentAnchor Href="@($"/store/resource-viewer?store={StoreName}&type={ResourceType}&id={context.Id}")" Appearance="Appearance.Hypertext">@context.Id</FluentAnchor>
-            </ChildContent>
-        </TemplateColumn>
+        </PropertyColumn>
 
-        @if (_resourceStore.ResourcesHaveName)
+        @if (ResourceStore.ResourcesHaveName)
         {
             <PropertyColumn Title="Name" Property="@(t => t.Name)" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(NameFilter)" Tooltip="true" IsDefaultSortColumn="true">
                 <ColumnOptions>
@@ -49,7 +40,7 @@
             </PropertyColumn>
         }
 
-        @if (_resourceStore.ResourcesAreConformance)
+        @if (ResourceStore.ResourcesAreConformance)
         {
             <PropertyColumn Title="Url" Property="@(t => t.Url)" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(UrlFilter)" Tooltip="true">
                 <ColumnOptions>
@@ -78,7 +69,7 @@
             </PropertyColumn>
         }
 
-        @if (_resourceStore.ResourcesAreIdentifiable)
+        @if (ResourceStore.ResourcesAreIdentifiable)
         {
             <PropertyColumn Title="Identifiers" Property="@(t => t.Identifiers)" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(IdentifierFilter)" Tooltip="true">
                 <ColumnOptions>
@@ -96,43 +87,40 @@
     </FluentDataGrid>
 </FluentStack>
 
+
 @code {
-    /// <summary>Gets or sets the navigation tracker.</summary>
-    [CascadingParameter]
-    public INavTracker? NavTracker { get; set; } = null;
-
-    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
-    {
-        new() { Display = StoreName, Link = "/store?store=" + StoreName },
-        new() { Display = ResourceType, Link = $"/store/resource-list?store={StoreName}&type={ResourceType}" },
-    };
-
-    /// <summary>Gets or sets the package name.</summary>
-    [Parameter]
-    [SupplyParameterFromQuery(Name = "store")]
-    public string StoreName { get; set; } = "";
-
-    /// <summary>Gets or sets the identifier of the resource.</summary>
-    [Parameter]
-    [SupplyParameterFromQuery(Name = "type")]
-    public string ResourceType { get; set; } = "";
-
     /// <summary>The FHIR store.</summary>
-    private IFhirStore _store = null!;
+    [Parameter]
+    public IFhirStore Store { get; set; } = null!;
 
     /// <summary>The resource store.</summary>
-    private IResourceStore _resourceStore = null!;
+    [Parameter]
+    public IResourceStore ResourceStore { get; set; } = null!;
+
+    [Parameter]
+    public string ResourceType { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool AllowMultipleSelection { get; set; } = false;
+
+    [Parameter]
+    public HashSet<string> SelectedIds { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<HashSet<string>> SelectedIdsChanged { get; set; }
 
     private string ColSizes => "1fr" +
-        (_resourceStore.ResourcesHaveName ? " 1fr" : string.Empty) +
-        (_resourceStore.ResourcesAreConformance ? " 1fr 1fr" : string.Empty) +
-        (_resourceStore.ResourcesAreIdentifiable ? " 1fr" : string.Empty);
+        (ResourceStore.ResourcesHaveName ? " 1fr" : string.Empty) +
+        (ResourceStore.ResourcesAreConformance ? " 1fr 1fr" : string.Empty) +
+        (ResourceStore.ResourcesAreIdentifiable ? " 1fr" : string.Empty);
 
     private System.Timers.Timer? debounceTimer = null;
 
     private IQueryable<InstanceTableRec>? _filteredItems = null;
 
     private IQueryable<InstanceTableRec>? FilteredItems => _filteredItems;
+
+    // private readonly HashSet<string> _selectedIds = new();
 
     private string _idFilter = string.Empty;
 
@@ -213,8 +201,8 @@
     /// <returns>The filtered items.</returns>
     private IQueryable<InstanceTableRec>? GetFilteredItems()
     {
-        if ((_resourceStore == null) ||
-            (!_resourceStore.Any()))
+        if ((ResourceStore == null) ||
+            (!ResourceStore.Any()))
         {
             return null;
         }
@@ -226,20 +214,62 @@
             string.IsNullOrWhiteSpace(_descriptionFilter) &&
             string.IsNullOrWhiteSpace(_identifierFilter))
         {
-            return _resourceStore.GetInstanceTableView();
+            return ResourceStore.GetInstanceTableView();
         }
 
         // apply filters
-        return _resourceStore
+        return ResourceStore
             .GetInstanceTableView()
-            .Where(tr => string.IsNullOrWhiteSpace(_idFilter) || tr.Id.Contains(_idFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_nameFilter) || tr.Name.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_urlFilter) || tr.Url.Contains(_urlFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_descriptionFilter) || tr.Description.Contains(_descriptionFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(tr => string.IsNullOrWhiteSpace(_identifierFilter) || tr.Identifiers.Contains(_identifierFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_idFilter) ? true : tr.Id.Contains(_idFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_nameFilter) ? true : tr.Name.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_urlFilter) ? true : tr.Url.Contains(_urlFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_descriptionFilter) ? true : tr.Description.Contains(_descriptionFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(tr => string.IsNullOrWhiteSpace(_identifierFilter) ? true : tr.Identifiers.Contains(_identifierFilter, StringComparison.OrdinalIgnoreCase))
             .AsQueryable<InstanceTableRec>();
     }
-    
+
+    private void HandleRowFocus(FluentDataGridRow<InstanceTableRec> row)
+    {
+        // _ = JsLogAsync($"Focused row item id: {row.Item?.Id}");
+
+        if (AllowMultipleSelection)
+        {
+            if (row?.Item != null)
+            {
+                if (SelectedIds.Contains(row.Item.Id))
+                {
+                    SelectedIds.Remove(row.Item.Id);
+                }
+                else
+                {
+                    SelectedIds.Add(row.Item.Id);
+                }
+            }
+        }
+        else
+        {
+            SelectedIds.Clear();
+            if (row?.Item != null)
+            {
+                SelectedIds.Add(row.Item.Id);
+            }
+        }
+
+        SelectedIdsChanged.InvokeAsync(SelectedIds);
+
+        // SelectedIds = SelectedIds.AsEnumerable<string>();
+        StateHasChanged();
+    }
+
+    /// <summary>Logs an asynchronous.</summary>
+    /// <param name="message">The message.</param>
+    /// <returns>An asynchronous result.</returns>
+    private async Task JsLogAsync(string message)
+    {
+        // note this has to be awaited or the call never happens
+        await JS.InvokeVoidAsync("console.log", message);
+    }
+
     /// <summary>Executes the search action.</summary>
     private void OnSearchChanged()
     {
@@ -292,56 +322,10 @@
     {
         base.OnInitialized();
 
-        if ((!string.IsNullOrEmpty(StoreName)) &&
-            (!string.IsNullOrEmpty(ResourceType)) &&
-            (StoreManager.TryGetValue(StoreName, out _store!)) &&
-            (_store.TryGetValue(ResourceType, out _resourceStore!)))
-        {
-            _resourceStore.OnInstanceCreated += ResourceStore_OnChanged;
-            _resourceStore.OnInstanceUpdated += ResourceStore_OnChanged;
-            _resourceStore.OnInstanceDeleted += ResourceStore_OnChanged;
-            _filteredItems = GetFilteredItems();
-        }
-
-        // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav(_navPages);
-
-        NavigationManager.LocationChanged += HandleLocationChanged;
-    }
-
-
-    /// <summary>Handles the location changed.</summary>
-    /// <param name="sender">The sender.</param>
-    /// <param name="e">     Location changed event information.</param>
-    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
-    {
-        if (e.Location.ToLowerInvariant().Contains("/store/resource-editor", StringComparison.Ordinal))
-        {
-            // if (_store != null)
-            // {
-            // }
-
-            if (_resourceStore != null)
-            {
-                _resourceStore.OnInstanceCreated -= ResourceStore_OnChanged;
-                _resourceStore.OnInstanceUpdated -= ResourceStore_OnChanged;
-                _resourceStore.OnInstanceDeleted -= ResourceStore_OnChanged;
-            }
-
-            if ((!string.IsNullOrEmpty(StoreName)) &&
-                (!string.IsNullOrEmpty(ResourceType)) &&
-                (StoreManager.TryGetValue(StoreName, out _store!)) &&
-                (_store.TryGetValue(ResourceType, out _resourceStore!)))
-            {
-                _resourceStore.OnInstanceCreated += ResourceStore_OnChanged;
-                _resourceStore.OnInstanceUpdated += ResourceStore_OnChanged;
-                _resourceStore.OnInstanceDeleted += ResourceStore_OnChanged;
-                _filteredItems = GetFilteredItems();
-            }
-
-            // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav(_navPages);
-        }
+        ResourceStore.OnInstanceCreated += ResourceStore_OnChanged;
+        ResourceStore.OnInstanceUpdated += ResourceStore_OnChanged;
+        ResourceStore.OnInstanceDeleted += ResourceStore_OnChanged;
+        _filteredItems = GetFilteredItems();
     }
 
     /// <summary>FHIR store on changed.</summary>
@@ -359,19 +343,17 @@
     /// </summary>
     public void Dispose()
     {
-        NavigationManager.LocationChanged -= HandleLocationChanged;
-
         debounceTimer?.Dispose();
 
-        if (_store != null)
+        if (Store != null)
         {
         }
 
-        if (_resourceStore != null)
+        if (ResourceStore != null)
         {
-            _resourceStore.OnInstanceCreated -= ResourceStore_OnChanged;
-            _resourceStore.OnInstanceUpdated -= ResourceStore_OnChanged;
-            _resourceStore.OnInstanceDeleted -= ResourceStore_OnChanged;
+            ResourceStore.OnInstanceCreated -= ResourceStore_OnChanged;
+            ResourceStore.OnInstanceUpdated -= ResourceStore_OnChanged;
+            ResourceStore.OnInstanceDeleted -= ResourceStore_OnChanged;
         }
     }
 }

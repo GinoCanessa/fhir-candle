@@ -1,4 +1,6 @@
-﻿@page "/smart/login"
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/smart/login"
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
 @inject ISmartAuthManager AuthManager
@@ -7,179 +9,82 @@
 
 <PageTitle>SMART Login</PageTitle>
 
-<MudCard>
-    <MudCardHeader>
-        <CardHeaderContent>
-            <MudText Typo="Typo.h4">SMART Login</MudText>
-            <MudText Typo="Typo.body1">Please login to the FHIR store: @StoreName.</MudText>
-        </CardHeaderContent>
-    </MudCardHeader>
-    <MudCardContent>
-        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
-            <MudTabPanel Text="Patient Login">
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.H4">SMART Login</FluentLabel>
+    <FluentLabel Typo="Typography.Body">Please login to the FHIR store: @StoreName.</FluentLabel>
 
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
+    <FluentTabs Orientation="Orientation.Horizontal">
+        <FluentTab Label="Patient Login">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_patientStore"
+                    ResourceType="Patient"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPatientIds"
+                    />
 
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                }
+                <FluentTextField Label="User (Patient)" Value="@(string.Join(", ", SelectedPatientIds))" ReadOnly="true" />
 
-                <br />
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+                    <FluentButton Appearance="Appearance.Accent" Disabled="@(!SelectedPatientIds.Any())" OnClick="@(() => ProcessLoginPatient())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentTab>
 
-                <MudTextField Label="User (Patient)" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
+        <FluentTab Label="Practitioner Login">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_practitionerStore"
+                    ResourceType="Practitioner"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPractitionerIds"
+                    />
 
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Disabled="@(string.IsNullOrEmpty(SelectedPatientId))" Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginPatient())">Login</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
-                </MudStack>
-            </MudTabPanel>
+                <FluentLabel Typo="Typography.Body">If you want a patient context, please select a patient below:</FluentLabel>
 
-            <MudTabPanel Text="Practitioner Login">
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPractitioner
-                            Store="@_store"
-                            ResourceStore="@_store["Practitioner"]"
-                            @bind-SelectedId="SelectedPractitionerId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_patientStore"
+                    ResourceType="Patient"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPatientIds"
+                    />
 
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPractitioner
-                            Store="@_store"
-                            ResourceStore="@_store["Practitioner"]"
-                            @bind-SelectedId="SelectedPractitionerId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
+                <FluentTextField Label="User (Practitioner)" Value="@(string.Join(", ", SelectedPractitionerIds))" ReadOnly="true" />
+                <FluentTextField Label="Patient" Value="@(string.Join(", ", SelectedPatientIds))" ReadOnly="true" />
 
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPractitioner
-                            Store="@_store"
-                            ResourceStore="@_store["Practitioner"]"
-                            @bind-SelectedId="SelectedPractitionerId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                }
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+                    <FluentButton Appearance="Appearance.Accent" Disabled="@(!SelectedPractitionerIds.Any())" OnClick="@(() => ProcessLoginPractitioner())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentTab>
 
-                <br />
+        <FluentTab Label="Administrator Login">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                <FluentLabel Typo="Typography.Body">If you want a patient context, please select a patient below:</FluentLabel>
+                <FhirCandle.Ui.Common.Components.ResourcePicker
+                    Store="@_store"
+                    ResourceStore="@_patientStore"
+                    ResourceType="Patient"
+                    AllowMultipleSelection="false"
+                    @bind-SelectedIds="SelectedPatientIds"
+                    />
 
-                <MudText Typo="Typo.body1" Class="ma-2">If you want a patient context, please select a patient below:</MudText>
+                <FluentTextField Label="User (Admin)" Value="@("administrator")" ReadOnly="true" />
+                <FluentTextField Label="Patient" Value="@(string.Join(", ", SelectedPatientIds))" ReadOnly="true" />
 
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                    }
-
-                <br />
-
-                <MudTextField Label="User (Practitioner)" @bind-Value="SelectedPractitionerId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Practitioner" @bind-Value="SelectedPractitionerId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Disabled="@(string.IsNullOrEmpty(SelectedPractitionerId))" Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginPractitioner())">Login</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
-                </MudStack>
-            </MudTabPanel>
-
-            <MudTabPanel Text="Administrator Login">
-                <MudText Typo="Typo.body1" Class="ma-2">If you want a patient context, please select a patient below:</MudText>
-
-                @switch (_store.Config.FhirVersion)
-                {
-                    case TenantConfiguration.SupportedFhirVersions.R4:
-                        <FhirCandle.Ui.R4.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R4B:
-                        <FhirCandle.Ui.R4B.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-
-                    case TenantConfiguration.SupportedFhirVersions.R5:
-                        <FhirCandle.Ui.R5.Components.Pickers.PickerPatient
-                            Store="@_store"
-                            ResourceStore="@_store["Patient"]"
-                            @bind-SelectedId="SelectedPatientId"
-                            @bind-SelectedId:event="SelectedIdChanged"
-                            />
-                        break;
-                }
-
-                <MudTextField Label="User (Admin)" Value="@("administrator")" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-                <MudTextField Label="Patient" @bind-Value="SelectedPatientId" Variant="Variant.Outlined" Class="ma-2" ReadOnly="true" />
-
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ProcessLoginAdministrator())">Login</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => CancelLogin())">Cancel</MudButton>
-                </MudStack>
-
-            </MudTabPanel>
-        </MudTabs>
-    </MudCardContent>
-</MudCard>
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="4">
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ProcessLoginAdministrator())">Login</FluentButton>
+                    <FluentButton Appearance="Appearance.Accent" OnClick="@(() => CancelLogin())">Cancel</FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentTab>
+    </FluentTabs>
+</FluentStack>
 
 
 @code {
@@ -187,12 +92,20 @@
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = "SMART Login: " + StoreName, Link = $"/smart/login?store={StoreName}&key={Key}" },
+    };
+
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
     [SupplyParameterFromQuery(Name = "store")]
     public string StoreName { get; set; } = "";
 
     private IFhirStore _store = null!;
+
+    private IResourceStore _patientStore = null!;
+    private IResourceStore _practitionerStore = null!;
 
     /// <summary>Gets or sets the authorization key.</summary>
     [Parameter]
@@ -206,10 +119,10 @@
     public string SelectedUser { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the selected patient identifier.</summary>
-    public string SelectedPatientId { get; set; } = string.Empty;
+    public HashSet<string> SelectedPatientIds { get; set; } = new();
 
     /// <summary>Gets or sets the selected practitioner identifier.</summary>
-    public string SelectedPractitionerId { get; set; } = string.Empty;
+    public HashSet<string> SelectedPractitionerIds { get; set; } = new();
 
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
@@ -217,16 +130,7 @@
     {
         base.OnInitialized();
 
-        _ = StoreManager.TryGetValue(StoreName, out _store!);
-        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
-
-        // if ((!string.IsNullOrEmpty(StoreName)) &&
-        //     (AuthManager.HasTenant(StoreName)))
-        // {
-        //     //
-        // }
-
-        NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
+        DoInit();
     }
 
     /// <summary>Cancel login.</summary>
@@ -240,21 +144,11 @@
         // TODO: show an error on the screen
     }
 
-    private void ProcessLogin()
-    {
-        _auth.UserId = SelectedUser;
-        _auth.LaunchPatient = SelectedPatientId;
-        _auth.LaunchPractitioner = SelectedPractitionerId;
-
-        _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
-
-        NavigationManager.NavigateTo($"/smart/auth?store={StoreName}&key={Key}");
-    }
-
     private void ProcessLoginAdministrator()
     {
         _auth.UserId = "administrator";
-        _auth.LaunchPatient = SelectedPatientId;
+        _auth.LaunchPatient = SelectedPatientIds.FirstOrDefault() ?? string.Empty;
+        // _auth.LaunchPractitioner = SelectedPractitionerIds.FirstOrDefault() ?? string.Empty;
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
@@ -263,8 +157,13 @@
 
     private void ProcessLoginPatient()
     {
-        _auth.UserId = "Patient/" + SelectedPatientId;
-        _auth.LaunchPatient = SelectedPatientId;
+        if (!SelectedPatientIds.Any())
+        {
+            return;
+        }
+
+        _auth.UserId = "Patient/" + SelectedPatientIds.First();
+        _auth.LaunchPatient = SelectedPatientIds.First();
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
@@ -273,13 +172,31 @@
 
     private void ProcessLoginPractitioner()
     {
-        _auth.UserId = "Practitioner/" + SelectedPractitionerId;
-        _auth.LaunchPatient = SelectedPatientId;
-        _auth.LaunchPractitioner = SelectedPractitionerId;
+        if (!SelectedPractitionerIds.Any())
+        {
+            return;
+        }
+
+        _auth.UserId = "Practitioner/" + SelectedPractitionerIds.First();
+        _auth.LaunchPatient = SelectedPatientIds.FirstOrDefault() ?? string.Empty;
+        _auth.LaunchPractitioner = SelectedPractitionerIds.First();
 
         _ = AuthManager.TryUpdateAuth(StoreName, Key, _auth);
 
         NavigationManager.NavigateTo($"/smart/auth?store={StoreName}&key={Key}");
+    }
+
+    private void DoInit()
+    {
+        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
+
+        if (StoreManager.TryGetValue(StoreName, out _store!))
+        {
+            _ = _store.TryGetValue("Patient", out _patientStore!);
+            _ = _store.TryGetValue("Practitioner", out _practitionerStore!);
+        }
+
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -289,20 +206,7 @@
     {
         if (e.Location.ToLowerInvariant().Contains("/smart/login?", StringComparison.Ordinal))
         {
-            // if (_store != null)
-            // {
-            //     _store.OnChanged -= Store_OnChanged;
-            // }
-
-            _ = StoreManager.TryGetValue(StoreName, out _store!);
-            _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
-
-            // if ((!string.IsNullOrEmpty(StoreName)) &&
-            //     (StoreManager.TryGetValue(StoreName, out _store!)))
-            // {
-            // }
-
-            NavTracker?.NotifyNav(StoreName, $"/smart/login?store={StoreName}&key={Key}", 1);
+            DoInit();
         }
     }
 

@@ -3,7 +3,7 @@
 //     Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // </copyright>
 
-namespace FhirCandle.Extensions;
+namespace fhir.candle.Extensions;
 
 /// <summary>A primitive extensions.</summary>
 public static class PrimitiveExtensions
@@ -51,7 +51,7 @@ public static class PrimitiveExtensions
         {
             int scalePart = bits[3];
 
-            // Accoring to MSDN, the exponent is represented by
+            // According to MSDN, the exponent is represented by
             // bits 16-23 (the 2nd word):
             // http://msdn.microsoft.com/en-us/library/system.decimal.getbits.aspx
             int exponent = (scalePart & 0x00FF0000) >> 16;

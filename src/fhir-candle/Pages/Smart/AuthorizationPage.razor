@@ -1,4 +1,6 @@
-﻿@page "/smart/auth"
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/smart/auth"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -8,65 +10,39 @@
 
 <PageTitle>SMART Authorization</PageTitle>
 
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+
 @if (string.IsNullOrEmpty(ErrorMessage))
 {
+    <FluentLabel Typo="Typography.H4">SMART Authorization</FluentLabel>
+    <FluentLabel Typo="Typography.Body">Please select allowed scopes:</FluentLabel>
 
-    <MudCard>
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h4">SMART Authorization</MudText>
-                <MudText Typo="Typo.body1">Please select allowed scopes:</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            <MudStack Row="false" Spacing="3">
+    <FluentStack Orientation="Orientation.Horizontal" Spacing="4">
+        <FluentButton BackgroundColor="var(--success)" OnClick="@(() => ApproveAuth())">Approve Selected Scopes</FluentButton>
+        <FluentButton BackgroundColor="var(--error)" OnClick="@(() => DenyAuth())">Cancel</FluentButton>
+    </FluentStack>
 
-                <MudStack Row="true" Spacing="3" Class="ma-2">
-                    <MudButton Color="Color.Success" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => ApproveScopes())">Approve Selected Scopes</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" Class="ma-2" OnClick="@(() => DenyScopes())">Cancel</MudButton>
-                </MudStack>
+    <FluentCheckbox Label="@($"All Scopes")"
+                ThreeState="true"
+                ShowIndeterminate="false"
+                @bind-CheckState="AllScopesSelected" />
 
-                <MudTable 
-                    @ref="_displayTable"
-                    T="string"
-                    Dense="true"
-                    Striped="true"
-                    MultiSelection="true"
-                    @bind-SelectedItems="_selected"
-                    Hover="true"
-                    SelectOnRowClick="true"
-                    Items="_auth.Scopes.Keys">
-                    <ColGroup>
-                        <col style="width: 5vw!important;" />
-                        <col style="width: 90vw!important;" />
-                    </ColGroup>
-                    <HeaderContent>
-                        <MudTh>Scope</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Scope">@context</MudTd>
-                    </RowTemplate>
-                </MudTable>
-            </MudStack>
-        </MudCardContent>
-    </MudCard>
+    <FluentDataGrid Items="@_items" GridTemplateColumns="1fr 2fr" RowClass="@(s => _selected.Contains(s.Scope) ? "highlighted-row" : null!)" OnRowFocus="HandleRowFocus" TGridItem=ScopeInfo>
+        <PropertyColumn Title="Scope" Property="@(t => t.Scope)" Sortable="true" Tooltip="true">
+        </PropertyColumn>
+
+        <PropertyColumn Title="Description" Property="@(t => t.Description)" Sortable="true" Tooltip="true">
+        </PropertyColumn>
+    </FluentDataGrid>
 }
 else
 {
-    <MudCard>
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h4">SMART Authorization</MudText>
-                <MudText Typo="Typo.body1">Error</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            <MudStack Row="false" Spacing="3">
-                <MudText Typo="Typo.body1">@ErrorMessage</MudText>
-            </MudStack>
-        </MudCardContent>
-    </MudCard>
+    <FluentLabel Typo="Typography.H4">SMART Authorization</FluentLabel>
+    <FluentLabel Typo="Typography.Body">Error</FluentLabel>
+    <FluentLabel Typo="Typography.Body">@ErrorMessage</FluentLabel>
 }
+
+</FluentStack>
 
 
 @code {
@@ -74,11 +50,43 @@ else
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
 
-    /// <summary>The display table.</summary>
-    private MudTable<string>? _displayTable = null;
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = "Authorization: " + StoreName, Link = $"/smart/auth?store={StoreName}&key={Key}" },
+    };
 
-    /// <summary>The selected.</summary>
-    private HashSet<string> _selected = new();
+    private record class ScopeInfo
+    {
+        public required string Scope { get; init; }
+        public string Description { get; init; } = string.Empty;
+    }
+
+    private IQueryable<ScopeInfo> _items = Array.Empty<ScopeInfo>().AsQueryable();
+
+    /// <summary>The selected scopes.</summary>
+    private readonly HashSet<string> _selected = new();
+
+    /// <summary>Gets or sets all scopes selected.</summary>
+    private bool? AllScopesSelected
+    {
+        get =>
+            _selected.SetEquals(_auth.Scopes.Keys)
+                ? true
+                : _selected.Count == 0
+                    ? false
+                    : null;
+        set
+        {
+            if (value is true)
+            {
+                _selected.UnionWith(_auth.Scopes.Keys);
+            }
+            else if (value is false)
+            {
+                _selected.Clear();
+            }
+        }
+    }
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
@@ -95,23 +103,218 @@ else
     /// <summary>The authorization information.</summary>
     private AuthorizationInfo _auth = null!;
 
+    private void HandleRowFocus(FluentDataGridRow<ScopeInfo> row)
+    {
+        // _ = JsLogAsync($"Focused row item id: {row.Item?.Id}");
+
+        if (row?.Item != null)
+        {
+            if (_selected.Contains(row.Item.Scope))
+            {
+                _selected.Remove(row.Item.Scope);
+            }
+            else
+            {
+                _selected.Add(row.Item.Scope);
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void UpdateScopeInfo()
+    {
+        List<ScopeInfo> scopeInfo = new();
+
+        foreach (string scope in _auth.Scopes.Keys)
+        {
+            switch (scope)
+            {
+                case "openid":
+                case "fhirUser":
+                case "profile":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Permission to retrieve information about the current logged-in user."
+                    });
+                    break;
+
+                case "launch":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Permission to obtain launch context when app is launched from an EHR."
+                    });
+                    break;
+
+                case "launch/patient":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "When launching outside the EHR, ask for a patient to be selected at launch time."
+                    });
+                    break;
+
+                case "offline_access":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Request a refresh_token that can be used to obtain a new access token to replace an expired one, even after the end-user no longer is online after the access token expires."
+                    });
+                    break;
+
+                case "online_access":
+                    scopeInfo.Add(new()
+                    {
+                        Scope = scope,
+                        Description = "Request a refresh_token that can be used to obtain a new access token to replace an expired one, and that will be usable for as long as the end-user remains online."
+                    });
+                    break;
+
+                default:
+                    {
+                        if (ParseResourceScope(scope, out string context, out string resourceType, out List<string> ops, out List<string> filters))
+                        {
+                            scopeInfo.Add(new()
+                            {
+                                Scope = scope,
+                                Description = $"Permission to {string.Join("&", ops)} all {resourceType} resources the {context} has access to" + 
+                                    (filters.Any()
+                                    ? $", if they match: {string.Join(", ", filters)}"
+                                    : "."),
+                            });
+                        }
+                        else
+                        {
+                            scopeInfo.Add(new()
+                            {
+                                Scope = scope,
+                                Description = ""
+                            });
+                        }
+                    }
+                    break;
+            }
+        }
+
+        _items = scopeInfo.AsQueryable();
+    }
+
+    private bool ParseResourceScope(string scope, out string context, out string resourceType, out List<string> ops, out List<string> filters)
+    {
+        resourceType = string.Empty;
+        context = string.Empty;
+        ops = new();
+        filters = new();
+
+        if (string.IsNullOrEmpty(scope))
+        {
+            return false;
+        }
+
+        string contextRemoved;
+
+        if (scope.StartsWith("patient/", StringComparison.Ordinal))
+        {
+            context = "Patient";
+            contextRemoved = scope.Substring(8);
+        }
+        else if (scope.StartsWith("user/", StringComparison.Ordinal))
+        {
+            context = "User";
+            contextRemoved = scope.Substring(5);
+        }
+        else
+        {
+            return false;
+        }
+
+        int opDelimiterLoc = contextRemoved.IndexOf('.');
+        string opLiterals = opDelimiterLoc > 0 ? contextRemoved.Substring(opDelimiterLoc + 1) : string.Empty;
+        resourceType = opDelimiterLoc > 0 ? contextRemoved.Substring(0, opDelimiterLoc) : contextRemoved;
+
+        if (resourceType == "*")
+        {
+            resourceType = "ALL";
+        }
+
+        int filterDelimiterLoc = opLiterals.IndexOf('?');
+        string filterLiterals = filterDelimiterLoc > 0 ? opLiterals.Substring(filterDelimiterLoc + 1) : string.Empty;
+        opLiterals = filterDelimiterLoc > 0 ? opLiterals.Substring(0, filterDelimiterLoc) : opLiterals;
+
+        if (!string.IsNullOrEmpty(filterLiterals))
+        {
+            filters.AddRange(filterLiterals.Split('&'));
+        }
+
+        if (opLiterals == "read")
+        {
+            ops.Add("Read");
+            ops.Add("Search");
+        }
+        else if (opLiterals == "write")
+        {
+            ops.Add("Create");
+            ops.Add("Update");
+            ops.Add("Delete");
+        }
+        else if (opLiterals == "*")
+        {
+            ops.Add("Create");
+            ops.Add("Read");
+            ops.Add("Update");
+            ops.Add("Delete");
+            ops.Add("Search");
+        }
+        else
+        {
+            if (opLiterals.Contains("c", StringComparison.Ordinal))
+            {
+                ops.Add("Create");
+            }
+
+            if (opLiterals.Contains("r", StringComparison.Ordinal))
+            {
+                ops.Add("Read");
+            }
+
+            if (opLiterals.Contains("u", StringComparison.Ordinal))
+            {
+                ops.Add("Update");
+            }
+
+            if (opLiterals.Contains("d", StringComparison.Ordinal))
+            {
+                ops.Add("Delete");
+            }
+
+            if (opLiterals.Contains("s", StringComparison.Ordinal))
+            {
+                ops.Add("Search");
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>Executes the initialized asynchronous action.</summary>
     /// <returns>An asynchronous result.</returns>
     protected override void OnInitialized()
     {
         base.OnInitialized();
 
-        _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
-
-        if (_auth != null)
+        if (AuthManager.TryGetAuthorization(StoreName, Key, out _auth))
         {
-            _selected = new HashSet<string>(_auth.Scopes.Keys);
+            UpdateScopeInfo();
+            _selected.Clear();
+            AllScopesSelected = true;
         }
 
-        NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
+        NavTracker?.NotifyNav(_navPages);
     }
 
-    private void DenyScopes()
+    private void DenyAuth()
     {
         if (AuthManager.TryGetClientRedirect(StoreName, Key, out string url, "denied", "authorization request was denied"))
         {
@@ -121,7 +324,7 @@ else
         // TODO: show an error on the screen
     }
 
-    private void ApproveScopes()
+    private void ApproveAuth()
     {
         foreach (string scope in _auth.Scopes.Keys)
         {
@@ -148,7 +351,7 @@ else
         {
             _ = AuthManager.TryGetAuthorization(StoreName, Key, out _auth);
 
-            NavTracker?.NotifyNav(StoreName, $"/smart/auth?store={StoreName}&key={Key}", 1);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 

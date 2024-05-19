@@ -9,6 +9,9 @@ using System.Text.Json.Serialization;
 
 namespace fhir.candle.Models;
 
+/// <summary>
+/// Represents a package manifest in a registry.
+/// </summary>
 public class RegistryPackageManifest
 {
     /// <summary>Gets or sets the identifier.</summary>

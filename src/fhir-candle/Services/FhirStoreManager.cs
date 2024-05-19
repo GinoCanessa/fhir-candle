@@ -14,7 +14,6 @@ using FhirCandle.Extensions;
 using FhirCandle.Models;
 using FhirCandle.Storage;
 using FhirStore.Smart;
-using MudBlazor;
 using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace fhir.candle.Services;
@@ -50,30 +49,22 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     private Dictionary<string, IFhirStore> _storesByController = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The additional pages by controller.</summary>
-    private Dictionary<string, IEnumerable<PackagePageInfo>> _additionalPagesByController = new();
+    private Dictionary<string, List<PackagePageInfo>> _additionalPagesByController = new();
 
     /// <summary>
     /// Gets an enumerable collection that contains the keys in the read-only dictionary.
     /// </summary>
-    /// <typeparam name="string">    Type of the string.</typeparam>
-    /// <typeparam name="IFhirStore">Type of the FHIR store.</typeparam>
     IEnumerable<string> IReadOnlyDictionary<string, IFhirStore>.Keys => _storesByController.Keys;
 
     /// <summary>
     /// Gets an enumerable collection that contains the values in the read-only dictionary.
     /// </summary>
-    /// <typeparam name="string">    Type of the string.</typeparam>
-    /// <typeparam name="IFhirStore">Type of the FHIR store.</typeparam>
     IEnumerable<IFhirStore> IReadOnlyDictionary<string, IFhirStore>.Values => _storesByController.Values;
 
     /// <summary>Gets the number of elements in the collection.</summary>
-    /// <typeparam name="string">     Type of the string.</typeparam>
-    /// <typeparam name="IFhirStore>">Type of the FHIR store></typeparam>
     int IReadOnlyCollection<KeyValuePair<string, IFhirStore>>.Count => _storesByController.Count;
 
     /// <summary>Gets the element that has the specified key in the read-only dictionary.</summary>
-    /// <typeparam name="string">    Type of the string.</typeparam>
-    /// <typeparam name="IFhirStore">Type of the FHIR store.</typeparam>
     /// <param name="key">The key to locate.</param>
     /// <returns>The element that has the specified key in the read-only dictionary.</returns>
     IFhirStore IReadOnlyDictionary<string, IFhirStore>.this[string key] => _storesByController[key];
@@ -81,8 +72,6 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     /// <summary>
     /// Determines whether the read-only dictionary contains an element that has the specified key.
     /// </summary>
-    /// <typeparam name="string">    Type of the string.</typeparam>
-    /// <typeparam name="IFhirStore">Type of the FHIR store.</typeparam>
     /// <param name="key">The key to locate.</param>
     /// <returns>
     /// <see langword="true" /> if the read-only dictionary contains an element that has the
@@ -91,8 +80,6 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     bool IReadOnlyDictionary<string, IFhirStore>.ContainsKey(string key) => _storesByController.ContainsKey(key);
 
     /// <summary>Gets the value that is associated with the specified key.</summary>
-    /// <typeparam name="string">    Type of the string.</typeparam>
-    /// <typeparam name="IFhirStore">Type of the FHIR store.</typeparam>
     /// <param name="key">  The key to locate.</param>
     /// <param name="value">[out] When this method returns, the value associated with the specified
     ///  key, if the key is found; otherwise, the default value for the type of the <paramref name="value" />
@@ -104,8 +91,6 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     bool IReadOnlyDictionary<string, IFhirStore>.TryGetValue(string key, out IFhirStore value) => _storesByController.TryGetValue(key, out value!);
 
     /// <summary>Returns an enumerator that iterates through the collection.</summary>
-    /// <typeparam name="string">     Type of the string.</typeparam>
-    /// <typeparam name="IFhirStore>">Type of the FHIR store></typeparam>
     /// <returns>An enumerator that can be used to iterate through the collection.</returns>
     IEnumerator<KeyValuePair<string, IFhirStore>> IEnumerable<KeyValuePair<string, IFhirStore>>.GetEnumerator() => _storesByController.GetEnumerator();
 
@@ -134,7 +119,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     }
 
     /// <summary>Gets the additional pages by tenant.</summary>
-    public Dictionary<string, IEnumerable<PackagePageInfo>> AdditionalPagesByTenant { get => _additionalPagesByController; }
+    public IReadOnlyDictionary<string, IQueryable<PackagePageInfo>> AdditionalPagesByTenant => _additionalPagesByController.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.AsQueryable());
 
     /// <summary>State has changed.</summary>
     public void StateHasChanged()
@@ -143,7 +128,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
         if (handler != null)
         {
-            handler(this, new());
+            handler(this, EventArgs.Empty);
         }
     }
 
@@ -235,14 +220,13 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
     }
 
     /// <summary>Loads package pages.</summary>
-    /// <param name="manager">The manager.</param>
     /// <returns>The package pages.</returns>
     private void LoadPackagePages()
     {
         _logger.LogInformation("FhirStoreManager <<< Discovering package-based pages...");
 
         // get all page types
-        List<PackagePageInfo> pages = new();
+        List<PackagePageInfo> pages = [];
 
         //pages.AddRange(System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
         //    .Where(t => t.GetInterfaces().Contains(typeof(IPackagePage)))
@@ -330,7 +314,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
                         if (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase))
                         {
-                            ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                            _additionalPagesByController[name].Add(page);
                         }
                         else
                         {
@@ -361,7 +345,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
                     if (string.IsNullOrEmpty(page.OnlyShowOnEndpoint) || page.OnlyShowOnEndpoint.Equals(name, StringComparison.OrdinalIgnoreCase))
                     {
-                        ((List<PackagePageInfo>)_additionalPagesByController[name]).Add(page);
+                        _additionalPagesByController[name].Add(page);
                     }
                     else
                     {
@@ -376,21 +360,22 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
         }
     }
 
-    /// <summary>A loaded packagage.</summary>
-    /// <param name="directive">          The directive.</param>
-    /// <param name="name">               The name.</param>
-    /// <param name="version">            The version.</param>
-    /// <param name="directory">          Pathname of the directory.</param>
-    /// <param name="supplementDirectory">Pathname of the supplement directory.</param>
-    /// <param name="fhirVersion">        The FHIR version.</param>
+    /// <summary>
+    /// A record struct that represents a loaded package.
+    /// </summary>
+    /// <param name="directive">The directive of the loaded package.</param>
+    /// <param name="name">The name of the loaded package.</param>
+    /// <param name="version">The version of the loaded package.</param>
+    /// <param name="directory">The directory where the loaded package is located.</param>
+    /// <param name="supplementDirectory">The directory of the supplemental content for the loaded package.</param>
+    /// <param name="fhirVersion">The FHIR version of the loaded package.</param>
     private record struct LoadedPackageRec(
         string directive,
         string name,
         string version,
         string directory,
         string supplementDirectory,
-        FhirPackageService.FhirSequenceEnum fhirVersion
-        );
+        FhirPackageService.FhirSequenceEnum fhirVersion);
 
     /// <summary>Loads ri contents.</summary>
     /// <param name="dir">The dir.</param>
@@ -682,9 +667,9 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
             }
         }
 
-        LoadedPackageRec EntryToRec(string supplementalRoot, FhirPackageService.PackageCacheEntry entry)
+        LoadedPackageRec EntryToRec(string entryRoot, FhirPackageService.PackageCacheEntry entry)
         {
-            string supplementDir = GetSupplementDir(supplementalRoot, entry);
+            string supplementDir = GetSupplementDir(entryRoot, entry);
 
             string[] directiveComponents = entry.resolvedDirective.Split('#');
 
@@ -738,7 +723,7 @@ public class FhirStoreManager : IFhirStoreManager, IDisposable
 
     /// <summary>Gets supplement dir.</summary>
     /// <param name="supplementalRoot"> The supplemental root.</param>
-    /// <param name="resolvedDirective">The resolved directive.</param>
+    /// <param name="entry">The resolved directive entry.</param>
     /// <returns>The supplement dir.</returns>
     private string GetSupplementDir(string supplementalRoot, FhirPackageService.PackageCacheEntry entry)
     {

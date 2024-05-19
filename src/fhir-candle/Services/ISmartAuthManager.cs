@@ -21,6 +21,9 @@ public interface ISmartAuthManager : IHostedService
     /// <returns>True if the tenant exists, false if not.</returns>
     bool HasTenant(string tenant);
 
+    /// <summary>Gets a value indicating whether this object is enabled.</summary>
+    bool IsEnabled { get; }
+
     /// <summary>Gets the smart configuration by tenant.</summary>
     Dictionary<string, SmartWellKnown> SmartConfigurationByTenant { get; }
 
@@ -59,6 +62,8 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="tenant">  The tenant name.</param>
     /// <param name="key">     The key.</param>
     /// <param name="redirect">[out] The redirect.</param>
+    /// <param name="error"></param>
+    /// <param name="errorDescription"></param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool TryGetClientRedirect(
         string tenant, 
@@ -170,6 +175,7 @@ public interface ISmartAuthManager : IHostedService
     /// <param name="pkceMethod">         Method used for the code_challenge parameter. (required v2,
     ///  opt v1)</param>
     /// <param name="redirectDestination">[out] The redirect destination.</param>
+    /// <param name="authKey"></param>
     /// <returns>True if it succeeds, false if it fails.</returns>
     bool RequestAuth(
         string tenant,

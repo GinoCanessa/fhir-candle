@@ -1,4 +1,6 @@
-﻿@page "/subscriptions/notifications-received"
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
+
+@page "/subscriptions/notifications-received"
 
 @inject NavigationManager NavigationManager
 @inject IFhirStoreManager StoreManager
@@ -7,46 +9,61 @@
 
 <PageTitle>Received Notifications</PageTitle>
 
-<MudGrid>
-    @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store?.ReceivedNotifications.AsEnumerable() ?? Array.Empty<KeyValuePair<string, List<ParsedSubscriptionStatus>>>())
-    {
-    <MudItem>
-        <MudBadge Content="@kvp.Value.Count()" Color="Color.Primary" Overlap="true" Class="mx-6 my-4">
-            <MudCard Outlined="true">
-                <MudCardContent>
-                    <MudField Label="Subscription">@kvp.Key</MudField>
-                    @if (kvp.Value.Any() && (kvp.Value.Last() is ParsedSubscriptionStatus status))
-                    {
-                        <MudField Label="Topic">@status.SubscriptionTopicCanonical</MudField>
-                        <MudField Label="Local Bundle">Bundle/@status.BundleId</MudField>
-                        <MudField Label="Received">@status.ProcessedDateTime.ToString("o")</MudField>
-                        <MudField Label="Type">@status.NotificationType</MudField>
+@if (!_store?.ReceivedNotifications.Any() ?? false)
+{
+    <FluentLabel Typo="Typography.Body">No events received for this endpoint.</FluentLabel>
+}
+else
+{
+    <FluentGrid Spacing="4">
+        @foreach (KeyValuePair<string, List<ParsedSubscriptionStatus>> kvp in _store!.ReceivedNotifications.AsEnumerable())
+        {
+            <FluentGridItem Style="min-width: var(--field-container-min-width);">
+                <FluentCounterBadge Count="@kvp.Value.Count()" Appearance="Appearance.Accent" BottomPosition="97" HorizontalPosition="97" Max="999">
+                    <FluentCard>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+                            <FluentTextField Label="Subscription" ReadOnly="true" Value="@kvp.Key"/>
+                            @if (kvp.Value.Any() && (kvp.Value.Last() is ParsedSubscriptionStatus status))
+                            {
+                                <FluentTextField Label="Topic" ReadOnly="true" Value="@status.SubscriptionTopicCanonical"/>
 
-                        <MudField Label="Recevied Event Details">
-                            <MudLink Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" Underline="Underline.Always">Received Events</MudLink>
-                        </MudField>
+                                <FluentLabel Typo="Typography.Body">Local Bundle</FluentLabel>
+                                <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/store/resource-viewer?store={StoreName}&type=Bundle&id={status.BundleId}")">@("Bundle/" + status.BundleId)</FluentAnchor>
+
+                                <FluentTextField Label="Received" ReadOnly="true" Value="@status.ProcessedDateTime.ToString("o")"/>
+                                <FluentTextField Label="Type" ReadOnly="true" Value="@status.NotificationType?.ToString()"/>
+
+                                <FluentLabel Typo="Typography.Body">Received Event Details</FluentLabel>
+                                <FluentAnchor Appearance="Appearance.Hypertext" Href="@($"/subscriptions/notification-received-viewer?store={StoreName}&ref={kvp.Key}")" >Received Events</FluentAnchor>
     
-                        @if (status.NotificationEvents.Any())
-                        {
-                            <MudField Label="Focus">@status.NotificationEvents.First().FocusReference</MudField>
-                        }
+                                @if (status.NotificationEvents.Any())
+                                {
+                                    <FluentTextField Label="Focus" ReadOnly="true" Value="@status.NotificationEvents.First().FocusReference"/>
+                                }
 
-                        @if (status.Errors.Any())
-                        {
-                            <MudField Label="Error">@status.Errors.First()</MudField>
-                        }
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudBadge>
-    </MudItem>
-    }
-</MudGrid>
+                                @if (status.Errors.Any())
+                                {
+                                    <FluentTextField Label="Error" ReadOnly="true" Value="@status.Errors.First()"/>
+                                }
+                            }
+                        </FluentStack>
+                    </FluentCard>
+                </FluentCounterBadge>
+            </FluentGridItem>
+        }
+    </FluentGrid>
+}
 
 @code {
     /// <summary>Gets or sets the navigation tracker.</summary>
     [CascadingParameter]
     public INavTracker? NavTracker { get; set; } = null;
+
+    private NavPageInfoRec[] _navPages => new NavPageInfoRec[]
+    {
+        new() { Display = StoreName, Link = "/store?store=" + StoreName },
+        new() { Display = "Received Subscription Events", Link = $"/subscriptions/notifications-received?store={StoreName}" },
+    };
 
     /// <summary>Gets or sets the package name.</summary>
     [Parameter]
@@ -69,8 +86,7 @@
         }
 
         // notify of store root in case user clicked here directly
-        NavTracker?.NotifyNav(StoreName, "/store?storeName=" + StoreName, 1);
-        NavTracker?.NotifyNav($"Received Notifications", "/subscriptions/notifications-received?store=" + StoreName, 2);
+        NavTracker?.NotifyNav(_navPages);
     }
 
     /// <summary>Handles the location changed.</summary>
@@ -82,7 +98,8 @@
         {
             if (_store != null)
             {
-                _store.OnChanged -= Store_OnChanged;
+                _store.OnInstanceCreated -= Store_OnChanged;
+                _store.OnInstanceDeleted -= Store_OnChanged;
                 _store.OnReceivedSubscriptionChanged -= Store_OnReceivedSubscriptionChanged;
                 _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
             }
@@ -90,14 +107,14 @@
             if ((!string.IsNullOrEmpty(StoreName)) &&
                 (StoreManager.TryGetValue(StoreName, out _store!)))
             {
-                _store.OnChanged += Store_OnChanged;
+                _store.OnInstanceCreated += Store_OnChanged;
+                _store.OnInstanceDeleted += Store_OnChanged;
                 _store.OnReceivedSubscriptionChanged += Store_OnReceivedSubscriptionChanged;
                 _store.OnReceivedSubscriptionEvent += Store_OnReceivedSubscriptionEvent;
             }
 
             // notify of store root in case user clicked here directly
-            NavTracker?.NotifyNav(StoreName, "/store?store=" + StoreName, 1);
-            NavTracker?.NotifyNav($"Received Notifications", "/subscriptions/notifications-received?store=" + StoreName, 2);
+            NavTracker?.NotifyNav(_navPages);
         }
     }
 
@@ -114,7 +131,7 @@
     /// <param name="e">     Event information.</param>
     private void Store_OnChanged(object? sender, EventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -124,7 +141,7 @@
     /// <param name="e">     Received subscription changed event information.</param>
     private void Store_OnReceivedSubscriptionChanged(object? sender, ReceivedSubscriptionChangedEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>Event handler. Called by Store for on received subscription events.</summary>
@@ -132,7 +149,7 @@
     /// <param name="e">     Received subscription event information.</param>
     private void Store_OnReceivedSubscriptionEvent(object? sender, ReceivedSubscriptionEventArgs e)
     {
-        InvokeAsync(() => StateHasChanged());
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -143,7 +160,8 @@
     {
         if (_store != null)
         {
-            _store.OnChanged -= Store_OnChanged;
+            _store.OnInstanceCreated -= Store_OnChanged;
+            _store.OnInstanceDeleted -= Store_OnChanged;
             _store.OnReceivedSubscriptionChanged -= Store_OnReceivedSubscriptionChanged;
             _store.OnReceivedSubscriptionEvent -= Store_OnReceivedSubscriptionEvent;
         }

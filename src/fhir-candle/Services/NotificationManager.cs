@@ -199,7 +199,14 @@ public class NotificationManager : INotificationManager
             store.ChangeSubscriptionStatus(e.Subscription.Id, "active");
         }
 
-        e.Subscription.RegisterSerializedSend(e.NotificationEvents.Select(ne => ne.EventNumber).Max(), contents);
+        if (e.NotificationEvents.Any())
+        {
+            e.Subscription.RegisterSerializedSend(e.NotificationEvents.Select(ne => ne.EventNumber).Max(), contents);
+        }
+        else
+        {
+            e.Subscription.RegisterSerializedSend(0, contents);
+        }
 
         return success;
     }
@@ -651,6 +658,9 @@ public class NotificationManager : INotificationManager
         return Task.CompletedTask;
     }
 
+    /// <summary>Check notification q.</summary>
+    /// <exception cref="Exception">Thrown when an exception error condition occurs.</exception>
+    /// <param name="state">The state.</param>
     private void CheckNotificationQ(object? state)
     {
         while (_notificationRequestQ.Any())

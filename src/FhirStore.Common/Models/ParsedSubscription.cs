@@ -115,7 +115,7 @@ public class ParsedSubscription
     public required long ExpirationTicks { get; set; }
 
     /// <summary>Gets or sets the number of current events.</summary>
-    public long CurrentEventCount { get => _currentEventCount; }
+    public long CurrentEventCount => _currentEventCount;
 
     /// <summary>Increment event count.</summary>
     /// <returns>A long.</returns>
@@ -125,10 +125,10 @@ public class ParsedSubscription
     }
 
     /// <summary>Gets or sets the generated events.</summary>
-    public Dictionary<long, SubscriptionEvent> GeneratedEvents { get => _generatedEvents; }
+    public Dictionary<long, SubscriptionEvent> GeneratedEvents => _generatedEvents;
 
     /// <summary>Gets the serialized events.</summary>
-    public Dictionary<long, string> SerializedEvents { get => _serializedEvents; }
+    public Dictionary<long, string> SerializedEvents => _serializedEvents;
 
     /// <summary>Registers the event described by subscriptionEvent.</summary>
     /// <param name="subscriptionEvent">The subscription event.</param>
@@ -168,7 +168,7 @@ public class ParsedSubscription
     }
 
     /// <summary>Gets or sets the notification errors.</summary>
-    public List<string> NotificationErrors { get => _notificationErrors; }
+    public List<string> NotificationErrors => _notificationErrors;
 
     /// <summary>Registers the error described by error.</summary>
     /// <param name="error">The error.</param>

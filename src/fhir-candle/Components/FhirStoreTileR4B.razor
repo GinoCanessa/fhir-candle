@@ -1,97 +1,76 @@
-﻿<MudText Typo="Typo.body1">
-    FHIR R4B endpoint at <code>@Store.Config.BaseUrl</code>
-    <sup>
-        <button onclick="@($"navigator.clipboard.writeText('{Store.Config.BaseUrl}')")">
-            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy FHIR URL" />
-        </button>
-    </sup>
-</MudText>
-<br />
+﻿@using Microsoft.FluentUI.AspNetCore.Components;
 
-@if (AdditionalContent != null)
-{
-    <DynamicComponent Type="@AdditionalContent" Parameters="@_contentParams" />
-}
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentLabel Typo="Typography.Body">
+        FHIR R4B endpoint at <code class="copy-click">@Store.Config.BaseUrl</code>
+    </FluentLabel>
 
-@if (RiPages.Any())
-{
-    <MudText Typo="Typo.body1">
-        Based on loaded packages, this server also implements the following pages:
-    </MudText>
+    @if (AdditionalContent != null)
+    {
+        <DynamicComponent Type="@AdditionalContent" Parameters="@_contentParams" />
+    }
 
-    <MudSimpleTable>
-        <thead>
-            <tr>
-                <th>Directive</th>
-                <th>Name</th>
-                <th>Description</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (PackagePageInfo info in RiPages.OrderBy(i => i.ContentFor))
-            {
-                <tr>
-                    <td>@info.ContentFor</td>
-                    <td><MudLink Href="@($"{info.RoutePath}?store={StoreName}")" Underline="Underline.Always">@info.PageName</MudLink></td>
-                        <td>@info.Description</td>
-                </tr>
-            }
-        </tbody>
-    </MudSimpleTable>
-    <br />
-}
+    @if (RiPages?.Any() ?? false)
+    {
+        <FluentLabel Typo="Typography.Body">
+            Based on loaded packages, this server also implements the following pages:
+        </FluentLabel>
 
-<MudText Typo="Typo.body1">
-    This endpoint uses FHIR <MudLink Href="https://hl7.org/fhir/R4B" Target="_" Underline="Underline.Always">R4B</MudLink>
-    and Subscriptions via the
-    <MudLink Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Target="_" Underline="Underline.Always">Subscriptions Backport IG</MudLink>
-</MudText>
+        <FluentDataGrid Items="@RiPages">
+            <PropertyColumn Title="Directive" Property="@(p => p.ContentFor)" Sortable="true" Tooltip="true" IsDefaultSortColumn="true">
+            </PropertyColumn>
 
-<MudList>
-    <MudListItem>
-        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-        <MudLink Href="@($"/store?store={StoreName}")"
-                    Underline="Underline.Always">FHIR Contents</MudLink>: FHIR resources in this tenant
-    </MudListItem>
+            <TemplateColumn Title="Name">
+                <FluentAnchor Href="@($"{context.RoutePath}?store={StoreName}")" Appearance="Appearance.Hypertext">@context.PageName</FluentAnchor>
+            </TemplateColumn>
 
-    <MudListItem>
-        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-        <MudLink Href="@($"/subscriptions/local?store={StoreName}")"
-                    Underline="Underline.Always">Local Subscriptions</MudLink>: outgoing Subscription notifications from this server
-    </MudListItem>
+            <PropertyColumn Title="Description" Property="@(p => p.Description)" Sortable="true" Tooltip="true">
+            </PropertyColumn>
+        </FluentDataGrid>
+    }
 
-    <MudListItem>
-        <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" />
-        <MudLink Href="@($"/subscriptions/notifications-received?store={StoreName}")"
-                    Underline="Underline.Always">Received Notifications</MudLink>: incoming notifications received by this server
-    </MudListItem>
-</MudList>
+    <FluentLabel Typo="Typography.Body">
+        This endpoint uses <FluentAnchor Href="https://hl7.org/fhir/R4B" Appearance="Appearance.Hypertext" Target="_blank">FHIR R4B</FluentAnchor>
+        and Subscriptions via the
+        <FluentAnchor Href="https://www.hl7.org/fhir/uv/subscriptions-backport/index.html" Appearance="Appearance.Hypertext" Target="_blank">Subscriptions Backport IG</FluentAnchor>
+    </FluentLabel>
+    
+    <ul>
+        <li>
+            <FluentAnchor Href="@($"/store?store={StoreName}")" Appearance="Appearance.Hypertext">FHIR Contents</FluentAnchor>: 
+            FHIR resources in this tenant
+        </li>
 
-<MudText Typo="Typo.body1">
-    The endpoint also exposes a system-level operation, <code>$subscription-hook</code>
-    <sup>
-        <button onclick="@($"navigator.clipboard.writeText('{Store.Config.BaseUrl}/$subscription-hook')")">
-            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copy URL" />
-        </button>
-    </sup>
+        <li>
+            <FluentAnchor Href="@($"/subscriptions/local?store={StoreName}")" Appearance="Appearance.Hypertext">Local Subscriptions</FluentAnchor>: 
+            outgoing Subscription notifications from this server
+        </li>
 
-    which can be used as a notification endpoint for FHIR @Store.Config.FhirVersion notifications (e.g.,
-    if you are developing a server that sends notifications, you can point it here).
-    Any received notification bundles are stored as resources locally, and the notifications will appear on
-    the
-    <MudLink Href="@($"/subscriptions/notifications-received?store={StoreName}")"
-                Underline="Underline.Always">Received Notifications</MudLink>
-    page.
-</MudText>
-<br />
-<MudText Typo="Typo.body1">
-    Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
-    For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
-    the notifications and be visible on the
-    <MudLink Href="@($"/subscriptions/local?store={StoreName}")"
-                Underline="Underline.Always">Local Subscriptions</MudLink>
-    page, but not actually attempt to send the notification to the endpoint.
-</MudText>
+        <li>
+            <FluentAnchor Href="@($"/subscriptions/notifications-received?store={StoreName}")" Appearance="Appearance.Hypertext">Received Notifications</FluentAnchor>: 
+            incoming notifications received by this server
+        </li>
+    </ul>
+
+    <FluentLabel Typo="Typography.Body">
+        The endpoint also exposes a system-level operation, <code class="copy-click">@($"{Store.Config.BaseUrl}/$subscription-hook")</code>
+        which can be used as a notification endpoint for FHIR @Store.Config.FhirVersion notifications (e.g.,
+        if you are developing a server that sends notifications, you can point it here).
+        Any received notification bundles are stored as resources locally, and the notifications will appear on
+        the
+        <FluentAnchor Href="@($"/subscriptions/notifications-received?store={StoreName}")" Appearance="Appearance.Hypertext">Received Notifications</FluentAnchor>
+        page.
+    </FluentLabel>
+
+    <FluentLabel Typo="Typography.Body">
+        Note that the server will NOT send notifications to addresses rooted in <code>example.org</code>.
+        For example, a REST-Hook pointing at <code>http://example.org/endpoints/test</code> will trigger
+        the notifications and be visible on the
+        <FluentAnchor Href="@($"/subscriptions/local?store={StoreName}")" Appearance="Appearance.Hypertext">Local Subscriptions</FluentAnchor>
+        page, but not actually attempt to send the notification to the endpoint.
+    </FluentLabel>
+
+</FluentStack>
 
 @code {
 
@@ -111,7 +90,7 @@
 
     /// <summary>Gets or sets the ri pages.</summary>
     [Parameter]
-    public IEnumerable<PackagePageInfo> RiPages { get; set; } = Enumerable.Empty<PackagePageInfo>();
+    public IQueryable<PackagePageInfo>? RiPages { get; set; } = null;
 
     /// <summary>Gets or sets the additional content.</summary>
     [Parameter]

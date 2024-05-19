@@ -15,8 +15,16 @@ public interface INavTracker
     bool IsDarkMode { get; }
 
     /// <summary>Notifies a navigation.</summary>
-    /// <param name="page"> The page.</param>
-    /// <param name="link"> The link.</param>
-    /// <param name="depth">The depth.</param>
-    void NotifyNav(string page, string link, int depth);
+    /// <param name="pages">The pages.</param>
+    void NotifyNav(NavPageInfoRec[] pages);
+
+    /// <summary>Logs to the JavaScript console.</summary>
+    /// <param name="message">The message.</param>
+    /// <remarks>This call does not need to be awaited, but needs to be async so that it can resolve the JS runtime call.</remarks>
+    Task JsLogAsync(string message);
+
+    /// <summary>Uses JS navigator.clipboard.writeText to copy contents to the clipboard.</summary>
+    /// <param name="content">The content.</param>
+    /// <returns>An asynchronous result.</returns>
+    Task JsClipboardCopy(string content);
 }

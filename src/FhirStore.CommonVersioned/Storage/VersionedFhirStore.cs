@@ -5080,12 +5080,12 @@ public partial class VersionedFhirStore : IFhirStore
         public required List<DataType> Value { get; init; }
         
         /// <summary>
-        /// answer:
+        /// matches:
         ///     only present if processing was successful (all-ok)
         ///     if a value is provided, does the supplied value match the server feature-supported value
-        ///     if a value is not provided, does not exist
+        ///     if a value is not provided, NOT PRESENT
         /// </summary>
-        public required bool? Answer { get; init; }
+        public required bool? Matches { get; init; }
     }
 
     public bool TryQueryCapabilityFeature(
@@ -5127,7 +5127,7 @@ public partial class VersionedFhirStore : IFhirStore
                     Name = featureName,
                     Context = string.IsNullOrEmpty(context) ? null : context,
                     Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
-                    Answer = null,
+                    Matches = null,
                     ProcessingStatus = "unknown",
                 };
                 return true;
@@ -5148,12 +5148,18 @@ public partial class VersionedFhirStore : IFhirStore
             (inputValue == null) &&
             string.IsNullOrEmpty(inputRawValue))
         {
+            List<DataType> rValues = cs.Rest
+                .SelectMany(r => r.Resource)
+                .Where(r => r.Interaction.Any(i => i.Code == interaction))
+                .Select(r => (DataType)new Code(r.Type))
+                .ToList();
+            
             response = new()
             {
                 Name = featureName,
                 Context = context,
-                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
-                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction))),
+                Value = rValues,
+                Matches = null, // cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction))),
                 ProcessingStatus = "all-ok",
             };
             return true;
@@ -5163,12 +5169,13 @@ public partial class VersionedFhirStore : IFhirStore
         if ((inputValue == null) &&
             string.IsNullOrEmpty(inputRawValue))
         {
+            // return allowed values
             response = new()
             {
                 Name = featureName,
                 Context = context,
-                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
-                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && r.Interaction.Any(i => i.Code == interaction))),
+                Value = [ new FhirBoolean(true), new FhirBoolean(false)],
+                Matches = null, // cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && r.Interaction.Any(i => i.Code == interaction))),
                 ProcessingStatus = "all-ok",
             };
             return true;
@@ -5196,7 +5203,7 @@ public partial class VersionedFhirStore : IFhirStore
                 Name = featureName,
                 Context = context,
                 Value = inputValue != null ? [ inputValue] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
-                Answer = null,
+                Matches = null,
                 ProcessingStatus = "invalid-value",
             };
             return true;
@@ -5210,20 +5217,19 @@ public partial class VersionedFhirStore : IFhirStore
                 Name = featureName,
                 Context = context,
                 Value = [ new FhirBoolean(testValue) ],
-                Answer = cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction) == testValue)),
+                Matches = cs.Rest.Any(rest => rest.Resource.Any(r => r.Interaction.Any(i => i.Code == interaction) == testValue)),
                 ProcessingStatus = "all-ok",
             };
             return true;
         }
         
         // have context and value
-        
         response = new()
         {
             Name = featureName,
             Context = context,
             Value = [ new FhirBoolean(testValue) ],
-            Answer = cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && (r.Interaction.Any(i => i.Code == interaction) == testValue))),
+            Matches = cs.Rest.Any(rest => rest.Resource.Any(r => (r.Type == context) && (r.Interaction.Any(i => i.Code == interaction) == testValue))),
             ProcessingStatus = "all-ok",
         };
         return true;
@@ -5237,6 +5243,12 @@ public partial class VersionedFhirStore : IFhirStore
         string? inputRawValue, 
         out FeatureQueryResponse response)
     {
+        // check for specific value request
+        string testValue = !string.IsNullOrEmpty(inputRawValue)
+            ? inputRawValue
+            : inputValue?.ToString() ?? string.Empty;
+        bool? testBool = bool.TryParse(testValue, out bool b) ? b : null;
+
         // check for context and fail it if present
         if (!string.IsNullOrEmpty(context))
         {
@@ -5244,8 +5256,8 @@ public partial class VersionedFhirStore : IFhirStore
             {
                 Name = featureName,
                 Context = context,
-                Value = inputValue != null ? [ inputValue ] : !string.IsNullOrEmpty(inputRawValue) ? [new FhirString(inputRawValue)] : [],
-                Answer = null,
+                Value =  testBool != null ? [ new FhirBoolean(testBool) ] : [],
+                Matches = null,
                 ProcessingStatus = "invalid-context",
             };
             return true;
@@ -5266,15 +5278,12 @@ public partial class VersionedFhirStore : IFhirStore
                 Name = featureName,
                 Context = null,
                 Value = rValues,
-                Answer = true,
+                Matches = null,
                 ProcessingStatus = "all-ok",
             };
 
             return true;
         }
-        
-        // check for specific value request
-        string testValue = !string.IsNullOrEmpty(inputRawValue) ? inputRawValue : inputValue?.ToString() ?? throw new Exception("No value expected here");
 
         Canonical testCanonical = new Canonical(testValue);
         
@@ -5288,7 +5297,7 @@ public partial class VersionedFhirStore : IFhirStore
             Name = featureName,
             Context = null,
             Value = responseValues.Count != 0 ? responseValues : [testCanonical],
-            Answer = responseValues.Count != 0,
+            Matches = responseValues.Count != 0,
             ProcessingStatus = "all-ok",
         };
         

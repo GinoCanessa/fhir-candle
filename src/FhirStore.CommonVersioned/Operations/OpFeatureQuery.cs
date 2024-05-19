@@ -74,6 +74,8 @@ public class OpFeatureQuery : IFhirOperation
     ///     ...
     /// General patterns:
     ///     feature alone: returns list of values on the server (can refuse - see processing-status)
+    ///         note: we cannot represent an empty list here, so if there are no values clients must check
+    ///         the processing-status to see if the feature is supported
     ///     feature + context: returns list of values in that context on the server
     ///     feature + value: returns answer of true/false if all contexts match the supplied value
     ///     feature + context + value: returns answer of true/false if the supplied context matches the supplied value
@@ -85,10 +87,10 @@ public class OpFeatureQuery : IFhirOperation
     ///         value:
     ///             if provided in input: the value requested (datatype as defined by the feature) (even if processing fails)
     ///             if not provided: the value of the feature (can have multiple repetitions) (uses datatype of feature)
-    ///         answer:
+    ///         answer: (boolean)
     ///             only present if processing was successful (all-ok)
     ///             if a value is provided, does the supplied value match the server feature-supported value
-    ///             if a value is not provided, does not exist
+    ///             if a value is not provided, NOT PRESENT
     /// </remarks>
     public bool DoOperation(
         FhirRequestContext ctx,
@@ -183,12 +185,12 @@ public class OpFeatureQuery : IFhirOperation
                 });
             }
             
-            if (fqr.Answer != null)
+            if (fqr.Matches != null)
             {
                 parts.Add(new Parameters.ParameterComponent()
                 {
-                    Name = "answer",
-                    Value = new FhirBoolean(fqr.Answer),
+                    Name = "matches",
+                    Value = new FhirBoolean(fqr.Matches),
                 });
             }
             

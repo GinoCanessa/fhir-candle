@@ -53,15 +53,16 @@
               hover: 'is-hovered' };
 
             const copyToClipboard = str => {
-              const el = document.createElement('input');
-              str.dataset.copyString ? el.value = str.dataset.copyString : el.value = str.text;
-              el.setAttribute('readonly', '');
-              el.style.position = 'absolute';
-              el.style.opacity = 0;
-              document.body.appendChild(el);
-              el.select();
-              document.execCommand('copy');
-              document.body.removeChild(el);
+                const el = document.createElement('input');
+                el.value = str.innerText;
+                el.setAttribute('readonly', '');
+                el.style.position = 'absolute';
+                el.style.opacity = 0;
+                document.body.appendChild(el);
+                el.select();
+                el.setSelectionRange(0, 99999);     // for mobile devices
+                navigator.clipboard.writeText(el.value);
+                document.body.removeChild(el);
             };
             const clickInteraction = e => {
               e.preventDefault();

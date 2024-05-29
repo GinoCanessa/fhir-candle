@@ -5,21 +5,38 @@ on:
     branches:
     - main
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
 
-    - uses: azure/docker-login@v1
-      with:
-        login-server: ${{ secrets.ARGO_CONTAINER_REGISTRY }}
-        username: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).clientId }}
-        password: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).clientSecret }}
+    # - uses: azure/docker-login@v1
+    #   with:
+    #     login-server: ${{ secrets.ARGO_CONTAINER_REGISTRY }}
+    #     username: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).clientId }}
+    #     password: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).clientSecret }}
+    # - uses: azure/aks-set-context@v1
+    #   with:
+    #     creds: '${{ secrets.ARGO_AZ_CREDENTIALS_23 }}'
+    #     cluster-name: ${{ secrets.ARGO_CLUSTER_NAME_23 }}
+    #     resource-group: ${{ secrets.ARGO_RESOURCE_GROUP }}
 
-    - uses: azure/aks-set-context@v1
+    - name: 'Az CLI login'
+      uses: azure/login@v1
       with:
-        creds: '${{ secrets.ARGO_AZ_CREDENTIALS_23 }}'
+        client-id: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).clientId }}
+        tenant-id: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).tenantId }}
+        subscription-id: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).subscriptionId }}
+    - name: Login to ACR via OIDC
+      run: az acr login --name ${{ secrets.ARGO_CONTAINER_REGISTRY }}
+    - uses: azure/aks-set-context@v3
+      with:
+        admin: true
         cluster-name: ${{ secrets.ARGO_CLUSTER_NAME_23 }}
         resource-group: ${{ secrets.ARGO_RESOURCE_GROUP }}
 

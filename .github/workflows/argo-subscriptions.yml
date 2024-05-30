@@ -36,7 +36,7 @@ jobs:
       run: az acr login --name ${{ secrets.ARGO_CONTAINER_REGISTRY }}
     - uses: azure/aks-set-context@v3
       with:
-        # admin: true
+        admin: true
         cluster-name: ${{ secrets.ARGO_CLUSTER_NAME_23 }}
         resource-group: ${{ secrets.ARGO_RESOURCE_GROUP }}
 

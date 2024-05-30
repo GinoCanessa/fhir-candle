@@ -34,9 +34,15 @@ jobs:
         subscription-id: ${{ fromJSON(secrets.ARGO_AZ_CREDENTIALS_23).subscriptionId }}
     - name: Login to ACR via OIDC
       run: az acr login --name ${{ secrets.ARGO_CONTAINER_REGISTRY }}
+
+    - name: Set up kubelogin for non-interactive login
+      uses: azure/use-kubelogin@v1
+      with:
+         kubelogin-version: 'v0.0.24'
     - uses: azure/aks-set-context@v3
       with:
-        admin: true
+        admin: false
+        use-kubelogin: true
         cluster-name: ${{ secrets.ARGO_CLUSTER_NAME_23 }}
         resource-group: ${{ secrets.ARGO_RESOURCE_GROUP }}
 

@@ -7,11 +7,45 @@ When you need a small FHIR.
 
 fhir-candle is a small in-memory FHIR server that can be used for testing and development. It is NOT intended to be used for production workloads.
 
+The project is intended to serve as a platform for rapid development and testing for FHIR - both for features in the core specification as well as Implementation Guide development.
+
+While there are many existing OSS FHIR servers, somewhere between most and all of them are intended to support production workloads.  In my own work on Reference Implementations, I often found it challenging to add the types of features I wanted due to the conflicts that causes.  To that end, here are some principles I generally use while developing this project:
+* No database / persisted state
+* Fast startup
+* Dynamically apply changes (e.g., search parameters)
+* House features that would not be appropriate in production
+    * E.g., provide feedback on SMART tokens to help developers
+
+## FHIR Foundation Project Statement
+* Maintainers: Gino Canessa
+* Issues / Discussion: Any issues should be submitted on [GitHub](https://github.com/ginocanessa/fhir-candle/issues). Discussion can be performed here on GitHub, or on the [dotnet stream on chat.fhir.org](https://chat.fhir.org/#narrow/stream/179171-dotnet).
+* License: This software is offered under the [MIT License](LICENSE).
+* Contribution Policy: See [Contributing](#contributing).
+* Security Information: See [Security](#security).
+
+## Contributing
+
+There are many ways to contribute:
+* [Submit bugs](https://github.com/ginocanessa/fhir-candle/issues) and help us verify fixes as they are checked in.
+* Review the [source code changes](https://github.com/ginocanessa/fhir-candle/pulls).
+* Engage with users and developers on the [dotnet stream on FHIR Zulip](https://chat.fhir.org/#narrow/stream/179171-dotnet)
+* Contribute features or bug fixes - see [Contributing](CONTRIBUTING.md) for details.
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
+contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+
+### Security
+
+If you think that there's security issues in this project, you can report them either on [GitHub](https://github.com/ginocanessa/fhir-candle/issues) using GitHub's standard security reporting framework, or you can email the maintainer directly via `gino` dot `canessa` at `microsoft.com`.
+
+
 # Documentation
 
 ## Get Started
 
-[Install .NET 7 or newer](https://get.dot.net) and run this command:
+[Install .NET 8 or newer](https://get.dot.net) and run this command:
 
 ```
 dotnet tool install --global fhir-candle
@@ -126,18 +160,5 @@ Note: items are unsorted within their priorities
 ## More Information
 
 
-## Contributing
-
-There are many ways to contribute:
-* [Submit bugs](https://github.com/ginocanessa/fhir-candle/issues) and help us verify fixes as they are checked in.
-* Review the [source code changes](https://github.com/ginocanessa/fhir-candle/pulls).
-* Engage with users and developers on [Official FHIR Zulip](https://chat.fhir.org/)
-* [Contribute bug fixes](CONTRIBUTING.md).
-
-See [Contributing](CONTRIBUTING.md) for more information.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 FHIR&reg; is the registered trademark of HL7 and is used with the permission of HL7. 

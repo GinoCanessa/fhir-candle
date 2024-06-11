@@ -38,7 +38,9 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ### Security
 
-If you think that there's security issues in this project, you can report them either on [GitHub](https://github.com/ginocanessa/fhir-candle/issues) using GitHub's standard security reporting framework, or you can email the maintainer directly via `gino` dot `canessa` at `microsoft.com`.
+To report a security issue, please use the GitHub Security Advisory ["Report a Vulnerability"](https://github.com/ginocanessa/fhir-candle/security/advisories/new) tab.
+
+For more information, please see the [Security Readme](SECURITY.MD).
 
 
 # Documentation

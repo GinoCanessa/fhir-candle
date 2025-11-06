@@ -11,8 +11,11 @@ using FhirCandle.Storage;
 using Hl7.Fhir.Rest;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace fhir.candle.Controllers;
 
@@ -1120,6 +1123,160 @@ public class FhirController : ControllerBase
         catch (Exception ex)
         {
             string msg = ex.InnerException == null ? $"PutResourceInstance <<< caught: {ex.Message}" : $"PutResourceInstance <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
+            await LogAndReturnError(Response, 500, msg);
+            return;
+        }
+    }
+
+    /// <summary>(An Action that handles HTTP PATCH requests) patches resource instance using JSON Patch (RFC 6902).</summary>
+    /// <param name="storeName">   The store.</param>
+    /// <param name="resourceName">Name of the resource.</param>
+    /// <param name="id">          The identifier.</param>
+    /// <param name="format">      Describes the format to use.</param>
+    /// <param name="pretty">      The pretty.</param>
+    /// <param name="prefer">      The prefer.</param>
+    /// <param name="ifMatch">     A match specifying if.</param>
+    /// <param name="authHeader">  The authentication header.</param>
+    /// <returns>An asynchronous result.</returns>
+    [HttpPatch, Route("{storeName}/{resourceName}/{id}")]
+    [Consumes("application/json-patch+json")]
+    public async Task PatchResourceInstance(
+        [FromRoute] string storeName,
+        [FromRoute] string resourceName,
+        [FromRoute] string id,
+        [FromQuery(Name = "_format")] string? format,
+        [FromQuery(Name = "_pretty")] string? pretty,
+        [FromHeader(Name = "Prefer")] string? prefer,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        [FromHeader(Name = "Authorization")] string? authHeader)
+    {
+        if (!_fhirStoreManager.TryGetValue(storeName, out IFhirStore? store))
+        {
+            await LogAndReturnError(Response, 404, $"PatchResourceInstance <<< no tenant at {storeName}!");
+            return;
+        }
+
+        if (!store.SupportsResource(resourceName))
+        {
+            await LogAndReturnError(Response, 404, $"PatchResourceInstance <<< tenant {storeName} does not support resource {resourceName}!");
+            return;
+        }
+
+        try
+        {
+            // Read the PATCH body (JSON Patch document)
+            using StreamReader reader = new StreamReader(Request.Body);
+            string patchContent = await reader.ReadToEndAsync();
+
+            // Step 1: Retrieve the current resource
+            FhirRequestContext getCtx = new()
+            {
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = "GET",
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                Interaction = Common.StoreInteractionCodes.InstanceRead,
+                ResourceType = resourceName,
+                Id = id,
+            };
+
+            if (!_smartAuthManager.IsAuthorized(getCtx))
+            {
+                Response.StatusCode = 401;
+                return;
+            }
+
+            if (!store.InstanceRead(getCtx, out FhirResponseContext getResponse))
+            {
+                // Resource not found or other error
+                await AddFhirResponse(Response, prefer, false, getResponse);
+                return;
+            }
+
+            // Step 2: Apply JSON Patch to the resource
+            string currentResourceJson = getResponse.SerializedResource ?? string.Empty;
+
+            if (string.IsNullOrEmpty(currentResourceJson))
+            {
+                await LogAndReturnError(Response, 500, "PatchResourceInstance <<< current resource is empty!");
+                return;
+            }
+
+            // Parse and apply the patch
+            JsonPatchDocument? patchDoc;
+            JObject? resourceObject;
+
+            try
+            {
+                patchDoc = JsonConvert.DeserializeObject<JsonPatchDocument>(patchContent);
+                resourceObject = JsonConvert.DeserializeObject<JObject>(currentResourceJson);
+            }
+            catch (JsonException jsonEx)
+            {
+                await LogAndReturnError(Response, 400, $"PatchResourceInstance <<< invalid JSON: {jsonEx.Message}");
+                return;
+            }
+
+            if (patchDoc == null || resourceObject == null)
+            {
+                await LogAndReturnError(Response, 400, "PatchResourceInstance <<< invalid patch document or resource!");
+                return;
+            }
+
+            // Apply the patch operations
+            try
+            {
+                patchDoc.ApplyTo(resourceObject);
+            }
+            catch (Exception patchEx)
+            {
+                await LogAndReturnError(Response, 400, $"PatchResourceInstance <<< patch apply failed: {patchEx.Message}");
+                return;
+            }
+
+            // Convert back to string
+            string patchedResourceJson = JsonConvert.SerializeObject(resourceObject);
+
+            // Step 3: Update the resource with patched content
+            FhirRequestContext updateCtx = new()
+            {
+                TenantName = storeName,
+                Store = store,
+                HttpMethod = "PUT", // Use PUT internally for the update
+                Url = Request.GetDisplayUrl(),
+                UrlPath = Request.Path,
+                UrlQuery = Request.QueryString.ToString(),
+                RequestHeaders = Request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Authorization = _smartAuthManager.GetAuthorization(storeName, authHeader ?? string.Empty),
+                DestinationFormat = GetMimeType(format, Request),
+                SerializePretty = pretty?.Equals("true", StringComparison.Ordinal) ?? false,
+                Interaction = Common.StoreInteractionCodes.InstanceUpdate,
+                ResourceType = resourceName,
+                Id = id,
+                IfMatch = ifMatch ?? string.Empty,
+                SourceFormat = "application/fhir+json",
+                SourceContent = patchedResourceJson,
+            };
+
+            if (!_smartAuthManager.IsAuthorized(updateCtx))
+            {
+                Response.StatusCode = 401;
+                return;
+            }
+
+            bool success = store.InstanceUpdate(
+                updateCtx,
+                out FhirResponseContext opResponse);
+
+            await AddFhirResponse(Response, prefer, success, opResponse);
+        }
+        catch (Exception ex)
+        {
+            string msg = ex.InnerException == null
+                ? $"PatchResourceInstance <<< caught: {ex.Message}"
+                : $"PatchResourceInstance <<< caught: {ex.Message}, inner: {ex.InnerException.Message}";
             await LogAndReturnError(Response, 500, msg);
             return;
         }
